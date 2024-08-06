@@ -14,13 +14,10 @@ impl Claude {
         // For now, we'll just return a placeholder string
         let rendered = format!(
             "
-                Current Directory: {}\n\
-                Globs: {:?}\n\
+                Edits: {:?}\n\
                 Prompt: {}
             ",
-            query.working_directory.display(),
-            query.edit_paths,
-            query.user_prompt
+            query.edit_paths, query.user_prompt
         );
 
         // Example of using our error type

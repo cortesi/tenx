@@ -1,4 +1,5 @@
 mod claude;
+mod crateops;
 mod error;
 mod query;
 

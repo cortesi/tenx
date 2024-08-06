@@ -6,9 +6,9 @@ use libtenx::Query;
 
 #[derive(Parser)]
 #[clap(name = "tenx")]
-#[clap(author = "Your Name")]
+#[clap(author = "Aldo Cortesi")]
 #[clap(version = "0.1.0")]
-#[clap(about = "AI-powered command-line assistant", long_about = None)]
+#[clap(about = "AI-powered command-line assistant for Rust", long_about = None)]
 struct Cli {
     #[clap(subcommand)]
     command: Commands,
