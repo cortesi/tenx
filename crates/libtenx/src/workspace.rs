@@ -11,13 +11,6 @@ impl Workspace {
         let common_ancestor = Self::find_common_ancestor(paths)?;
         let root_path = Self::find_workspace_root(&common_ancestor)?;
 
-        // Ensure root_path is absolute
-        let root_path = if root_path.is_absolute() {
-            root_path
-        } else {
-            std::env::current_dir()?.join(root_path)
-        };
-
         Ok(Workspace { root_path })
     }
 
@@ -41,7 +34,12 @@ impl Workspace {
     }
 
     fn find_workspace_root(start_dir: &Path) -> Result<PathBuf> {
-        let mut current_dir = start_dir.to_path_buf();
+        let mut current_dir = if start_dir.is_absolute() {
+            start_dir.to_path_buf()
+        } else {
+            std::env::current_dir()?.join(start_dir)
+        };
+
         loop {
             let cargo_toml = current_dir.join("Cargo.toml");
             if cargo_toml.exists() {
@@ -61,71 +59,34 @@ impl Workspace {
     }
 
     pub fn relative_path<P: AsRef<Path>>(&self, path: P) -> Result<PathBuf> {
-        let path = if path.as_ref().is_absolute() {
-            path.as_ref().to_path_buf()
-        } else {
-            std::env::current_dir()?.join(path)
-        };
+        let path = self.to_absolute_path(path)?;
 
         path.strip_prefix(&self.root_path)
             .map(|p| p.to_path_buf())
             .map_err(|e| ClaudeError::Workspace(format!("Failed to get relative path: {}", e)))
+    }
+
+    fn to_absolute_path<P: AsRef<Path>>(&self, path: P) -> Result<PathBuf> {
+        let path = path.as_ref();
+        if path.is_absolute() {
+            Ok(path.to_path_buf())
+        } else {
+            std::env::current_dir()
+                .map(|current_dir| current_dir.join(path))
+                .map_err(|e| {
+                    ClaudeError::Workspace(format!("Failed to get current directory: {}", e))
+                })
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::env;
-    use std::fs;
-    use std::path::{Path, PathBuf};
+    use std::path::PathBuf;
     use tempfile::TempDir;
 
-    struct TempEnv {
-        original_dir: PathBuf,
-    }
-
-    impl TempEnv {
-        fn new<P: AsRef<Path>>(temp_dir: P) -> std::io::Result<Self> {
-            let original_dir = env::current_dir()?;
-            env::set_current_dir(temp_dir)?;
-            Ok(TempEnv { original_dir })
-        }
-    }
-
-    impl Drop for TempEnv {
-        fn drop(&mut self) {
-            let _ = env::set_current_dir(&self.original_dir);
-        }
-    }
-
-    fn create_dummy_project(temp_dir: &Path) -> std::io::Result<()> {
-        // Create workspace Cargo.toml
-        fs::write(
-            temp_dir.join("Cargo.toml"),
-            "[workspace]\nmembers = [\"crate1\", \"crate2\"]",
-        )?;
-
-        // Create crate1
-        fs::create_dir(temp_dir.join("crate1"))?;
-        fs::write(
-            temp_dir.join("crate1/Cargo.toml"),
-            "[package]\nname = \"crate1\"\nversion = \"0.1.0\"",
-        )?;
-        fs::create_dir(temp_dir.join("crate1/src"))?;
-        fs::write(temp_dir.join("crate1/src/lib.rs"), "// Dummy content")?;
-
-        // Create crate2
-        fs::create_dir(temp_dir.join("crate2"))?;
-        fs::write(
-            temp_dir.join("crate2/Cargo.toml"),
-            "[package]\nname = \"crate2\"\nversion = \"0.1.0\"",
-        )?;
-        fs::create_dir(temp_dir.join("crate2/src"))?;
-        fs::write(temp_dir.join("crate2/src/lib.rs"), "// Dummy content")?;
-
-        Ok(())
-    }
+    use crate::testutils::{create_dummy_project, TempEnv};
 
     #[test]
     fn test_discover_workspace() -> Result<()> {
@@ -215,6 +176,42 @@ mod tests {
         ];
 
         let result = Workspace::discover(&paths);
+
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_relative_path_with_absolute_input() -> Result<()> {
+        let temp_dir = TempDir::new().unwrap();
+        create_dummy_project(temp_dir.path()).unwrap();
+
+        let _temp_env = TempEnv::new(temp_dir.path())?;
+
+        let paths = vec![temp_dir.path().join("crate1/src/lib.rs")];
+        let workspace = Workspace::discover(&paths)?;
+
+        let absolute_path = temp_dir.path().join("crate1/src/main.rs");
+        let relative_path = workspace.relative_path(absolute_path)?;
+
+        assert_eq!(relative_path, PathBuf::from("src/main.rs"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_relative_path_outside_workspace() -> Result<()> {
+        let temp_dir = TempDir::new().unwrap();
+        create_dummy_project(temp_dir.path()).unwrap();
+
+        let _temp_env = TempEnv::new(temp_dir.path())?;
+
+        let paths = vec![temp_dir.path().join("crate1/src/lib.rs")];
+        let workspace = Workspace::discover(&paths)?;
+
+        let outside_path = temp_dir.path().join("../outside.rs");
+        let result = workspace.relative_path(outside_path);
 
         assert!(result.is_err());
 

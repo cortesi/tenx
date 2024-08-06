@@ -1,6 +1,7 @@
 mod claude;
 mod error;
 mod query;
+mod testutils;
 mod workspace;
 
 pub use claude::Claude;

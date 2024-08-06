@@ -27,6 +27,14 @@ enum Commands {
         /// Specifies files to edit
         #[clap(required = true, value_parser)]
         files: Vec<PathBuf>,
+
+        /// Specifies files to attach (but not edit)
+        #[clap(short, long, value_parser)]
+        attach: Vec<PathBuf>,
+
+        /// User prompt for the edit operation
+        #[clap(short, long)]
+        prompt: Option<String>,
     },
 }
 
@@ -39,15 +47,20 @@ fn main() -> Result<()> {
             println!("Handling 'info' command with path: {:?}", path);
             Ok(())
         }
-        Commands::Edit { files } => {
-            // Handle 'edit' command
-            println!("Handling 'edit' command with files: {:?}", files);
-
+        Commands::Edit {
+            files,
+            attach,
+            prompt,
+        } => {
             // Construct a Query from the provided file paths
-            let query = Query::from_edits(files.clone())
-                .context("Failed to create Query from edit paths")?;
+            let query = Query::new(
+                files.clone(),
+                attach.clone(),
+                prompt.clone().unwrap_or_default(),
+            )
+            .context("Failed to create Query")?;
 
-            println!("Created Query: {:?}", query);
+            println!("Created Query: {:#?}", query);
             Ok(())
         }
     }
