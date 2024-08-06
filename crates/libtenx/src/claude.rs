@@ -13,13 +13,13 @@ impl Claude {
         // Here we'll implement the logic to render the query to text
         // For now, we'll just return a placeholder string
         let rendered = format!(
-            "Project Root: {}\n\
-             Current Directory: {}\n\
-             Globs: {:?}\n\
-             Prompt: {}",
-            query.project_root.display(),
-            query.current_directory.display(),
-            query.include_globs,
+            "
+                Current Directory: {}\n\
+                Globs: {:?}\n\
+                Prompt: {}
+            ",
+            query.working_directory.display(),
+            query.edit_paths,
             query.user_prompt
         );
 

@@ -1,9 +1,16 @@
 [package]
 name = "libtenx"
-version = "0.1.0"
 edition = "2021"
+
+version.workspace = true
+authors.workspace = true
+description.workspace = true
+license.workspace = true
+repository.workspace = true
+
 
 [dependencies]
 libruskel = "0.0.6"
 misanthropy = "0.0.6"
 thiserror = "1.0.63"
+walkdir = "2.5.0"

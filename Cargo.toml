@@ -3,7 +3,7 @@
 version = "0.0.1"
 edition = "2021"
 authors = ["Aldo Cortesi <aldo@corte.si>"]
-description = "AI-assisted coding for rust"
+description = "AI-assisted coding for Rust"
 license = "MIT"
 repository = "https://github.com/cortesi/tenx"
 keywords = ["ai"]
@@ -12,3 +12,5 @@ keywords = ["ai"]
 resolver = "2"
 members = ["crates/*"]
 
+[workspace.dependencies]
+libtenx = { version = "0.0.1", path = "crates/libtenx" }

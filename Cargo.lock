@@ -472,6 +472,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0fbb260a053428790f3de475e304ff84cdbc4face759ea7a3e64c1edd938a7fc"
 dependencies = [
  "clap_builder",
+ "clap_derive",
 ]
 
 [[package]]
@@ -485,6 +486,18 @@ dependencies = [
  "clap_lex",
  "strsim",
  "terminal_size",
+]
+
+[[package]]
+name = "clap_derive"
+version = "4.5.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "501d359d5f3dcaf6ecdeee48833ae73ec6e42723a1e52419c79abf9507eec0a0"
+dependencies = [
+ "heck",
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -1874,6 +1887,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "heck"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
+
+[[package]]
 name = "hermit-abi"
 version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2252,11 +2271,12 @@ dependencies = [
 
 [[package]]
 name = "libtenx"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "libruskel",
  "misanthropy",
  "thiserror",
+ "walkdir",
 ]
 
 [[package]]
@@ -3481,7 +3501,12 @@ dependencies = [
 
 [[package]]
 name = "tenx"
-version = "0.1.0"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "clap",
+ "libtenx",
+]
 
 [[package]]
 name = "terminal_size"
