@@ -1,7 +1,7 @@
 use crate::error::{ClaudeError, Result};
 use std::path::{Path, PathBuf};
 
-use crate::crateops::Workspace;
+use crate::workspace::Workspace;
 
 #[derive(Debug)]
 pub struct Query {

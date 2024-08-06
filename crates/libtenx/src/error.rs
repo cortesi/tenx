@@ -8,14 +8,11 @@ pub enum ClaudeError {
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 
-    #[error("Cargo.toml not found")]
-    CargoTomlNotFound,
-
     #[error("No paths provided")]
     NoPathsProvided,
 
-    #[error("No common ancestor found for the provided paths")]
-    NoCommonAncestor,
+    #[error("Workspace error: {0}")]
+    Workspace(String),
 }
 
 pub type Result<T> = std::result::Result<T, ClaudeError>;

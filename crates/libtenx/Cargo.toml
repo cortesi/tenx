@@ -12,5 +12,6 @@ repository.workspace = true
 [dependencies]
 libruskel = "0.0.6"
 misanthropy = "0.0.6"
+tempfile = "3.11.0"
 thiserror = "1.0.63"
 walkdir = "2.5.0"
