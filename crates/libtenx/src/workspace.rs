@@ -1,17 +1,24 @@
-use std::path::{Path, PathBuf};
-
 use crate::error::{ClaudeError, Result};
+use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
 pub struct Workspace {
-    pub manifest_path: PathBuf,
+    root_path: PathBuf,
 }
 
 impl Workspace {
     pub fn discover<P: AsRef<Path>>(paths: &[P]) -> Result<Self> {
         let common_ancestor = Self::find_common_ancestor(paths)?;
-        let manifest_path = Self::find_enclosing_cargo_toml(&common_ancestor)?;
-        Ok(Workspace { manifest_path })
+        let root_path = Self::find_workspace_root(&common_ancestor)?;
+
+        // Ensure root_path is absolute
+        let root_path = if root_path.is_absolute() {
+            root_path
+        } else {
+            std::env::current_dir()?.join(root_path)
+        };
+
+        Ok(Workspace { root_path })
     }
 
     fn find_common_ancestor<P: AsRef<Path>>(paths: &[P]) -> Result<PathBuf> {
@@ -33,18 +40,36 @@ impl Workspace {
         Ok(common_ancestor)
     }
 
-    fn find_enclosing_cargo_toml(start_dir: &Path) -> Result<PathBuf> {
+    fn find_workspace_root(start_dir: &Path) -> Result<PathBuf> {
         let mut current_dir = start_dir.to_path_buf();
         loop {
             let cargo_toml = current_dir.join("Cargo.toml");
             if cargo_toml.exists() {
-                return Ok(cargo_toml);
+                return Ok(current_dir);
             }
             if !current_dir.pop() {
                 break;
             }
         }
-        Err(ClaudeError::Workspace("Cargo.toml not found".to_string()))
+        Err(ClaudeError::Workspace(
+            "Workspace root not found".to_string(),
+        ))
+    }
+
+    pub fn manifest_path(&self) -> PathBuf {
+        self.root_path.join("Cargo.toml")
+    }
+
+    pub fn relative_path<P: AsRef<Path>>(&self, path: P) -> Result<PathBuf> {
+        let path = if path.as_ref().is_absolute() {
+            path.as_ref().to_path_buf()
+        } else {
+            std::env::current_dir()?.join(path)
+        };
+
+        path.strip_prefix(&self.root_path)
+            .map(|p| p.to_path_buf())
+            .map_err(|e| ClaudeError::Workspace(format!("Failed to get relative path: {}", e)))
     }
 }
 
@@ -99,7 +124,10 @@ mod tests {
 
         let workspace = Workspace::discover(&paths)?;
 
-        assert_eq!(workspace.manifest_path, temp_dir.path().join("Cargo.toml"));
+        assert_eq!(
+            workspace.manifest_path(),
+            temp_dir.path().join("Cargo.toml")
+        );
 
         env::set_current_dir(original_dir).unwrap();
         Ok(())
@@ -118,7 +146,7 @@ mod tests {
         let workspace = Workspace::discover(&paths)?;
 
         assert_eq!(
-            workspace.manifest_path,
+            workspace.manifest_path(),
             temp_dir.path().join("crate1/Cargo.toml")
         );
 
@@ -138,10 +166,8 @@ mod tests {
         let result = Workspace::discover(&paths);
 
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .ends_with("Cargo.toml not found"),);
+        println!("{:?}", result);
+        assert!(result.unwrap_err().to_string().ends_with("root not found"),);
 
         env::set_current_dir(original_dir).unwrap();
     }
