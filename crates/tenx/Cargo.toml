@@ -11,4 +11,6 @@ repository.workspace = true
 [dependencies]
 anyhow = "1.0.86"
 clap = { version = "4.5.13", features = ["derive"] }
+colored = "2.1.0"
 libtenx = { workspace=true }
+tokio = { version = "1.39.2", features = ["full"] }
