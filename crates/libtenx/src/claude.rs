@@ -1,14 +1,15 @@
+use crate::error::ClaudeError;
 use crate::query::Query;
-use std::error::Error;
 
-struct Claude;
+#[derive(Debug, Default)]
+pub struct Claude;
 
 impl Claude {
     pub fn new() -> Self {
         Claude
     }
 
-    pub async fn render(&self, query: &Query) -> Result<String, Box<dyn Error>> {
+    pub async fn render(&self, query: &Query) -> Result<String, ClaudeError> {
         // Here we'll implement the logic to render the query to text
         // For now, we'll just return a placeholder string
         let rendered = format!(
@@ -21,6 +22,13 @@ impl Claude {
             query.include_globs,
             query.user_prompt
         );
+
+        // Example of using our error type
+        if rendered.is_empty() {
+            return Err(ClaudeError::RenderError(
+                "Failed to render query".to_string(),
+            ));
+        }
 
         Ok(rendered)
     }

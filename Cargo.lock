@@ -2256,6 +2256,7 @@ version = "0.1.0"
 dependencies = [
  "libruskel",
  "misanthropy",
+ "thiserror",
 ]
 
 [[package]]
