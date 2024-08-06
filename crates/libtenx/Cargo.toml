@@ -1,0 +1,8 @@
+[package]
+name = "libtenx"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+libruskel = "0.0.6"
+misanthropy = "0.0.6"
