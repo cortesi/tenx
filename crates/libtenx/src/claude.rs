@@ -1,5 +1,5 @@
+use crate::context::Context;
 use crate::error::ClaudeError;
-use crate::query::Query;
 
 #[derive(Debug, Default)]
 pub struct Claude;
@@ -9,7 +9,7 @@ impl Claude {
         Claude
     }
 
-    pub async fn render(&self, query: &Query) -> Result<String, ClaudeError> {
+    pub async fn render(&self, query: &Context) -> Result<String, ClaudeError> {
         // Here we'll implement the logic to render the query to text
         // For now, we'll just return a placeholder string
         let rendered = format!(

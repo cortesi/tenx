@@ -3,7 +3,7 @@ use clap::{Parser, Subcommand};
 use colored::*;
 use std::path::PathBuf;
 
-use libtenx::{Claude, Query};
+use libtenx::{self, Claude};
 
 #[derive(Parser)]
 #[clap(name = "tenx")]
@@ -37,9 +37,9 @@ enum Commands {
         #[clap(short, long)]
         prompt: Option<String>,
 
-        /// Show the generated query
+        /// Show the generated context
         #[clap(long)]
-        show_query: bool,
+        show_context: bool,
 
         /// Show the generated prompt
         #[clap(long)]
@@ -61,24 +61,24 @@ async fn main() -> Result<()> {
             files,
             attach,
             prompt,
-            show_query,
+            show_context: show_context,
             show_prompt,
         } => {
             // Construct a Query from the provided file paths
-            let query = Query::new(
+            let context = libtenx::Context::new(
                 files.clone(),
                 attach.clone(),
                 prompt.clone().unwrap_or_default(),
             )
             .context("Failed to create Query")?;
 
-            if *show_query {
-                println!("{}", "Query:".green().bold());
-                println!("{:#?}", query);
+            if *show_context {
+                println!("{}", "Context:".green().bold());
+                println!("{:#?}", context);
             }
 
             let c = Claude::new();
-            let rendered_prompt = c.render(&query).await?;
+            let rendered_prompt = c.render(&context).await?;
 
             if *show_prompt {
                 println!("{}", "Prompt:".blue().bold());

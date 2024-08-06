@@ -4,14 +4,14 @@ use std::path::{Path, PathBuf};
 use crate::workspace::Workspace;
 
 #[derive(Debug)]
-pub struct Query {
+pub struct Context {
     pub attach_paths: Vec<PathBuf>,
     pub edit_paths: Vec<PathBuf>,
     pub user_prompt: String,
     pub workspace: Workspace,
 }
 
-impl Query {
+impl Context {
     pub fn new<P: AsRef<Path>>(
         edit_paths: Vec<P>,
         attach_paths: Vec<P>,
@@ -45,7 +45,7 @@ impl Query {
             .map(|p| workspace.relative_path(p))
             .collect::<Result<Vec<PathBuf>>>()?;
 
-        Ok(Query {
+        Ok(Context {
             edit_paths: relative_edit_paths,
             attach_paths: relative_attach_paths,
             user_prompt,
@@ -76,7 +76,7 @@ mod tests {
         let attach_paths = vec![temp_dir.path().join("crate3/src/lib.rs")];
         let user_prompt = "Test prompt".to_string();
 
-        let query = Query::new(edit_paths, attach_paths, user_prompt)?;
+        let query = Context::new(edit_paths, attach_paths, user_prompt)?;
 
         assert_eq!(query.edit_paths.len(), 2);
         assert_eq!(query.edit_paths[0], PathBuf::from("crate1/src/lib.rs"));
@@ -99,7 +99,7 @@ mod tests {
         let attach_paths = vec![temp_dir.path().join("crate2/src/lib.rs")];
         let user_prompt = String::new();
 
-        let query = Query::new(edit_paths, attach_paths, user_prompt)?;
+        let query = Context::new(edit_paths, attach_paths, user_prompt)?;
 
         assert_eq!(
             query.workspace.manifest_path(),
@@ -120,7 +120,7 @@ mod tests {
         let attach_paths: Vec<PathBuf> = vec![];
         let user_prompt = String::new();
 
-        let result = Query::new(edit_paths, attach_paths, user_prompt);
+        let result = Context::new(edit_paths, attach_paths, user_prompt);
 
         assert!(result.is_err());
 
