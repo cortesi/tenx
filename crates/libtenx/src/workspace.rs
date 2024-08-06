@@ -78,8 +78,26 @@ mod tests {
     use super::*;
     use std::env;
     use std::fs;
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
     use tempfile::TempDir;
+
+    struct TempEnv {
+        original_dir: PathBuf,
+    }
+
+    impl TempEnv {
+        fn new<P: AsRef<Path>>(temp_dir: P) -> std::io::Result<Self> {
+            let original_dir = env::current_dir()?;
+            env::set_current_dir(temp_dir)?;
+            Ok(TempEnv { original_dir })
+        }
+    }
+
+    impl Drop for TempEnv {
+        fn drop(&mut self) {
+            let _ = env::set_current_dir(&self.original_dir);
+        }
+    }
 
     fn create_dummy_project(temp_dir: &Path) -> std::io::Result<()> {
         // Create workspace Cargo.toml
@@ -114,8 +132,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         create_dummy_project(temp_dir.path()).unwrap();
 
-        let original_dir = env::current_dir().unwrap();
-        env::set_current_dir(temp_dir.path()).unwrap();
+        let _temp_env = TempEnv::new(temp_dir.path())?;
 
         let paths = vec![
             temp_dir.path().join("crate1/src/lib.rs"),
@@ -129,7 +146,6 @@ mod tests {
             temp_dir.path().join("Cargo.toml")
         );
 
-        env::set_current_dir(original_dir).unwrap();
         Ok(())
     }
 
@@ -138,8 +154,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         create_dummy_project(temp_dir.path()).unwrap();
 
-        let original_dir = env::current_dir().unwrap();
-        env::set_current_dir(temp_dir.path()).unwrap();
+        let _temp_env = TempEnv::new(temp_dir.path())?;
 
         let paths = vec![temp_dir.path().join("crate1/src/lib.rs")];
 
@@ -150,30 +165,30 @@ mod tests {
             temp_dir.path().join("crate1/Cargo.toml")
         );
 
-        env::set_current_dir(original_dir).unwrap();
         Ok(())
     }
 
     #[test]
-    fn test_no_cargo_toml() {
+    fn test_no_cargo_toml() -> Result<()> {
         let temp_dir = TempDir::new().unwrap();
 
-        let original_dir = env::current_dir().unwrap();
-        env::set_current_dir(temp_dir.path()).unwrap();
+        let _temp_env = TempEnv::new(temp_dir.path())?;
 
         let paths = vec![temp_dir.path().to_path_buf()];
 
         let result = Workspace::discover(&paths);
 
         assert!(result.is_err());
-        println!("{:?}", result);
-        assert!(result.unwrap_err().to_string().ends_with("root not found"),);
+        assert!(result.unwrap_err().to_string().ends_with("root not found"));
 
-        env::set_current_dir(original_dir).unwrap();
+        Ok(())
     }
 
     #[test]
-    fn test_no_paths_provided() {
+    fn test_no_paths_provided() -> Result<()> {
+        let temp_dir = TempDir::new().unwrap();
+        let _temp_env = TempEnv::new(temp_dir.path())?;
+
         let paths: Vec<PathBuf> = vec![];
 
         let result = Workspace::discover(&paths);
@@ -182,13 +197,17 @@ mod tests {
         assert!(result
             .unwrap_err()
             .to_string()
-            .ends_with("No paths provided"),);
+            .ends_with("No paths provided"));
+
+        Ok(())
     }
 
     #[test]
-    fn test_no_common_ancestor() {
+    fn test_no_common_ancestor() -> Result<()> {
         let temp_dir1 = TempDir::new().unwrap();
         let temp_dir2 = TempDir::new().unwrap();
+
+        let _temp_env = TempEnv::new(&temp_dir1)?;
 
         let paths = vec![
             temp_dir1.path().to_path_buf(),
@@ -198,5 +217,7 @@ mod tests {
         let result = Workspace::discover(&paths);
 
         assert!(result.is_err());
+
+        Ok(())
     }
 }
