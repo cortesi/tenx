@@ -7,7 +7,7 @@ pub fn initialise<P: AsRef<Path>>(
     edit_paths: Vec<P>,
     attach_paths: Vec<P>,
     user_prompt: String,
-) -> Result<(Context, Workspace)> {
+) -> Result<Context> {
     let edit_paths: Vec<PathBuf> = edit_paths
         .into_iter()
         .map(|p| p.as_ref().to_path_buf())
@@ -36,9 +36,14 @@ pub fn initialise<P: AsRef<Path>>(
         .map(|p| workspace.relative_path(p))
         .collect::<Result<Vec<PathBuf>>>()?;
 
-    let context = Context::new(relative_edit_paths, relative_attach_paths, user_prompt);
+    let context = Context::new(
+        relative_edit_paths,
+        relative_attach_paths,
+        user_prompt,
+        workspace,
+    );
 
-    Ok((context, workspace))
+    Ok(context)
 }
 
 #[cfg(test)]
@@ -65,7 +70,7 @@ mod tests {
         let attach_paths = vec![temp_dir.path().join("crate3/src/lib.rs")];
         let user_prompt = "Test prompt".to_string();
 
-        let (context, workspace) = initialise(edit_paths, attach_paths, user_prompt)?;
+        let context = initialise(edit_paths, attach_paths, user_prompt)?;
 
         assert_eq!(context.edit_paths.len(), 2);
         assert_eq!(context.edit_paths[0], PathBuf::from("crate1/src/lib.rs"));
@@ -75,7 +80,7 @@ mod tests {
         assert_eq!(context.user_prompt, "Test prompt");
 
         assert_eq!(
-            workspace.manifest_path(),
+            context.workspace.manifest_path(),
             temp_dir.path().join("Cargo.toml")
         );
 

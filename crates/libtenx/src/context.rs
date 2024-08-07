@@ -12,6 +12,8 @@ pub struct Context {
     pub edit_paths: Vec<PathBuf>,
     /// The user's initial prompt
     pub user_prompt: String,
+    /// The workspace we're operating on
+    pub workspace: Workspace,
 }
 
 impl Context {
@@ -19,20 +21,22 @@ impl Context {
         edit_paths: Vec<PathBuf>,
         attach_paths: Vec<PathBuf>,
         user_prompt: String,
+        workspace: Workspace,
     ) -> Self {
         Context {
             edit_paths,
             attach_paths,
             user_prompt,
+            workspace,
         }
     }
 
-    pub fn render(&self, workspace: &Workspace) -> Result<String> {
+    pub fn render(&self) -> Result<String> {
         let mut rendered = String::new();
 
         // Add editable files
         for path in &self.edit_paths {
-            let contents = workspace.get_contents(path)?;
+            let contents = self.workspace.get_contents(path)?;
             rendered.push_str(&format!(
                 "<editable path=\"{}\">\n{}</editable>\n\n",
                 path.display(),
@@ -42,7 +46,7 @@ impl Context {
 
         // Add context files
         for path in &self.attach_paths {
-            let contents = workspace.get_contents(path)?;
+            let contents = self.workspace.get_contents(path)?;
             rendered.push_str(&format!(
                 "<context path=\"{}\">\n{}</context>\n\n",
                 path.display(),

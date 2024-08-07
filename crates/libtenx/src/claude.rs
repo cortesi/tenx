@@ -17,12 +17,8 @@ impl Claude {
         Ok(Claude { anthropic })
     }
 
-    pub async fn render(
-        &self,
-        ctx: &Context,
-        workspace: &Workspace,
-    ) -> Result<misanthropy::MessagesRequest> {
-        let txt = ctx.render(workspace)?;
+    pub async fn render(&self, ctx: &Context) -> Result<misanthropy::MessagesRequest> {
+        let txt = ctx.render()?;
 
         Ok(misanthropy::MessagesRequest {
             model: DEFAULT_MODEL.to_string(),

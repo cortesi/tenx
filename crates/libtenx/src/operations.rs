@@ -7,13 +7,11 @@ use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct WriteFile {
-    pub path: String,
     pub content: String,
 }
 
 #[derive(Debug, Clone)]
 pub struct Diff {
-    pub path: String,
     pub old: String,
     pub new: String,
 }
@@ -113,7 +111,6 @@ pub fn parse_response_text(response: &str) -> Result<Operations> {
                 match current_tag.as_str() {
                     "write_file" => {
                         let write_file = WriteFile {
-                            path: current_path.clone(),
                             content: content.trim().to_string(),
                         };
                         operations
@@ -135,7 +132,6 @@ pub fn parse_response_text(response: &str) -> Result<Operations> {
                 match name.as_ref() {
                     b"diff" => {
                         let diff = Diff {
-                            path: current_path.clone(),
                             old: current_old.clone(),
                             new: current_new.clone(),
                         };
@@ -202,7 +198,6 @@ mod tests {
 
         match result.operations.get("/path/to/file.txt") {
             Some(Operation::Write(write_file)) => {
-                assert_eq!(write_file.path, "/path/to/file.txt");
                 assert_eq!(
                     write_file.content.trim(),
                     "This is the content of the file."
@@ -213,7 +208,6 @@ mod tests {
 
         match result.operations.get("/path/to/diff_file.txt") {
             Some(Operation::Diff(diff)) => {
-                assert_eq!(diff.path, "/path/to/diff_file.txt");
                 assert_eq!(diff.old.trim(), "Old content");
                 assert_eq!(diff.new.trim(), "New content");
             }

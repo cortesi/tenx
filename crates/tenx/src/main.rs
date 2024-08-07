@@ -102,17 +102,16 @@ async fn main() -> Result<()> {
                 edit_prompt()?
             };
 
-            let (context, workspace) = initialise(files.clone(), attach.clone(), user_prompt)
+            let context = initialise(files.clone(), attach.clone(), user_prompt)
                 .context("Failed to create Context and Workspace")?;
 
             if *show_context {
                 println!("{}", "Context:".green().bold());
-                println!("{:#?}", workspace);
                 println!("{:#?}", context);
             }
 
             let c = Claude::new(anthropic_key.as_deref().unwrap_or(""))?;
-            let mut request = c.render(&context, &workspace).await?;
+            let mut request = c.render(&context).await?;
             if *show_query {
                 println!("{}", "Query:".blue().bold());
                 println!("{:#?}", request);
