@@ -1,9 +1,9 @@
-use anyhow::{Context, Result};
+use anyhow::{Context as AnyhowContext, Result};
 use clap::{Parser, Subcommand};
 use colored::*;
 use std::path::PathBuf;
 
-use libtenx::{self, Claude};
+use libtenx::{self, initialise, Claude};
 
 #[derive(Parser)]
 #[clap(name = "tenx")]
@@ -44,6 +44,10 @@ enum Commands {
         /// Show the generated prompt
         #[clap(long)]
         show_prompt: bool,
+
+        /// Show the discovered workspace
+        #[clap(long)]
+        show_workspace: bool,
     },
 }
 
@@ -61,24 +65,30 @@ async fn main() -> Result<()> {
             files,
             attach,
             prompt,
-            show_context: show_context,
+            show_context,
             show_prompt,
+            show_workspace,
         } => {
-            // Construct a Query from the provided file paths
-            let context = libtenx::Context::new(
+            // Create Context and Workspace using the new function
+            let (context, workspace) = initialise(
                 files.clone(),
                 attach.clone(),
                 prompt.clone().unwrap_or_default(),
             )
-            .context("Failed to create Query")?;
+            .context("Failed to create Context and Workspace")?;
 
             if *show_context {
                 println!("{}", "Context:".green().bold());
                 println!("{:#?}", context);
             }
 
+            if *show_workspace {
+                println!("{}", "Workspace:".yellow().bold());
+                println!("{:#?}", workspace);
+            }
+
             let c = Claude::new();
-            let rendered_prompt = c.render(&context).await?;
+            let rendered_prompt = c.render(&context, &workspace).await?;
 
             if *show_prompt {
                 println!("{}", "Prompt:".blue().bold());
