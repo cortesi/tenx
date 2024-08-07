@@ -1,7 +1,7 @@
 mod claude;
 mod context;
 mod error;
-mod response;
+mod operations;
 mod tenx;
 mod testutils;
 mod workspace;
@@ -9,6 +9,6 @@ mod workspace;
 pub use claude::Claude;
 pub use context::*;
 pub use error::{Result, TenxError};
-pub use response::*;
+pub use operations::*;
 pub use tenx::*;
 pub use workspace::Workspace;

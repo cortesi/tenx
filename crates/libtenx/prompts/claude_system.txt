@@ -46,6 +46,10 @@
     Operations will be contained in the one of the following tags: <diff>,
     <write_file>. Tag openers and closers are ALWAYS alone on a new line. 
 
+    Changes are ALWAYS applied to the original file, as it's specified in the
+    editable tag. If you issue multiple changes to a file during a
+    conversation, only the latest change will be applied. 
+
     The <diff> tag has the following structure:
 
     <diff path="src/main.rs">

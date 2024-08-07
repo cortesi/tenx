@@ -1,25 +1,56 @@
 use crate::{Result, TenxError};
+use misanthropy::{Content, MessagesRequest, Role};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::QName;
 use quick_xml::Reader;
+use std::collections::HashMap;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
+pub struct WriteFile {
+    pub path: String,
+    pub content: String,
+}
+
+#[derive(Debug, Clone)]
 pub struct Diff {
     pub path: String,
     pub old: String,
     pub new: String,
 }
 
-#[derive(Debug)]
-pub struct WriteFile {
-    pub path: String,
-    pub content: String,
+#[derive(Debug, Clone)]
+pub enum Operation {
+    Write(WriteFile),
+    Diff(Diff),
 }
 
 #[derive(Debug)]
-pub struct Response {
-    merges: Vec<Diff>,
-    files: Vec<WriteFile>,
+pub struct Operations {
+    pub operations: HashMap<String, Operation>,
+}
+
+impl Operations {
+    fn new() -> Self {
+        Operations {
+            operations: HashMap::new(),
+        }
+    }
+}
+
+pub fn extract_operations(request: &MessagesRequest) -> Result<Operations> {
+    let mut operations = Operations::new();
+    for message in &request.messages {
+        if message.role == Role::Assistant {
+            for content in &message.content {
+                if let Content::Text { text } = content {
+                    let parsed_ops = parse_response_text(text)?;
+                    operations.operations.extend(parsed_ops.operations);
+                }
+            }
+        }
+    }
+
+    Ok(operations)
 }
 
 /// Parses a response string containing XML-like tags and returns a `Response` struct.
@@ -45,14 +76,11 @@ pub struct Response {
 /// `WriteFile` entries for `<write_file>` tags and `Diff` entries for `<diff>` tags.
 /// Whitespace is trimmed from the content of all tags. Any text outside of recognized tags is
 /// ignored.
-pub fn parse_response(response: &str) -> Result<Response> {
+pub fn parse_response_text(response: &str) -> Result<Operations> {
     let mut reader = Reader::from_str(response);
     reader.config_mut().trim_text(true);
 
-    let mut response = Response {
-        merges: Vec::new(),
-        files: Vec::new(),
-    };
+    let mut operations = Operations::new();
 
     let mut buf = Vec::new();
     let mut current_tag = String::new();
@@ -66,23 +94,15 @@ pub fn parse_response(response: &str) -> Result<Response> {
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(ref e)) => {
                 let name = e.name();
-                println!("Start tag: {:?}", std::str::from_utf8(name.as_ref()));
                 match name.as_ref() {
                     b"write_file" | b"diff" => {
                         current_tag = std::str::from_utf8(name.as_ref())
                             .map_err(|e| TenxError::ParseError(e.to_string()))?
                             .to_string();
                         current_path = get_path_attribute(e)?;
-                        println!("Current tag: {}, Path: {}", current_tag, current_path);
                     }
-                    b"old" => {
-                        in_old = true;
-                        println!("Entering <old> tag");
-                    }
-                    b"new" => {
-                        in_new = true;
-                        println!("Entering <new> tag");
-                    }
+                    b"old" => in_old = true,
+                    b"new" => in_new = true,
                     _ => {}
                 }
             }
@@ -90,22 +110,21 @@ pub fn parse_response(response: &str) -> Result<Response> {
                 let content = e
                     .unescape()
                     .map_err(|e| TenxError::ParseError(e.to_string()))?;
-                println!("Text content: {:?}", content);
                 match current_tag.as_str() {
                     "write_file" => {
-                        response.files.push(WriteFile {
+                        let write_file = WriteFile {
                             path: current_path.clone(),
                             content: content.trim().to_string(),
-                        });
-                        println!("Added write_file: {:?}", response.files.last().unwrap());
+                        };
+                        operations
+                            .operations
+                            .insert(current_path.clone(), Operation::Write(write_file));
                     }
                     "diff" => {
                         if in_old {
                             current_old = content.trim().to_string();
-                            println!("Set old content: {:?}", current_old);
                         } else if in_new {
                             current_new = content.trim().to_string();
-                            println!("Set new content: {:?}", current_new);
                         }
                     }
                     _ => {} // Discard text outside of recognized tags
@@ -113,26 +132,21 @@ pub fn parse_response(response: &str) -> Result<Response> {
             }
             Ok(Event::End(ref e)) => {
                 let name = e.name();
-                println!("End tag: {:?}", std::str::from_utf8(name.as_ref()));
                 match name.as_ref() {
                     b"diff" => {
-                        response.merges.push(Diff {
+                        let diff = Diff {
                             path: current_path.clone(),
                             old: current_old.clone(),
                             new: current_new.clone(),
-                        });
-                        println!("Added diff: {:?}", response.merges.last().unwrap());
+                        };
+                        operations
+                            .operations
+                            .insert(current_path.clone(), Operation::Diff(diff));
                         current_old.clear();
                         current_new.clear();
                     }
-                    b"old" => {
-                        in_old = false;
-                        println!("Exiting <old> tag");
-                    }
-                    b"new" => {
-                        in_new = false;
-                        println!("Exiting <new> tag");
-                    }
+                    b"old" => in_old = false,
+                    b"new" => in_new = false,
                     _ => {}
                 }
                 if name.as_ref() == b"write_file" || name.as_ref() == b"diff" {
@@ -146,7 +160,7 @@ pub fn parse_response(response: &str) -> Result<Response> {
         buf.clear();
     }
 
-    Ok(response)
+    Ok(operations)
 }
 
 fn get_path_attribute(e: &BytesStart) -> Result<String> {
@@ -182,18 +196,28 @@ mod tests {
             ignored
         "#;
 
-        let result = parse_response(input).unwrap();
+        let result = parse_response_text(input).unwrap();
 
-        assert_eq!(result.files.len(), 1);
-        assert_eq!(result.files[0].path, "/path/to/file.txt");
-        assert_eq!(
-            result.files[0].content.trim(),
-            "This is the content of the file."
-        );
+        assert_eq!(result.operations.len(), 2);
 
-        assert_eq!(result.merges.len(), 1);
-        assert_eq!(result.merges[0].path, "/path/to/diff_file.txt");
-        assert_eq!(result.merges[0].old.trim(), "Old content");
-        assert_eq!(result.merges[0].new.trim(), "New content");
+        match result.operations.get("/path/to/file.txt") {
+            Some(Operation::Write(write_file)) => {
+                assert_eq!(write_file.path, "/path/to/file.txt");
+                assert_eq!(
+                    write_file.content.trim(),
+                    "This is the content of the file."
+                );
+            }
+            _ => panic!("Expected WriteFile operation for /path/to/file.txt"),
+        }
+
+        match result.operations.get("/path/to/diff_file.txt") {
+            Some(Operation::Diff(diff)) => {
+                assert_eq!(diff.path, "/path/to/diff_file.txt");
+                assert_eq!(diff.old.trim(), "Old content");
+                assert_eq!(diff.new.trim(), "New content");
+            }
+            _ => panic!("Expected Diff operation for /path/to/diff_file.txt"),
+        }
     }
 }

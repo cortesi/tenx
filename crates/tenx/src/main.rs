@@ -112,19 +112,23 @@ async fn main() -> Result<()> {
             }
 
             let c = Claude::new(anthropic_key.as_deref().unwrap_or(""))?;
-            let rendered_prompt = c.render(&context, &workspace).await?;
+            let mut request = c.render(&context, &workspace).await?;
             if *show_query {
                 println!("{}", "Query:".blue().bold());
-                println!("{:#?}", rendered_prompt);
+                println!("{:#?}", request);
             }
             print!("{} ", "Claude:".blue().bold());
-            let _response = c
-                .stream_response(&rendered_prompt, |chunk| {
+            let response = c
+                .stream_response(&request, |chunk| {
                     print!("{}", chunk);
                     io::stdout().flush()?;
                     Ok(())
                 })
                 .await?;
+            request.merge_response(&response);
+
+            let ops = libtenx::extract_operations(&request)?;
+            println!("\n{:#?}", ops);
 
             Ok(())
         }
