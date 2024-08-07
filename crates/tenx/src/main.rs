@@ -92,7 +92,7 @@ async fn main() -> Result<()> {
 
             if *show_prompt {
                 println!("{}", "Prompt:".blue().bold());
-                println!("{}", rendered_prompt);
+                println!("{:#?}", rendered_prompt);
             }
 
             Ok(())
