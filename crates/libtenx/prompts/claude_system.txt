@@ -44,7 +44,7 @@
     You will emit changes to editable files only, never touching files only
     provided as context. You will never add comments indicating elided code.
     Operations will be contained in the one of the following tags: <diff>,
-    <write_file>.
+    <write_file>. Tag openers and closers are ALWAYS alone on a new line. 
 
     The <diff> tag has the following structure:
 
