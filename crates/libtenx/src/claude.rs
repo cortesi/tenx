@@ -118,13 +118,20 @@ impl Claude {
 
     pub async fn render(
         &self,
-        query: &Context,
+        ctx: &Context,
         workspace: &Workspace,
     ) -> Result<misanthropy::MessagesRequest, ClaudeError> {
+        let txt = ctx.render(workspace)?;
+
         Ok(misanthropy::MessagesRequest {
             model: DEFAULT_MODEL.to_string(),
             max_tokens: MAX_TOKENS,
-            messages: vec![],
+            messages: vec![misanthropy::Message {
+                role: misanthropy::Role::User,
+                content: vec![misanthropy::Content::Text {
+                    text: txt.to_string(),
+                }],
+            }],
             system: Some(SYSTEM.to_string()),
             temperature: None,
             stream: true,

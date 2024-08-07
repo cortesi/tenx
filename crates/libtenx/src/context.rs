@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 
+use crate::{Result, Workspace};
+
 /// Defines the initial context of a conversation. This defines which files are editable, plus which
 /// files and documentation will be provided as context.
 #[derive(Debug)]
@@ -23,5 +25,34 @@ impl Context {
             attach_paths,
             user_prompt,
         }
+    }
+
+    pub fn render(&self, workspace: &Workspace) -> Result<String> {
+        let mut rendered = String::new();
+
+        // Add editable files
+        for path in &self.edit_paths {
+            let contents = workspace.get_contents(path)?;
+            rendered.push_str(&format!(
+                "<editable path=\"{}\">\n{}</editable>\n\n",
+                path.display(),
+                contents
+            ));
+        }
+
+        // Add context files
+        for path in &self.attach_paths {
+            let contents = workspace.get_contents(path)?;
+            rendered.push_str(&format!(
+                "<context path=\"{}\">\n{}</context>\n\n",
+                path.display(),
+                contents
+            ));
+        }
+
+        // Add user prompt
+        rendered.push_str(&self.user_prompt);
+
+        Ok(rendered)
     }
 }
