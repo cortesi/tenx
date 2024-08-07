@@ -3,7 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::error::{ClaudeError, Result};
+use crate::error::{Result, TenxError};
 
 #[derive(Debug)]
 pub struct Workspace {
@@ -20,16 +20,14 @@ impl Workspace {
 
     fn find_common_ancestor<P: AsRef<Path>>(paths: &[P]) -> Result<PathBuf> {
         if paths.is_empty() {
-            return Err(ClaudeError::Workspace("No paths provided".to_string()));
+            return Err(TenxError::Workspace("No paths provided".to_string()));
         }
 
         let mut common_ancestor = paths[0].as_ref().to_path_buf();
         for path in paths.iter().skip(1) {
             while !path.as_ref().starts_with(&common_ancestor) {
                 if !common_ancestor.pop() {
-                    return Err(ClaudeError::Workspace(
-                        "No common ancestor found".to_string(),
-                    ));
+                    return Err(TenxError::Workspace("No common ancestor found".to_string()));
                 }
             }
         }
@@ -53,9 +51,7 @@ impl Workspace {
                 break;
             }
         }
-        Err(ClaudeError::Workspace(
-            "Workspace root not found".to_string(),
-        ))
+        Err(TenxError::Workspace("Workspace root not found".to_string()))
     }
 
     pub fn manifest_path(&self) -> PathBuf {
@@ -67,13 +63,13 @@ impl Workspace {
 
         path.strip_prefix(&self.root_path)
             .map(|p| p.to_path_buf())
-            .map_err(|e| ClaudeError::Workspace(format!("Failed to get relative path: {}", e)))
+            .map_err(|e| TenxError::Workspace(format!("Failed to get relative path: {}", e)))
     }
 
     pub fn get_contents<P: AsRef<Path>>(&self, path: P) -> Result<String> {
         let full_path = self.root_path.join(path);
         fs::read_to_string(&full_path).map_err(|e| {
-            ClaudeError::Workspace(format!(
+            TenxError::Workspace(format!(
                 "Failed to read file '{}': {}",
                 full_path.display(),
                 e
@@ -89,7 +85,7 @@ impl Workspace {
             std::env::current_dir()
                 .map(|current_dir| current_dir.join(path))
                 .map_err(|e| {
-                    ClaudeError::Workspace(format!("Failed to get current directory: {}", e))
+                    TenxError::Workspace(format!("Failed to get current directory: {}", e))
                 })
         }
     }

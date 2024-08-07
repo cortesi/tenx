@@ -7,6 +7,6 @@ mod workspace;
 
 pub use claude::Claude;
 pub use context::*;
-pub use error::{ClaudeError, Result};
+pub use error::{Result, TenxError};
 pub use tenx::*;
 pub use workspace::Workspace;

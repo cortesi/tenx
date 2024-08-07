@@ -8,11 +8,10 @@ use std::{
 use anyhow::{Context as AnyhowContext, Result};
 use clap::{Parser, Subcommand};
 use colored::*;
-use futures_util::StreamExt;
+use misanthropy::{Anthropic, ContentBlockDelta, StreamEvent};
 use tempfile::NamedTempFile;
 
 use libtenx::{self, initialise, Claude};
-use misanthropy::{Anthropic, ContentBlockDelta, StreamEvent};
 
 #[derive(Parser)]
 #[clap(name = "tenx")]
@@ -77,7 +76,7 @@ fn edit_prompt() -> Result<String> {
 async fn stream_response(
     anthropic: &Anthropic,
     request: &misanthropy::MessagesRequest,
-) -> Result<()> {
+) -> Result<misanthropy::MessagesResponse> {
     match anthropic.messages_stream(request) {
         Ok(mut streamed_response) => {
             print!("{} ", "Claude:".blue().bold());
@@ -106,14 +105,15 @@ async fn stream_response(
                     }
                 }
             }
+
+            Ok(streamed_response.response)
         }
         Err(e) => {
             eprintln!("{}", "Failed to start stream:".red().bold());
             eprintln!("{}", e);
+            Err(e.into())
         }
     }
-
-    Ok(())
 }
 
 #[tokio::main]
@@ -150,15 +150,29 @@ async fn main() -> Result<()> {
                 println!("{:#?}", context);
             }
 
-            let c = Claude::new();
+            let c = Claude::new("")?; // Use environment variable for API key
             let rendered_prompt = c.render(&context, &workspace).await?;
             if *show_query {
                 println!("{}", "Query:".blue().bold());
                 println!("{:#?}", rendered_prompt);
             }
 
-            let anthropic = Anthropic::from_env()?;
-            stream_response(&anthropic, &rendered_prompt).await?;
+            print!("{} ", "Claude:".blue().bold());
+            io::stdout().flush()?;
+
+            let response = c
+                .stream_response(&rendered_prompt, |chunk| {
+                    print!("{}", chunk);
+                    io::stdout().flush()?;
+                    Ok(())
+                })
+                .await?;
+
+            println!(); // End the line after the full response
+
+            // Here you can do something with the response if needed
+            println!("{}", "Full response:".green().bold());
+            println!("{:#?}", response);
 
             Ok(())
         }
