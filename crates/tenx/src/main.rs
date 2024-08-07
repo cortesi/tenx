@@ -8,7 +8,6 @@ use std::{
 use anyhow::{Context as AnyhowContext, Result};
 use clap::{Parser, Subcommand};
 use colored::*;
-use misanthropy::{Anthropic, ContentBlockDelta, StreamEvent};
 use tempfile::NamedTempFile;
 
 use libtenx::{self, initialise, Claude};
@@ -56,6 +55,10 @@ enum Commands {
         /// Show the query that will be sent to the model
         #[clap(long)]
         show_query: bool,
+
+        /// Anthropic API key
+        #[clap(long, env = "ANTHROPIC_API_KEY", hide_env_values = true)]
+        anthropic_key: Option<String>,
     },
 }
 
@@ -71,49 +74,6 @@ fn edit_prompt() -> Result<String> {
         .status()
         .context("Failed to open editor")?;
     fs::read_to_string(temp_file.path()).context("Failed to read temporary file")
-}
-
-async fn stream_response(
-    anthropic: &Anthropic,
-    request: &misanthropy::MessagesRequest,
-) -> Result<misanthropy::MessagesResponse> {
-    match anthropic.messages_stream(request) {
-        Ok(mut streamed_response) => {
-            print!("{} ", "Claude:".blue().bold());
-            io::stdout().flush()?;
-
-            while let Some(event) = streamed_response.next().await {
-                match event {
-                    Ok(event) => {
-                        match event {
-                            StreamEvent::ContentBlockDelta { delta, .. } => {
-                                if let ContentBlockDelta::TextDelta { text } = delta {
-                                    print!("{}", text);
-                                    io::stdout().flush()?;
-                                }
-                            }
-                            StreamEvent::MessageStop => {
-                                println!(); // End the line after the full response
-                            }
-                            _ => {} // Ignore other event types
-                        }
-                    }
-                    Err(e) => {
-                        eprintln!("{}", "Error in stream:".red().bold());
-                        eprintln!("{}", e);
-                        break;
-                    }
-                }
-            }
-
-            Ok(streamed_response.response)
-        }
-        Err(e) => {
-            eprintln!("{}", "Failed to start stream:".red().bold());
-            eprintln!("{}", e);
-            Err(e.into())
-        }
-    }
 }
 
 #[tokio::main]
@@ -132,6 +92,7 @@ async fn main() -> Result<()> {
             prompt_file,
             show_context,
             show_query,
+            anthropic_key,
         } => {
             let user_prompt = if let Some(p) = prompt {
                 p.clone()
@@ -150,29 +111,20 @@ async fn main() -> Result<()> {
                 println!("{:#?}", context);
             }
 
-            let c = Claude::new("")?; // Use environment variable for API key
+            let c = Claude::new(anthropic_key.as_deref().unwrap_or(""))?;
             let rendered_prompt = c.render(&context, &workspace).await?;
             if *show_query {
                 println!("{}", "Query:".blue().bold());
                 println!("{:#?}", rendered_prompt);
             }
-
             print!("{} ", "Claude:".blue().bold());
-            io::stdout().flush()?;
-
-            let response = c
+            let _response = c
                 .stream_response(&rendered_prompt, |chunk| {
                     print!("{}", chunk);
                     io::stdout().flush()?;
                     Ok(())
                 })
                 .await?;
-
-            println!(); // End the line after the full response
-
-            // Here you can do something with the response if needed
-            println!("{}", "Full response:".green().bold());
-            println!("{:#?}", response);
 
             Ok(())
         }

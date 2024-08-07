@@ -10,7 +10,7 @@ repository.workspace = true
 
 [dependencies]
 anyhow = "1.0.86"
-clap = { version = "4.5.13", features = ["derive"] }
+clap = { version = "4.5.13", features = ["derive", "env"] }
 colored = "2.1.0"
 futures-util = "0.3.30"
 libtenx = { workspace=true }
