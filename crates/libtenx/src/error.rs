@@ -18,6 +18,9 @@ pub enum TenxError {
 
     #[error("Model error: {0}")]
     Model(String),
+
+    #[error("Parse error: {0}")]
+    ParseError(String),
 }
 
 impl From<misanthropy::Error> for TenxError {

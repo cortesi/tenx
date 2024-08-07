@@ -17,4 +17,5 @@ thiserror = "1.0.63"
 walkdir = "2.5.0"
 
 [dev-dependencies]
+indoc = "2.0.5"
 pretty_assertions = "1.4.0"
