@@ -1,5 +1,9 @@
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
+
 use crate::error::{ClaudeError, Result};
-use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
 pub struct Workspace {
@@ -64,6 +68,17 @@ impl Workspace {
         path.strip_prefix(&self.root_path)
             .map(|p| p.to_path_buf())
             .map_err(|e| ClaudeError::Workspace(format!("Failed to get relative path: {}", e)))
+    }
+
+    pub fn get_contents<P: AsRef<Path>>(&self, path: P) -> Result<String> {
+        let full_path = self.root_path.join(path);
+        fs::read_to_string(&full_path).map_err(|e| {
+            ClaudeError::Workspace(format!(
+                "Failed to read file '{}': {}",
+                full_path.display(),
+                e
+            ))
+        })
     }
 
     fn to_absolute_path<P: AsRef<Path>>(&self, path: P) -> Result<PathBuf> {
@@ -214,6 +229,31 @@ mod tests {
         let result = workspace.relative_path(outside_path);
 
         assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_contents() -> Result<()> {
+        let temp_dir = TempDir::new().unwrap();
+        create_dummy_project(temp_dir.path()).unwrap();
+
+        let _temp_env = TempEnv::new(temp_dir.path())?;
+
+        let paths = vec![temp_dir.path().join("crate1/src/lib.rs")];
+        let workspace = Workspace::discover(&paths)?;
+
+        // Test reading an existing file
+        let contents = workspace.get_contents("src/lib.rs")?;
+        assert_eq!(contents.trim(), "// Dummy content");
+
+        // Test reading a non-existent file
+        let result = workspace.get_contents("src/nonexistent.txt");
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Failed to read file"));
 
         Ok(())
     }
