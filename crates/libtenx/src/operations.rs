@@ -16,6 +16,40 @@ pub struct Diff {
     pub new: String,
 }
 
+impl Diff {
+    pub fn apply(&self, input: &str) -> Result<String> {
+        let old_lines: Vec<&str> = self.old.lines().map(str::trim).collect();
+        let new_lines: Vec<&str> = self.new.lines().collect();
+        let input_lines: Vec<&str> = input.lines().collect();
+
+        let mut result = Vec::new();
+        let mut i = 0;
+
+        while i < input_lines.len() {
+            if input_lines[i..]
+                .iter()
+                .map(|s| s.trim())
+                .collect::<Vec<_>>()
+                .starts_with(&old_lines)
+            {
+                // Found a match, replace with new content
+                result.extend(new_lines.iter().cloned());
+                i += old_lines.len();
+            } else {
+                // No match, keep the original line
+                result.push(input_lines[i]);
+                i += 1;
+            }
+        }
+
+        if result == input_lines {
+            Err(TenxError::Operation("No changes were applied".to_string()))
+        } else {
+            Ok(result.join("\n"))
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Operation {
     Write(WriteFile),
@@ -95,7 +129,7 @@ pub fn parse_response_text(response: &str) -> Result<Operations> {
                 match name.as_ref() {
                     b"write_file" | b"diff" => {
                         current_tag = std::str::from_utf8(name.as_ref())
-                            .map_err(|e| TenxError::ParseError(e.to_string()))?
+                            .map_err(|e| TenxError::Parse(e.to_string()))?
                             .to_string();
                         current_path = get_path_attribute(e)?;
                     }
@@ -105,9 +139,7 @@ pub fn parse_response_text(response: &str) -> Result<Operations> {
                 }
             }
             Ok(Event::Text(e)) => {
-                let content = e
-                    .unescape()
-                    .map_err(|e| TenxError::ParseError(e.to_string()))?;
+                let content = e.unescape().map_err(|e| TenxError::Parse(e.to_string()))?;
                 match current_tag.as_str() {
                     "write_file" => {
                         let write_file = WriteFile {
@@ -150,7 +182,7 @@ pub fn parse_response_text(response: &str) -> Result<Operations> {
                 }
             }
             Ok(Event::Eof) => break,
-            Err(e) => return Err(TenxError::ParseError(e.to_string())),
+            Err(e) => return Err(TenxError::Parse(e.to_string())),
             _ => {}
         }
         buf.clear();
@@ -163,12 +195,12 @@ fn get_path_attribute(e: &BytesStart) -> Result<String> {
     let path_attr = e
         .attributes()
         .find(|a| a.as_ref().map(|a| a.key == QName(b"path")).unwrap_or(false))
-        .ok_or_else(|| TenxError::ParseError("Missing path attribute".to_string()))?;
+        .ok_or_else(|| TenxError::Parse("Missing path attribute".to_string()))?;
 
     let path_value = path_attr
-        .map_err(|e| TenxError::ParseError(e.to_string()))?
+        .map_err(|e| TenxError::Parse(e.to_string()))?
         .unescape_value()
-        .map_err(|e| TenxError::ParseError(e.to_string()))?;
+        .map_err(|e| TenxError::Parse(e.to_string()))?;
 
     Ok(path_value.into_owned())
 }
@@ -213,5 +245,36 @@ mod tests {
             }
             _ => panic!("Expected Diff operation for /path/to/diff_file.txt"),
         }
+    }
+
+    #[test]
+    fn test_diff_apply() {
+        let diff = Diff {
+            old: "This is\nold content\nto be replaced".to_string(),
+            new: "This is\nnew content\nthat replaces the old".to_string(),
+        };
+
+        let input = "Some initial text\nThis is\nold content\nto be replaced\nSome final text";
+        let expected_output =
+            "Some initial text\nThis is\nnew content\nthat replaces the old\nSome final text";
+
+        let result = diff.apply(input).expect("Failed to apply diff");
+        assert_eq!(result, expected_output);
+    }
+
+    #[test]
+    fn test_diff_apply_whitespace_insensitive() {
+        let diff = Diff {
+            old: "  This is\n  old content  \nto be replaced  ".to_string(),
+            new: "This is\nnew content\nthat replaces the old".to_string(),
+        };
+
+        let input =
+            "Some initial text\n This is \n   old content\n  to be replaced \nSome final text";
+        let expected_output =
+            "Some initial text\nThis is\nnew content\nthat replaces the old\nSome final text";
+
+        let result = diff.apply(input).expect("Failed to apply diff");
+        assert_eq!(result, expected_output);
     }
 }

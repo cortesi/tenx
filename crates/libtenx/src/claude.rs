@@ -1,6 +1,6 @@
 use misanthropy::{Anthropic, ContentBlockDelta, StreamEvent};
 
-use crate::{Context, Result, Workspace};
+use crate::{Context, Result};
 
 const SYSTEM: &str = include_str!("../prompts/claude_system.txt");
 const DEFAULT_MODEL: &str = "claude-3-5-sonnet-20240620";

@@ -5,7 +5,7 @@ pub type Result<T> = std::result::Result<T, TenxError>;
 #[derive(Error, Debug)]
 pub enum TenxError {
     #[error("Failed to render query: {0}")]
-    RenderError(String),
+    Render(String),
 
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
@@ -20,7 +20,10 @@ pub enum TenxError {
     Model(String),
 
     #[error("Parse error: {0}")]
-    ParseError(String),
+    Parse(String),
+
+    #[error("Error applying operation: {0}")]
+    Operation(String),
 }
 
 impl From<misanthropy::Error> for TenxError {
