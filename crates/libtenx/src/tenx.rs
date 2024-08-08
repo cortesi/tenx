@@ -36,14 +36,12 @@ pub fn initialise<P: AsRef<Path>>(
         .map(|p| workspace.relative_path(p))
         .collect::<Result<Vec<PathBuf>>>()?;
 
-    let context = Context::new(
+    Context::new(
         relative_edit_paths,
         relative_attach_paths,
         user_prompt,
         workspace,
-    );
-
-    Ok(context)
+    )
 }
 
 #[cfg(test)]
