@@ -1,14 +1,18 @@
-use crate::{Result, TenxError};
+use std::path::PathBuf;
+
 use misanthropy::{Content, MessagesRequest, Role};
-use std::collections::HashMap;
+
+use crate::{Result, TenxError};
 
 #[derive(Debug, Clone)]
 pub struct WriteFile {
+    pub path: PathBuf,
     pub content: String,
 }
 
 #[derive(Debug, Clone)]
 pub struct Replace {
+    pub path: PathBuf,
     pub old: String,
     pub new: String,
 }
@@ -55,13 +59,13 @@ pub enum Operation {
 
 #[derive(Debug)]
 pub struct Operations {
-    pub operations: HashMap<String, Operation>,
+    pub operations: Vec<Operation>,
 }
 
 impl Operations {
     fn new() -> Self {
         Operations {
-            operations: HashMap::new(),
+            operations: Vec::new(),
         }
     }
 }
@@ -82,7 +86,7 @@ pub fn extract_operations(request: &MessagesRequest) -> Result<Operations> {
     Ok(operations)
 }
 
-/// Parses a response string containing XML-like tags and returns a `Response` struct.
+/// Parses a response string containing XML-like tags and returns a `Operations` struct.
 ///
 /// The input string should contain one or more of the following tags:
 ///
@@ -101,7 +105,7 @@ pub fn extract_operations(request: &MessagesRequest) -> Result<Operations> {
 /// </replace>
 /// ```
 ///
-/// The function parses these tags and populates a `Response` struct with
+/// The function parses these tags and populates an `Operations` struct with
 /// `WriteFile` entries for `<write_file>` tags and `Replace` entries for `<replace>` tags.
 /// Whitespace is trimmed from the content of all tags. Any text outside of recognized tags is
 /// ignored.
@@ -114,16 +118,19 @@ pub fn parse_response_text(response: &str) -> Result<Operations> {
         if trimmed.starts_with("<write_file ") {
             let path = extract_path(trimmed)?;
             let content = parse_content(&mut lines, "write_file")?;
-            operations
-                .operations
-                .insert(path, Operation::Write(WriteFile { content }));
+            operations.operations.push(Operation::Write(WriteFile {
+                path: path.into(),
+                content,
+            }));
         } else if trimmed.starts_with("<replace ") {
             let path = extract_path(trimmed)?;
             let old = parse_nested_content(&mut lines, "old")?;
             let new = parse_nested_content(&mut lines, "new")?;
-            operations
-                .operations
-                .insert(path, Operation::Replace(Replace { old, new }));
+            operations.operations.push(Operation::Replace(Replace {
+                path: path.into(),
+                old,
+                new,
+            }));
         }
         // Ignore other lines
     }
@@ -211,18 +218,20 @@ mod tests {
         let result = parse_response_text(input).unwrap();
         assert_eq!(result.operations.len(), 2);
 
-        match result.operations.get("/path/to/file2.txt") {
-            Some(Operation::Write(write_file)) => {
+        match &result.operations[0] {
+            Operation::Write(write_file) => {
+                assert_eq!(write_file.path.as_os_str(), "/path/to/file2.txt");
                 assert_eq!(
                     write_file.content.trim(),
                     "This is the content of the file."
                 );
             }
-            _ => panic!("Expected WriteFile operation for /path/to/file.txt"),
+            _ => panic!("Expected WriteFile operation for /path/to/file2.txt"),
         }
 
-        match result.operations.get("/path/to/file.txt") {
-            Some(Operation::Replace(replace)) => {
+        match &result.operations[1] {
+            Operation::Replace(replace) => {
+                assert_eq!(replace.path.as_os_str(), "/path/to/file.txt");
                 assert_eq!(replace.old.trim(), "Old content");
                 assert_eq!(replace.new.trim(), "New content");
             }
@@ -233,6 +242,7 @@ mod tests {
     #[test]
     fn test_replace_apply() {
         let replace = Replace {
+            path: "/path/to/file.txt".into(),
             old: "This is\nold content\nto be replaced".to_string(),
             new: "This is\nnew content\nthat replaces the old".to_string(),
         };
@@ -248,6 +258,7 @@ mod tests {
     #[test]
     fn test_replace_apply_whitespace_insensitive() {
         let replace = Replace {
+            path: "/path/to/file.txt".into(),
             old: "  This is\n  old content  \nto be replaced  ".to_string(),
             new: "This is\nnew content\nthat replaces the old".to_string(),
         };

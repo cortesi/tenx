@@ -1,7 +1,4 @@
-use std::{
-    collections::HashMap,
-    path::{Path, PathBuf},
-};
+use std::{collections::HashMap, path::PathBuf};
 
 use crate::{Operation, Operations, Result, TenxError, Workspace};
 
@@ -44,47 +41,33 @@ impl Context {
     }
 
     pub fn apply_all(&mut self, operations: &Operations) -> Result<()> {
-        for (path_str, operation) in &operations.operations {
-            let path = PathBuf::from(path_str);
-
-            // Check if the file is in the edit set
-            if !self.edit_paths.iter().any(|p| p == &path) {
-                return Err(TenxError::Operation(format!(
-                    "Cannot edit file '{}' as it's not in the edit set",
-                    path.display()
-                )));
-            }
-
-            self.apply(&path, operation)?;
+        for operation in &operations.operations {
+            self.apply(operation)?;
         }
         Ok(())
     }
 
-    pub fn apply(&mut self, path: &Path, operation: &Operation) -> Result<()> {
-        // Check if the file is in the edit set
-        if !self.edit_paths.iter().any(|p| p == path) {
-            return Err(TenxError::Operation(format!(
-                "Cannot edit file '{}' as it's not in the edit set",
-                path.display()
-            )));
-        }
-
+    pub fn apply(&mut self, operation: &Operation) -> Result<()> {
         match operation {
             Operation::Replace(replace) => {
                 // Get the current content from the cache
-                let current_content = self.cache.get(path).ok_or_else(|| {
-                    TenxError::Operation(format!("File '{}' not found in cache", path.display()))
+                let current_content = self.cache.get(&replace.path).ok_or_else(|| {
+                    TenxError::Operation(format!(
+                        "File '{}' not found in cache",
+                        replace.path.display()
+                    ))
                 })?;
 
                 // Apply the replacement
                 let new_content = replace.apply(current_content)?;
 
                 // Write to the workspace
-                self.workspace.write_file(path, &new_content)?;
+                self.workspace.write_file(&replace.path, &new_content)?;
             }
             Operation::Write(write_file) => {
                 // Write to the workspace
-                self.workspace.write_file(path, &write_file.content)?;
+                self.workspace
+                    .write_file(&write_file.path, &write_file.content)?;
             }
         }
 
@@ -156,10 +139,11 @@ mod tests {
         let path = PathBuf::from("crate1/src/lib.rs");
 
         let operation = Operation::Write(WriteFile {
+            path: "crate1/src/lib.rs".into(),
             content: "New content".to_string(),
         });
 
-        context.apply(&path, &operation).unwrap();
+        context.apply(&operation).unwrap();
 
         // Cache should remain unchanged
         assert_eq!(context.cache.get(&path).unwrap(), "Initial content");
@@ -173,11 +157,12 @@ mod tests {
         let path = PathBuf::from("crate1/src/lib.rs");
 
         let operation = Operation::Replace(Replace {
+            path: "crate1/src/lib.rs".into(),
             old: "Initial content".to_string(),
             new: "Updated content".to_string(),
         });
 
-        context.apply(&path, &operation).unwrap();
+        context.apply(&operation).unwrap();
 
         // Cache should remain unchanged
         assert_eq!(context.cache.get(&path).unwrap(), "Initial content");
@@ -186,19 +171,5 @@ mod tests {
             context.workspace.read_file(&path).unwrap(),
             "Updated content"
         );
-    }
-
-    #[test]
-    fn test_apply_to_non_editable_file() {
-        let (_temp_dir, mut context) = setup_test_context();
-        let path = PathBuf::from("crate2/src/lib.rs");
-
-        let operation = Operation::Write(WriteFile {
-            content: "New content".to_string(),
-        });
-
-        let result = context.apply(&path, &operation);
-
-        assert!(matches!(result, Err(TenxError::Operation(_))));
     }
 }
