@@ -47,7 +47,7 @@ impl Context {
         Ok(())
     }
 
-    pub fn apply(&mut self, operation: &Operation) -> Result<()> {
+    fn apply(&mut self, operation: &Operation) -> Result<()> {
         match operation {
             Operation::Replace(replace) => {
                 // Get the current content from the cache
