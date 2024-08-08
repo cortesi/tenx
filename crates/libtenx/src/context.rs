@@ -70,14 +70,14 @@ impl Context {
         }
 
         match operation {
-            Operation::Diff(diff) => {
+            Operation::Replace(replace) => {
                 // Get the current content from the cache
                 let current_content = self.cache.get(path).ok_or_else(|| {
                     TenxError::Operation(format!("File '{}' not found in cache", path.display()))
                 })?;
 
-                // Apply the diff
-                let new_content = diff.apply(current_content)?;
+                // Apply the replacement
+                let new_content = replace.apply(current_content)?;
 
                 // Write to the workspace
                 self.workspace.write_file(path, &new_content)?;
@@ -125,7 +125,7 @@ impl Context {
 mod tests {
     use super::*;
     use crate::testutils::{create_dummy_project, TempEnv};
-    use crate::{Diff, Operation, TenxError, Workspace, WriteFile};
+    use crate::{Operation, Replace, TenxError, Workspace, WriteFile};
     use std::path::PathBuf;
     use tempfile::TempDir;
 
@@ -168,11 +168,11 @@ mod tests {
     }
 
     #[test]
-    fn test_apply_diff_operation() {
+    fn test_apply_replace_operation() {
         let (_temp_dir, mut context) = setup_test_context();
         let path = PathBuf::from("crate1/src/lib.rs");
 
-        let operation = Operation::Diff(Diff {
+        let operation = Operation::Replace(Replace {
             old: "Initial content".to_string(),
             new: "Updated content".to_string(),
         });

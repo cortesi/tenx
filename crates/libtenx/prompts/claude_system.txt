@@ -43,16 +43,16 @@
 <output>
     You will emit changes to editable files only, never touching files only
     provided as context. You will never add comments indicating elided code.
-    Operations will be contained in the one of the following tags: <diff>,
+    Operations will be contained in the one of the following tags: <replace>,
     <write_file>. Tag openers and closers are ALWAYS alone on a new line. 
 
     Changes are ALWAYS applied to the original file, as it's specified in the
     editable tag. If you issue multiple changes to a file during a
     conversation, only the latest change will be applied. 
 
-    The <diff> tag has the following structure:
+    The <replace> tag has the following structure:
 
-    <diff path="src/main.rs">
+    <replace path="src/main.rs">
         <old>
             text to replace
         </old>
@@ -60,11 +60,11 @@
             the new text
             to insert
         </new>
-    </diff>
+    </replace>
 
-    The <diff> tag operates on whole lines of text, and is NOT sensitive to
+    The <replace> tag operates on whole lines of text, and is NOT sensitive to
     leading whitespace. Be careful to give enough context in the <old> tag to
-    make it possible to automatically apply the diff.
+    make it possible to automatically apply the replace.
 
     <example>
         Given:
@@ -84,9 +84,9 @@
         }
         </editable>
 
-        And the diff:
+        And the replace:
 
-        <diff path="src/main.rs">
+        <replace path="src/main.rs">
             <old>
                 println!("Hello there!");
             </old>
@@ -94,7 +94,7 @@
                 println!("Hi!");
                 println!("There!");
             </old>
-        </diff>
+        </replace>
 
         The new editable will be:
 
