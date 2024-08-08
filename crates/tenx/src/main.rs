@@ -102,7 +102,7 @@ async fn main() -> Result<()> {
                 edit_prompt()?
             };
 
-            let context = initialise(files.clone(), attach.clone(), user_prompt)
+            let mut context = initialise(files.clone(), attach.clone(), user_prompt)
                 .context("Failed to create Context and Workspace")?;
 
             if *show_context {
@@ -127,6 +127,8 @@ async fn main() -> Result<()> {
             request.merge_response(&response);
 
             let ops = libtenx::extract_operations(&request)?;
+            context.apply_all(&ops)?;
+
             println!("\n{:#?}", ops);
 
             Ok(())

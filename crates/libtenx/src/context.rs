@@ -3,7 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{Operation, Result, TenxError, Workspace};
+use crate::{Operation, Operations, Result, TenxError, Workspace};
 
 /// Defines the initial context of a conversation. This defines which files are editable, plus which
 /// files and documentation will be provided as context.
@@ -41,6 +41,23 @@ impl Context {
             workspace,
             cache,
         })
+    }
+
+    pub fn apply_all(&mut self, operations: &Operations) -> Result<()> {
+        for (path_str, operation) in &operations.operations {
+            let path = PathBuf::from(path_str);
+
+            // Check if the file is in the edit set
+            if !self.edit_paths.iter().any(|p| p == &path) {
+                return Err(TenxError::Operation(format!(
+                    "Cannot edit file '{}' as it's not in the edit set",
+                    path.display()
+                )));
+            }
+
+            self.apply(&path, operation)?;
+        }
+        Ok(())
     }
 
     pub fn apply(&mut self, path: &Path, operation: &Operation) -> Result<()> {
