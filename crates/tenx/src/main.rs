@@ -48,17 +48,21 @@ enum Commands {
         #[clap(long)]
         prompt_file: Option<PathBuf>,
 
-        /// Show the generated context
-        #[clap(long)]
-        show_context: bool,
+        /// Increase output verbosity
+        #[clap(short, long, action = clap::ArgAction::Count, default_value = "1")]
+        verbose: u8,
 
-        /// Show the query that will be sent to the model
-        #[clap(long)]
-        show_query: bool,
+        /// Decrease output verbosity
+        #[clap(short, long)]
+        quiet: bool,
 
         /// Anthropic API key
         #[clap(long, env = "ANTHROPIC_API_KEY", hide_env_values = true)]
         anthropic_key: Option<String>,
+
+        /// Don't apply changes, just show what would be done
+        #[clap(long)]
+        dry_run: bool,
     },
 }
 
@@ -90,10 +94,13 @@ async fn main() -> Result<()> {
             attach,
             prompt,
             prompt_file,
-            show_context,
-            show_query,
+            verbose,
+            quiet,
             anthropic_key,
+            dry_run,
         } => {
+            let verbosity = if *quiet { 0 } else { *verbose };
+
             let user_prompt = if let Some(p) = prompt {
                 p.clone()
             } else if let Some(file_path) = prompt_file {
@@ -105,14 +112,14 @@ async fn main() -> Result<()> {
             let mut context = initialise(files.clone(), attach.clone(), user_prompt)
                 .context("Failed to create Context and Workspace")?;
 
-            if *show_context {
+            if verbosity >= 2 {
                 println!("{}", "Context:".green().bold());
                 println!("{:#?}", context);
             }
 
             let c = Claude::new(anthropic_key.as_deref().unwrap_or(""))?;
             let mut request = c.render(&context).await?;
-            if *show_query {
+            if verbosity >= 2 {
                 println!("{}", "Query:".blue().bold());
                 println!("{:#?}", request);
             }
@@ -127,11 +134,23 @@ async fn main() -> Result<()> {
             request.merge_response(&response);
 
             let ops = libtenx::extract_operations(&request)?;
-            context.apply_all(&ops)?;
 
-            println!("\n{:#?}", ops);
+            if *dry_run {
+                println!(
+                    "\n{}",
+                    "Dry run: Changes that would be applied:".yellow().bold()
+                );
+                println!("{:#?}", ops);
+            } else {
+                context.apply_all(&ops)?;
+                if verbosity >= 1 {
+                    println!("\n{}", "Applied changes:".green().bold());
+                    println!("{:#?}", ops);
+                }
+            }
 
             Ok(())
         }
     }
 }
+
