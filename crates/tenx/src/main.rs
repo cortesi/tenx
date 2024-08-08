@@ -18,6 +18,18 @@ use libtenx::{self, initialise, Claude};
 #[clap(version = "0.1.0")]
 #[clap(about = "AI-powered command-line assistant for Rust", long_about = None)]
 struct Cli {
+    /// Increase output verbosity
+    #[clap(short, long, action = clap::ArgAction::Count, global = true, default_value = "1")]
+    verbose: u8,
+
+    /// Decrease output verbosity
+    #[clap(short, long, global = true)]
+    quiet: bool,
+
+    /// Anthropic API key
+    #[clap(long, env = "ANTHROPIC_API_KEY", hide_env_values = true, global = true)]
+    anthropic_key: Option<String>,
+
     #[clap(subcommand)]
     command: Commands,
 }
@@ -47,18 +59,6 @@ enum Commands {
         /// Path to a file containing the prompt
         #[clap(long)]
         prompt_file: Option<PathBuf>,
-
-        /// Increase output verbosity
-        #[clap(short, long, action = clap::ArgAction::Count, default_value = "1")]
-        verbose: u8,
-
-        /// Decrease output verbosity
-        #[clap(short, long)]
-        quiet: bool,
-
-        /// Anthropic API key
-        #[clap(long, env = "ANTHROPIC_API_KEY", hide_env_values = true)]
-        anthropic_key: Option<String>,
 
         /// Don't apply changes, just show what would be done
         #[clap(long)]
@@ -94,12 +94,9 @@ async fn main() -> Result<()> {
             attach,
             prompt,
             prompt_file,
-            verbose,
-            quiet,
-            anthropic_key,
             dry_run,
         } => {
-            let verbosity = if *quiet { 0 } else { *verbose };
+            let verbosity = if cli.quiet { 0 } else { cli.verbose };
 
             let user_prompt = if let Some(p) = prompt {
                 p.clone()
@@ -117,7 +114,7 @@ async fn main() -> Result<()> {
                 println!("{:#?}", context);
             }
 
-            let c = Claude::new(anthropic_key.as_deref().unwrap_or(""))?;
+            let c = Claude::new(cli.anthropic_key.as_deref().unwrap_or(""))?;
             let mut request = c.render(&context).await?;
             if verbosity >= 2 {
                 println!("{}", "Query:".blue().bold());
