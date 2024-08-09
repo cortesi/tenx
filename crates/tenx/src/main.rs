@@ -9,7 +9,7 @@ use tracing_subscriber::fmt::time::FormatTime;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{fmt, EnvFilter};
 
-use libtenx::{self, Claude, Context, Prompt};
+use libtenx::{self, Claude, Prompt, Tenx};
 
 mod edit;
 
@@ -106,7 +106,7 @@ async fn main() -> Result<()> {
             prompt,
             prompt_file,
         } => {
-            let mut context = Context::new(std::env::current_dir()?);
+            let mut tx = Tenx::new(std::env::current_dir()?);
             let dialect = libtenx::dialect::Tags::default();
             let mut c = Claude::new(
                 cli.anthropic_key.as_deref().unwrap_or(""),
@@ -137,12 +137,12 @@ async fn main() -> Result<()> {
                 ));
             };
             let ops = c.prompt(&user_prompt).await?;
-            context.apply_all(&ops)?;
+            tx.apply_all(&ops)?;
             info!("\n{}", "Changes applied successfully".green().bold());
             Ok(())
         }
         Commands::Edit { files, attach } => {
-            let mut context = Context::new(std::env::current_dir()?);
+            let mut tx = Tenx::new(std::env::current_dir()?);
             let dialect = libtenx::dialect::Tags::default();
             let mut c = Claude::new(
                 cli.anthropic_key.as_deref().unwrap_or(""),
@@ -155,7 +155,7 @@ async fn main() -> Result<()> {
 
             let user_prompt = edit::edit_prompt(files, attach)?;
             let ops = c.prompt(&user_prompt).await?;
-            context.apply_all(&ops)?;
+            tx.apply_all(&ops)?;
             info!("\n{}", "Changes applied successfully".green().bold());
 
             Ok(())
