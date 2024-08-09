@@ -3565,6 +3565,8 @@ dependencies = [
  "libtenx",
  "tempfile",
  "tokio",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

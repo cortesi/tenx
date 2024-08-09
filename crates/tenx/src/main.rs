@@ -9,8 +9,38 @@ use anyhow::{Context as AnyhowContext, Result};
 use clap::{Parser, Subcommand};
 use colored::*;
 use tempfile::NamedTempFile;
+use tracing::{info, Subscriber};
+use tracing_subscriber::fmt::format::{FmtSpan, Writer};
+use tracing_subscriber::fmt::time::FormatTime;
+use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::{fmt, EnvFilter};
 
 use libtenx::{self, initialise, Claude};
+
+struct NoTime;
+
+impl FormatTime for NoTime {
+    fn format_time(&self, _: &mut Writer<'_>) -> std::fmt::Result {
+        Ok(())
+    }
+}
+
+/// Creates a subscriber that writes to stdout without timestamps.
+fn create_subscriber(verbosity: u8) -> impl Subscriber {
+    let filter = match verbosity {
+        0 => EnvFilter::new("warn"),
+        1 => EnvFilter::new("info"),
+        2 => EnvFilter::new("debug"),
+        _ => EnvFilter::new("trace"),
+    };
+
+    fmt::Subscriber::builder()
+        .with_env_filter(filter)
+        .with_timer(NoTime)
+        .with_writer(io::stdout)
+        .with_span_events(FmtSpan::NONE)
+        .finish()
+}
 
 #[derive(Parser)]
 #[clap(name = "tenx")]
@@ -118,10 +148,13 @@ fn edit_prompt(files: &[PathBuf], attach: &[PathBuf]) -> Result<String> {
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
+    let verbosity = if cli.quiet { 0 } else { cli.verbose };
+    let subscriber = create_subscriber(verbosity);
+    subscriber.init();
 
     match &cli.command {
         Commands::Info { path } => {
-            println!("Handling 'info' command with path: {:?}", path);
+            info!("Handling 'info' command with path: {:?}", path);
             Ok(())
         }
         Commands::Edit {
@@ -131,8 +164,6 @@ async fn main() -> Result<()> {
             prompt_file,
             dry_run,
         } => {
-            let verbosity = if cli.quiet { 0 } else { cli.verbose };
-
             let user_prompt = if let Some(p) = prompt {
                 p.clone()
             } else if let Some(file_path) = prompt_file {
@@ -143,19 +174,13 @@ async fn main() -> Result<()> {
 
             let mut context = initialise(files.clone(), attach.clone(), user_prompt)
                 .context("Failed to create Context and Workspace")?;
-
-            if verbosity >= 2 {
-                println!("{}", "Context:".green().bold());
-                println!("{:#?}", context);
-            }
+            tracing::debug!("Context: {:#?}", context);
 
             let c = Claude::new(cli.anthropic_key.as_deref().unwrap_or(""))?;
             let mut request = c.render(&context).await?;
-            if verbosity >= 2 {
-                println!("{}", "Query:".blue().bold());
-                println!("{:#?}", request);
-            }
-            print!("{} ", "Claude:".blue().bold());
+            tracing::debug!("Query: {:#?}", request);
+
+            info!("{}", "Claude:".blue().bold());
             let response = c
                 .stream_response(&request, |chunk| {
                     print!("{}", chunk);
@@ -166,19 +191,16 @@ async fn main() -> Result<()> {
             request.merge_response(&response);
 
             let ops = libtenx::extract_operations(&request)?;
-
             if *dry_run {
-                println!(
+                info!(
                     "\n{}",
                     "Dry run: Changes that would be applied:".yellow().bold()
                 );
-                println!("{:#?}", ops);
+                info!("{:#?}", ops);
             } else {
                 context.apply_all(&ops)?;
-                if verbosity >= 1 {
-                    println!("\n{}", "Applied changes:".green().bold());
-                    println!("{:#?}", ops);
-                }
+                info!("\n{}", "Applied changes:".green().bold());
+                info!("{:#?}", ops);
             }
 
             Ok(())
