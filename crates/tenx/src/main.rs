@@ -109,10 +109,14 @@ async fn main() -> Result<()> {
             let dialect = Dialects::Tags(libtenx::dialect::Tags::default());
             let mut tx = Tenx::new(std::env::current_dir()?, dialect)
                 .with_anthropic_key(cli.anthropic_key.clone().unwrap_or_default());
-            let mut c = Claude::new(&tx.anthropic_key, tx.state.dialect.clone(), |chunk| {
-                print!("{}", chunk);
-                Ok(())
-            })?;
+            let mut c = Claude::new(
+                &tx.anthropic_key,
+                libtenx::dialect::Tags::default(),
+                |chunk| {
+                    print!("{}", chunk);
+                    Ok(())
+                },
+            )?;
 
             let user_prompt = if let Some(p) = prompt {
                 Prompt {
@@ -147,10 +151,14 @@ async fn main() -> Result<()> {
             let dialect = Dialects::Tags(libtenx::dialect::Tags::default());
             let mut tx = Tenx::new(std::env::current_dir()?, dialect)
                 .with_anthropic_key(cli.anthropic_key.clone().unwrap_or_default());
-            let mut c = Claude::new(&tx.anthropic_key, tx.state.dialect.clone(), |chunk| {
-                print!("{}", chunk);
-                Ok(())
-            })?;
+            let mut c = Claude::new(
+                &tx.anthropic_key,
+                libtenx::dialect::Tags::default(),
+                |chunk| {
+                    print!("{}", chunk);
+                    Ok(())
+                },
+            )?;
 
             let user_prompt = edit::edit_prompt(files, attach)?;
             let ops = c.prompt(&user_prompt).await?;
@@ -165,4 +173,3 @@ async fn main() -> Result<()> {
         }
     }
 }
-
