@@ -150,8 +150,7 @@ async fn main() -> Result<()> {
                 info!("{:#?}", ops);
             } else {
                 context.apply_all(&ops)?;
-                info!("\n{}", "Applied changes:".green().bold());
-                info!("{:#?}", ops);
+                info!("\n{}", "Changes applied successfully".green().bold());
             }
 
             Ok(())

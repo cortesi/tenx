@@ -2,7 +2,11 @@ use anyhow::{Context as AnyhowContext, Result};
 use std::{fs, io::Write, path::PathBuf, process::Command};
 use tempfile::NamedTempFile;
 
+use indoc::indoc;
 use libtenx::Prompt;
+
+const EDITABLE_FILES_HEADING: &str = "### Editable files:";
+const CONTEXT_FILES_HEADING: &str = "### Context files:";
 
 /// Returns the user's preferred editor.
 fn get_editor() -> String {
@@ -11,17 +15,19 @@ fn get_editor() -> String {
 
 /// Renders the initial text for the user to edit.
 fn render_initial_text(files: &[PathBuf], attach: &[PathBuf]) -> String {
-    let mut text =
-        String::from("\n\n\n\n # Enter your prompt above. You may edit the file lists below.");
-    text.push_str("# Editable files:\n");
+    let mut text = String::from(indoc! {r#"
+            
+            # Enter your prompt above. You may edit the file lists below."
+
+        "#
+    });
+    text.push_str(&format!("{}\n", EDITABLE_FILES_HEADING));
     for file in files {
         text.push_str(&format!("{}\n", file.display()));
     }
-    if !attach.is_empty() {
-        text.push_str("\n# Context files:\n");
-        for file in attach {
-            text.push_str(&format!("{}\n", file.display()));
-        }
+    text.push_str(&format!("\n{}\n", CONTEXT_FILES_HEADING));
+    for file in attach {
+        text.push_str(&format!("{}\n", file.display()));
     }
     text.push('\n');
     text
@@ -37,9 +43,9 @@ fn parse_edited_text(input: &str) -> Prompt {
 
     for line in lines {
         let trimmed = line.trim();
-        if trimmed.starts_with("# Editable files:") {
+        if trimmed == EDITABLE_FILES_HEADING {
             current_section = Some("editable");
-        } else if trimmed.starts_with("# Context files:") {
+        } else if trimmed == CONTEXT_FILES_HEADING {
             current_section = Some("context");
         } else if trimmed.starts_with('#') || trimmed.is_empty() {
             continue;
@@ -81,18 +87,23 @@ mod tests {
 
     #[test]
     fn test_parse_edited_text() {
-        let input = r#"This is a user prompt
-with multiple lines.
+        let input = format!(
+            indoc! {r#"
+                This is a user prompt
+                with multiple lines.
 
-# Editable files:
-src/main.rs
-src/lib.rs
+                {}
+                src/main.rs
+                src/lib.rs
 
-# Context files:
-tests/test_main.rs
-README.md
-"#;
-        let prompt = parse_edited_text(input);
+                {}
+                tests/test_main.rs
+                README.md
+            "#
+            },
+            EDITABLE_FILES_HEADING, CONTEXT_FILES_HEADING
+        );
+        let prompt = parse_edited_text(&input);
         assert_eq!(
             prompt.user_prompt,
             "This is a user prompt\nwith multiple lines."

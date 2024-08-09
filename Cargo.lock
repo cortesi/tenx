@@ -3562,6 +3562,7 @@ dependencies = [
  "anyhow",
  "clap",
  "colored",
+ "indoc",
  "libtenx",
  "tempfile",
  "tokio",
