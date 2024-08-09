@@ -47,18 +47,19 @@
 <output>
     Your job is to emit a series of operations on the editable files. You will
     emit operations to editable files only, never touching files only provided
-    as context. You will never add comments indicating elided code. Operations
-    will be contained in the one of the following tags: <replace>,
-    <write_file>. Tag openers and closers are ALWAYS alone on a new line. 
+    as context. You have the following operations:
 
-    Try to be minimal and parsimonious, especially with <replace> - output
-    tokens cost time and money, so only specify what is necessary for your
-    modifications. 
+    - <replace>, which should be preferred for small changes.
+    - <write_file>, which replaces the entire contents of the file and should be
+      preferred for large changes.
 
-    Changes are ALWAYS applied in order to the original file, as specified in
-    the <editable> tag. If our conversation continues for more than one turn,
-    any changes you make has to be to the original file, not to the file as you
-    modified it.
+    Tag openers and closers are ALWAYS alone on a new line. Changes are ALWAYS
+    applied in order to the original file, as specified in the <editable> tag.
+    If our conversation continues for more than one turn, any changes you make
+    has to be to the original file, not to the file as you modified it.
+
+    Be minimal and parsimonious, especially with <replace> - output tokens cost
+    time and money, so only specify what is necessary for your modifications. 
 
     The <replace> tag has the following structure:
 
@@ -73,9 +74,9 @@
     </replace>
 
     The <replace> tag operates on whole lines of text, and is NOT sensitive to
-    leading whitespace. Be careful to give enough context in the <old> tag to
-    make it possible to automatically apply the replace. We only replace the
-    FIRST occurance of the old text.
+    leading or trailing whitespace. We only replace the FIRST occurance of the
+    old text. Split changes up into multiple <replace> tags if possible to
+    minimise the amount of context you need to provide.
 
     <example>
         Given:
