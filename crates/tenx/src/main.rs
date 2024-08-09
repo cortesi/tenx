@@ -1,8 +1,4 @@
-use std::{
-    fs,
-    io::{self, Write},
-    path::PathBuf,
-};
+use std::{fs, io, path::PathBuf};
 
 use anyhow::{Context as AnyhowContext, Result};
 use clap::{Parser, Subcommand};
@@ -112,7 +108,14 @@ async fn main() -> Result<()> {
         } => {
             let mut context = Context::new(std::env::current_dir()?);
             let dialect = libtenx::dialect::Tags::default();
-            let mut c = Claude::new(cli.anthropic_key.as_deref().unwrap_or(""), dialect)?;
+            let mut c = Claude::new(
+                cli.anthropic_key.as_deref().unwrap_or(""),
+                dialect,
+                |chunk| {
+                    print!("{}", chunk);
+                    Ok(())
+                },
+            )?;
 
             let user_prompt = if let Some(p) = prompt {
                 Prompt {
@@ -133,13 +136,7 @@ async fn main() -> Result<()> {
                     "Either --prompt or --prompt-file must be provided"
                 ));
             };
-            let ops = c
-                .prompt(&user_prompt, |chunk| {
-                    print!("{}", chunk);
-                    io::stdout().flush()?;
-                    Ok(())
-                })
-                .await?;
+            let ops = c.prompt(&user_prompt).await?;
             context.apply_all(&ops)?;
             info!("\n{}", "Changes applied successfully".green().bold());
             Ok(())
@@ -147,16 +144,17 @@ async fn main() -> Result<()> {
         Commands::Edit { files, attach } => {
             let mut context = Context::new(std::env::current_dir()?);
             let dialect = libtenx::dialect::Tags::default();
-            let mut c = Claude::new(cli.anthropic_key.as_deref().unwrap_or(""), dialect)?;
+            let mut c = Claude::new(
+                cli.anthropic_key.as_deref().unwrap_or(""),
+                dialect,
+                |chunk| {
+                    print!("{}", chunk);
+                    Ok(())
+                },
+            )?;
 
             let user_prompt = edit::edit_prompt(files, attach)?;
-            let ops = c
-                .prompt(&user_prompt, |chunk| {
-                    print!("{}", chunk);
-                    io::stdout().flush()?;
-                    Ok(())
-                })
-                .await?;
+            let ops = c.prompt(&user_prompt).await?;
             context.apply_all(&ops)?;
             info!("\n{}", "Changes applied successfully".green().bold());
 
@@ -164,4 +162,3 @@ async fn main() -> Result<()> {
         }
     }
 }
-

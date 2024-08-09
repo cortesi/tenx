@@ -6,19 +6,27 @@ const DEFAULT_MODEL: &str = "claude-3-5-sonnet-20240620";
 const MAX_TOKENS: u32 = 8192;
 
 #[derive(Debug)]
-pub struct Claude<D: Dialect> {
-    anthropic: Anthropic,
+pub struct Claude<D: Dialect, F>
+where
+    F: FnMut(&str) -> Result<()>,
+{
+    api_key: String,
     conversation: misanthropy::MessagesRequest,
     dialect: D,
+    on_chunk: F,
 }
 
-impl<D: Dialect> Claude<D> {
-    pub fn new(api_key: &str, dialect: D) -> Result<Self> {
-        let anthropic = Anthropic::from_string_or_env(api_key)?;
+impl<D: Dialect, F> Claude<D, F>
+where
+    F: FnMut(&str) -> Result<()>,
+{
+    /// Creates a new Claude instance with the given API key, dialect, and chunk handler.
+    pub fn new(api_key: &str, dialect: D, on_chunk: F) -> Result<Self> {
         let system = dialect.system();
         Ok(Claude {
-            anthropic,
+            api_key: api_key.to_string(),
             dialect,
+            on_chunk,
             conversation: misanthropy::MessagesRequest {
                 model: DEFAULT_MODEL.to_string(),
                 max_tokens: MAX_TOKENS,
@@ -33,10 +41,8 @@ impl<D: Dialect> Claude<D> {
         })
     }
 
-    pub async fn prompt<F>(&mut self, prompt: &Prompt, progress: F) -> Result<Operations>
-    where
-        F: FnMut(&str) -> Result<()>,
-    {
+    /// Sends a prompt to Claude and returns the operations.
+    pub async fn prompt(&mut self, prompt: &Prompt) -> Result<Operations> {
         let txt = self.dialect.render(prompt)?;
         self.conversation.messages.push(misanthropy::Message {
             role: misanthropy::Role::User,
@@ -44,26 +50,20 @@ impl<D: Dialect> Claude<D> {
                 text: txt.to_string(),
             }],
         });
-        let resp = self.stream_response(&self.conversation, progress).await?;
+        let resp = self.stream_response().await?;
         self.conversation.merge_response(&resp);
         extract_operations(&self.conversation)
     }
 
-    async fn stream_response<F>(
-        &self,
-        request: &misanthropy::MessagesRequest,
-        mut on_chunk: F,
-    ) -> Result<misanthropy::MessagesResponse>
-    where
-        F: FnMut(&str) -> Result<()>,
-    {
-        let mut streamed_response = self.anthropic.messages_stream(request)?;
+    async fn stream_response(&mut self) -> Result<misanthropy::MessagesResponse> {
+        let anthropic = Anthropic::new(&self.api_key);
+        let mut streamed_response = anthropic.messages_stream(&self.conversation)?;
         while let Some(event) = streamed_response.next().await {
             let event = event?;
             match event {
                 StreamEvent::ContentBlockDelta { delta, .. } => {
                     if let ContentBlockDelta::TextDelta { text } = delta {
-                        on_chunk(&text)?;
+                        (self.on_chunk)(&text)?;
                     }
                 }
                 StreamEvent::MessageStop => {
@@ -75,3 +75,4 @@ impl<D: Dialect> Claude<D> {
         Ok(streamed_response.response)
     }
 }
+
