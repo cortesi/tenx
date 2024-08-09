@@ -3,7 +3,7 @@
 
 use std::fs;
 
-use crate::{Context, Operation, Operations, Replace, Result, TenxError, WriteFile};
+use crate::{Operation, Operations, Replace, Result, TenxError, WriteFile};
 
 use super::{Dialect, Prompt};
 

@@ -49,8 +49,14 @@
     will be contained in the one of the following tags: <replace>,
     <write_file>. Tag openers and closers are ALWAYS alone on a new line. 
 
+    Try to be minimal and parsimonious, especially with <replace> - output
+    tokens cost time and money, so only specify what is necessary for your
+    modifications. 
+
     Changes are ALWAYS applied in order to the original file, as specified in
-    the <editable> tag.  
+    the <editable> tag. If our conversation continues for more than one turn,
+    any changes you make has to be to the original file, not to the file as you
+    modified it.
 
     The <replace> tag has the following structure:
 
@@ -66,7 +72,7 @@
 
     The <replace> tag operates on whole lines of text, and is NOT sensitive to
     leading whitespace. Be careful to give enough context in the <old> tag to
-    make it possible to automatically apply the replace.
+    make it possible to automatically apply the replace. 
 
     <example>
         Given:
@@ -117,7 +123,7 @@
         </editable>
     </example>
 
-    <write_file> tags are used to replace the entire contents of a file, or create a new file. For example:
+    <write_file> tags are used to replace the entire contents of a file or create a new file. For example:
 
     <example>
         <write_file path="src/main.rs">

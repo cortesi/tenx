@@ -2,7 +2,6 @@ use misanthropy::{Anthropic, ContentBlockDelta, StreamEvent};
 
 use crate::{dialect::Dialect, extract_operations, Operations, Prompt, Result};
 
-const SYSTEM: &str = include_str!("../prompts/claude_system.txt");
 const DEFAULT_MODEL: &str = "claude-3-5-sonnet-20240620";
 const MAX_TOKENS: u32 = 8192;
 
@@ -16,6 +15,7 @@ pub struct Claude<D: Dialect> {
 impl<D: Dialect> Claude<D> {
     pub fn new(api_key: &str, dialect: D) -> Result<Self> {
         let anthropic = Anthropic::from_string_or_env(api_key)?;
+        let system = dialect.system();
         Ok(Claude {
             anthropic,
             dialect,
@@ -23,7 +23,7 @@ impl<D: Dialect> Claude<D> {
                 model: DEFAULT_MODEL.to_string(),
                 max_tokens: MAX_TOKENS,
                 messages: vec![],
-                system: Some(SYSTEM.to_string()),
+                system: Some(system),
                 temperature: None,
                 stream: true,
                 tools: vec![],

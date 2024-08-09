@@ -133,7 +133,9 @@ async fn main() -> Result<()> {
                 edit::edit_prompt(files, attach)?
             };
 
-            let mut context = Context::default();
+            let current_dir = std::env::current_dir()?;
+            let mut context = Context::new(current_dir);
+
             let dialect = libtenx::dialect::Tags::default();
             let mut c = Claude::new(cli.anthropic_key.as_deref().unwrap_or(""), dialect)?;
 
@@ -160,3 +162,4 @@ async fn main() -> Result<()> {
         }
     }
 }
+

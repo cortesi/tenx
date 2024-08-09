@@ -1,13 +1,26 @@
-use std::{collections::HashMap, fs, path::PathBuf};
+use std::{
+    collections::HashMap,
+    fs,
+    path::{Path, PathBuf},
+};
 
 use crate::{Operation, Operations, Result};
 
-#[derive(Debug, Default)]
+/// Represents the context of file operations, including a snapshot of file contents.
+#[derive(Debug)]
 pub struct Context {
     pub snapshot: HashMap<PathBuf, String>,
+    pub working_directory: PathBuf,
 }
 
 impl Context {
+    /// Creates a new Context with the specified working directory.
+    pub fn new<P: AsRef<Path>>(working_directory: P) -> Self {
+        Self {
+            snapshot: HashMap::new(),
+            working_directory: working_directory.as_ref().to_path_buf(),
+        }
+    }
     pub fn apply_all(&mut self, operations: &Operations) -> Result<()> {
         // Collect unique paths from operations
         let affected_paths: std::collections::HashSet<_> = operations
@@ -61,3 +74,4 @@ impl Context {
         Ok(())
     }
 }
+

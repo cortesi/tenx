@@ -1,6 +1,6 @@
 mod tags;
 
-use crate::{Context, Operations, Prompt, Result};
+use crate::{Operations, Prompt, Result};
 
 pub use tags::*;
 
