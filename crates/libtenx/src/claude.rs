@@ -1,40 +1,57 @@
 use misanthropy::{Anthropic, ContentBlockDelta, StreamEvent};
 
-use crate::{Context, Result};
+use crate::{dialect::Dialect, extract_operations, Operations, Prompt, Result};
 
 const SYSTEM: &str = include_str!("../prompts/claude_system.txt");
 const DEFAULT_MODEL: &str = "claude-3-5-sonnet-20240620";
 const MAX_TOKENS: u32 = 8192;
 
 #[derive(Debug)]
-pub struct Claude {
+pub struct Claude<D: Dialect> {
     anthropic: Anthropic,
+    conversation: misanthropy::MessagesRequest,
+    dialect: D,
 }
 
-impl Claude {
-    pub fn new(api_key: &str) -> Result<Self> {
+impl<D: Dialect> Claude<D> {
+    pub fn new(api_key: &str, dialect: D) -> Result<Self> {
         let anthropic = Anthropic::from_string_or_env(api_key)?;
-        Ok(Claude { anthropic })
+        Ok(Claude {
+            anthropic,
+            dialect,
+            conversation: misanthropy::MessagesRequest {
+                model: DEFAULT_MODEL.to_string(),
+                max_tokens: MAX_TOKENS,
+                messages: vec![],
+                system: Some(SYSTEM.to_string()),
+                temperature: None,
+                stream: true,
+                tools: vec![],
+                tool_choice: misanthropy::ToolChoice::Auto,
+                stop_sequences: vec![],
+            },
+        })
     }
 
-    pub async fn render(&self, ctx: &Context) -> Result<misanthropy::MessagesRequest> {
-        let txt = ctx.render()?;
-        Ok(misanthropy::MessagesRequest {
-            model: DEFAULT_MODEL.to_string(),
-            max_tokens: MAX_TOKENS,
-            messages: vec![misanthropy::Message {
-                role: misanthropy::Role::User,
-                content: vec![misanthropy::Content::Text {
-                    text: txt.to_string(),
-                }],
+    fn add_prompt(&mut self, prompt: &Prompt) -> Result<()> {
+        let txt = self.dialect.render(prompt)?;
+        self.conversation.messages.push(misanthropy::Message {
+            role: misanthropy::Role::User,
+            content: vec![misanthropy::Content::Text {
+                text: txt.to_string(),
             }],
-            system: Some(SYSTEM.to_string()),
-            temperature: None,
-            stream: true,
-            tools: vec![],
-            tool_choice: misanthropy::ToolChoice::Auto,
-            stop_sequences: vec![],
-        })
+        });
+        Ok(())
+    }
+
+    pub async fn prompt<F>(&mut self, prompt: &Prompt, progress: F) -> Result<Operations>
+    where
+        F: FnMut(&str) -> Result<()>,
+    {
+        self.add_prompt(prompt)?;
+        let resp = self.stream_response(&self.conversation, progress).await?;
+        self.conversation.merge_response(&resp);
+        extract_operations(&self.conversation)
     }
 
     pub async fn stream_response<F>(

@@ -10,7 +10,7 @@ pub trait Dialect {
     /// Return the system prompt for this model
     fn system(&self) -> String;
     /// Render a prompt to send to the model
-    fn render(&self, ctx: Context, p: &Prompt) -> Result<String>;
+    fn render(&self, p: &Prompt) -> Result<String>;
     /// Parse a model's response into concrete operations
     fn parse(&self, txt: &str) -> Result<Operations>;
 }

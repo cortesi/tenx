@@ -13,7 +13,7 @@ use tracing_subscriber::fmt::time::FormatTime;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{fmt, EnvFilter};
 
-use libtenx::{self, initialise, Claude};
+use libtenx::{self, Claude, Context, Prompt};
 
 mod edit;
 
@@ -116,31 +116,34 @@ async fn main() -> Result<()> {
             dry_run,
         } => {
             let user_prompt = if let Some(p) = prompt {
-                p.clone()
+                Prompt {
+                    attach_paths: attach.clone(),
+                    edit_paths: files.clone(),
+                    user_prompt: p.clone(),
+                }
             } else if let Some(file_path) = prompt_file {
-                fs::read_to_string(file_path).context("Failed to read prompt file")?
+                let prompt_content =
+                    fs::read_to_string(file_path).context("Failed to read prompt file")?;
+                Prompt {
+                    attach_paths: attach.clone(),
+                    edit_paths: files.clone(),
+                    user_prompt: prompt_content,
+                }
             } else {
-                edit::edit_prompt(files, attach)?.user_prompt
+                edit::edit_prompt(files, attach)?
             };
 
-            let mut context = initialise(files.clone(), attach.clone(), user_prompt)
-                .context("Failed to create Context and Workspace")?;
-            tracing::debug!("Context: {:#?}", context);
+            let mut context = Context::default();
+            let dialect = libtenx::dialect::Tags::default();
+            let mut c = Claude::new(cli.anthropic_key.as_deref().unwrap_or(""), dialect)?;
 
-            let c = Claude::new(cli.anthropic_key.as_deref().unwrap_or(""))?;
-
-            let mut request = c.render(&context).await?;
-            tracing::debug!("Claude query: {:#?}", request);
-            let response = c
-                .stream_response(&request, |chunk| {
+            let ops = c
+                .prompt(&user_prompt, |chunk| {
                     print!("{}", chunk);
                     io::stdout().flush()?;
                     Ok(())
                 })
                 .await?;
-            request.merge_response(&response);
-
-            let ops = libtenx::extract_operations(&request)?;
 
             if *dry_run {
                 info!(

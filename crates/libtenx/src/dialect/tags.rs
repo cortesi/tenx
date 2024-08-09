@@ -1,12 +1,15 @@
 //! Defines an interaction style where files are sent to the model in XML-like tags,
 //! and model responses are parsed from similar tags.
 
+use std::fs;
+
 use crate::{Context, Operation, Operations, Replace, Result, TenxError, WriteFile};
 
 use super::{Dialect, Prompt};
 
 const SYSTEM: &str = include_str!("./tags-system.txt");
 
+#[derive(Debug, Default)]
 pub struct Tags {}
 
 impl Dialect for Tags {
@@ -14,12 +17,12 @@ impl Dialect for Tags {
         SYSTEM.to_string()
     }
 
-    fn render(&self, ctx: Context, p: &Prompt) -> Result<String> {
+    fn render(&self, p: &Prompt) -> Result<String> {
         let mut rendered = String::new();
 
         // Add editable files
         for path in &p.edit_paths {
-            let contents = ctx.workspace.read_file(path)?;
+            let contents = fs::read_to_string(path)?;
             rendered.push_str(&format!(
                 "\n<editable path=\"{}\">\n{}</editable>\n\n",
                 path.display(),
@@ -29,7 +32,7 @@ impl Dialect for Tags {
 
         // Add context files
         for path in &p.attach_paths {
-            let contents = ctx.workspace.read_file(path)?;
+            let contents = fs::read_to_string(path)?;
             rendered.push_str(&format!(
                 "\n<context path=\"{}\">\n{}</context>\n\n",
                 path.display(),
