@@ -5,6 +5,7 @@ use crate::{Operation, Operations, Result, State};
 /// Tenx is an AI-driven coding assistant.
 pub struct Tenx {
     state: State,
+    anthropic_key: String,
 }
 
 impl Tenx {
@@ -12,7 +13,22 @@ impl Tenx {
     pub fn new<P: AsRef<Path>>(working_directory: P) -> Self {
         Self {
             state: State::new(working_directory),
+            anthropic_key: String::new(),
         }
+    }
+
+    /// Sets the Anthropic API key.
+    pub fn with_anthropic_key(mut self, key: String) -> Self {
+        self.anthropic_key = key;
+        self
+    }
+
+    /// Resets all files in the state snapshot to their original contents.
+    pub fn reset(&self) -> Result<()> {
+        for (path, content) in &self.state.snapshot {
+            fs::write(path, content)?;
+        }
+        Ok(())
     }
 
     pub fn apply_all(&mut self, operations: &Operations) -> Result<()> {

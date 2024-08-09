@@ -3,7 +3,7 @@ use std::{fs, io, path::PathBuf};
 use anyhow::{Context as AnyhowContext, Result};
 use clap::{Parser, Subcommand};
 use colored::*;
-use tracing::{info, Subscriber};
+use tracing::{info, warn, Subscriber};
 use tracing_subscriber::fmt::format::{FmtSpan, Writer};
 use tracing_subscriber::fmt::time::FormatTime;
 use tracing_subscriber::util::SubscriberInitExt;
@@ -137,7 +137,11 @@ async fn main() -> Result<()> {
                 ));
             };
             let ops = c.prompt(&user_prompt).await?;
-            tx.apply_all(&ops)?;
+            if let Err(e) = tx.apply_all(&ops) {
+                warn!("Error applying changes, resetting state: {}", e);
+                tx.reset()?;
+                return Err(e.into());
+            }
             info!("\n{}", "Changes applied successfully".green().bold());
             Ok(())
         }
@@ -155,10 +159,14 @@ async fn main() -> Result<()> {
 
             let user_prompt = edit::edit_prompt(files, attach)?;
             let ops = c.prompt(&user_prompt).await?;
-            tx.apply_all(&ops)?;
+            if let Err(e) = tx.apply_all(&ops) {
+                warn!("Error applying changes, resetting state: {}", e);
+                tx.reset()?;
+                return Err(e.into());
+            }
             info!("\n{}", "Changes applied successfully".green().bold());
-
             Ok(())
         }
     }
 }
+
