@@ -1,3 +1,5 @@
+use tracing::warn;
+
 use misanthropy::{Anthropic, ContentBlockDelta, StreamEvent};
 
 use crate::{dialect::Dialect, extract_operations, Operations, Prompt, Result};
@@ -65,6 +67,9 @@ where
                     if let ContentBlockDelta::TextDelta { text } = delta {
                         (self.on_chunk)(&text)?;
                     }
+                }
+                StreamEvent::Error { error } => {
+                    tracing::warn!("Error in stream: {:?}", error);
                 }
                 StreamEvent::MessageStop => {
                     // The message has ended, but we don't need to do anything special here

@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 mod tags;
 
 use crate::{Operations, Prompt, Result};
@@ -13,4 +15,29 @@ pub trait Dialect {
     fn render(&self, p: &Prompt) -> Result<String>;
     /// Parse a model's response into concrete operations
     fn parse(&self, txt: &str) -> Result<Operations>;
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum Dialects {
+    Tags(Tags),
+}
+
+impl Dialect for Dialects {
+    fn system(&self) -> String {
+        match self {
+            Dialects::Tags(t) => t.system(),
+        }
+    }
+
+    fn render(&self, p: &Prompt) -> Result<String> {
+        match self {
+            Dialects::Tags(t) => t.render(p),
+        }
+    }
+
+    fn parse(&self, txt: &str) -> Result<Operations> {
+        match self {
+            Dialects::Tags(t) => t.parse(txt),
+        }
+    }
 }

@@ -17,6 +17,8 @@ quick-xml = "0.36.1"
 tempfile = "3.11.0"
 thiserror = "1.0.63"
 walkdir = "2.5.0"
+tracing = "0.1.40"
+serde = { version = "1.0.205", features = ["derive"] }
 
 [dev-dependencies]
 indoc = "2.0.5"

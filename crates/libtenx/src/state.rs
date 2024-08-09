@@ -3,8 +3,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use serde::{Deserialize, Serialize};
+
 /// The serializable state of Tenx.
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct State {
     pub snapshot: HashMap<PathBuf, String>,
     pub working_directory: PathBuf,

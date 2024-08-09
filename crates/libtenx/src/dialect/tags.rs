@@ -1,15 +1,15 @@
 //! Defines an interaction style where files are sent to the model in XML-like tags,
 //! and model responses are parsed from similar tags.
 
+use serde::{Deserialize, Serialize};
 use std::fs;
 
-use crate::{Operation, Operations, Replace, Result, TenxError, WriteFile};
-
 use super::{Dialect, Prompt};
+use crate::{Operation, Operations, Replace, Result, TenxError, WriteFile};
 
 const SYSTEM: &str = include_str!("./tags-system.txt");
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Tags {}
 
 impl Dialect for Tags {
