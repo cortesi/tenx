@@ -6,7 +6,7 @@ use std::{
 use crate::dialect::Dialects;
 use serde::{Deserialize, Serialize};
 
-/// The serializable state of Tenx.
+/// The serializable state of Tenx, which persists between invocations.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct State {
     pub snapshot: HashMap<PathBuf, String>,
