@@ -15,7 +15,11 @@ use tracing_subscriber::fmt::time::FormatTime;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{fmt, EnvFilter};
 
-use libtenx::{self, initialise, Claude};
+use libtenx::{
+    self,
+    dialect::{Dialect, Tags},
+    initialise, Claude,
+};
 
 struct NoTime;
 
@@ -176,11 +180,11 @@ async fn main() -> Result<()> {
                 .context("Failed to create Context and Workspace")?;
             tracing::debug!("Context: {:#?}", context);
 
+            let d = Tags {};
             let c = Claude::new(cli.anthropic_key.as_deref().unwrap_or(""))?;
-            let mut request = c.render(&context).await?;
-            tracing::debug!("Query: {:#?}", request);
 
-            info!("{}", "Claude:".blue().bold());
+            let mut request = c.render(&context).await?;
+            tracing::debug!("Claude query: {:#?}", request);
             let response = c
                 .stream_response(&request, |chunk| {
                     print!("{}", chunk);
@@ -191,6 +195,7 @@ async fn main() -> Result<()> {
             request.merge_response(&response);
 
             let ops = libtenx::extract_operations(&request)?;
+
             if *dry_run {
                 info!(
                     "\n{}",
@@ -207,4 +212,3 @@ async fn main() -> Result<()> {
         }
     }
 }
-

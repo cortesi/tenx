@@ -19,7 +19,6 @@ impl Claude {
 
     pub async fn render(&self, ctx: &Context) -> Result<misanthropy::MessagesRequest> {
         let txt = ctx.render()?;
-
         Ok(misanthropy::MessagesRequest {
             model: DEFAULT_MODEL.to_string(),
             max_tokens: MAX_TOKENS,

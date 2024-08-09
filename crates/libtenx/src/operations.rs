@@ -57,21 +57,13 @@ pub enum Operation {
     Replace(Replace),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Operations {
     pub operations: Vec<Operation>,
 }
 
-impl Operations {
-    fn new() -> Self {
-        Operations {
-            operations: Vec::new(),
-        }
-    }
-}
-
 pub fn extract_operations(request: &MessagesRequest) -> Result<Operations> {
-    let mut operations = Operations::new();
+    let mut operations = Operations::default();
     for message in &request.messages {
         if message.role == Role::Assistant {
             for content in &message.content {
@@ -110,7 +102,7 @@ pub fn extract_operations(request: &MessagesRequest) -> Result<Operations> {
 /// Whitespace is trimmed from the content of all tags. Any text outside of recognized tags is
 /// ignored.
 pub fn parse_response_text(response: &str) -> Result<Operations> {
-    let mut operations = Operations::new();
+    let mut operations = Operations::default();
     let mut lines = response.lines().peekable();
 
     while let Some(line) = lines.next() {
