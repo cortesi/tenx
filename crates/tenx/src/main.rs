@@ -9,7 +9,7 @@ use tracing_subscriber::fmt::time::FormatTime;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{fmt, EnvFilter};
 
-use libtenx::{self, Claude, Prompt, Tenx};
+use libtenx::{self, dialect::Dialects, Claude, Prompt, Tenx};
 
 mod edit;
 
@@ -106,10 +106,10 @@ async fn main() -> Result<()> {
             prompt,
             prompt_file,
         } => {
-            let mut tx = Tenx::new(std::env::current_dir()?)
+            let dialect = Dialects::Tags(libtenx::dialect::Tags::default());
+            let mut tx = Tenx::new(std::env::current_dir()?, dialect)
                 .with_anthropic_key(cli.anthropic_key.clone().unwrap_or_default());
-            let dialect = libtenx::dialect::Tags::default();
-            let mut c = Claude::new(&tx.anthropic_key, dialect, |chunk| {
+            let mut c = Claude::new(&tx.anthropic_key, tx.state.dialect.clone(), |chunk| {
                 print!("{}", chunk);
                 Ok(())
             })?;
@@ -144,10 +144,10 @@ async fn main() -> Result<()> {
             Ok(())
         }
         Commands::Edit { files, attach } => {
-            let mut tx = Tenx::new(std::env::current_dir()?)
+            let dialect = Dialects::Tags(libtenx::dialect::Tags::default());
+            let mut tx = Tenx::new(std::env::current_dir()?, dialect)
                 .with_anthropic_key(cli.anthropic_key.clone().unwrap_or_default());
-            let dialect = libtenx::dialect::Tags::default();
-            let mut c = Claude::new(&tx.anthropic_key, dialect, |chunk| {
+            let mut c = Claude::new(&tx.anthropic_key, tx.state.dialect.clone(), |chunk| {
                 print!("{}", chunk);
                 Ok(())
             })?;

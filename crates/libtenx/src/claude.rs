@@ -69,7 +69,7 @@ where
                     }
                 }
                 StreamEvent::Error { error } => {
-                    tracing::warn!("Error in stream: {:?}", error);
+                    warn!("Error in stream: {:?}", error);
                 }
                 StreamEvent::MessageStop => {
                     // The message has ended, but we don't need to do anything special here

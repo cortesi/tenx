@@ -1,6 +1,6 @@
 use std::{fs, path::Path};
 
-use crate::{Operation, Operations, Result, State};
+use crate::{dialect::Dialects, Operation, Operations, Result, State};
 
 /// Tenx is an AI-driven coding assistant.
 pub struct Tenx {
@@ -9,10 +9,10 @@ pub struct Tenx {
 }
 
 impl Tenx {
-    /// Creates a new Context with the specified working directory.
-    pub fn new<P: AsRef<Path>>(working_directory: P) -> Self {
+    /// Creates a new Context with the specified working directory and dialect.
+    pub fn new<P: AsRef<Path>>(working_directory: P, dialect: Dialects) -> Self {
         Self {
-            state: State::new(working_directory),
+            state: State::new(working_directory, dialect),
             anthropic_key: String::new(),
         }
     }
@@ -74,3 +74,4 @@ impl Tenx {
         Ok(())
     }
 }
+
