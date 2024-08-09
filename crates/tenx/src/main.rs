@@ -106,16 +106,13 @@ async fn main() -> Result<()> {
             prompt,
             prompt_file,
         } => {
-            let mut tx = Tenx::new(std::env::current_dir()?);
+            let mut tx = Tenx::new(std::env::current_dir()?)
+                .with_anthropic_key(cli.anthropic_key.clone().unwrap_or_default());
             let dialect = libtenx::dialect::Tags::default();
-            let mut c = Claude::new(
-                cli.anthropic_key.as_deref().unwrap_or(""),
-                dialect,
-                |chunk| {
-                    print!("{}", chunk);
-                    Ok(())
-                },
-            )?;
+            let mut c = Claude::new(&tx.anthropic_key, dialect, |chunk| {
+                print!("{}", chunk);
+                Ok(())
+            })?;
 
             let user_prompt = if let Some(p) = prompt {
                 Prompt {
@@ -138,7 +135,8 @@ async fn main() -> Result<()> {
             };
             let ops = c.prompt(&user_prompt).await?;
             if let Err(e) = tx.apply_all(&ops) {
-                warn!("Error applying changes, resetting state: {}", e);
+                warn!("{}", e);
+                warn!("Resetting state...");
                 tx.reset()?;
                 return Err(e.into());
             }
@@ -146,21 +144,19 @@ async fn main() -> Result<()> {
             Ok(())
         }
         Commands::Edit { files, attach } => {
-            let mut tx = Tenx::new(std::env::current_dir()?);
+            let mut tx = Tenx::new(std::env::current_dir()?)
+                .with_anthropic_key(cli.anthropic_key.clone().unwrap_or_default());
             let dialect = libtenx::dialect::Tags::default();
-            let mut c = Claude::new(
-                cli.anthropic_key.as_deref().unwrap_or(""),
-                dialect,
-                |chunk| {
-                    print!("{}", chunk);
-                    Ok(())
-                },
-            )?;
+            let mut c = Claude::new(&tx.anthropic_key, dialect, |chunk| {
+                print!("{}", chunk);
+                Ok(())
+            })?;
 
             let user_prompt = edit::edit_prompt(files, attach)?;
             let ops = c.prompt(&user_prompt).await?;
             if let Err(e) = tx.apply_all(&ops) {
-                warn!("Error applying changes, resetting state: {}", e);
+                warn!("{}", e);
+                warn!("Resetting state...");
                 tx.reset()?;
                 return Err(e.into());
             }

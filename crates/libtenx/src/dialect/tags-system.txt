@@ -74,7 +74,8 @@
 
     The <replace> tag operates on whole lines of text, and is NOT sensitive to
     leading whitespace. Be careful to give enough context in the <old> tag to
-    make it possible to automatically apply the replace. 
+    make it possible to automatically apply the replace. We only replace the
+    FIRST occurance of the old text.
 
     <example>
         Given:

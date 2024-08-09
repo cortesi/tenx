@@ -4,8 +4,8 @@ use crate::{Operation, Operations, Result, State};
 
 /// Tenx is an AI-driven coding assistant.
 pub struct Tenx {
-    state: State,
-    anthropic_key: String,
+    pub state: State,
+    pub anthropic_key: String,
 }
 
 impl Tenx {

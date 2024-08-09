@@ -18,6 +18,10 @@ pub struct Replace {
 }
 
 impl Replace {
+    /// Applies the replacement operation to the given input string.
+    ///
+    /// Replaces only the first occurrence of the old content with the new content.
+    /// Returns the modified string if the replacement was successful, or an error if no changes were made.
     pub fn apply(&self, input: &str) -> Result<String> {
         let old_lines: Vec<&str> = self.old.lines().map(str::trim).collect();
         let new_lines: Vec<&str> = self.new.lines().collect();
@@ -33,21 +37,18 @@ impl Replace {
                 .collect::<Vec<_>>()
                 .starts_with(&old_lines)
             {
-                // Found a match, replace with new content
                 result.extend(new_lines.iter().cloned());
-                i += old_lines.len();
+                result.extend(input_lines[i + old_lines.len()..].iter().cloned());
+                return Ok(result.join("\n"));
             } else {
-                // No match, keep the original line
                 result.push(input_lines[i]);
                 i += 1;
             }
         }
 
-        if result == input_lines {
-            Err(TenxError::Operation("No changes were applied".to_string()))
-        } else {
-            Ok(result.join("\n"))
-        }
+        Err(TenxError::Operation(
+            "Could not find the text to replace".to_string(),
+        ))
     }
 }
 
@@ -231,7 +232,7 @@ mod tests {
         }
     }
 
-    #[test]
+#[test]
     fn test_replace_apply() {
         let replace = Replace {
             path: "/path/to/file.txt".into(),
@@ -239,9 +240,8 @@ mod tests {
             new: "This is\nnew content\nthat replaces the old".to_string(),
         };
 
-        let input = "Some initial text\nThis is\nold content\nto be replaced\nSome final text";
-        let expected_output =
-            "Some initial text\nThis is\nnew content\nthat replaces the old\nSome final text";
+        let input = "Some initial text\nThis is\nold content\nto be replaced\nSome final text\nThis is\nold content\nto be replaced\nMore text";
+        let expected_output = "Some initial text\nThis is\nnew content\nthat replaces the old\nSome final text\nThis is\nold content\nto be replaced\nMore text";
 
         let result = replace.apply(input).expect("Failed to apply replace");
         assert_eq!(result, expected_output);
