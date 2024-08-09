@@ -1,7 +1,4 @@
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
 use crate::error::{Result, TenxError};
 
@@ -56,61 +53,6 @@ impl Workspace {
 
     pub fn manifest_path(&self) -> PathBuf {
         self.root_path.join("Cargo.toml")
-    }
-
-    pub fn relative_path<P: AsRef<Path>>(&self, path: P) -> Result<PathBuf> {
-        let path = self.to_absolute_path(path)?;
-
-        path.strip_prefix(&self.root_path)
-            .map(|p| p.to_path_buf())
-            .map_err(|e| TenxError::Workspace(format!("Failed to get relative path: {}", e)))
-    }
-
-    pub fn read_file<P: AsRef<Path>>(&self, path: P) -> Result<String> {
-        let full_path = self.root_path.join(path);
-        fs::read_to_string(&full_path).map_err(|e| {
-            TenxError::Workspace(format!(
-                "Failed to read file '{}': {}",
-                full_path.display(),
-                e
-            ))
-        })
-    }
-
-    pub fn write_file<P: AsRef<Path>>(&self, path: P, content: &str) -> Result<()> {
-        let full_path = self.root_path.join(path);
-
-        // Ensure the parent directory exists
-        if let Some(parent) = full_path.parent() {
-            fs::create_dir_all(parent).map_err(|e| {
-                TenxError::Workspace(format!(
-                    "Failed to create directory '{}': {}",
-                    parent.display(),
-                    e
-                ))
-            })?;
-        }
-
-        fs::write(&full_path, content).map_err(|e| {
-            TenxError::Workspace(format!(
-                "Failed to write file '{}': {}",
-                full_path.display(),
-                e
-            ))
-        })
-    }
-
-    fn to_absolute_path<P: AsRef<Path>>(&self, path: P) -> Result<PathBuf> {
-        let path = path.as_ref();
-        if path.is_absolute() {
-            Ok(path.to_path_buf())
-        } else {
-            std::env::current_dir()
-                .map(|current_dir| current_dir.join(path))
-                .map_err(|e| {
-                    TenxError::Workspace(format!("Failed to get current directory: {}", e))
-                })
-        }
     }
 }
 
@@ -212,95 +154,6 @@ mod tests {
         let result = Workspace::discover(&paths);
 
         assert!(result.is_err());
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_relative_path_with_absolute_input() -> Result<()> {
-        let temp_dir = TempDir::new().unwrap();
-        create_dummy_project(temp_dir.path()).unwrap();
-
-        let _temp_env = TempEnv::new(temp_dir.path())?;
-
-        let paths = vec![temp_dir.path().join("crate1/src/lib.rs")];
-        let workspace = Workspace::discover(&paths)?;
-
-        let absolute_path = temp_dir.path().join("crate1/src/main.rs");
-        let relative_path = workspace.relative_path(absolute_path)?;
-
-        assert_eq!(relative_path, PathBuf::from("src/main.rs"));
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_relative_path_outside_workspace() -> Result<()> {
-        let temp_dir = TempDir::new().unwrap();
-        create_dummy_project(temp_dir.path()).unwrap();
-
-        let _temp_env = TempEnv::new(temp_dir.path())?;
-
-        let paths = vec![temp_dir.path().join("crate1/src/lib.rs")];
-        let workspace = Workspace::discover(&paths)?;
-
-        let outside_path = temp_dir.path().join("../outside.rs");
-        let result = workspace.relative_path(outside_path);
-
-        assert!(result.is_err());
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_contents() -> Result<()> {
-        let temp_dir = TempDir::new().unwrap();
-        create_dummy_project(temp_dir.path()).unwrap();
-
-        let _temp_env = TempEnv::new(temp_dir.path())?;
-
-        let paths = vec![temp_dir.path().join("crate1/src/lib.rs")];
-        let workspace = Workspace::discover(&paths)?;
-
-        // Test reading an existing file
-        let contents = workspace.read_file("src/lib.rs")?;
-        assert_eq!(contents.trim(), "// Dummy content");
-
-        // Test reading a non-existent file
-        let result = workspace.read_file("src/nonexistent.txt");
-        assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Failed to read file"));
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_write_file() -> Result<()> {
-        let temp_dir = TempDir::new().unwrap();
-        create_dummy_project(temp_dir.path()).unwrap();
-
-        let _temp_env = TempEnv::new(temp_dir.path())?;
-
-        let paths = vec![temp_dir.path().join("crate1/src/lib.rs")];
-        let workspace = Workspace::discover(&paths)?;
-
-        // Test writing a new file
-        workspace.write_file("src/new_file.rs", "// New file content")?;
-        let contents = workspace.read_file("src/new_file.rs")?;
-        assert_eq!(contents.trim(), "// New file content");
-
-        // Test overwriting an existing file
-        workspace.write_file("src/lib.rs", "// Updated content")?;
-        let contents = workspace.read_file("src/lib.rs")?;
-        assert_eq!(contents.trim(), "// Updated content");
-
-        // Test writing a file in a new directory
-        workspace.write_file("new_dir/new_file.txt", "Content in new directory")?;
-        let contents = workspace.read_file("new_dir/new_file.txt")?;
-        assert_eq!(contents.trim(), "Content in new directory");
 
         Ok(())
     }

@@ -66,14 +66,18 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Get information about the current project
-    Info {
-        /// Sets the project path
-        #[clap(short, long, value_parser)]
-        path: Option<PathBuf>,
-    },
-    /// Edit files in the project
+    /// Edit files interactively
     Edit {
+        /// Specifies files to edit
+        #[clap(required = true, value_parser)]
+        files: Vec<PathBuf>,
+
+        /// Specifies files to attach (but not edit)
+        #[clap(short, long, value_parser)]
+        attach: Vec<PathBuf>,
+    },
+    /// Non-interacctive editing of files
+    Oneshot {
         /// Specifies files to edit
         #[clap(required = true, value_parser)]
         files: Vec<PathBuf>,
@@ -89,10 +93,6 @@ enum Commands {
         /// Path to a file containing the prompt
         #[clap(long)]
         prompt_file: Option<PathBuf>,
-
-        /// Don't apply changes, just show what would be done
-        #[clap(long)]
-        dry_run: bool,
     },
 }
 
@@ -104,17 +104,16 @@ async fn main() -> Result<()> {
     subscriber.init();
 
     match &cli.command {
-        Commands::Info { path } => {
-            info!("Handling 'info' command with path: {:?}", path);
-            Ok(())
-        }
-        Commands::Edit {
+        Commands::Oneshot {
             files,
             attach,
             prompt,
             prompt_file,
-            dry_run,
         } => {
+            let mut context = Context::new(std::env::current_dir()?);
+            let dialect = libtenx::dialect::Tags::default();
+            let mut c = Claude::new(cli.anthropic_key.as_deref().unwrap_or(""), dialect)?;
+
             let user_prompt = if let Some(p) = prompt {
                 Prompt {
                     attach_paths: attach.clone(),
@@ -130,15 +129,10 @@ async fn main() -> Result<()> {
                     user_prompt: prompt_content,
                 }
             } else {
-                edit::edit_prompt(files, attach)?
+                return Err(anyhow::anyhow!(
+                    "Either --prompt or --prompt-file must be provided"
+                ));
             };
-
-            let current_dir = std::env::current_dir()?;
-            let mut context = Context::new(current_dir);
-
-            let dialect = libtenx::dialect::Tags::default();
-            let mut c = Claude::new(cli.anthropic_key.as_deref().unwrap_or(""), dialect)?;
-
             let ops = c
                 .prompt(&user_prompt, |chunk| {
                     print!("{}", chunk);
@@ -146,17 +140,25 @@ async fn main() -> Result<()> {
                     Ok(())
                 })
                 .await?;
+            context.apply_all(&ops)?;
+            info!("\n{}", "Changes applied successfully".green().bold());
+            Ok(())
+        }
+        Commands::Edit { files, attach } => {
+            let mut context = Context::new(std::env::current_dir()?);
+            let dialect = libtenx::dialect::Tags::default();
+            let mut c = Claude::new(cli.anthropic_key.as_deref().unwrap_or(""), dialect)?;
 
-            if *dry_run {
-                info!(
-                    "\n{}",
-                    "Dry run: Changes that would be applied:".yellow().bold()
-                );
-                info!("{:#?}", ops);
-            } else {
-                context.apply_all(&ops)?;
-                info!("\n{}", "Changes applied successfully".green().bold());
-            }
+            let user_prompt = edit::edit_prompt(files, attach)?;
+            let ops = c
+                .prompt(&user_prompt, |chunk| {
+                    print!("{}", chunk);
+                    io::stdout().flush()?;
+                    Ok(())
+                })
+                .await?;
+            context.apply_all(&ops)?;
+            info!("\n{}", "Changes applied successfully".green().bold());
 
             Ok(())
         }

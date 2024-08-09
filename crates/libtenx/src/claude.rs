@@ -33,7 +33,10 @@ impl<D: Dialect> Claude<D> {
         })
     }
 
-    fn add_prompt(&mut self, prompt: &Prompt) -> Result<()> {
+    pub async fn prompt<F>(&mut self, prompt: &Prompt, progress: F) -> Result<Operations>
+    where
+        F: FnMut(&str) -> Result<()>,
+    {
         let txt = self.dialect.render(prompt)?;
         self.conversation.messages.push(misanthropy::Message {
             role: misanthropy::Role::User,
@@ -41,20 +44,12 @@ impl<D: Dialect> Claude<D> {
                 text: txt.to_string(),
             }],
         });
-        Ok(())
-    }
-
-    pub async fn prompt<F>(&mut self, prompt: &Prompt, progress: F) -> Result<Operations>
-    where
-        F: FnMut(&str) -> Result<()>,
-    {
-        self.add_prompt(prompt)?;
         let resp = self.stream_response(&self.conversation, progress).await?;
         self.conversation.merge_response(&resp);
         extract_operations(&self.conversation)
     }
 
-    pub async fn stream_response<F>(
+    async fn stream_response<F>(
         &self,
         request: &misanthropy::MessagesRequest,
         mut on_chunk: F,
