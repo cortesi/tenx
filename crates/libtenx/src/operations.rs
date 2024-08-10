@@ -1,8 +1,5 @@
-use std::path::PathBuf;
-
-use misanthropy::{Content, MessagesRequest, Role};
-
 use crate::{Result, TenxError};
+use std::path::PathBuf;
 
 #[derive(Debug, Clone)]
 pub struct WriteFile {
@@ -61,22 +58,6 @@ pub enum Operation {
 #[derive(Debug, Default)]
 pub struct Operations {
     pub operations: Vec<Operation>,
-}
-
-pub fn extract_operations(request: &MessagesRequest) -> Result<Operations> {
-    let mut operations = Operations::default();
-    for message in &request.messages {
-        if message.role == Role::Assistant {
-            for content in &message.content {
-                if let Content::Text { text } = content {
-                    let parsed_ops = parse_response_text(text)?;
-                    operations.operations.extend(parsed_ops.operations);
-                }
-            }
-        }
-    }
-
-    Ok(operations)
 }
 
 /// Parses a response string containing XML-like tags and returns a `Operations` struct.
@@ -232,7 +213,7 @@ mod tests {
         }
     }
 
-#[test]
+    #[test]
     fn test_replace_apply() {
         let replace = Replace {
             path: "/path/to/file.txt".into(),
@@ -264,3 +245,4 @@ mod tests {
         assert_eq!(result, expected_output);
     }
 }
+

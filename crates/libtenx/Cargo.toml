@@ -19,6 +19,7 @@ thiserror = "1.0.63"
 walkdir = "2.5.0"
 tracing = "0.1.40"
 serde = { version = "1.0.205", features = ["derive"] }
+tokio = "1.39.2"
 
 [dev-dependencies]
 indoc = "2.0.5"

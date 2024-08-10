@@ -49,9 +49,9 @@
     emit operations to editable files only, never touching files only provided
     as context. You have the following operations:
 
-    - <replace>, which should be preferred for small changes.
-    - <write_file>, which replaces the entire contents of the file and should be
-      preferred for large changes.
+    - <replace>, which should be used for small changes. 
+    - <write_file>, which replaces the entire contents of the file and should
+      ALWAYS be used for changes to more than a third of a file.
 
     Tag openers and closers are ALWAYS alone on a new line. Changes are ALWAYS
     applied in order to the original file, as specified in the <editable> tag.

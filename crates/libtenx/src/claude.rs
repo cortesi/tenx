@@ -1,29 +1,22 @@
 use tracing::warn;
 
-use misanthropy::{Anthropic, ContentBlockDelta, StreamEvent};
+use misanthropy::{Anthropic, Content, ContentBlockDelta, Role, StreamEvent};
 
-use crate::{dialect::Dialect, extract_operations, Operations, Prompt, Result, Tenx};
+use crate::{dialect::Dialect, operations, Operations, Prompt, Result, Tenx};
 
 const DEFAULT_MODEL: &str = "claude-3-5-sonnet-20240620";
 const MAX_TOKENS: u32 = 8192;
 
+use tokio::sync::mpsc;
+
 #[derive(Debug)]
-pub struct Claude<F>
-where
-    F: FnMut(&str) -> Result<()>,
-{
+pub struct Claude {
     conversation: misanthropy::MessagesRequest,
-    on_chunk: F,
 }
 
-impl<F> Claude<F>
-where
-    F: FnMut(&str) -> Result<()>,
-{
-    /// Creates a new Claude instance with the given chunk handler.
-    pub fn new(on_chunk: F) -> Result<Self> {
-        Ok(Claude {
-            on_chunk,
+impl Default for Claude {
+    fn default() -> Self {
+        Claude {
             conversation: misanthropy::MessagesRequest {
                 model: DEFAULT_MODEL.to_string(),
                 max_tokens: MAX_TOKENS,
@@ -35,11 +28,21 @@ where
                 tool_choice: misanthropy::ToolChoice::Auto,
                 stop_sequences: vec![],
             },
-        })
+        }
     }
+}
 
-    /// Sends a prompt to Claude and returns the operations.
-    pub async fn prompt(&mut self, tenx: &Tenx, prompt: &Prompt) -> Result<Operations> {
+impl Claude {
+    /// Sends a prompt to Claude and returns the resulting operations.
+    ///
+    /// Takes a reference to Tenx, a Prompt, and an optional mpsc::Sender for streaming text
+    /// chunks. Returns a Result containing the extracted Operations.
+    pub async fn prompt(
+        &mut self,
+        tenx: &Tenx,
+        prompt: &Prompt,
+        sender: Option<mpsc::Sender<String>>,
+    ) -> Result<Operations> {
         self.conversation.system = Some(tenx.state.dialect.system());
         let txt = tenx.state.dialect.render(prompt)?;
         self.conversation.messages.push(misanthropy::Message {
@@ -48,12 +51,32 @@ where
                 text: txt.to_string(),
             }],
         });
-        let resp = self.stream_response(&tenx.anthropic_key).await?;
+        let resp = self.stream_response(&tenx.anthropic_key, sender).await?;
         self.conversation.merge_response(&resp);
-        extract_operations(&self.conversation)
+        self.extract_operations()
     }
 
-    async fn stream_response(&mut self, api_key: &str) -> Result<misanthropy::MessagesResponse> {
+    fn extract_operations(&self) -> Result<Operations> {
+        let mut operations = Operations::default();
+        for message in &self.conversation.messages {
+            if message.role == Role::Assistant {
+                for content in &message.content {
+                    if let Content::Text { text } = content {
+                        let parsed_ops = operations::parse_response_text(text)?;
+                        operations.operations.extend(parsed_ops.operations);
+                    }
+                }
+            }
+        }
+
+        Ok(operations)
+    }
+
+    async fn stream_response(
+        &mut self,
+        api_key: &str,
+        sender: Option<mpsc::Sender<String>>,
+    ) -> Result<misanthropy::MessagesResponse> {
         let anthropic = Anthropic::new(api_key);
         let mut streamed_response = anthropic.messages_stream(&self.conversation)?;
         while let Some(event) = streamed_response.next().await {
@@ -61,7 +84,11 @@ where
             match event {
                 StreamEvent::ContentBlockDelta { delta, .. } => {
                     if let ContentBlockDelta::TextDelta { text } = delta {
-                        (self.on_chunk)(&text)?;
+                        if let Some(sender) = &sender {
+                            if let Err(e) = sender.send(text).await {
+                                warn!("Error sending message to channel: {:?}", e);
+                            }
+                        }
                     }
                 }
                 StreamEvent::Error { error } => {
@@ -76,4 +103,3 @@ where
         Ok(streamed_response.response)
     }
 }
-

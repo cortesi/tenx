@@ -3,6 +3,7 @@ use std::{fs, io, path::PathBuf};
 use anyhow::{Context as AnyhowContext, Result};
 use clap::{Parser, Subcommand};
 use colored::*;
+use tokio::sync::mpsc;
 use tracing::{info, warn, Subscriber};
 use tracing_subscriber::fmt::format::{FmtSpan, Writer};
 use tracing_subscriber::fmt::time::FormatTime;
@@ -109,10 +110,7 @@ async fn main() -> Result<()> {
             let dialect = Dialects::Tags(libtenx::dialect::Tags::default());
             let mut tx = Tenx::new(std::env::current_dir()?, dialect)
                 .with_anthropic_key(cli.anthropic_key.clone().unwrap_or_default());
-            let mut c = Claude::new(|chunk| {
-                print!("{}", chunk);
-                Ok(())
-            })?;
+            let mut c = Claude::default();
 
             let user_prompt = if let Some(p) = prompt {
                 Prompt {
@@ -133,34 +131,40 @@ async fn main() -> Result<()> {
                     "Either --prompt or --prompt-file must be provided"
                 ));
             };
-            let ops = c.prompt(&tx, &user_prompt).await?;
+            let ops = c.prompt(&tx, &user_prompt, None).await?;
             if let Err(e) = tx.apply_all(&ops) {
                 warn!("{}", e);
                 warn!("Resetting state...");
                 tx.reset()?;
                 return Err(e.into());
             }
-            info!("\n{}", "Changes applied successfully".green().bold());
+            info!("\n\n{}", "Changes applied successfully".green().bold());
             Ok(())
         }
         Commands::Edit { files, attach } => {
             let dialect = Dialects::Tags(libtenx::dialect::Tags::default());
             let mut tx = Tenx::new(std::env::current_dir()?, dialect)
                 .with_anthropic_key(cli.anthropic_key.clone().unwrap_or_default());
-            let mut c = Claude::new(|chunk| {
-                print!("{}", chunk);
-                Ok(())
-            })?;
+            let mut c = Claude::default();
+
+            let (sender, mut receiver) = mpsc::channel(100);
+            let print_task = tokio::spawn(async move {
+                while let Some(chunk) = receiver.recv().await {
+                    print!("{}", chunk);
+                }
+            });
 
             let user_prompt = edit::edit_prompt(files, attach)?;
-            let ops = c.prompt(&tx, &user_prompt).await?;
+            let ops = c.prompt(&tx, &user_prompt, Some(sender)).await?;
+
+            print_task.await?;
             if let Err(e) = tx.apply_all(&ops) {
                 warn!("{}", e);
                 warn!("Resetting state...");
                 tx.reset()?;
                 return Err(e.into());
             }
-            info!("\n{}", "Changes applied successfully".green().bold());
+            info!("\n\n{}", "Changes applied successfully".green().bold());
             Ok(())
         }
     }
