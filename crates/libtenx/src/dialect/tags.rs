@@ -42,10 +42,10 @@ impl Dialect for Tags {
 
         // Add docs
         for doc in &p.docs {
-            if let Some(contents) = &doc.contents {
+            if let Ok(contents) = doc.to_string() {
                 rendered.push_str(&format!(
-                    "\n<doc name=\"{}\">\n{}</doc>\n\n",
-                    doc.name, contents
+                    "\n<doc name=\"{}\" type=\"{:?}\">\n{}</doc>\n\n",
+                    doc.name, doc.ty, contents
                 ));
             }
         }
@@ -211,4 +211,3 @@ mod tests {
         }
     }
 }
-

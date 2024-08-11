@@ -10,7 +10,9 @@ use tracing_subscriber::fmt::time::FormatTime;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{fmt, EnvFilter};
 
-use libtenx::{self, dialect::Dialects, model::Claude, model::Models, DocType, Docs, Prompt, Tenx};
+use libtenx::{
+    self, dialect::Dialects, model::Claude, model::Models, Contents, DocType, Docs, Prompt, Tenx,
+};
 
 mod edit;
 
@@ -113,18 +115,17 @@ enum Commands {
 async fn create_docs(docs: &Vec<PathBuf>, ruskel: &[String]) -> Result<Vec<Docs>> {
     let mut result = Vec::new();
     for path in docs {
-        let content = fs::read_to_string(path).context("Failed to read doc file")?;
         result.push(Docs {
             ty: DocType::Text,
-            name: "".into(),
-            contents: Some(content),
+            name: path.file_name().unwrap().to_string_lossy().into_owned(),
+            contents: Contents::Path(path.clone()),
         });
     }
     for name in ruskel.iter() {
         result.push(Docs {
             ty: DocType::Ruskel,
             name: name.to_string(),
-            contents: None,
+            contents: Contents::Unresolved(name.to_string()),
         });
     }
     Ok(result)
@@ -175,7 +176,7 @@ async fn main() -> Result<()> {
                 ));
             };
 
-            tx.prompt(&user_prompt, None).await?;
+            tx.prompt(user_prompt, None).await?;
 
             info!("\n\n{}", "Changes applied successfully".green().bold());
             Ok(())
@@ -202,7 +203,7 @@ async fn main() -> Result<()> {
             let mut user_prompt = edit::edit_prompt(files, attach)?;
             user_prompt.docs = create_docs(docs, ruskel).await?;
 
-            tx.prompt(&user_prompt, Some(sender)).await?;
+            tx.prompt(user_prompt, Some(sender)).await?;
 
             print_task.await?;
             info!("\n\n{}", "Changes applied successfully".green().bold());
@@ -210,4 +211,3 @@ async fn main() -> Result<()> {
         }
     }
 }
-

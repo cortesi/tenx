@@ -46,13 +46,18 @@ impl Tenx {
     /// Sends a prompt to the model.
     pub async fn prompt(
         &mut self,
-        prompt: &Prompt,
+        mut prompt: Prompt,
         sender: Option<mpsc::Sender<String>>,
     ) -> Result<()> {
+        // Resolve docs
+        for doc in &mut prompt.docs {
+            doc.resolve()?;
+        }
+
         let ops = self
             .state
             .model
-            .prompt(&self.config, &self.state.dialect, prompt, sender)
+            .prompt(&self.config, &self.state.dialect, &prompt, sender)
             .await?;
         if let Err(e) = self.apply_all(&ops) {
             warn!("{}", e);
@@ -105,3 +110,4 @@ impl Tenx {
         Ok(())
     }
 }
+

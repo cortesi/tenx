@@ -24,6 +24,9 @@ pub enum TenxError {
 
     #[error("Error applying operation: {0}")]
     Operation(String),
+
+    #[error("Resolution error: {0}")]
+    Resolve(String),
 }
 
 impl From<misanthropy::Error> for TenxError {
