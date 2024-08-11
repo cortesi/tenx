@@ -62,6 +62,7 @@ fn parse_edited_text(input: &str) -> Prompt {
         attach_paths,
         edit_paths,
         user_prompt: user_prompt.trim().to_string(),
+        docs: vec![],
     }
 }
 

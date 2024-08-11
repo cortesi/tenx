@@ -40,6 +40,16 @@ impl Dialect for Tags {
             ));
         }
 
+        // Add docs
+        for doc in &p.docs {
+            if let Some(contents) = &doc.contents {
+                rendered.push_str(&format!(
+                    "\n<doc name=\"{}\">\n{}</doc>\n\n",
+                    doc.name, contents
+                ));
+            }
+        }
+
         // Add user prompt
         rendered.push_str(&p.user_prompt);
         Ok(rendered)
@@ -201,3 +211,4 @@ mod tests {
         }
     }
 }
+

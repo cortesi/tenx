@@ -10,7 +10,7 @@ use tracing_subscriber::fmt::time::FormatTime;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{fmt, EnvFilter};
 
-use libtenx::{self, dialect::Dialects, model::Claude, model::Models, Prompt, Tenx};
+use libtenx::{self, dialect::Dialects, model::Claude, model::Models, DocType, Docs, Prompt, Tenx};
 
 mod edit;
 
@@ -72,8 +72,16 @@ enum Commands {
         /// Specifies files to attach (but not edit)
         #[clap(short, long, value_parser)]
         attach: Vec<PathBuf>,
+
+        /// Add documentation file
+        #[clap(long, value_parser)]
+        docs: Vec<PathBuf>,
+
+        /// Add ruskel documentation
+        #[clap(long)]
+        ruskel: Vec<String>,
     },
-    /// Non-interacctive editing of files
+    /// Non-interactive editing of files
     Oneshot {
         /// Specifies files to edit
         #[clap(required = true, value_parser)]
@@ -90,7 +98,37 @@ enum Commands {
         /// Path to a file containing the prompt
         #[clap(long)]
         prompt_file: Option<PathBuf>,
+
+        /// Add documentation file
+        #[clap(long, value_parser)]
+        docs: Vec<PathBuf>,
+
+        /// Add ruskel documentation
+        #[clap(long)]
+        ruskel: Vec<String>,
     },
+}
+
+#[tokio::main]
+/// Creates a vector of Docs from the provided paths and ruskel strings
+async fn create_docs(docs: &Vec<PathBuf>, ruskel: &[String]) -> Result<Vec<Docs>> {
+    let mut result = Vec::new();
+    for path in docs {
+        let content = fs::read_to_string(path).context("Failed to read doc file")?;
+        result.push(Docs {
+            ty: DocType::Text,
+            name: "".into(),
+            contents: Some(content),
+        });
+    }
+    for name in ruskel.iter() {
+        result.push(Docs {
+            ty: DocType::Ruskel,
+            name: name.to_string(),
+            contents: None,
+        });
+    }
+    Ok(result)
 }
 
 #[tokio::main]
@@ -106,6 +144,8 @@ async fn main() -> Result<()> {
             attach,
             prompt,
             prompt_file,
+            docs,
+            ruskel,
         } => {
             let mut tx = Tenx::new(
                 std::env::current_dir()?,
@@ -119,6 +159,7 @@ async fn main() -> Result<()> {
                     attach_paths: attach.clone(),
                     edit_paths: files.clone(),
                     user_prompt: p.clone(),
+                    docs: create_docs(docs, ruskel)?,
                 }
             } else if let Some(file_path) = prompt_file {
                 let prompt_content =
@@ -127,6 +168,7 @@ async fn main() -> Result<()> {
                     attach_paths: attach.clone(),
                     edit_paths: files.clone(),
                     user_prompt: prompt_content,
+                    docs: create_docs(docs, ruskel)?,
                 }
             } else {
                 return Err(anyhow::anyhow!(
@@ -139,7 +181,12 @@ async fn main() -> Result<()> {
             info!("\n\n{}", "Changes applied successfully".green().bold());
             Ok(())
         }
-        Commands::Edit { files, attach } => {
+        Commands::Edit {
+            files,
+            attach,
+            docs,
+            ruskel,
+        } => {
             let mut tx = Tenx::new(
                 std::env::current_dir()?,
                 Dialects::Tags(libtenx::dialect::Tags::default()),
@@ -153,7 +200,8 @@ async fn main() -> Result<()> {
                     print!("{}", chunk);
                 }
             });
-            let user_prompt = edit::edit_prompt(files, attach)?;
+            let mut user_prompt = edit::edit_prompt(files, attach)?;
+            user_prompt.docs = create_docs(docs, ruskel)?;
 
             tx.prompt(&user_prompt, Some(sender)).await?;
 
