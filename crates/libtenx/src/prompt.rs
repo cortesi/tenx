@@ -5,6 +5,15 @@ pub enum DocType {
     Text,
 }
 
+pub enum Contents {
+    /// Unresolved content that should be read from a file
+    Path(PathBuf),
+    /// Unresolved content that will be resolved in accord with DocType.
+    Unresolved(String),
+    /// Resolved content that can be passed to the model.
+    Resolved(String),
+}
+
 /// Reference material included in the prompt.
 pub struct Docs {
     /// The type of documentation.

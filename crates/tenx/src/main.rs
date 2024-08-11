@@ -109,7 +109,6 @@ enum Commands {
     },
 }
 
-#[tokio::main]
 /// Creates a vector of Docs from the provided paths and ruskel strings
 async fn create_docs(docs: &Vec<PathBuf>, ruskel: &[String]) -> Result<Vec<Docs>> {
     let mut result = Vec::new();
@@ -159,7 +158,7 @@ async fn main() -> Result<()> {
                     attach_paths: attach.clone(),
                     edit_paths: files.clone(),
                     user_prompt: p.clone(),
-                    docs: create_docs(docs, ruskel)?,
+                    docs: create_docs(docs, ruskel).await?,
                 }
             } else if let Some(file_path) = prompt_file {
                 let prompt_content =
@@ -168,7 +167,7 @@ async fn main() -> Result<()> {
                     attach_paths: attach.clone(),
                     edit_paths: files.clone(),
                     user_prompt: prompt_content,
-                    docs: create_docs(docs, ruskel)?,
+                    docs: create_docs(docs, ruskel).await?,
                 }
             } else {
                 return Err(anyhow::anyhow!(
@@ -201,7 +200,7 @@ async fn main() -> Result<()> {
                 }
             });
             let mut user_prompt = edit::edit_prompt(files, attach)?;
-            user_prompt.docs = create_docs(docs, ruskel)?;
+            user_prompt.docs = create_docs(docs, ruskel).await?;
 
             tx.prompt(&user_prompt, Some(sender)).await?;
 
