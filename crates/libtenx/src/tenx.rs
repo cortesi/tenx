@@ -1,25 +1,36 @@
 use std::{fs, path::Path};
 
-use crate::{dialect::Dialects, Operation, Operations, Result, State};
+use tokio::sync::mpsc;
+
+use crate::{
+    dialect::Dialects,
+    model::{Model, Models},
+    Operation, Operations, Prompt, Result, State,
+};
+
+#[derive(Debug, Default)]
+pub struct Config {
+    pub anthropic_key: String,
+}
 
 /// Tenx is an AI-driven coding assistant.
 pub struct Tenx {
     pub state: State,
-    pub anthropic_key: String,
+    pub config: Config,
 }
 
 impl Tenx {
     /// Creates a new Context with the specified working directory and dialect.
-    pub fn new<P: AsRef<Path>>(working_directory: P, dialect: Dialects) -> Self {
+    pub fn new<P: AsRef<Path>>(working_directory: P, dialect: Dialects, model: Models) -> Self {
         Self {
-            state: State::new(working_directory, dialect),
-            anthropic_key: String::new(),
+            state: State::new(working_directory, dialect, model),
+            config: Config::default(),
         }
     }
 
     /// Sets the Anthropic API key.
     pub fn with_anthropic_key(mut self, key: String) -> Self {
-        self.anthropic_key = key;
+        self.config.anthropic_key = key;
         self
     }
 
@@ -29,6 +40,17 @@ impl Tenx {
             fs::write(path, content)?;
         }
         Ok(())
+    }
+
+    pub async fn prompt(
+        &mut self,
+        prompt: &Prompt,
+        sender: Option<mpsc::Sender<String>>,
+    ) -> Result<Operations> {
+        self.state
+            .model
+            .prompt(&self.config, &self.state.dialect, prompt, sender)
+            .await
     }
 
     pub fn apply_all(&mut self, operations: &Operations) -> Result<()> {
@@ -74,4 +96,3 @@ impl Tenx {
         Ok(())
     }
 }
-

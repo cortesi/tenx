@@ -1,15 +1,19 @@
 use tracing::warn;
 
 use misanthropy::{Anthropic, Content, ContentBlockDelta, Role, StreamEvent};
+use serde::{Deserialize, Serialize};
 
-use crate::{dialect::Dialect, operations, Operations, Prompt, Result, Tenx};
+use crate::{
+    dialect::{Dialect, Dialects},
+    operations, Config, Operations, Prompt, Result,
+};
 
 const DEFAULT_MODEL: &str = "claude-3-5-sonnet-20240620";
 const MAX_TOKENS: u32 = 8192;
 
 use tokio::sync::mpsc;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Claude {
     conversation: misanthropy::MessagesRequest,
 }
@@ -39,37 +43,22 @@ impl Claude {
     /// chunks. Returns a Result containing the extracted Operations.
     pub async fn prompt(
         &mut self,
-        tenx: &Tenx,
+        config: &Config,
+        dialect: &Dialects,
         prompt: &Prompt,
         sender: Option<mpsc::Sender<String>>,
     ) -> Result<Operations> {
-        self.conversation.system = Some(tenx.state.dialect.system());
-        let txt = tenx.state.dialect.render(prompt)?;
+        self.conversation.system = Some(dialect.system());
+        let txt = dialect.render(prompt)?;
         self.conversation.messages.push(misanthropy::Message {
             role: misanthropy::Role::User,
             content: vec![misanthropy::Content::Text {
                 text: txt.to_string(),
             }],
         });
-        let resp = self.stream_response(&tenx.anthropic_key, sender).await?;
+        let resp = self.stream_response(&config.anthropic_key, sender).await?;
         self.conversation.merge_response(&resp);
         self.extract_operations()
-    }
-
-    fn extract_operations(&self) -> Result<Operations> {
-        let mut operations = Operations::default();
-        for message in &self.conversation.messages {
-            if message.role == Role::Assistant {
-                for content in &message.content {
-                    if let Content::Text { text } = content {
-                        let parsed_ops = operations::parse_response_text(text)?;
-                        operations.operations.extend(parsed_ops.operations);
-                    }
-                }
-            }
-        }
-
-        Ok(operations)
     }
 
     async fn stream_response(
@@ -101,5 +90,20 @@ impl Claude {
             }
         }
         Ok(streamed_response.response)
+    }
+
+    fn extract_operations(&self) -> Result<Operations> {
+        let mut operations = Operations::default();
+        for message in &self.conversation.messages {
+            if message.role == Role::Assistant {
+                for content in &message.content {
+                    if let Content::Text { text } = content {
+                        let parsed_ops = operations::parse_response_text(text)?;
+                        operations.operations.extend(parsed_ops.operations);
+                    }
+                }
+            }
+        }
+        Ok(operations)
     }
 }

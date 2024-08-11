@@ -10,7 +10,7 @@ use tracing_subscriber::fmt::time::FormatTime;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{fmt, EnvFilter};
 
-use libtenx::{self, dialect::Dialects, Claude, Prompt, Tenx};
+use libtenx::{self, dialect::Dialects, model::Claude, model::Models, Prompt, Tenx};
 
 mod edit;
 
@@ -107,10 +107,12 @@ async fn main() -> Result<()> {
             prompt,
             prompt_file,
         } => {
-            let dialect = Dialects::Tags(libtenx::dialect::Tags::default());
-            let mut tx = Tenx::new(std::env::current_dir()?, dialect)
-                .with_anthropic_key(cli.anthropic_key.clone().unwrap_or_default());
-            let mut c = Claude::default();
+            let mut tx = Tenx::new(
+                std::env::current_dir()?,
+                Dialects::Tags(libtenx::dialect::Tags::default()),
+                Models::Claude(Claude::default()),
+            )
+            .with_anthropic_key(cli.anthropic_key.clone().unwrap_or_default());
 
             let user_prompt = if let Some(p) = prompt {
                 Prompt {
@@ -131,7 +133,7 @@ async fn main() -> Result<()> {
                     "Either --prompt or --prompt-file must be provided"
                 ));
             };
-            let ops = c.prompt(&tx, &user_prompt, None).await?;
+            let ops = tx.prompt(&user_prompt, None).await?;
             if let Err(e) = tx.apply_all(&ops) {
                 warn!("{}", e);
                 warn!("Resetting state...");
@@ -142,10 +144,12 @@ async fn main() -> Result<()> {
             Ok(())
         }
         Commands::Edit { files, attach } => {
-            let dialect = Dialects::Tags(libtenx::dialect::Tags::default());
-            let mut tx = Tenx::new(std::env::current_dir()?, dialect)
-                .with_anthropic_key(cli.anthropic_key.clone().unwrap_or_default());
-            let mut c = Claude::default();
+            let mut tx = Tenx::new(
+                std::env::current_dir()?,
+                Dialects::Tags(libtenx::dialect::Tags::default()),
+                Models::Claude(Claude::default()),
+            )
+            .with_anthropic_key(cli.anthropic_key.clone().unwrap_or_default());
 
             let (sender, mut receiver) = mpsc::channel(100);
             let print_task = tokio::spawn(async move {
@@ -155,7 +159,7 @@ async fn main() -> Result<()> {
             });
 
             let user_prompt = edit::edit_prompt(files, attach)?;
-            let ops = c.prompt(&tx, &user_prompt, Some(sender)).await?;
+            let ops = tx.prompt(&user_prompt, Some(sender)).await?;
 
             print_task.await?;
             if let Err(e) = tx.apply_all(&ops) {
