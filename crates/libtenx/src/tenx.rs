@@ -1,6 +1,7 @@
 use std::{fs, path::Path};
 
 use tokio::sync::mpsc;
+use tracing::warn;
 
 use crate::{
     dialect::Dialects,
@@ -42,18 +43,26 @@ impl Tenx {
         Ok(())
     }
 
+    /// Sends a prompt to the model.
     pub async fn prompt(
         &mut self,
         prompt: &Prompt,
         sender: Option<mpsc::Sender<String>>,
-    ) -> Result<Operations> {
-        self.state
+    ) -> Result<()> {
+        let ops = self
+            .state
             .model
             .prompt(&self.config, &self.state.dialect, prompt, sender)
-            .await
+            .await?;
+        if let Err(e) = self.apply_all(&ops) {
+            warn!("{}", e);
+            warn!("Resetting state...");
+            self.reset()?;
+        }
+        Ok(())
     }
 
-    pub fn apply_all(&mut self, operations: &Operations) -> Result<()> {
+    fn apply_all(&mut self, operations: &Operations) -> Result<()> {
         // Collect unique paths from operations
         let affected_paths: std::collections::HashSet<_> = operations
             .operations
@@ -82,7 +91,7 @@ impl Tenx {
         Ok(())
     }
 
-    pub fn apply(&mut self, operation: &Operation) -> Result<()> {
+    fn apply(&mut self, operation: &Operation) -> Result<()> {
         match operation {
             Operation::Replace(replace) => {
                 let current_content = fs::read_to_string(&replace.path)?;

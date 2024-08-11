@@ -4,7 +4,7 @@ use anyhow::{Context as AnyhowContext, Result};
 use clap::{Parser, Subcommand};
 use colored::*;
 use tokio::sync::mpsc;
-use tracing::{info, warn, Subscriber};
+use tracing::{info, Subscriber};
 use tracing_subscriber::fmt::format::{FmtSpan, Writer};
 use tracing_subscriber::fmt::time::FormatTime;
 use tracing_subscriber::util::SubscriberInitExt;
@@ -133,13 +133,9 @@ async fn main() -> Result<()> {
                     "Either --prompt or --prompt-file must be provided"
                 ));
             };
-            let ops = tx.prompt(&user_prompt, None).await?;
-            if let Err(e) = tx.apply_all(&ops) {
-                warn!("{}", e);
-                warn!("Resetting state...");
-                tx.reset()?;
-                return Err(e.into());
-            }
+
+            tx.prompt(&user_prompt, None).await?;
+
             info!("\n\n{}", "Changes applied successfully".green().bold());
             Ok(())
         }
@@ -157,17 +153,11 @@ async fn main() -> Result<()> {
                     print!("{}", chunk);
                 }
             });
-
             let user_prompt = edit::edit_prompt(files, attach)?;
-            let ops = tx.prompt(&user_prompt, Some(sender)).await?;
+
+            tx.prompt(&user_prompt, Some(sender)).await?;
 
             print_task.await?;
-            if let Err(e) = tx.apply_all(&ops) {
-                warn!("{}", e);
-                warn!("Resetting state...");
-                tx.reset()?;
-                return Err(e.into());
-            }
             info!("\n\n{}", "Changes applied successfully".green().bold());
             Ok(())
         }
