@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    fs,
+    env, fs,
     path::{Path, PathBuf},
 };
 
@@ -42,8 +42,9 @@ impl StateStore {
         let base_dir = base_dir
             .map(|p| p.as_ref().to_path_buf())
             .unwrap_or_else(|| {
-                dirs::config_dir()
-                    .expect("Failed to get config directory")
+                dirs::home_dir()
+                    .expect("Failed to get home directory")
+                    .join(".config")
                     .join("tenx")
                     .join("state")
             });

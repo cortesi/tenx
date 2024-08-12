@@ -51,12 +51,31 @@ impl Tenx {
     pub async fn start(
         &self,
         state: &mut State,
-        mut prompt: Prompt,
+        prompt: Prompt,
         sender: Option<mpsc::Sender<String>>,
     ) -> Result<()> {
         let state_store = StateStore::new(self.config.state_dir.as_ref())?;
         state_store.save(state)?;
+        self.process_prompt(state, prompt, sender, &state_store)
+            .await
+    }
 
+    /// Resumes a session by loading the state and sending a prompt to the model.
+    pub async fn resume(&self, prompt: Prompt, sender: Option<mpsc::Sender<String>>) -> Result<()> {
+        let state_store = StateStore::new(self.config.state_dir.as_ref())?;
+        let mut state = state_store.load(&std::env::current_dir()?)?;
+        self.process_prompt(&mut state, prompt, sender, &state_store)
+            .await
+    }
+
+    /// Common logic for processing a prompt and updating the state.
+    async fn process_prompt(
+        &self,
+        state: &mut State,
+        mut prompt: Prompt,
+        sender: Option<mpsc::Sender<String>>,
+        state_store: &StateStore,
+    ) -> Result<()> {
         for doc in &mut prompt.docs {
             doc.resolve()?;
         }
@@ -64,14 +83,18 @@ impl Tenx {
             .model
             .prompt(&self.config, &state.dialect, &prompt, sender)
             .await?;
-        if let Err(e) = Self::apply_all(state, &ops) {
-            warn!("{}", e);
-            warn!("Resetting state...");
-            Self::reset(state)?;
-        } else {
-            state_store.save(state)?;
+        match Self::apply_all(state, &ops) {
+            Ok(_) => {
+                state_store.save(state)?;
+                Ok(())
+            }
+            Err(e) => {
+                warn!("{}", e);
+                warn!("Resetting state...");
+                Self::reset(state)?;
+                Err(e)
+            }
         }
-        Ok(())
     }
 
     fn apply_all(state: &mut State, operations: &Operations) -> Result<()> {
@@ -117,3 +140,4 @@ impl Tenx {
         Ok(())
     }
 }
+
