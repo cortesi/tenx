@@ -141,3 +141,12 @@ impl Tenx {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_start() -> Result<()> {
+        Ok(())
+    }
+}

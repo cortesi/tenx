@@ -1,13 +1,15 @@
 use crate::{Result, TenxError};
 use std::path::PathBuf;
 
-#[derive(Debug, Clone)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WriteFile {
     pub path: PathBuf,
     pub content: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Replace {
     pub path: PathBuf,
     pub old: String,
@@ -49,13 +51,13 @@ impl Replace {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Operation {
     Write(WriteFile),
     Replace(Replace),
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Operations {
     pub operations: Vec<Operation>,
 }
