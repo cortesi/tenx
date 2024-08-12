@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use tokio::sync::mpsc;
 
 /// A dummy model for testing purposes.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Dummy {
     operations: Operations,
 }
