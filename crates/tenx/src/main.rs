@@ -87,6 +87,14 @@ enum Commands {
         /// Add ruskel documentation
         #[clap(long)]
         ruskel: Vec<String>,
+
+        /// User prompt for the edit operation
+        #[clap(long)]
+        prompt: Option<String>,
+
+        /// Path to a file containing the prompt
+        #[clap(long)]
+        prompt_file: Option<PathBuf>,
     },
     /// Resume an existing conversation
     Resume {
@@ -105,16 +113,6 @@ enum Commands {
         /// Add ruskel documentation
         #[clap(long)]
         ruskel: Vec<String>,
-    },
-    /// Non-interactive editing of files
-    Oneshot {
-        /// Specifies files to edit
-        #[clap(required = true, value_parser)]
-        files: Vec<PathBuf>,
-
-        /// Specifies files to attach (but not edit)
-        #[clap(short, long, value_parser)]
-        attach: Vec<PathBuf>,
 
         /// User prompt for the edit operation
         #[clap(long)]
@@ -123,14 +121,6 @@ enum Commands {
         /// Path to a file containing the prompt
         #[clap(long)]
         prompt_file: Option<PathBuf>,
-
-        /// Add documentation file
-        #[clap(long, value_parser)]
-        docs: Vec<PathBuf>,
-
-        /// Add ruskel documentation
-        #[clap(long)]
-        ruskel: Vec<String>,
     },
 }
 
@@ -172,22 +162,28 @@ async fn main() -> Result<()> {
     subscriber.init();
 
     match &cli.command {
-        Commands::Oneshot {
+        Commands::Start {
             files,
             attach,
-            prompt,
-            prompt_file,
             docs,
             ruskel,
+            prompt,
+            prompt_file,
         } => {
             let config = create_config(&cli)?;
-
             let tx = Tenx::new(config);
             let mut state = State::new(
                 std::env::current_dir()?,
                 Dialects::Tags(libtenx::dialect::Tags::default()),
                 Models::Claude(Claude::default()),
             );
+
+            let (sender, mut receiver) = mpsc::channel(100);
+            let print_task = tokio::spawn(async move {
+                while let Some(chunk) = receiver.recv().await {
+                    print!("{}", chunk);
+                }
+            });
 
             let user_prompt = if let Some(p) = prompt {
                 Prompt {
@@ -206,38 +202,10 @@ async fn main() -> Result<()> {
                     docs: create_docs(docs, ruskel)?,
                 }
             } else {
-                return Err(anyhow::anyhow!(
-                    "Either --prompt or --prompt-file must be provided"
-                ));
+                let mut p = edit::edit_prompt(files, attach)?;
+                p.docs = create_docs(docs, ruskel)?;
+                p
             };
-
-            tx.start(&mut state, user_prompt, None).await?;
-
-            info!("\n\n{}", "Changes applied successfully".green().bold());
-            Ok(())
-        }
-        Commands::Start {
-            files,
-            attach,
-            docs,
-            ruskel,
-        } => {
-            let config = create_config(&cli)?;
-            let tx = Tenx::new(config);
-            let mut state = State::new(
-                std::env::current_dir()?,
-                Dialects::Tags(libtenx::dialect::Tags::default()),
-                Models::Claude(Claude::default()),
-            );
-
-            let (sender, mut receiver) = mpsc::channel(100);
-            let print_task = tokio::spawn(async move {
-                while let Some(chunk) = receiver.recv().await {
-                    print!("{}", chunk);
-                }
-            });
-            let mut user_prompt = edit::edit_prompt(files, attach)?;
-            user_prompt.docs = create_docs(docs, ruskel)?;
 
             tx.start(&mut state, user_prompt, Some(sender)).await?;
 
@@ -250,6 +218,8 @@ async fn main() -> Result<()> {
             attach,
             docs,
             ruskel,
+            prompt,
+            prompt_file,
         } => {
             let config = create_config(&cli)?;
             let tx = Tenx::new(config);
@@ -260,9 +230,29 @@ async fn main() -> Result<()> {
                     print!("{}", chunk);
                 }
             });
-            let f = files.clone().unwrap_or_default();
-            let mut user_prompt = edit::edit_prompt(&f, attach)?;
-            user_prompt.docs = create_docs(docs, ruskel)?;
+
+            let user_prompt = if let Some(p) = prompt {
+                Prompt {
+                    attach_paths: attach.clone(),
+                    edit_paths: files.clone().unwrap_or_default(),
+                    user_prompt: p.clone(),
+                    docs: create_docs(docs, ruskel)?,
+                }
+            } else if let Some(file_path) = prompt_file {
+                let prompt_content =
+                    fs::read_to_string(file_path).context("Failed to read prompt file")?;
+                Prompt {
+                    attach_paths: attach.clone(),
+                    edit_paths: files.clone().unwrap_or_default(),
+                    user_prompt: prompt_content,
+                    docs: create_docs(docs, ruskel)?,
+                }
+            } else {
+                let f = files.clone().unwrap_or_default();
+                let mut p = edit::edit_prompt(&f, attach)?;
+                p.docs = create_docs(docs, ruskel)?;
+                p
+            };
 
             tx.resume(user_prompt, Some(sender)).await?;
 
