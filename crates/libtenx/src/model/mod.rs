@@ -29,7 +29,7 @@ impl Model for Models {
         sender: Option<mpsc::Sender<String>>,
     ) -> Result<Operations> {
         match self {
-            Models::Claude(c) => c.prompt(config, dialect, prompt, sender).await,
+            Models::Claude(c) => c.start(config, dialect, prompt, sender).await,
         }
     }
 }

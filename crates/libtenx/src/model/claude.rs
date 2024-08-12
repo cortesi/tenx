@@ -37,11 +37,12 @@ impl Default for Claude {
 }
 
 impl Claude {
-    /// Sends a prompt to Claude and returns the resulting operations.
+    /// Creates a new conversation, then sends a prompt to the active and returns the resulting
+    /// operations.
     ///
     /// Takes a reference to Tenx, a Prompt, and an optional mpsc::Sender for streaming text
     /// chunks. Returns a Result containing the extracted Operations.
-    pub async fn prompt(
+    pub async fn start(
         &mut self,
         config: &Config,
         dialect: &Dialects,

@@ -37,7 +37,8 @@ pub struct StateStore {
 
 impl StateStore {
     /// Creates a new StateStore with the specified base directory.
-    pub fn new<P: AsRef<Path>>(base_dir: Option<P>) -> Self {
+    /// Creates a new StateStore with the specified base directory.
+    pub fn new<P: AsRef<Path>>(base_dir: Option<P>) -> std::io::Result<Self> {
         let base_dir = base_dir
             .map(|p| p.as_ref().to_path_buf())
             .unwrap_or_else(|| {
@@ -46,14 +47,14 @@ impl StateStore {
                     .join("tenx")
                     .join("state")
             });
-        Self { base_dir }
+        fs::create_dir_all(&base_dir)?;
+        Ok(Self { base_dir })
     }
 
     /// Saves the given State to a file.
     pub fn save(&self, state: &State) -> std::io::Result<()> {
         let file_name = normalize_path(&state.working_directory);
         let file_path = self.base_dir.join(file_name);
-        fs::create_dir_all(self.base_dir.as_path())?;
         let serialized = serde_json::to_string(state)?;
         fs::write(file_path, serialized)
     }
@@ -92,19 +93,21 @@ mod tests {
     }
 
     #[test]
-    fn test_state_store() {
+    fn test_state_store() -> std::io::Result<()> {
         let temp_dir = TempDir::new().unwrap();
-        let state_store = StateStore::new(Some(temp_dir.path()));
+        let state_store = StateStore::new(Some(temp_dir.path()))?;
 
         let state = State::new(
             "/test/dir",
             Dialects::Tags(dialect::Tags {}),
             model::Models::Claude(model::Claude::default()),
         );
-        state_store.save(&state).unwrap();
+        state_store.save(&state)?;
 
-        let loaded_state = state_store.load("/test/dir").unwrap();
+        let loaded_state = state_store.load("/test/dir")?;
         assert_eq!(loaded_state.working_directory, state.working_directory);
         assert_eq!(loaded_state.dialect, state.dialect);
+        Ok(())
     }
 }
+

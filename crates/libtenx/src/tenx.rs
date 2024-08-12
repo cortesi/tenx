@@ -1,4 +1,7 @@
-use std::{fs, path::Path};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 use tokio::sync::mpsc;
 use tracing::warn;
@@ -6,12 +9,27 @@ use tracing::warn;
 use crate::{
     dialect::Dialects,
     model::{Model, Models},
-    Operation, Operations, Prompt, Result, State,
+    Operation, Operations, Prompt, Result, State, StateStore,
 };
 
 #[derive(Debug, Default)]
 pub struct Config {
     pub anthropic_key: String,
+    pub state_dir: Option<PathBuf>,
+}
+
+impl Config {
+    /// Sets the Anthropic API key.
+    pub fn with_anthropic_key(mut self, key: String) -> Self {
+        self.anthropic_key = key;
+        self
+    }
+
+    /// Sets the state directory.
+    pub fn with_state_dir<P: AsRef<Path>>(mut self, dir: P) -> Self {
+        self.state_dir = Some(dir.as_ref().to_path_buf());
+        self
+    }
 }
 
 /// Tenx is an AI-driven coding assistant.
@@ -21,18 +39,17 @@ pub struct Tenx {
 }
 
 impl Tenx {
-    /// Creates a new Context with the specified working directory and dialect.
-    pub fn new<P: AsRef<Path>>(working_directory: P, dialect: Dialects, model: Models) -> Self {
+    /// Creates a new Context with the specified working directory, dialect, model, and configuration.
+    pub fn new<P: AsRef<Path>>(
+        working_directory: P,
+        dialect: Dialects,
+        model: Models,
+        config: Config,
+    ) -> Self {
         Self {
             state: State::new(working_directory, dialect, model),
-            config: Config::default(),
+            config,
         }
-    }
-
-    /// Sets the Anthropic API key.
-    pub fn with_anthropic_key(mut self, key: String) -> Self {
-        self.config.anthropic_key = key;
-        self
     }
 
     /// Resets all files in the state snapshot to their original contents.
@@ -43,16 +60,18 @@ impl Tenx {
         Ok(())
     }
 
-    /// Sends a prompt to the model.
-    pub async fn prompt(
+    /// Sends a prompt to the model and updates the state.
+    pub async fn start(
         &mut self,
         mut prompt: Prompt,
         sender: Option<mpsc::Sender<String>>,
     ) -> Result<()> {
+        let state_store = StateStore::new(self.config.state_dir.as_ref())?;
+        state_store.save(&self.state)?;
+
         for doc in &mut prompt.docs {
             doc.resolve()?;
         }
-
         let ops = self
             .state
             .model
@@ -62,6 +81,8 @@ impl Tenx {
             warn!("{}", e);
             warn!("Resetting state...");
             self.reset()?;
+        } else {
+            state_store.save(&self.state)?;
         }
         Ok(())
     }

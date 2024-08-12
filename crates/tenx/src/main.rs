@@ -11,7 +11,8 @@ use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{fmt, EnvFilter};
 
 use libtenx::{
-    self, dialect::Dialects, model::Claude, model::Models, Contents, DocType, Docs, Prompt, Tenx,
+    self, dialect::Dialects, model::Claude, model::Models, Config, Contents, DocType, Docs, Prompt,
+    Tenx,
 };
 
 mod edit;
@@ -59,14 +60,18 @@ struct Cli {
     #[clap(long, env = "ANTHROPIC_API_KEY", hide_env_values = true, global = true)]
     anthropic_key: Option<String>,
 
+    /// State directory
+    #[clap(long, global = true)]
+    state_dir: Option<PathBuf>,
+
     #[clap(subcommand)]
     command: Commands,
 }
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Edit files interactively
-    Edit {
+    /// Start a new conversation
+    Start {
         /// Specifies files to edit
         #[clap(required = true, value_parser)]
         files: Vec<PathBuf>,
@@ -147,12 +152,18 @@ async fn main() -> Result<()> {
             docs,
             ruskel,
         } => {
+            let mut config =
+                Config::default().with_anthropic_key(cli.anthropic_key.clone().unwrap_or_default());
+            if let Some(state_dir) = cli.state_dir.clone() {
+                config = config.with_state_dir(state_dir);
+            }
+
             let mut tx = Tenx::new(
                 std::env::current_dir()?,
                 Dialects::Tags(libtenx::dialect::Tags::default()),
                 Models::Claude(Claude::default()),
-            )
-            .with_anthropic_key(cli.anthropic_key.clone().unwrap_or_default());
+                config,
+            );
 
             let user_prompt = if let Some(p) = prompt {
                 Prompt {
@@ -176,23 +187,29 @@ async fn main() -> Result<()> {
                 ));
             };
 
-            tx.prompt(user_prompt, None).await?;
+            tx.start(user_prompt, None).await?;
 
             info!("\n\n{}", "Changes applied successfully".green().bold());
             Ok(())
         }
-        Commands::Edit {
+        Commands::Start {
             files,
             attach,
             docs,
             ruskel,
         } => {
+            let mut config =
+                Config::default().with_anthropic_key(cli.anthropic_key.clone().unwrap_or_default());
+            if let Some(state_dir) = cli.state_dir.clone() {
+                config = config.with_state_dir(state_dir);
+            }
+
             let mut tx = Tenx::new(
                 std::env::current_dir()?,
                 Dialects::Tags(libtenx::dialect::Tags::default()),
                 Models::Claude(Claude::default()),
-            )
-            .with_anthropic_key(cli.anthropic_key.clone().unwrap_or_default());
+                config,
+            );
 
             let (sender, mut receiver) = mpsc::channel(100);
             let print_task = tokio::spawn(async move {
@@ -203,7 +220,7 @@ async fn main() -> Result<()> {
             let mut user_prompt = edit::edit_prompt(files, attach)?;
             user_prompt.docs = create_docs(docs, ruskel).await?;
 
-            tx.prompt(user_prompt, Some(sender)).await?;
+            tx.start(user_prompt, Some(sender)).await?;
 
             print_task.await?;
             info!("\n\n{}", "Changes applied successfully".green().bold());
@@ -211,3 +228,4 @@ async fn main() -> Result<()> {
         }
     }
 }
+
