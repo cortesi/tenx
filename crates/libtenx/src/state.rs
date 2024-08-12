@@ -8,7 +8,7 @@ use colored::*;
 use serde::{Deserialize, Serialize};
 
 use crate::dialect::Dialect;
-use crate::model::Model;
+use crate::model::{Model, ModelProvider};
 
 /// The serializable state of Tenx, which persists between invocations.
 #[derive(Debug, Deserialize, Serialize)]
@@ -33,7 +33,6 @@ impl State {
     /// Pretty prints the State information.
     pub fn pretty_print(&self) -> String {
         let mut output = String::new();
-
         output.push_str(&format!(
             "{}\n{:?}\n\n",
             "Working Directory:".blue().bold(),
@@ -52,7 +51,8 @@ impl State {
             self.dialect
         ));
 
-        output.push_str(&format!("{}\n{:?}\n", "Model:".blue().bold(), self.model));
+        output.push_str(&format!("{}\n", "Model:".blue().bold()));
+        self.model.pretty_print();
 
         output
     }
@@ -139,4 +139,3 @@ mod tests {
         Ok(())
     }
 }
-

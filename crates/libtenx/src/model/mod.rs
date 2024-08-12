@@ -13,7 +13,7 @@ use crate::{dialect::Dialect, Config, Operations, PromptInput, Result};
 
 /// Implemented by types that expose a prompt operation.
 #[async_trait]
-pub trait Prompt {
+pub trait ModelProvider {
     async fn prompt(
         &mut self,
         config: &Config,
@@ -21,6 +21,8 @@ pub trait Prompt {
         prompt: &PromptInput,
         sender: Option<mpsc::Sender<String>>,
     ) -> Result<Operations>;
+
+    fn pretty_print(&self);
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -30,7 +32,7 @@ pub enum Model {
 }
 
 #[async_trait]
-impl Prompt for Model {
+impl ModelProvider for Model {
     async fn prompt(
         &mut self,
         config: &Config,
@@ -39,8 +41,16 @@ impl Prompt for Model {
         sender: Option<mpsc::Sender<String>>,
     ) -> Result<Operations> {
         match self {
-            Model::Claude(c) => c.start(config, dialect, prompt, sender).await,
+            Model::Claude(c) => c.prompt(config, dialect, prompt, sender).await,
             Model::Dummy(d) => d.prompt(config, dialect, prompt, sender).await,
         }
     }
+
+    fn pretty_print(&self) {
+        match self {
+            Model::Claude(c) => c.pretty_print(),
+            Model::Dummy(d) => d.pretty_print(),
+        }
+    }
 }
+

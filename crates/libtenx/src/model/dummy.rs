@@ -1,5 +1,7 @@
+use colored::*;
 use serde::{Deserialize, Serialize};
 
+use super::ModelProvider;
 use crate::dialect::Dialect;
 use crate::{Config, Operations, PromptInput, Result};
 use async_trait::async_trait;
@@ -19,7 +21,7 @@ impl Dummy {
 }
 
 #[async_trait]
-impl super::Prompt for Dummy {
+impl ModelProvider for Dummy {
     async fn prompt(
         &mut self,
         _config: &Config,
@@ -29,4 +31,9 @@ impl super::Prompt for Dummy {
     ) -> Result<Operations> {
         Ok(self.operations.clone())
     }
+
+    fn pretty_print(&self) {
+        println!("{}", "Dummy Model".bold().yellow());
+    }
 }
+

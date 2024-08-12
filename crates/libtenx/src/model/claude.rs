@@ -1,8 +1,10 @@
+use colored::*;
 use tracing::warn;
 
 use misanthropy::{Anthropic, Content, ContentBlockDelta, Role, StreamEvent};
 use serde::{Deserialize, Serialize};
 
+use super::ModelProvider;
 use crate::{
     dialect::{Dialect, DialectProvider},
     operations, Config, Operations, PromptInput, Result,
@@ -18,50 +20,7 @@ pub struct Claude {
     conversation: misanthropy::MessagesRequest,
 }
 
-impl Default for Claude {
-    fn default() -> Self {
-        Claude {
-            conversation: misanthropy::MessagesRequest {
-                model: DEFAULT_MODEL.to_string(),
-                max_tokens: MAX_TOKENS,
-                messages: vec![],
-                system: None,
-                temperature: None,
-                stream: true,
-                tools: vec![],
-                tool_choice: misanthropy::ToolChoice::Auto,
-                stop_sequences: vec![],
-            },
-        }
-    }
-}
-
 impl Claude {
-    /// Creates a new conversation, then sends a prompt to the active and returns the resulting
-    /// operations.
-    ///
-    /// Takes a reference to Tenx, a Prompt, and an optional mpsc::Sender for streaming text
-    /// chunks. Returns a Result containing the extracted Operations.
-    pub async fn start(
-        &mut self,
-        config: &Config,
-        dialect: &Dialect,
-        prompt: &PromptInput,
-        sender: Option<mpsc::Sender<String>>,
-    ) -> Result<Operations> {
-        self.conversation.system = Some(dialect.system());
-        let txt = dialect.render(prompt)?;
-        self.conversation.messages.push(misanthropy::Message {
-            role: misanthropy::Role::User,
-            content: vec![misanthropy::Content::Text {
-                text: txt.to_string(),
-            }],
-        });
-        let resp = self.stream_response(&config.anthropic_key, sender).await?;
-        self.conversation.merge_response(&resp);
-        self.extract_operations()
-    }
-
     async fn stream_response(
         &mut self,
         api_key: &str,
@@ -108,3 +67,68 @@ impl Claude {
         Ok(operations)
     }
 }
+
+impl Default for Claude {
+    fn default() -> Self {
+        Claude {
+            conversation: misanthropy::MessagesRequest {
+                model: DEFAULT_MODEL.to_string(),
+                max_tokens: MAX_TOKENS,
+                messages: vec![],
+                system: None,
+                temperature: None,
+                stream: true,
+                tools: vec![],
+                tool_choice: misanthropy::ToolChoice::Auto,
+                stop_sequences: vec![],
+            },
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl ModelProvider for Claude {
+    fn pretty_print(&self) {
+        println!("{}", "Claude Model Conversation".bold().green());
+        println!("{}", "=========================".green());
+
+        // if let Some(system) = &self.conversation.system {
+        //     println!("{}", "System:".bold().blue());
+        //     println!("{}\n", system);
+        // }
+
+        for (i, message) in self.conversation.messages.iter().enumerate() {
+            let role = match message.role {
+                Role::User => "User".bold().yellow(),
+                Role::Assistant => "Assistant".bold().cyan(),
+            };
+            println!("{}. {}:", i + 1, role);
+            for content in &message.content {
+                if let Content::Text { text } = content {
+                    println!("{}\n", text);
+                }
+            }
+        }
+    }
+
+    async fn prompt(
+        &mut self,
+        config: &Config,
+        dialect: &Dialect,
+        prompt: &PromptInput,
+        sender: Option<mpsc::Sender<String>>,
+    ) -> Result<Operations> {
+        self.conversation.system = Some(dialect.system());
+        let txt = dialect.render(prompt)?;
+        self.conversation.messages.push(misanthropy::Message {
+            role: misanthropy::Role::User,
+            content: vec![misanthropy::Content::Text {
+                text: txt.to_string(),
+            }],
+        });
+        let resp = self.stream_response(&config.anthropic_key, sender).await?;
+        self.conversation.merge_response(&resp);
+        self.extract_operations()
+    }
+}
+
