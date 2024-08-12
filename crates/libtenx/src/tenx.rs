@@ -49,7 +49,6 @@ impl Tenx {
         mut prompt: Prompt,
         sender: Option<mpsc::Sender<String>>,
     ) -> Result<()> {
-        // Resolve docs
         for doc in &mut prompt.docs {
             doc.resolve()?;
         }

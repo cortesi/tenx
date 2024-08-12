@@ -17,7 +17,7 @@ pub trait Dialect {
     fn parse(&self, txt: &str) -> Result<Operations>;
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum Dialects {
     Tags(Tags),
 }

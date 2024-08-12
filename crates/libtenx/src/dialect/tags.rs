@@ -9,7 +9,7 @@ use crate::{Operation, Operations, Replace, Result, TenxError, WriteFile};
 
 const SYSTEM: &str = include_str!("./tags-system.txt");
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Tags {}
 
 impl Dialect for Tags {
