@@ -5,7 +5,7 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 echo $SCRIPT_DIR
 cd $SCRIPT_DIR/..
 
-cargo run -- edit \
+cargo run -- start \
     --prompt "Please complete the fibonacci function" \
     --show-query \
     $SCRIPT_DIR/simple/src/*.rs 

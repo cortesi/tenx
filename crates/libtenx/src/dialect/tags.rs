@@ -19,6 +19,7 @@ impl Dialect for Tags {
 
     fn render(&self, p: &Prompt) -> Result<String> {
         let mut rendered = String::new();
+        rendered.push_str("<input>\n");
 
         // Add editable files
         for path in &p.edit_paths {
@@ -51,7 +52,8 @@ impl Dialect for Tags {
         }
 
         // Add user prompt
-        rendered.push_str(&p.user_prompt);
+        rendered.push_str(&format!("\n<prompt>\n{}\n</prompt>\n\n", p.user_prompt));
+        rendered.push_str("</input>");
         Ok(rendered)
     }
 
