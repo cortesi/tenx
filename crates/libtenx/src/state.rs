@@ -51,8 +51,8 @@ impl State {
             self.dialect
         ));
 
-        output.push_str(&format!("{}\n", "Model:".blue().bold()));
-        self.model.pretty_print();
+output.push_str(&format!("{}\n", "Model:".blue().bold()));
+        output.push_str(&self.model.pretty_print());
 
         output
     }

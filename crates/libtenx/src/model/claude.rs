@@ -88,27 +88,24 @@ impl Default for Claude {
 
 #[async_trait::async_trait]
 impl ModelProvider for Claude {
-    fn pretty_print(&self) {
-        println!("{}", "Claude Model Conversation".bold().green());
-        println!("{}", "=========================".green());
-
-        // if let Some(system) = &self.conversation.system {
-        //     println!("{}", "System:".bold().blue());
-        //     println!("{}\n", system);
-        // }
+    fn pretty_print(&self) -> String {
+        let mut output = String::new();
+        output.push_str(&format!("{}\n", "Claude Model Conversation".bold().green()));
+        output.push_str(&format!("{}\n", "=========================".green()));
 
         for (i, message) in self.conversation.messages.iter().enumerate() {
             let role = match message.role {
                 Role::User => "User".bold().yellow(),
                 Role::Assistant => "Assistant".bold().cyan(),
             };
-            println!("{}. {}:", i + 1, role);
+            output.push_str(&format!("{}. {}:\n", i + 1, role));
             for content in &message.content {
                 if let Content::Text { text } = content {
-                    println!("{}\n", text);
+                    output.push_str(&format!("{}\n\n", text));
                 }
             }
         }
+        output
     }
 
     async fn prompt(

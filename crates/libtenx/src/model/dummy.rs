@@ -32,8 +32,7 @@ impl ModelProvider for Dummy {
         Ok(self.operations.clone())
     }
 
-    fn pretty_print(&self) {
-        println!("{}", "Dummy Model".bold().yellow());
+fn pretty_print(&self) -> String {
+        format!("{}\n", "Dummy Model".bold().yellow())
     }
 }
-

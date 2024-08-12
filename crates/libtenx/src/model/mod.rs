@@ -22,7 +22,7 @@ pub trait ModelProvider {
         sender: Option<mpsc::Sender<String>>,
     ) -> Result<Operations>;
 
-    fn pretty_print(&self);
+fn pretty_print(&self) -> String;
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -46,11 +46,10 @@ impl ModelProvider for Model {
         }
     }
 
-    fn pretty_print(&self) {
+fn pretty_print(&self) -> String {
         match self {
             Model::Claude(c) => c.pretty_print(),
             Model::Dummy(d) => d.pretty_print(),
         }
     }
 }
-
