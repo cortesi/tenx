@@ -6,21 +6,21 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
-use crate::dialect::Dialects;
-use crate::model::Models;
+use crate::dialect::Dialect;
+use crate::model::Model;
 
 /// The serializable state of Tenx, which persists between invocations.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct State {
     pub snapshot: HashMap<PathBuf, String>,
     pub working_directory: PathBuf,
-    pub dialect: Dialects,
-    pub model: Models,
+    pub dialect: Dialect,
+    pub model: Model,
 }
 
 impl State {
     /// Creates a new Context with the specified working directory and dialect.
-    pub fn new<P: AsRef<Path>>(working_directory: P, dialect: Dialects, model: Models) -> Self {
+    pub fn new<P: AsRef<Path>>(working_directory: P, dialect: Dialect, model: Model) -> Self {
         Self {
             snapshot: HashMap::new(),
             working_directory: working_directory.as_ref().to_path_buf(),
@@ -100,8 +100,8 @@ mod tests {
 
         let state = State::new(
             "/test/dir",
-            Dialects::Tags(dialect::Tags {}),
-            model::Models::Claude(model::Claude::default()),
+            Dialect::Tags(dialect::Tags {}),
+            model::Model::Claude(model::Claude::default()),
         );
         state_store.save(&state)?;
 
@@ -111,4 +111,3 @@ mod tests {
         Ok(())
     }
 }
-

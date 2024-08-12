@@ -4,8 +4,8 @@ use misanthropy::{Anthropic, Content, ContentBlockDelta, Role, StreamEvent};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    dialect::{Dialect, Dialects},
-    operations, Config, Operations, Prompt, Result,
+    dialect::{Dialect, DialectProvider},
+    operations, Config, Operations, PromptInput, Result,
 };
 
 const DEFAULT_MODEL: &str = "claude-3-5-sonnet-20240620";
@@ -45,8 +45,8 @@ impl Claude {
     pub async fn start(
         &mut self,
         config: &Config,
-        dialect: &Dialects,
-        prompt: &Prompt,
+        dialect: &Dialect,
+        prompt: &PromptInput,
         sender: Option<mpsc::Sender<String>>,
     ) -> Result<Operations> {
         self.conversation.system = Some(dialect.system());

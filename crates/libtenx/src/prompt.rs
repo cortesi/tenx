@@ -67,9 +67,9 @@ impl Docs {
     }
 }
 
-/// Prompt is an abstract representation of a single prompt in a conversation with a model.
+/// PromptInput is an abstract representation of a single prompt in a conversation with a model.
 #[derive(Debug, Default)]
-pub struct Prompt {
+pub struct PromptInput {
     /// Files to attach, but which the model can't edit
     pub attach_paths: Vec<PathBuf>,
     /// Editable paths

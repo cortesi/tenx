@@ -4,7 +4,7 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 
-use super::{Dialect, Prompt};
+use super::{DialectProvider, PromptInput};
 use crate::{Operation, Operations, Replace, Result, TenxError, WriteFile};
 
 const SYSTEM: &str = include_str!("./tags-system.txt");
@@ -12,12 +12,12 @@ const SYSTEM: &str = include_str!("./tags-system.txt");
 #[derive(Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Tags {}
 
-impl Dialect for Tags {
+impl DialectProvider for Tags {
     fn system(&self) -> String {
         SYSTEM.to_string()
     }
 
-    fn render(&self, p: &Prompt) -> Result<String> {
+    fn render(&self, p: &PromptInput) -> Result<String> {
         let mut rendered = String::new();
         rendered.push_str("<input>\n");
 

@@ -6,7 +6,7 @@ use std::{
 use tokio::sync::mpsc;
 use tracing::warn;
 
-use crate::{model::Model, Operation, Operations, Prompt, Result, State, StateStore};
+use crate::{model::Prompt, Operation, Operations, PromptInput, Result, State, StateStore};
 
 #[derive(Debug, Default)]
 pub struct Config {
@@ -51,7 +51,7 @@ impl Tenx {
     pub async fn start(
         &self,
         state: &mut State,
-        prompt: Prompt,
+        prompt: PromptInput,
         sender: Option<mpsc::Sender<String>>,
     ) -> Result<()> {
         let state_store = StateStore::new(self.config.state_dir.as_ref())?;
@@ -61,7 +61,11 @@ impl Tenx {
     }
 
     /// Resumes a session by loading the state and sending a prompt to the model.
-    pub async fn resume(&self, prompt: Prompt, sender: Option<mpsc::Sender<String>>) -> Result<()> {
+    pub async fn resume(
+        &self,
+        prompt: PromptInput,
+        sender: Option<mpsc::Sender<String>>,
+    ) -> Result<()> {
         let state_store = StateStore::new(self.config.state_dir.as_ref())?;
         let mut state = state_store.load(&std::env::current_dir()?)?;
         self.process_prompt(&mut state, prompt, sender, &state_store)
@@ -72,7 +76,7 @@ impl Tenx {
     async fn process_prompt(
         &self,
         state: &mut State,
-        mut prompt: Prompt,
+        mut prompt: PromptInput,
         sender: Option<mpsc::Sender<String>>,
         state_store: &StateStore,
     ) -> Result<()> {
@@ -144,7 +148,7 @@ impl Tenx {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{dialect::Dialects, model::Models, operations::Operation, operations::Replace};
+    use crate::{dialect::Dialect, model::Model, operations::Operation, operations::Replace};
     use std::fs;
     use tempfile::tempdir;
 
@@ -159,18 +163,18 @@ mod tests {
 
         let mut state = State {
             working_directory: temp_dir.path().to_path_buf(),
-            model: Models::Dummy(crate::model::Dummy::new(Operations {
+            model: Model::Dummy(crate::model::Dummy::new(Operations {
                 operations: vec![Operation::Replace(Replace {
                     path: file_path.clone(),
                     old: "Initial content".to_string(),
                     new: "Updated content".to_string(),
                 })],
             })),
-            dialect: Dialects::Tags(crate::dialect::Tags::default()),
+            dialect: Dialect::Tags(crate::dialect::Tags::default()),
             snapshot: std::collections::HashMap::new(),
         };
 
-        let prompt = Prompt {
+        let prompt = PromptInput {
             edit_paths: vec![file_path.clone()],
             user_prompt: "Test prompt".to_string(),
             ..Default::default()
@@ -184,4 +188,3 @@ mod tests {
         Ok(())
     }
 }
-

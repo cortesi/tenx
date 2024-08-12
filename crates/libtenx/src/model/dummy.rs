@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
-use crate::dialect::Dialects;
-use crate::{Config, Operations, Prompt, Result};
+use crate::dialect::Dialect;
+use crate::{Config, Operations, PromptInput, Result};
 use async_trait::async_trait;
 use tokio::sync::mpsc;
 
@@ -19,15 +19,14 @@ impl Dummy {
 }
 
 #[async_trait]
-impl super::Model for Dummy {
+impl super::Prompt for Dummy {
     async fn prompt(
         &mut self,
         _config: &Config,
-        _dialect: &Dialects,
-        _prompt: &Prompt,
+        _dialect: &Dialect,
+        _prompt: &PromptInput,
         _sender: Option<mpsc::Sender<String>>,
     ) -> Result<Operations> {
         Ok(self.operations.clone())
     }
 }
-

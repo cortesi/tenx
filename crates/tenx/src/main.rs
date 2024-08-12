@@ -11,8 +11,8 @@ use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{fmt, EnvFilter};
 
 use libtenx::{
-    self, dialect::Dialects, model::Claude, model::Models, Config, Contents, DocType, Docs, Prompt,
-    State, Tenx,
+    self, dialect::Dialect, model::Claude, model::Model, Config, Contents, DocType, Docs,
+    PromptInput, State, Tenx,
 };
 
 mod edit;
@@ -174,8 +174,8 @@ async fn main() -> Result<()> {
             let tx = Tenx::new(config);
             let mut state = State::new(
                 std::env::current_dir()?,
-                Dialects::Tags(libtenx::dialect::Tags::default()),
-                Models::Claude(Claude::default()),
+                Dialect::Tags(libtenx::dialect::Tags::default()),
+                Model::Claude(Claude::default()),
             );
 
             let (sender, mut receiver) = mpsc::channel(100);
@@ -186,7 +186,7 @@ async fn main() -> Result<()> {
             });
 
             let user_prompt = if let Some(p) = prompt {
-                Prompt {
+                PromptInput {
                     attach_paths: attach.clone(),
                     edit_paths: files.clone(),
                     user_prompt: p.clone(),
@@ -195,13 +195,13 @@ async fn main() -> Result<()> {
             } else if let Some(file_path) = prompt_file {
                 let prompt_content =
                     fs::read_to_string(file_path).context("Failed to read prompt file")?;
-                Prompt {
+                PromptInput {
                     attach_paths: attach.clone(),
                     edit_paths: files.clone(),
                     user_prompt: prompt_content,
                     docs: create_docs(docs, ruskel)?,
                 }
-} else {
+            } else {
                 match edit::edit_prompt(files, attach)? {
                     Some(mut p) => {
                         p.docs = create_docs(docs, ruskel)?;
@@ -236,7 +236,7 @@ async fn main() -> Result<()> {
             });
 
             let user_prompt = if let Some(p) = prompt {
-                Prompt {
+                PromptInput {
                     attach_paths: attach.clone(),
                     edit_paths: files.clone().unwrap_or_default(),
                     user_prompt: p.clone(),
@@ -245,13 +245,13 @@ async fn main() -> Result<()> {
             } else if let Some(file_path) = prompt_file {
                 let prompt_content =
                     fs::read_to_string(file_path).context("Failed to read prompt file")?;
-                Prompt {
+                PromptInput {
                     attach_paths: attach.clone(),
                     edit_paths: files.clone().unwrap_or_default(),
                     user_prompt: prompt_content,
                     docs: create_docs(docs, ruskel)?,
                 }
-} else {
+            } else {
                 let f = files.clone().unwrap_or_default();
                 match edit::edit_prompt(&f, attach)? {
                     Some(mut p) => {

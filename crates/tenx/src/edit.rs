@@ -3,7 +3,7 @@ use std::{fs, io::Write, path::PathBuf, process::Command};
 use tempfile::NamedTempFile;
 
 use indoc::indoc;
-use libtenx::Prompt;
+use libtenx::PromptInput;
 
 const EDITABLE_FILES_HEADING: &str = "### Editable files:";
 const CONTEXT_FILES_HEADING: &str = "### Context files:";
@@ -34,7 +34,7 @@ fn render_initial_text(files: &[PathBuf], attach: &[PathBuf]) -> String {
 }
 
 /// Parses the edited text into a Prompt.
-fn parse_edited_text(input: &str) -> Prompt {
+fn parse_edited_text(input: &str) -> PromptInput {
     let lines = input.lines();
     let mut user_prompt = String::new();
     let mut edit_paths = Vec::new();
@@ -58,7 +58,7 @@ fn parse_edited_text(input: &str) -> Prompt {
         }
     }
 
-    Prompt {
+    PromptInput {
         attach_paths,
         edit_paths,
         user_prompt: user_prompt.trim().to_string(),
@@ -67,7 +67,7 @@ fn parse_edited_text(input: &str) -> Prompt {
 }
 
 /// Opens an editor for the user to input their prompt.
-pub fn edit_prompt(files: &[PathBuf], attach: &[PathBuf]) -> Result<Option<Prompt>> {
+pub fn edit_prompt(files: &[PathBuf], attach: &[PathBuf]) -> Result<Option<PromptInput>> {
     let mut temp_file = NamedTempFile::new()?;
     let initial_text = render_initial_text(files, attach);
     temp_file.write_all(initial_text.as_bytes())?;
@@ -127,4 +127,3 @@ mod tests {
         );
     }
 }
-
