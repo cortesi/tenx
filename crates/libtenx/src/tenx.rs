@@ -80,6 +80,7 @@ impl Tenx {
         sender: Option<mpsc::Sender<String>>,
         state_store: &StateStore,
     ) -> Result<()> {
+        state.prompt_inputs.push(prompt.clone());
         for doc in &mut prompt.docs {
             doc.resolve()?;
         }
@@ -160,6 +161,11 @@ mod tests {
 
         let config = Config::default().with_state_dir(temp_dir.path());
         let tenx = Tenx::new(config);
+        let prompt = PromptInput {
+            edit_paths: vec![file_path.clone()],
+            user_prompt: "Test prompt".to_string(),
+            ..Default::default()
+        };
 
         let mut state = State {
             working_directory: temp_dir.path().to_path_buf(),
@@ -172,12 +178,7 @@ mod tests {
             })),
             dialect: Dialect::Tags(crate::dialect::Tags::default()),
             snapshot: std::collections::HashMap::new(),
-        };
-
-        let prompt = PromptInput {
-            edit_paths: vec![file_path.clone()],
-            user_prompt: "Test prompt".to_string(),
-            ..Default::default()
+            prompt_inputs: vec![prompt.clone()],
         };
 
         tenx.start(&mut state, prompt, None).await?;

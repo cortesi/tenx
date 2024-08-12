@@ -101,20 +101,20 @@ mod tests {
         create_dummy_project(temp_dir.path()).unwrap();
 
         let _temp_env = TempEnv::new(temp_dir.path())?;
-
-        let state = State {
-            working_directory: temp_dir.path().to_path_buf(),
-            model: Model::Dummy(crate::model::Dummy::default()),
-            dialect: Dialect::Tags(crate::dialect::Tags::default()),
-            snapshot: std::collections::HashMap::new(),
-        };
-
         let prompt = PromptInput {
             edit_paths: vec![
                 temp_dir.path().join("crate1/src/lib.rs"),
                 temp_dir.path().join("crate2/src/lib.rs"),
             ],
             ..Default::default()
+        };
+
+        let state = State {
+            working_directory: temp_dir.path().to_path_buf(),
+            model: Model::Dummy(crate::model::Dummy::default()),
+            dialect: Dialect::Tags(crate::dialect::Tags::default()),
+            snapshot: std::collections::HashMap::new(),
+            prompt_inputs: vec![prompt.clone()],
         };
 
         let checker = CargoChecker;
@@ -143,6 +143,7 @@ mod tests {
             model: Model::Dummy(crate::model::Dummy::default()),
             dialect: Dialect::Tags(crate::dialect::Tags::default()),
             snapshot: std::collections::HashMap::new(),
+            prompt_inputs: vec![prompt.clone()],
         };
 
         let workspace = RustWorkspace::discover(&prompt, &state)?;
@@ -172,6 +173,7 @@ mod tests {
             model: Model::Dummy(crate::model::Dummy::default()),
             dialect: Dialect::Tags(crate::dialect::Tags::default()),
             snapshot: std::collections::HashMap::new(),
+            prompt_inputs: vec![prompt.clone()],
         };
 
         let workspace = RustWorkspace::discover(&prompt, &state)?;
@@ -200,6 +202,7 @@ mod tests {
             model: Model::Dummy(crate::model::Dummy::default()),
             dialect: Dialect::Tags(crate::dialect::Tags::default()),
             snapshot: std::collections::HashMap::new(),
+            prompt_inputs: vec![prompt.clone()],
         };
 
         let result = RustWorkspace::discover(&prompt, &state);
@@ -222,6 +225,7 @@ mod tests {
             model: Model::Dummy(crate::model::Dummy::default()),
             dialect: Dialect::Tags(crate::dialect::Tags::default()),
             snapshot: std::collections::HashMap::new(),
+            prompt_inputs: vec![prompt.clone()],
         };
 
         let result = RustWorkspace::discover(&prompt, &state);
@@ -255,6 +259,7 @@ mod tests {
             model: Model::Dummy(crate::model::Dummy::default()),
             dialect: Dialect::Tags(crate::dialect::Tags::default()),
             snapshot: std::collections::HashMap::new(),
+            prompt_inputs: vec![prompt.clone()],
         };
 
         let result = RustWorkspace::discover(&prompt, &state);

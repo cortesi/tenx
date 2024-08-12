@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::dialect::Dialect;
 use crate::model::{Model, ModelProvider};
+use crate::prompt::PromptInput;
 
 /// The serializable state of Tenx, which persists between invocations.
 #[derive(Debug, Deserialize, Serialize)]
@@ -17,6 +18,7 @@ pub struct State {
     pub working_directory: PathBuf,
     pub dialect: Dialect,
     pub model: Model,
+    pub prompt_inputs: Vec<PromptInput>,
 }
 
 impl State {
@@ -27,6 +29,7 @@ impl State {
             working_directory: working_directory.as_ref().to_path_buf(),
             model,
             dialect,
+            prompt_inputs: Vec::new(),
         }
     }
 
@@ -51,7 +54,7 @@ impl State {
             self.dialect
         ));
 
-output.push_str(&format!("{}\n", "Model:".blue().bold()));
+        output.push_str(&format!("{}\n", "Model:".blue().bold()));
         output.push_str(&self.model.pretty_print());
 
         output

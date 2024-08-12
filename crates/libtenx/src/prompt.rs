@@ -1,15 +1,17 @@
 use std::path::PathBuf;
 
-use crate::{Result, TenxError};
 use libruskel::Ruskel;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone)]
+use crate::{Result, TenxError};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum DocType {
     Ruskel,
     Text,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum Contents {
     /// Unresolved content that should be read from a file
     Path(PathBuf),
@@ -20,7 +22,7 @@ pub enum Contents {
 }
 
 /// Reference material included in the prompt.
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Docs {
     /// The type of documentation.
     pub ty: DocType,
@@ -68,7 +70,7 @@ impl Docs {
 }
 
 /// PromptInput is an abstract representation of a single prompt in a conversation with a model.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub struct PromptInput {
     /// Files to attach, but which the model can't edit
     pub attach_paths: Vec<PathBuf>,
