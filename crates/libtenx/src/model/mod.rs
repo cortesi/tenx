@@ -1,7 +1,10 @@
 use serde::{Deserialize, Serialize};
 
 mod claude;
+mod dummy;
+
 pub use claude::Claude;
+pub use dummy::Dummy;
 
 use async_trait::async_trait;
 use tokio::sync::mpsc;
@@ -30,6 +33,7 @@ impl Model for Models {
     ) -> Result<Operations> {
         match self {
             Models::Claude(c) => c.start(config, dialect, prompt, sender).await,
+            Models::Dummy(d) => d.prompt(config, dialect, prompt, sender).await,
         }
     }
 }
@@ -37,4 +41,6 @@ impl Model for Models {
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Models {
     Claude(Claude),
+    Dummy(Dummy),
 }
+
