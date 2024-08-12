@@ -9,6 +9,7 @@ pub enum DocType {
     Text,
 }
 
+#[derive(Debug)]
 pub enum Contents {
     /// Unresolved content that should be read from a file
     Path(PathBuf),
@@ -19,6 +20,7 @@ pub enum Contents {
 }
 
 /// Reference material included in the prompt.
+#[derive(Debug)]
 pub struct Docs {
     /// The type of documentation.
     pub ty: DocType,
@@ -66,6 +68,7 @@ impl Docs {
 }
 
 /// Prompt is an abstract representation of a single prompt in a conversation with a model.
+#[derive(Debug, Default)]
 pub struct Prompt {
     /// Files to attach, but which the model can't edit
     pub attach_paths: Vec<PathBuf>,
@@ -76,4 +79,3 @@ pub struct Prompt {
     /// Included documentation
     pub docs: Vec<Docs>,
 }
-

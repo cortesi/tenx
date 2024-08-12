@@ -144,9 +144,44 @@ impl Tenx {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{dialect::Dialects, model::Models, operations::Operation, operations::Replace};
+    use std::fs;
+    use tempfile::tempdir;
 
     #[tokio::test]
     async fn test_start() -> Result<()> {
+        let temp_dir = tempdir()?;
+        let file_path = temp_dir.path().join("test.txt");
+        fs::write(&file_path, "Initial content")?;
+
+        let config = Config::default().with_state_dir(temp_dir.path());
+        let tenx = Tenx::new(config);
+
+        let mut state = State {
+            working_directory: temp_dir.path().to_path_buf(),
+            model: Models::Dummy(crate::model::Dummy::new(Operations {
+                operations: vec![Operation::Replace(Replace {
+                    path: file_path.clone(),
+                    old: "Initial content".to_string(),
+                    new: "Updated content".to_string(),
+                })],
+            })),
+            dialect: Dialects::Tags(crate::dialect::Tags::default()),
+            snapshot: std::collections::HashMap::new(),
+        };
+
+        let prompt = Prompt {
+            edit_paths: vec![file_path.clone()],
+            user_prompt: "Test prompt".to_string(),
+            ..Default::default()
+        };
+
+        tenx.start(&mut state, prompt, None).await?;
+
+        let updated_content = fs::read_to_string(&file_path)?;
+        assert_eq!(updated_content, "Updated content");
+
         Ok(())
     }
 }
+
