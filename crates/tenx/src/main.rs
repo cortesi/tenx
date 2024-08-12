@@ -12,7 +12,7 @@ use tracing_subscriber::{fmt, EnvFilter};
 
 use libtenx::{
     self, dialect::Dialects, model::Claude, model::Models, Config, Contents, DocType, Docs, Prompt,
-    Tenx,
+    State, Tenx,
 };
 
 mod edit;
@@ -158,11 +158,11 @@ async fn main() -> Result<()> {
                 config = config.with_state_dir(state_dir);
             }
 
-            let mut tx = Tenx::new(
+            let tx = Tenx::new(config);
+            let mut state = State::new(
                 std::env::current_dir()?,
                 Dialects::Tags(libtenx::dialect::Tags::default()),
                 Models::Claude(Claude::default()),
-                config,
             );
 
             let user_prompt = if let Some(p) = prompt {
@@ -187,7 +187,7 @@ async fn main() -> Result<()> {
                 ));
             };
 
-            tx.start(user_prompt, None).await?;
+            tx.start(&mut state, user_prompt, None).await?;
 
             info!("\n\n{}", "Changes applied successfully".green().bold());
             Ok(())
@@ -204,11 +204,11 @@ async fn main() -> Result<()> {
                 config = config.with_state_dir(state_dir);
             }
 
-            let mut tx = Tenx::new(
+            let tx = Tenx::new(config);
+            let mut state = State::new(
                 std::env::current_dir()?,
                 Dialects::Tags(libtenx::dialect::Tags::default()),
                 Models::Claude(Claude::default()),
-                config,
             );
 
             let (sender, mut receiver) = mpsc::channel(100);
@@ -220,7 +220,7 @@ async fn main() -> Result<()> {
             let mut user_prompt = edit::edit_prompt(files, attach)?;
             user_prompt.docs = create_docs(docs, ruskel).await?;
 
-            tx.start(user_prompt, Some(sender)).await?;
+            tx.start(&mut state, user_prompt, Some(sender)).await?;
 
             print_task.await?;
             info!("\n\n{}", "Changes applied successfully".green().bold());
