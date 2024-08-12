@@ -201,10 +201,14 @@ async fn main() -> Result<()> {
                     user_prompt: prompt_content,
                     docs: create_docs(docs, ruskel)?,
                 }
-            } else {
-                let mut p = edit::edit_prompt(files, attach)?;
-                p.docs = create_docs(docs, ruskel)?;
-                p
+} else {
+                match edit::edit_prompt(files, attach)? {
+                    Some(mut p) => {
+                        p.docs = create_docs(docs, ruskel)?;
+                        p
+                    }
+                    None => return Ok(()),
+                }
             };
 
             tx.start(&mut state, user_prompt, Some(sender)).await?;
@@ -247,11 +251,15 @@ async fn main() -> Result<()> {
                     user_prompt: prompt_content,
                     docs: create_docs(docs, ruskel)?,
                 }
-            } else {
+} else {
                 let f = files.clone().unwrap_or_default();
-                let mut p = edit::edit_prompt(&f, attach)?;
-                p.docs = create_docs(docs, ruskel)?;
-                p
+                match edit::edit_prompt(&f, attach)? {
+                    Some(mut p) => {
+                        p.docs = create_docs(docs, ruskel)?;
+                        p
+                    }
+                    None => return Ok(()),
+                }
             };
 
             tx.resume(user_prompt, Some(sender)).await?;
@@ -262,4 +270,3 @@ async fn main() -> Result<()> {
         }
     }
 }
-

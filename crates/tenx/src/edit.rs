@@ -67,7 +67,7 @@ fn parse_edited_text(input: &str) -> Prompt {
 }
 
 /// Opens an editor for the user to input their prompt.
-pub fn edit_prompt(files: &[PathBuf], attach: &[PathBuf]) -> Result<Prompt> {
+pub fn edit_prompt(files: &[PathBuf], attach: &[PathBuf]) -> Result<Option<Prompt>> {
     let mut temp_file = NamedTempFile::new()?;
     let initial_text = render_initial_text(files, attach);
     temp_file.write_all(initial_text.as_bytes())?;
@@ -79,7 +79,12 @@ pub fn edit_prompt(files: &[PathBuf], attach: &[PathBuf]) -> Result<Prompt> {
         .context("Failed to open editor")?;
     let edited_content =
         fs::read_to_string(temp_file.path()).context("Failed to read temporary file")?;
-    Ok(parse_edited_text(&edited_content))
+    let prompt = parse_edited_text(&edited_content);
+    if prompt.user_prompt.is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(prompt))
+    }
 }
 
 #[cfg(test)]
@@ -122,3 +127,4 @@ mod tests {
         );
     }
 }
+
