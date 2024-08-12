@@ -88,6 +88,24 @@ enum Commands {
         #[clap(long)]
         ruskel: Vec<String>,
     },
+    /// Resume an existing conversation
+    Resume {
+        /// Specifies files to edit
+        #[clap(value_parser)]
+        files: Option<Vec<PathBuf>>,
+
+        /// Specifies files to attach (but not edit)
+        #[clap(short, long, value_parser)]
+        attach: Vec<PathBuf>,
+
+        /// Add documentation file
+        #[clap(long, value_parser)]
+        docs: Vec<PathBuf>,
+
+        /// Add ruskel documentation
+        #[clap(long)]
+        ruskel: Vec<String>,
+    },
     /// Non-interactive editing of files
     Oneshot {
         /// Specifies files to edit
@@ -117,7 +135,7 @@ enum Commands {
 }
 
 /// Creates a vector of Docs from the provided paths and ruskel strings
-async fn create_docs(docs: &Vec<PathBuf>, ruskel: &[String]) -> Result<Vec<Docs>> {
+fn create_docs(docs: &Vec<PathBuf>, ruskel: &[String]) -> Result<Vec<Docs>> {
     let mut result = Vec::new();
     for path in docs {
         result.push(Docs {
@@ -136,6 +154,16 @@ async fn create_docs(docs: &Vec<PathBuf>, ruskel: &[String]) -> Result<Vec<Docs>
     Ok(result)
 }
 
+/// Creates a Config from CLI arguments
+fn create_config(cli: &Cli) -> Result<Config> {
+    let mut config =
+        Config::default().with_anthropic_key(cli.anthropic_key.clone().unwrap_or_default());
+    if let Some(state_dir) = cli.state_dir.clone() {
+        config = config.with_state_dir(state_dir);
+    }
+    Ok(config)
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -152,11 +180,7 @@ async fn main() -> Result<()> {
             docs,
             ruskel,
         } => {
-            let mut config =
-                Config::default().with_anthropic_key(cli.anthropic_key.clone().unwrap_or_default());
-            if let Some(state_dir) = cli.state_dir.clone() {
-                config = config.with_state_dir(state_dir);
-            }
+            let config = create_config(&cli)?;
 
             let tx = Tenx::new(config);
             let mut state = State::new(
@@ -170,7 +194,7 @@ async fn main() -> Result<()> {
                     attach_paths: attach.clone(),
                     edit_paths: files.clone(),
                     user_prompt: p.clone(),
-                    docs: create_docs(docs, ruskel).await?,
+                    docs: create_docs(docs, ruskel)?,
                 }
             } else if let Some(file_path) = prompt_file {
                 let prompt_content =
@@ -179,7 +203,7 @@ async fn main() -> Result<()> {
                     attach_paths: attach.clone(),
                     edit_paths: files.clone(),
                     user_prompt: prompt_content,
-                    docs: create_docs(docs, ruskel).await?,
+                    docs: create_docs(docs, ruskel)?,
                 }
             } else {
                 return Err(anyhow::anyhow!(
@@ -198,12 +222,7 @@ async fn main() -> Result<()> {
             docs,
             ruskel,
         } => {
-            let mut config =
-                Config::default().with_anthropic_key(cli.anthropic_key.clone().unwrap_or_default());
-            if let Some(state_dir) = cli.state_dir.clone() {
-                config = config.with_state_dir(state_dir);
-            }
-
+            let config = create_config(&cli)?;
             let tx = Tenx::new(config);
             let mut state = State::new(
                 std::env::current_dir()?,
@@ -218,9 +237,34 @@ async fn main() -> Result<()> {
                 }
             });
             let mut user_prompt = edit::edit_prompt(files, attach)?;
-            user_prompt.docs = create_docs(docs, ruskel).await?;
+            user_prompt.docs = create_docs(docs, ruskel)?;
 
             tx.start(&mut state, user_prompt, Some(sender)).await?;
+
+            print_task.await?;
+            info!("\n\n{}", "Changes applied successfully".green().bold());
+            Ok(())
+        }
+        Commands::Resume {
+            files,
+            attach,
+            docs,
+            ruskel,
+        } => {
+            let config = create_config(&cli)?;
+            let tx = Tenx::new(config);
+
+            let (sender, mut receiver) = mpsc::channel(100);
+            let print_task = tokio::spawn(async move {
+                while let Some(chunk) = receiver.recv().await {
+                    print!("{}", chunk);
+                }
+            });
+            let f = files.clone().unwrap_or_default();
+            let mut user_prompt = edit::edit_prompt(&f, attach)?;
+            user_prompt.docs = create_docs(docs, ruskel)?;
+
+            tx.resume(user_prompt, Some(sender)).await?;
 
             print_task.await?;
             info!("\n\n{}", "Changes applied successfully".green().bold());
