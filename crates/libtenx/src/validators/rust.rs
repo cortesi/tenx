@@ -1,13 +1,13 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use super::Checker;
+use super::Validator;
 use crate::{PromptInput, Result, State, TenxError};
 
 pub struct CargoChecker;
 
-impl Checker for CargoChecker {
-    fn check(&self, prompt: &PromptInput, state: &State) -> Result<()> {
+impl Validator for CargoChecker {
+    fn validate(&self, prompt: &PromptInput, state: &State) -> Result<()> {
         let workspace = RustWorkspace::discover(prompt, state)?;
         let output = Command::new("cargo")
             .arg("check")
@@ -118,7 +118,7 @@ mod tests {
         };
 
         let checker = CargoChecker;
-        assert!(checker.check(&prompt, &state).is_ok());
+        assert!(checker.validate(&prompt, &state).is_ok());
 
         Ok(())
     }
@@ -264,4 +264,3 @@ mod tests {
         Ok(())
     }
 }
-
