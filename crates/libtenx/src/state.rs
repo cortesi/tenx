@@ -4,6 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use colored::*;
 use serde::{Deserialize, Serialize};
 
 use crate::dialect::Dialect;
@@ -27,6 +28,33 @@ impl State {
             model,
             dialect,
         }
+    }
+
+    /// Pretty prints the State information.
+    pub fn pretty_print(&self) -> String {
+        let mut output = String::new();
+
+        output.push_str(&format!(
+            "{}\n{:?}\n\n",
+            "Working Directory:".blue().bold(),
+            self.working_directory
+        ));
+
+        output.push_str(&format!("{}\n", "Files in Snapshot:".blue().bold()));
+        for path in self.snapshot.keys() {
+            output.push_str(&format!("  - {:?}\n", path));
+        }
+        output.push('\n');
+
+        output.push_str(&format!(
+            "{}\n{:?}\n\n",
+            "Dialect:".blue().bold(),
+            self.dialect
+        ));
+
+        output.push_str(&format!("{}\n{:?}\n", "Model:".blue().bold(), self.model));
+
+        output
     }
 }
 
@@ -111,3 +139,4 @@ mod tests {
         Ok(())
     }
 }
+

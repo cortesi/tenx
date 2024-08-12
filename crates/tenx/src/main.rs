@@ -12,7 +12,7 @@ use tracing_subscriber::{fmt, EnvFilter};
 
 use libtenx::{
     self, dialect::Dialect, model::Claude, model::Model, Config, Contents, DocType, Docs,
-    PromptInput, State, Tenx,
+    PromptInput, State, StateStore, Tenx,
 };
 
 mod edit;
@@ -122,6 +122,8 @@ enum Commands {
         #[clap(long)]
         prompt_file: Option<PathBuf>,
     },
+    /// Show the current state
+    Show,
 }
 
 /// Creates a vector of Docs from the provided paths and ruskel strings
@@ -266,6 +268,13 @@ async fn main() -> Result<()> {
 
             print_task.await?;
             info!("\n\n{}", "Changes applied successfully".green().bold());
+            Ok(())
+        }
+Commands::Show => {
+            let config = create_config(&cli)?;
+            let state_store = StateStore::new(config.state_dir.as_ref())?;
+            let state = state_store.load(&std::env::current_dir()?)?;
+            println!("{}", state.pretty_print());
             Ok(())
         }
     }

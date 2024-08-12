@@ -2338,6 +2338,7 @@ name = "libtenx"
 version = "0.0.1"
 dependencies = [
  "async-trait",
+ "colored",
  "dirs",
  "indoc",
  "libruskel",
