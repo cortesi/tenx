@@ -84,10 +84,11 @@ impl Tenx {
         for doc in &mut prompt.docs {
             doc.resolve()?;
         }
-        let ops = state
-            .model
-            .prompt(&self.config, &state.dialect, &prompt, sender)
+        let mut model = state.model.take().unwrap();
+        let ops = model
+            .prompt(&self.config, &state.dialect, state, sender)
             .await?;
+        state.model = Some(model);
         match Self::apply_all(state, &ops) {
             Ok(_) => {
                 state_store.save(state)?;
@@ -169,13 +170,13 @@ mod tests {
 
         let mut state = State {
             working_directory: temp_dir.path().to_path_buf(),
-            model: Model::Dummy(crate::model::Dummy::new(Operations {
+            model: Some(Model::Dummy(crate::model::Dummy::new(Operations {
                 operations: vec![Operation::Replace(Replace {
                     path: file_path.clone(),
                     old: "Initial content".to_string(),
                     new: "Updated content".to_string(),
                 })],
-            })),
+            }))),
             dialect: Dialect::Tags(crate::dialect::Tags::default()),
             snapshot: std::collections::HashMap::new(),
             prompt_inputs: vec![prompt.clone()],
@@ -189,3 +190,4 @@ mod tests {
         Ok(())
     }
 }
+

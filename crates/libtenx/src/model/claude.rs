@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use super::ModelProvider;
 use crate::{
     dialect::{Dialect, DialectProvider},
-    operations, Config, Operations, PromptInput, Result,
+    operations, Config, Operations, Result, State, TenxError,
 };
 
 const DEFAULT_MODEL: &str = "claude-3-5-sonnet-20240620";
@@ -15,7 +15,7 @@ const MAX_TOKENS: u32 = 8192;
 
 use tokio::sync::mpsc;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Claude {
     conversation: misanthropy::MessagesRequest,
 }
@@ -112,10 +112,14 @@ impl ModelProvider for Claude {
         &mut self,
         config: &Config,
         dialect: &Dialect,
-        prompt: &PromptInput,
+        state: &State,
         sender: Option<mpsc::Sender<String>>,
     ) -> Result<Operations> {
         self.conversation.system = Some(dialect.system());
+        let prompt = state
+            .prompt_inputs
+            .last()
+            .ok_or(TenxError::Internal("no prompt inputs".into()))?;
         let txt = dialect.render(prompt)?;
         self.conversation.messages.push(misanthropy::Message {
             role: misanthropy::Role::User,

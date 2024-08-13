@@ -111,7 +111,7 @@ mod tests {
 
         let state = State {
             working_directory: temp_dir.path().to_path_buf(),
-            model: Model::Dummy(crate::model::Dummy::default()),
+            model: Some(Model::Dummy(crate::model::Dummy::default())),
             dialect: Dialect::Tags(crate::dialect::Tags::default()),
             snapshot: std::collections::HashMap::new(),
             prompt_inputs: vec![prompt.clone()],
@@ -140,7 +140,7 @@ mod tests {
 
         let state = State {
             working_directory: temp_dir.path().to_path_buf(),
-            model: Model::Dummy(crate::model::Dummy::default()),
+            model: Some(Model::Dummy(crate::model::Dummy::default())),
             dialect: Dialect::Tags(crate::dialect::Tags::default()),
             snapshot: std::collections::HashMap::new(),
             prompt_inputs: vec![prompt.clone()],
@@ -170,7 +170,7 @@ mod tests {
 
         let state = State {
             working_directory: temp_dir.path().to_path_buf(),
-            model: Model::Dummy(crate::model::Dummy::default()),
+            model: Some(Model::Dummy(crate::model::Dummy::default())),
             dialect: Dialect::Tags(crate::dialect::Tags::default()),
             snapshot: std::collections::HashMap::new(),
             prompt_inputs: vec![prompt.clone()],
@@ -199,7 +199,7 @@ mod tests {
 
         let state = State {
             working_directory: temp_dir.path().to_path_buf(),
-            model: Model::Dummy(crate::model::Dummy::default()),
+            model: Some(Model::Dummy(crate::model::Dummy::default())),
             dialect: Dialect::Tags(crate::dialect::Tags::default()),
             snapshot: std::collections::HashMap::new(),
             prompt_inputs: vec![prompt.clone()],
@@ -222,7 +222,7 @@ mod tests {
 
         let state = State {
             working_directory: temp_dir.path().to_path_buf(),
-            model: Model::Dummy(crate::model::Dummy::default()),
+            model: Some(Model::Dummy(crate::model::Dummy::default())),
             dialect: Dialect::Tags(crate::dialect::Tags::default()),
             snapshot: std::collections::HashMap::new(),
             prompt_inputs: vec![prompt.clone()],
@@ -256,7 +256,7 @@ mod tests {
 
         let state = State {
             working_directory: temp_dir1.path().to_path_buf(),
-            model: Model::Dummy(crate::model::Dummy::default()),
+            model: Some(Model::Dummy(crate::model::Dummy::default())),
             dialect: Dialect::Tags(crate::dialect::Tags::default()),
             snapshot: std::collections::HashMap::new(),
             prompt_inputs: vec![prompt.clone()],

@@ -27,6 +27,9 @@ pub enum TenxError {
 
     #[error("Resolution error: {0}")]
     Resolve(String),
+
+    #[error("Internal error: {0}")]
+    Internal(String),
 }
 
 impl From<misanthropy::Error> for TenxError {
@@ -34,3 +37,4 @@ impl From<misanthropy::Error> for TenxError {
         TenxError::Model(error.to_string())
     }
 }
+

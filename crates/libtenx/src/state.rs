@@ -17,7 +17,7 @@ pub struct State {
     pub snapshot: HashMap<PathBuf, String>,
     pub working_directory: PathBuf,
     pub dialect: Dialect,
-    pub model: Model,
+    pub model: Option<Model>,
     pub prompt_inputs: Vec<PromptInput>,
 }
 
@@ -27,7 +27,7 @@ impl State {
         Self {
             snapshot: HashMap::new(),
             working_directory: working_directory.as_ref().to_path_buf(),
-            model,
+            model: Some(model),
             dialect,
             prompt_inputs: Vec::new(),
         }
@@ -55,7 +55,12 @@ impl State {
         ));
 
         output.push_str(&format!("{}\n", "Model:".blue().bold()));
-        output.push_str(&self.model.pretty_print());
+        output.push_str(
+            &self
+                .model
+                .as_ref()
+                .map_or(String::new(), |m| m.pretty_print()),
+        );
 
         output
     }

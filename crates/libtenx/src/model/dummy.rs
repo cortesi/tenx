@@ -2,13 +2,13 @@ use colored::*;
 use serde::{Deserialize, Serialize};
 
 use super::ModelProvider;
-use crate::dialect::Dialect;
-use crate::{Config, Operations, PromptInput, Result};
 use async_trait::async_trait;
 use tokio::sync::mpsc;
 
+use crate::{dialect::Dialect, Config, Operations, Result, State};
+
 /// A dummy model for testing purposes.
-#[derive(Debug, Serialize, Deserialize, Default)]
+#[derive(Debug, Serialize, Deserialize, Default, Clone)]
 pub struct Dummy {
     operations: Operations,
 }
@@ -26,13 +26,14 @@ impl ModelProvider for Dummy {
         &mut self,
         _config: &Config,
         _dialect: &Dialect,
-        _prompt: &PromptInput,
+        _state: &State,
         _sender: Option<mpsc::Sender<String>>,
     ) -> Result<Operations> {
         Ok(self.operations.clone())
     }
 
-fn pretty_print(&self) -> String {
+    fn pretty_print(&self) -> String {
         format!("{}\n", "Dummy Model".bold().yellow())
     }
 }
+
