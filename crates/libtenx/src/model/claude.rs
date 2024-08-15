@@ -12,6 +12,7 @@ use crate::{
 
 const DEFAULT_MODEL: &str = "claude-3-5-sonnet-20240620";
 const MAX_TOKENS: u32 = 8192;
+const CONTEXT_LEADIN: &str = "Here is some immutable context that you may not edit.\n";
 
 use tokio::sync::mpsc;
 
@@ -120,15 +121,37 @@ impl ModelProvider for Claude {
             .prompt_inputs
             .last()
             .ok_or(TenxError::Internal("no prompt inputs".into()))?;
-        let txt = dialect.render(prompt)?;
-        self.conversation.messages.push(misanthropy::Message {
+
+        let context = dialect.render_context(state)?;
+        let ctx_u = misanthropy::Message {
             role: misanthropy::Role::User,
             content: vec![misanthropy::Content::Text {
-                text: txt.to_string(),
+                text: format!("{}\n{}", CONTEXT_LEADIN, context),
             }],
+        };
+        let ctx_a = misanthropy::Message {
+            role: misanthropy::Role::Assistant,
+            content: vec![misanthropy::Content::Text {
+                text: "Got it. What would you like me to do?".to_string(),
+            }],
+        };
+        if self.conversation.messages.is_empty() {
+            self.conversation.messages = vec![ctx_u, ctx_a];
+        } else {
+            assert!(self.conversation.messages.len() >= 2);
+            self.conversation.messages[0] = ctx_u;
+            self.conversation.messages[1] = ctx_a;
+        }
+
+        let txt = dialect.render_prompt(prompt)?;
+        self.conversation.messages.push(misanthropy::Message {
+            role: misanthropy::Role::User,
+            content: vec![misanthropy::Content::Text { text: txt }],
         });
+
         let resp = self.stream_response(&config.anthropic_key, sender).await?;
         self.conversation.merge_response(&resp);
         self.extract_operations()
     }
 }
+

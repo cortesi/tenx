@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 mod tags;
 
-use crate::{Operations, PromptInput, Result};
+use crate::{Operations, PromptInput, Result, Session};
 
 pub use tags::*;
 
@@ -12,7 +12,9 @@ pub trait DialectProvider {
     /// Return the system prompt for this dialect
     fn system(&self) -> String;
     /// Render a prompt to send to the model
-    fn render(&self, p: &PromptInput) -> Result<String>;
+    fn render_prompt(&self, p: &PromptInput) -> Result<String>;
+    /// Render the immutable context to be sent to the model
+    fn render_context(&self, p: &Session) -> Result<String>;
     /// Parse a model's response into concrete operations
     fn parse(&self, txt: &str) -> Result<Operations>;
 }
@@ -29,9 +31,15 @@ impl DialectProvider for Dialect {
         }
     }
 
-    fn render(&self, p: &PromptInput) -> Result<String> {
+    fn render_context(&self, s: &Session) -> Result<String> {
         match self {
-            Dialect::Tags(t) => t.render(p),
+            Dialect::Tags(t) => t.render_context(s),
+        }
+    }
+
+    fn render_prompt(&self, p: &PromptInput) -> Result<String> {
+        match self {
+            Dialect::Tags(t) => t.render_prompt(p),
         }
     }
 

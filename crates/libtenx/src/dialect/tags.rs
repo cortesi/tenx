@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 
 use super::{DialectProvider, PromptInput};
-use crate::{Operation, Operations, Replace, Result, TenxError, WriteFile};
+use crate::{Operation, Operations, Replace, Result, Session, TenxError, WriteFile};
 
 const SYSTEM: &str = include_str!("./tags-system.txt");
 
@@ -17,7 +17,24 @@ impl DialectProvider for Tags {
         SYSTEM.to_string()
     }
 
-    fn render(&self, p: &PromptInput) -> Result<String> {
+    fn render_context(&self, s: &Session) -> Result<String> {
+        let mut rendered = String::new();
+        rendered.push_str("<context>\n");
+
+        for ctx in &s.context {
+            rendered.push_str(&format!(
+                "<item name=\"{}\" type=\"{:?}\">\n{}\n</item>\n",
+                ctx.name,
+                ctx.ty,
+                ctx.to_string()?
+            ));
+        }
+
+        rendered.push_str("</context>");
+        Ok(rendered)
+    }
+
+    fn render_prompt(&self, p: &PromptInput) -> Result<String> {
         let mut rendered = String::new();
         rendered.push_str("<input>\n");
 
@@ -213,3 +230,4 @@ mod tests {
         }
     }
 }
+

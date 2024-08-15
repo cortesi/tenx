@@ -7,7 +7,7 @@ use tokio::sync::mpsc;
 use tracing::warn;
 
 use crate::{
-    model::ModelProvider, Operation, Operations, PromptInput, Result, Session, StateStore,
+    model::ModelProvider, Operation, Operations, PromptInput, Result, Session, SessionStore,
 };
 
 #[derive(Debug, Default)]
@@ -56,7 +56,7 @@ impl Tenx {
         prompt: PromptInput,
         sender: Option<mpsc::Sender<String>>,
     ) -> Result<()> {
-        let state_store = StateStore::new(self.config.state_dir.as_ref())?;
+        let state_store = SessionStore::new(self.config.state_dir.as_ref())?;
         state_store.save(state)?;
         self.process_prompt(state, prompt, sender, &state_store)
             .await
@@ -68,7 +68,7 @@ impl Tenx {
         prompt: PromptInput,
         sender: Option<mpsc::Sender<String>>,
     ) -> Result<()> {
-        let state_store = StateStore::new(self.config.state_dir.as_ref())?;
+        let state_store = SessionStore::new(self.config.state_dir.as_ref())?;
         let mut state = state_store.load(&std::env::current_dir()?)?;
         self.process_prompt(&mut state, prompt, sender, &state_store)
             .await
@@ -80,7 +80,7 @@ impl Tenx {
         state: &mut Session,
         mut prompt: PromptInput,
         sender: Option<mpsc::Sender<String>>,
-        state_store: &StateStore,
+        state_store: &SessionStore,
     ) -> Result<()> {
         state.prompt_inputs.push(prompt.clone());
         for doc in &mut prompt.docs {

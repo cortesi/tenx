@@ -1,7 +1,7 @@
 mod error;
 mod operations;
 mod prompt;
-mod state;
+mod session;
 mod tenx;
 mod testutils;
 mod validators;
@@ -12,6 +12,6 @@ pub mod model;
 pub use error::{Result, TenxError};
 pub use operations::*;
 pub use prompt::*;
-pub use state::*;
+pub use session::*;
 pub use tenx::*;
 pub use validators::*;

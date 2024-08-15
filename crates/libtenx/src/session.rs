@@ -39,40 +39,39 @@ pub struct Context {
     /// The name of the documentation.
     pub name: String,
     /// The contents of the help document.
-    pub contents: ContextData,
+    pub data: ContextData,
 }
 
 impl Context {
     /// Resolves the contents of the documentation.
     pub fn resolve(&mut self) -> Result<()> {
-        self.contents =
-            match std::mem::replace(&mut self.contents, ContextData::Resolved(String::new())) {
-                ContextData::Path(path) => {
-                    ContextData::Resolved(std::fs::read_to_string(path).map_err(TenxError::Io)?)
+        self.data = match std::mem::replace(&mut self.data, ContextData::Resolved(String::new())) {
+            ContextData::Path(path) => {
+                ContextData::Resolved(std::fs::read_to_string(path).map_err(TenxError::Io)?)
+            }
+            ContextData::Unresolved(content) => match self.ty {
+                ContextType::Ruskel => {
+                    let ruskel = Ruskel::new(&content);
+                    ContextData::Resolved(
+                        ruskel
+                            .render(false, false)
+                            .map_err(|e| TenxError::Resolve(e.to_string()))?,
+                    )
                 }
-                ContextData::Unresolved(content) => match self.ty {
-                    ContextType::Ruskel => {
-                        let ruskel = Ruskel::new(&content);
-                        ContextData::Resolved(
-                            ruskel
-                                .render(false, false)
-                                .map_err(|e| TenxError::Resolve(e.to_string()))?,
-                        )
-                    }
-                    ContextType::File => {
-                        return Err(TenxError::Resolve(
-                            "Cannot resolve unresolved Text content".to_string(),
-                        ))
-                    }
-                },
-                resolved @ ContextData::Resolved(_) => resolved,
-            };
+                ContextType::File => {
+                    return Err(TenxError::Resolve(
+                        "Cannot resolve unresolved Text content".to_string(),
+                    ))
+                }
+            },
+            resolved @ ContextData::Resolved(_) => resolved,
+        };
         Ok(())
     }
 
     /// Converts a Docs to a string representation.
     pub fn to_string(&self) -> Result<String> {
-        match &self.contents {
+        match &self.data {
             ContextData::Resolved(content) => Ok(content.clone()),
             _ => Err(TenxError::Parse("Unresolved doc content".to_string())),
         }
@@ -101,6 +100,11 @@ impl Session {
             prompt_inputs: vec![],
             context: vec![],
         }
+    }
+
+    /// Adds a new context to the session.
+    pub fn add_context(&mut self, context: Context) {
+        self.context.push(context);
     }
 
     /// Pretty prints the State information.
@@ -137,11 +141,11 @@ impl Session {
 }
 
 /// Manages the storage and retrieval of State objects.
-pub struct StateStore {
+pub struct SessionStore {
     base_dir: PathBuf,
 }
 
-impl StateStore {
+impl SessionStore {
     /// Creates a new StateStore with the specified base directory.
     /// Creates a new StateStore with the specified base directory.
     pub fn new<P: AsRef<Path>>(base_dir: Option<P>) -> std::io::Result<Self> {
@@ -202,7 +206,7 @@ mod tests {
     #[test]
     fn test_state_store() -> std::io::Result<()> {
         let temp_dir = TempDir::new().unwrap();
-        let state_store = StateStore::new(Some(temp_dir.path()))?;
+        let state_store = SessionStore::new(Some(temp_dir.path()))?;
 
         let state = Session::new(
             "/test/dir",
@@ -217,3 +221,4 @@ mod tests {
         Ok(())
     }
 }
+
