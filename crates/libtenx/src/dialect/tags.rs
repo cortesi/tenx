@@ -1,5 +1,5 @@
-//! Defines an interaction style where files are sent to the model in XML-like tags,
-//! and model responses are parsed from similar tags.
+//! Defines an interaction style where files are sent to the model in XML-like tags, and model
+//! responses are parsed from similar tags.
 
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -26,7 +26,7 @@ impl DialectProvider for Tags {
                 "<item name=\"{}\" type=\"{:?}\">\n{}\n</item>\n",
                 ctx.name,
                 ctx.ty,
-                ctx.to_string()?
+                ctx.body()?
             ));
         }
 
@@ -99,7 +99,6 @@ impl DialectProvider for Tags {
             }
             // Ignore other lines
         }
-
         Ok(operations)
     }
 }

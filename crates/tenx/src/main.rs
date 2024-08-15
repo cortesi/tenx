@@ -11,8 +11,8 @@ use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{fmt, EnvFilter};
 
 use libtenx::{
-    self, dialect::Dialect, model::Claude, model::Model, Config, Context, ContextData, ContextType,
-    PromptInput, Session, SessionStore, Tenx,
+    self, dialect::Dialect, model::Claude, model::Model, Config, PromptInput, Session,
+    SessionStore, Tenx,
 };
 
 mod edit;
@@ -138,7 +138,7 @@ async fn main() -> Result<()> {
             let config = load_config(&cli)?;
             let tx = Tenx::new(config);
             let mut state = Session::new(
-                std::env::current_dir()?,
+                None,
                 Dialect::Tags(libtenx::dialect::Tags::default()),
                 Model::Claude(Claude::default()),
             );
@@ -220,26 +220,17 @@ async fn main() -> Result<()> {
             let config = load_config(&cli)?;
             let tx = Tenx::new(config);
             let mut state = Session::new(
-                std::env::current_dir()?,
+                None,
                 Dialect::Tags(libtenx::dialect::Tags::default()),
                 Model::Claude(Claude::default()),
             );
 
             for file in files {
-                let content = fs::read_to_string(file)?;
-                state.add_context(Context {
-                    ty: ContextType::File,
-                    name: file.file_name().unwrap().to_string_lossy().into_owned(),
-                    data: ContextData::Resolved(content),
-                });
+                state.add_path(file)?;
             }
 
             for ruskel_doc in ruskel {
-                state.add_context(Context {
-                    ty: ContextType::Ruskel,
-                    name: ruskel_doc.clone(),
-                    data: ContextData::Unresolved(ruskel_doc.clone()),
-                });
+                state.add_ruskel(ruskel_doc.clone())?;
             }
 
             tx.save(state)?;
@@ -248,7 +239,7 @@ async fn main() -> Result<()> {
         }
         Commands::Show => {
             let config = load_config(&cli)?;
-            let session_store = SessionStore::new(config.state_dir.as_ref())?;
+            let session_store = SessionStore::open(config.state_dir.as_ref())?;
             let state = session_store.load(&std::env::current_dir()?)?;
             println!("{}", state.pretty_print());
             Ok(())

@@ -7,8 +7,8 @@ use crate::{PromptInput, Result, Session, TenxError};
 pub struct CargoChecker;
 
 impl Validator for CargoChecker {
-    fn validate(&self, prompt: &PromptInput, state: &Session) -> Result<()> {
-        let workspace = RustWorkspace::discover(prompt, state)?;
+    fn validate(&self, _prompt: &PromptInput, state: &Session) -> Result<()> {
+        let workspace = RustWorkspace::discover(state)?;
         let output = Command::new("cargo")
             .arg("check")
             .current_dir(&workspace.root_path)
@@ -33,14 +33,8 @@ struct RustWorkspace {
 }
 
 impl RustWorkspace {
-    pub fn discover(prompt: &PromptInput, state: &Session) -> Result<Self> {
-        let paths: Vec<PathBuf> = prompt
-            .edit_paths
-            .iter()
-            .chain(state.snapshot.keys())
-            .cloned()
-            .collect();
-        let common_ancestor = Self::find_common_ancestor(&paths)?;
+    pub fn discover(session: &Session) -> Result<Self> {
+        let common_ancestor = Self::find_common_ancestor(&session.edit_paths())?;
         let root_path = Self::find_workspace_root(&common_ancestor)?;
 
         Ok(RustWorkspace { root_path })
@@ -105,15 +99,15 @@ mod tests {
             ..Default::default()
         };
 
-        let mut state = Session::new(
-            temp_dir.path().to_path_buf(),
+        let mut session = Session::new(
+            Some(temp_dir.path().to_path_buf()),
             Dialect::Tags(crate::dialect::Tags::default()),
             Model::Dummy(crate::model::Dummy::default()),
         );
-        state.prompt_inputs.push(prompt.clone());
+        session.prompt_inputs.push(prompt.clone());
 
         let checker = CargoChecker;
-        assert!(checker.validate(&prompt, &state).is_ok());
+        assert!(checker.validate(&prompt, &session).is_ok());
 
         Ok(())
     }
@@ -133,14 +127,14 @@ mod tests {
             ..Default::default()
         };
 
-        let mut state = Session::new(
-            temp_dir.path().to_path_buf(),
+        let mut session = Session::new(
+            Some(temp_dir.path().to_path_buf()),
             Dialect::Tags(crate::dialect::Tags::default()),
             Model::Dummy(crate::model::Dummy::default()),
         );
-        state.prompt_inputs.push(prompt.clone());
+        session.prompt_inputs.push(prompt.clone());
 
-        let workspace = RustWorkspace::discover(&prompt, &state)?;
+        let workspace = RustWorkspace::discover(&session)?;
         assert_eq!(workspace.root_path, temp_dir.path());
 
         Ok(())
@@ -159,13 +153,13 @@ mod tests {
         };
 
         let mut state = Session::new(
-            temp_dir.path().to_path_buf(),
+            Some(temp_dir.path().to_path_buf()),
             Dialect::Tags(crate::dialect::Tags::default()),
             Model::Dummy(crate::model::Dummy::default()),
         );
         state.prompt_inputs.push(prompt.clone());
 
-        let workspace = RustWorkspace::discover(&prompt, &state)?;
+        let workspace = RustWorkspace::discover(&state)?;
 
         assert_eq!(workspace.root_path, temp_dir.path().join("crate1"));
 
@@ -184,13 +178,13 @@ mod tests {
         };
 
         let mut state = Session::new(
-            temp_dir.path().to_path_buf(),
+            Some(temp_dir.path().to_path_buf()),
             Dialect::Tags(crate::dialect::Tags::default()),
             Model::Dummy(crate::model::Dummy::default()),
         );
         state.prompt_inputs.push(prompt.clone());
 
-        let result = RustWorkspace::discover(&prompt, &state);
+        let result = RustWorkspace::discover(&state);
 
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().ends_with("root not found"));
@@ -206,13 +200,13 @@ mod tests {
         let prompt = PromptInput::default();
 
         let mut state = Session::new(
-            temp_dir.path().to_path_buf(),
+            Some(temp_dir.path().to_path_buf()),
             Dialect::Tags(crate::dialect::Tags::default()),
             Model::Dummy(crate::model::Dummy::default()),
         );
         state.prompt_inputs.push(prompt.clone());
 
-        let result = RustWorkspace::discover(&prompt, &state);
+        let result = RustWorkspace::discover(&state);
 
         assert!(result.is_err());
         assert!(result
@@ -239,13 +233,13 @@ mod tests {
         };
 
         let mut state = Session::new(
-            temp_dir1.path().to_path_buf(),
+            Some(temp_dir1.path().to_path_buf()),
             Dialect::Tags(crate::dialect::Tags::default()),
             Model::Dummy(crate::model::Dummy::default()),
         );
         state.prompt_inputs.push(prompt.clone());
 
-        let result = RustWorkspace::discover(&prompt, &state);
+        let result = RustWorkspace::discover(&state);
 
         assert!(result.is_err());
 

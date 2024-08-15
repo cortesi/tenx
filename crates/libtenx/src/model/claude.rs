@@ -206,7 +206,7 @@ mod tests {
     fn test_update_context_messages() -> Result<()> {
         let mut claude = Claude::default();
         let mut session = Session::new(
-            ".",
+            Some(".".into()),
             Dialect::Tags(crate::dialect::Tags {}),
             crate::model::Model::Claude(claude.clone()),
         );

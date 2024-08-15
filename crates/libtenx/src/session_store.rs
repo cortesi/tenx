@@ -20,7 +20,7 @@ pub struct SessionStore {
 impl SessionStore {
     /// Creates a new StateStore with the specified base directory.
     /// Creates a new StateStore with the specified base directory.
-    pub fn new<P: AsRef<Path>>(base_dir: Option<P>) -> std::io::Result<Self> {
+    pub fn open<P: AsRef<Path>>(base_dir: Option<P>) -> std::io::Result<Self> {
         let base_dir = base_dir
             .map(|p| p.as_ref().to_path_buf())
             .unwrap_or_else(|| {
@@ -71,10 +71,10 @@ mod tests {
     #[test]
     fn test_state_store() -> std::io::Result<()> {
         let temp_dir = TempDir::new().unwrap();
-        let state_store = SessionStore::new(Some(temp_dir.path()))?;
+        let state_store = SessionStore::open(Some(temp_dir.path()))?;
 
         let state = Session::new(
-            "/test/dir",
+            Some("/test/dir".into()),
             dialect::Dialect::Tags(dialect::Tags {}),
             model::Model::Claude(model::Claude::default()),
         );

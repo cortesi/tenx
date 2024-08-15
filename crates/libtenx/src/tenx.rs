@@ -43,16 +43,14 @@ impl Tenx {
 
     /// Saves a session to the store.
     pub fn save(&self, session: Session) -> Result<Session> {
-        let session_store = SessionStore::new(self.config.state_dir.as_ref())?;
+        let session_store = SessionStore::open(self.config.state_dir.as_ref())?;
         session_store.save(&session)?;
         Ok(session)
     }
 
     /// Resets all files in the state snapshot to their original contents.
     pub fn reset(state: &Session) -> Result<()> {
-        for (path, content) in &state.snapshot {
-            fs::write(path, content)?;
-        }
+        // FIXME
         Ok(())
     }
 
@@ -63,7 +61,7 @@ impl Tenx {
         prompt: PromptInput,
         sender: Option<mpsc::Sender<String>>,
     ) -> Result<()> {
-        let session_store = SessionStore::new(self.config.state_dir.as_ref())?;
+        let session_store = SessionStore::open(self.config.state_dir.as_ref())?;
         session_store.save(state)?;
         self.process_prompt(state, prompt, sender, &session_store)
             .await
@@ -75,7 +73,7 @@ impl Tenx {
         prompt: PromptInput,
         sender: Option<mpsc::Sender<String>>,
     ) -> Result<()> {
-        let session_store = SessionStore::new(self.config.state_dir.as_ref())?;
+        let session_store = SessionStore::open(self.config.state_dir.as_ref())?;
         let mut state = session_store.load(&std::env::current_dir()?)?;
         self.process_prompt(&mut state, prompt, sender, &session_store)
             .await
@@ -109,29 +107,7 @@ impl Tenx {
         }
     }
 
-    fn apply_all(state: &mut Session, operations: &Operations) -> Result<()> {
-        // Collect unique paths from operations
-        let affected_paths: std::collections::HashSet<_> = operations
-            .operations
-            .iter()
-            .map(|op| match op {
-                Operation::Replace(replace) => &replace.path,
-                Operation::Write(write) => &write.path,
-            })
-            .collect();
-
-        // Process affected paths
-        for path in affected_paths {
-            if !state.snapshot.contains_key(path) {
-                // If the file is not in the snapshot, read and store its contents
-                let content = fs::read_to_string(path)?;
-                state.snapshot.insert(path.to_path_buf(), content);
-            } else {
-                // If the file is in the snapshot, restore its contents to disk
-                let content = state.snapshot.get(path).unwrap();
-                fs::write(path, content)?;
-            }
-        }
+    fn apply_all(_state: &mut Session, operations: &Operations) -> Result<()> {
         for operation in &operations.operations {
             Self::apply(operation)?;
         }
@@ -175,7 +151,7 @@ mod tests {
         };
 
         let mut state = Session::new(
-            temp_dir.path(),
+            Some(temp_dir.path().to_path_buf()),
             Dialect::Tags(crate::dialect::Tags::default()),
             Model::Dummy(crate::model::Dummy::new(Operations {
                 operations: vec![Operation::Replace(Replace {

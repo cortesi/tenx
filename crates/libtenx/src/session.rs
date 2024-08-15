@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    env,
     path::{Path, PathBuf},
 };
 
@@ -19,8 +19,6 @@ pub enum ContextType {
 pub enum ContextData {
     /// Unresolved content that should be read from a file
     Path(PathBuf),
-    /// Unresolved content that will be resolved in accord with DocType.
-    Unresolved(String),
     /// Resolved content that can be passed to the model.
     Resolved(String),
 }
@@ -37,45 +35,35 @@ pub struct Context {
 }
 
 impl Context {
-    /// Resolves the contents of the documentation.
-    pub fn resolve(&mut self) -> Result<()> {
-        self.data = match std::mem::replace(&mut self.data, ContextData::Resolved(String::new())) {
-            ContextData::Path(path) => {
-                ContextData::Resolved(std::fs::read_to_string(path).map_err(TenxError::Io)?)
-            }
-            ContextData::Unresolved(content) => match self.ty {
-                ContextType::Ruskel => {
-                    let ruskel = Ruskel::new(&content);
-                    ContextData::Resolved(
-                        ruskel
-                            .render(false, false)
-                            .map_err(|e| TenxError::Resolve(e.to_string()))?,
-                    )
-                }
-                ContextType::File => {
-                    return Err(TenxError::Resolve(
-                        "Cannot resolve unresolved Text content".to_string(),
-                    ))
-                }
-            },
-            resolved @ ContextData::Resolved(_) => resolved,
-        };
-        Ok(())
-    }
-
     /// Converts a Docs to a string representation.
-    pub fn to_string(&self) -> Result<String> {
+    pub fn body(&self) -> Result<String> {
         match &self.data {
             ContextData::Resolved(content) => Ok(content.clone()),
-            _ => Err(TenxError::Parse("Unresolved doc content".to_string())),
+            ContextData::Path(path) => Ok(std::fs::read_to_string(path).map_err(TenxError::Io)?),
         }
     }
+}
+
+/// Finds the working directory based on the given path or git repo root.
+pub fn find_working_dir<P: AsRef<Path>>(path: Option<P>) -> PathBuf {
+    if let Some(p) = path {
+        return p.as_ref().to_path_buf();
+    }
+    let mut current_dir = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    loop {
+        if current_dir.join(".git").is_dir() {
+            return current_dir;
+        }
+        if !current_dir.pop() {
+            break;
+        }
+    }
+    env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
 }
 
 /// The serializable state of Tenx, which persists between invocations.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Session {
-    pub snapshot: HashMap<PathBuf, String>,
     pub working_directory: PathBuf,
     pub dialect: Dialect,
     pub model: Option<Model>,
@@ -85,10 +73,9 @@ pub struct Session {
 
 impl Session {
     /// Creates a new Context with the specified working directory and dialect.
-    pub fn new<P: AsRef<Path>>(working_directory: P, dialect: Dialect, model: Model) -> Self {
+    pub fn new(working_directory: Option<PathBuf>, dialect: Dialect, model: Model) -> Self {
         Self {
-            snapshot: HashMap::new(),
-            working_directory: working_directory.as_ref().to_path_buf(),
+            working_directory: find_working_dir(working_directory),
             model: Some(model),
             dialect,
             prompt_inputs: vec![],
@@ -96,9 +83,61 @@ impl Session {
         }
     }
 
+    /// Returns a vector of unique paths that have occurred in the prompt_inputs for the session.
+    pub fn edit_paths(&self) -> Vec<PathBuf> {
+        self.prompt_inputs
+            .iter()
+            .flat_map(|input| input.edit_paths.clone())
+            .collect::<std::collections::HashSet<_>>()
+            .into_iter()
+            .collect()
+    }
+
     /// Adds a new context to the session.
     pub fn add_context(&mut self, context: Context) {
         self.context.push(context);
+    }
+
+    /// Adds a file path context to the session, normalizing relative paths.
+    pub fn add_path<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
+        let path = path.as_ref();
+        let normalized_path = if path.is_relative() {
+            if let Ok(current_dir) = env::current_dir() {
+                let absolute_path = current_dir.join(path);
+                absolute_path
+                    .strip_prefix(&self.working_directory)
+                    .unwrap_or(&absolute_path)
+                    .to_path_buf()
+            } else {
+                self.working_directory.join(path)
+            }
+        } else {
+            path.to_path_buf()
+        };
+
+        let name = normalized_path.to_string_lossy().into_owned();
+
+        self.context.push(Context {
+            ty: ContextType::File,
+            name,
+            data: ContextData::Path(normalized_path),
+        });
+        Ok(())
+    }
+
+    /// Adds a Ruskel context to the session and resolves it.
+    pub fn add_ruskel(&mut self, name: String) -> Result<()> {
+        let ruskel = Ruskel::new(&name);
+        let resolved = ruskel
+            .render(false, false)
+            .map_err(|e| TenxError::Resolve(e.to_string()))?;
+
+        self.context.push(Context {
+            ty: ContextType::Ruskel,
+            name,
+            data: ContextData::Resolved(resolved),
+        });
+        Ok(())
     }
 
     /// Pretty prints the Session information.
@@ -109,24 +148,21 @@ impl Session {
             "Working Directory:".blue().bold(),
             self.working_directory
         ));
-
-        output.push_str(&format!("{}\n", "Files in Snapshot:".blue().bold()));
-        for path in self.snapshot.keys() {
-            output.push_str(&format!("  - {:?}\n", path));
-        }
-        output.push('\n');
-
         output.push_str(&format!(
             "{} {:?}\n",
             "Dialect:".blue().bold(),
             self.dialect
         ));
-
         output.push_str(&format!("{}\n", "Context:".blue().bold()));
         for context in &self.context {
             output.push_str(&format!("  - {:?}: {}\n", context.ty, context.name));
+        }
+        output.push_str(&format!("{}\n", "Edit Paths:".blue().bold()));
+        for path in self.edit_paths() {
+            output.push_str(&format!("  - {}\n", path.display()));
         }
 
         output
     }
 }
+
