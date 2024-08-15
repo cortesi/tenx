@@ -9,7 +9,7 @@ pub use dummy::Dummy;
 use async_trait::async_trait;
 use tokio::sync::mpsc;
 
-use crate::{dialect::Dialect, Config, Operations, Result, State};
+use crate::{dialect::Dialect, Config, Operations, Result, Session};
 
 /// Implemented by types that expose a prompt operation.
 #[async_trait]
@@ -18,7 +18,7 @@ pub trait ModelProvider {
         &mut self,
         config: &Config,
         dialect: &Dialect,
-        state: &State,
+        state: &Session,
         sender: Option<mpsc::Sender<String>>,
     ) -> Result<Operations>;
 
@@ -37,7 +37,7 @@ impl ModelProvider for Model {
         &mut self,
         config: &Config,
         dialect: &Dialect,
-        state: &State,
+        state: &Session,
         sender: Option<mpsc::Sender<String>>,
     ) -> Result<Operations> {
         match self {

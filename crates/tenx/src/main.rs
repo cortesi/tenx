@@ -12,7 +12,7 @@ use tracing_subscriber::{fmt, EnvFilter};
 
 use libtenx::{
     self, dialect::Dialect, model::Claude, model::Model, Config, Contents, DocType, Docs,
-    PromptInput, State, StateStore, Tenx,
+    PromptInput, Session, StateStore, Tenx,
 };
 
 mod edit;
@@ -174,7 +174,7 @@ async fn main() -> Result<()> {
         } => {
             let config = create_config(&cli)?;
             let tx = Tenx::new(config);
-            let mut state = State::new(
+            let mut state = Session::new(
                 std::env::current_dir()?,
                 Dialect::Tags(libtenx::dialect::Tags::default()),
                 Model::Claude(Claude::default()),
@@ -270,7 +270,7 @@ async fn main() -> Result<()> {
             info!("\n\n{}", "Changes applied successfully".green().bold());
             Ok(())
         }
-Commands::Show => {
+        Commands::Show => {
             let config = create_config(&cli)?;
             let state_store = StateStore::new(config.state_dir.as_ref())?;
             let state = state_store.load(&std::env::current_dir()?)?;

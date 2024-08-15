@@ -5,23 +5,92 @@ use std::{
 };
 
 use colored::*;
+use libruskel::Ruskel;
 use serde::{Deserialize, Serialize};
 
-use crate::dialect::Dialect;
-use crate::model::{Model, ModelProvider};
-use crate::prompt::PromptInput;
+use crate::{
+    dialect::Dialect,
+    model::{Model, ModelProvider},
+    prompt::PromptInput,
+    Result, TenxError,
+};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ContextType {
+    Ruskel,
+    File,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum ContextData {
+    /// Unresolved content that should be read from a file
+    Path(PathBuf),
+    /// Unresolved content that will be resolved in accord with DocType.
+    Unresolved(String),
+    /// Resolved content that can be passed to the model.
+    Resolved(String),
+}
+
+/// Reference material included in the prompt.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Context {
+    /// The type of documentation.
+    pub ty: ContextType,
+    /// The name of the documentation.
+    pub name: String,
+    /// The contents of the help document.
+    pub contents: ContextData,
+}
+
+impl Context {
+    /// Resolves the contents of the documentation.
+    pub fn resolve(&mut self) -> Result<()> {
+        self.contents =
+            match std::mem::replace(&mut self.contents, ContextData::Resolved(String::new())) {
+                ContextData::Path(path) => {
+                    ContextData::Resolved(std::fs::read_to_string(path).map_err(TenxError::Io)?)
+                }
+                ContextData::Unresolved(content) => match self.ty {
+                    ContextType::Ruskel => {
+                        let ruskel = Ruskel::new(&content);
+                        ContextData::Resolved(
+                            ruskel
+                                .render(false, false)
+                                .map_err(|e| TenxError::Resolve(e.to_string()))?,
+                        )
+                    }
+                    ContextType::File => {
+                        return Err(TenxError::Resolve(
+                            "Cannot resolve unresolved Text content".to_string(),
+                        ))
+                    }
+                },
+                resolved @ ContextData::Resolved(_) => resolved,
+            };
+        Ok(())
+    }
+
+    /// Converts a Docs to a string representation.
+    pub fn to_string(&self) -> Result<String> {
+        match &self.contents {
+            ContextData::Resolved(content) => Ok(content.clone()),
+            _ => Err(TenxError::Parse("Unresolved doc content".to_string())),
+        }
+    }
+}
 
 /// The serializable state of Tenx, which persists between invocations.
 #[derive(Debug, Deserialize, Serialize)]
-pub struct State {
+pub struct Session {
     pub snapshot: HashMap<PathBuf, String>,
     pub working_directory: PathBuf,
     pub dialect: Dialect,
     pub model: Option<Model>,
     pub prompt_inputs: Vec<PromptInput>,
+    pub context: Vec<Context>,
 }
 
-impl State {
+impl Session {
     /// Creates a new Context with the specified working directory and dialect.
     pub fn new<P: AsRef<Path>>(working_directory: P, dialect: Dialect, model: Model) -> Self {
         Self {
@@ -29,7 +98,8 @@ impl State {
             working_directory: working_directory.as_ref().to_path_buf(),
             model: Some(model),
             dialect,
-            prompt_inputs: Vec::new(),
+            prompt_inputs: vec![],
+            context: vec![],
         }
     }
 
@@ -89,7 +159,7 @@ impl StateStore {
     }
 
     /// Saves the given State to a file.
-    pub fn save(&self, state: &State) -> std::io::Result<()> {
+    pub fn save(&self, state: &Session) -> std::io::Result<()> {
         let file_name = normalize_path(&state.working_directory);
         let file_path = self.base_dir.join(file_name);
         let serialized = serde_json::to_string(state)?;
@@ -97,7 +167,7 @@ impl StateStore {
     }
 
     /// Loads a State from a file based on the given working directory.
-    pub fn load<P: AsRef<Path>>(&self, working_directory: P) -> std::io::Result<State> {
+    pub fn load<P: AsRef<Path>>(&self, working_directory: P) -> std::io::Result<Session> {
         let file_name = normalize_path(working_directory.as_ref());
         let file_path = self.base_dir.join(file_name);
         let serialized = fs::read_to_string(file_path)?;
@@ -134,7 +204,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let state_store = StateStore::new(Some(temp_dir.path()))?;
 
-        let state = State::new(
+        let state = Session::new(
             "/test/dir",
             Dialect::Tags(dialect::Tags {}),
             model::Model::Claude(model::Claude::default()),

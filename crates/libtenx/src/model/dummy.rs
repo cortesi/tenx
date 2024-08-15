@@ -5,7 +5,7 @@ use super::ModelProvider;
 use async_trait::async_trait;
 use tokio::sync::mpsc;
 
-use crate::{dialect::Dialect, Config, Operations, Result, State};
+use crate::{dialect::Dialect, Config, Operations, Result, Session};
 
 /// A dummy model for testing purposes.
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]
@@ -26,7 +26,7 @@ impl ModelProvider for Dummy {
         &mut self,
         _config: &Config,
         _dialect: &Dialect,
-        _state: &State,
+        _state: &Session,
         _sender: Option<mpsc::Sender<String>>,
     ) -> Result<Operations> {
         Ok(self.operations.clone())
@@ -36,4 +36,3 @@ impl ModelProvider for Dummy {
         format!("{}\n", "Dummy Model".bold().yellow())
     }
 }
-

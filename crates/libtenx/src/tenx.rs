@@ -6,7 +6,9 @@ use std::{
 use tokio::sync::mpsc;
 use tracing::warn;
 
-use crate::{model::ModelProvider, Operation, Operations, PromptInput, Result, State, StateStore};
+use crate::{
+    model::ModelProvider, Operation, Operations, PromptInput, Result, Session, StateStore,
+};
 
 #[derive(Debug, Default)]
 pub struct Config {
@@ -40,7 +42,7 @@ impl Tenx {
     }
 
     /// Resets all files in the state snapshot to their original contents.
-    pub fn reset(state: &State) -> Result<()> {
+    pub fn reset(state: &Session) -> Result<()> {
         for (path, content) in &state.snapshot {
             fs::write(path, content)?;
         }
@@ -50,7 +52,7 @@ impl Tenx {
     /// Sends a prompt to the model and updates the state.
     pub async fn start(
         &self,
-        state: &mut State,
+        state: &mut Session,
         prompt: PromptInput,
         sender: Option<mpsc::Sender<String>>,
     ) -> Result<()> {
@@ -75,7 +77,7 @@ impl Tenx {
     /// Common logic for processing a prompt and updating the state.
     async fn process_prompt(
         &self,
-        state: &mut State,
+        state: &mut Session,
         mut prompt: PromptInput,
         sender: Option<mpsc::Sender<String>>,
         state_store: &StateStore,
@@ -103,7 +105,7 @@ impl Tenx {
         }
     }
 
-    fn apply_all(state: &mut State, operations: &Operations) -> Result<()> {
+    fn apply_all(state: &mut Session, operations: &Operations) -> Result<()> {
         // Collect unique paths from operations
         let affected_paths: std::collections::HashSet<_> = operations
             .operations
@@ -168,19 +170,18 @@ mod tests {
             ..Default::default()
         };
 
-        let mut state = State {
-            working_directory: temp_dir.path().to_path_buf(),
-            model: Some(Model::Dummy(crate::model::Dummy::new(Operations {
+        let mut state = Session::new(
+            temp_dir.path(),
+            Dialect::Tags(crate::dialect::Tags::default()),
+            Model::Dummy(crate::model::Dummy::new(Operations {
                 operations: vec![Operation::Replace(Replace {
                     path: file_path.clone(),
                     old: "Initial content".to_string(),
                     new: "Updated content".to_string(),
                 })],
-            }))),
-            dialect: Dialect::Tags(crate::dialect::Tags::default()),
-            snapshot: std::collections::HashMap::new(),
-            prompt_inputs: vec![prompt.clone()],
-        };
+            })),
+        );
+        state.prompt_inputs.push(prompt.clone());
 
         tenx.start(&mut state, prompt, None).await?;
 
@@ -190,4 +191,3 @@ mod tests {
         Ok(())
     }
 }
-

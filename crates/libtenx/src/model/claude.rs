@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use super::ModelProvider;
 use crate::{
     dialect::{Dialect, DialectProvider},
-    operations, Config, Operations, Result, State, TenxError,
+    operations, Config, Operations, Result, Session, TenxError,
 };
 
 const DEFAULT_MODEL: &str = "claude-3-5-sonnet-20240620";
@@ -112,7 +112,7 @@ impl ModelProvider for Claude {
         &mut self,
         config: &Config,
         dialect: &Dialect,
-        state: &State,
+        state: &Session,
         sender: Option<mpsc::Sender<String>>,
     ) -> Result<Operations> {
         self.conversation.system = Some(dialect.system());
@@ -132,4 +132,3 @@ impl ModelProvider for Claude {
         self.extract_operations()
     }
 }
-

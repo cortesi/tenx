@@ -2,12 +2,12 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use super::Validator;
-use crate::{PromptInput, Result, State, TenxError};
+use crate::{PromptInput, Result, Session, TenxError};
 
 pub struct CargoChecker;
 
 impl Validator for CargoChecker {
-    fn validate(&self, prompt: &PromptInput, state: &State) -> Result<()> {
+    fn validate(&self, prompt: &PromptInput, state: &Session) -> Result<()> {
         let workspace = RustWorkspace::discover(prompt, state)?;
         let output = Command::new("cargo")
             .arg("check")
@@ -33,7 +33,7 @@ struct RustWorkspace {
 }
 
 impl RustWorkspace {
-    pub fn discover(prompt: &PromptInput, state: &State) -> Result<Self> {
+    pub fn discover(prompt: &PromptInput, state: &Session) -> Result<Self> {
         let paths: Vec<PathBuf> = prompt
             .edit_paths
             .iter()
@@ -81,10 +81,6 @@ impl RustWorkspace {
         }
         Err(TenxError::Workspace("Workspace root not found".to_string()))
     }
-
-    pub fn manifest_path(&self) -> PathBuf {
-        self.root_path.join("Cargo.toml")
-    }
 }
 
 #[cfg(test)]
@@ -109,13 +105,12 @@ mod tests {
             ..Default::default()
         };
 
-        let state = State {
-            working_directory: temp_dir.path().to_path_buf(),
-            model: Some(Model::Dummy(crate::model::Dummy::default())),
-            dialect: Dialect::Tags(crate::dialect::Tags::default()),
-            snapshot: std::collections::HashMap::new(),
-            prompt_inputs: vec![prompt.clone()],
-        };
+        let mut state = Session::new(
+            temp_dir.path().to_path_buf(),
+            Dialect::Tags(crate::dialect::Tags::default()),
+            Model::Dummy(crate::model::Dummy::default()),
+        );
+        state.prompt_inputs.push(prompt.clone());
 
         let checker = CargoChecker;
         assert!(checker.validate(&prompt, &state).is_ok());
@@ -138,20 +133,15 @@ mod tests {
             ..Default::default()
         };
 
-        let state = State {
-            working_directory: temp_dir.path().to_path_buf(),
-            model: Some(Model::Dummy(crate::model::Dummy::default())),
-            dialect: Dialect::Tags(crate::dialect::Tags::default()),
-            snapshot: std::collections::HashMap::new(),
-            prompt_inputs: vec![prompt.clone()],
-        };
+        let mut state = Session::new(
+            temp_dir.path().to_path_buf(),
+            Dialect::Tags(crate::dialect::Tags::default()),
+            Model::Dummy(crate::model::Dummy::default()),
+        );
+        state.prompt_inputs.push(prompt.clone());
 
         let workspace = RustWorkspace::discover(&prompt, &state)?;
-
-        assert_eq!(
-            workspace.manifest_path(),
-            temp_dir.path().join("Cargo.toml")
-        );
+        assert_eq!(workspace.root_path, temp_dir.path());
 
         Ok(())
     }
@@ -168,20 +158,16 @@ mod tests {
             ..Default::default()
         };
 
-        let state = State {
-            working_directory: temp_dir.path().to_path_buf(),
-            model: Some(Model::Dummy(crate::model::Dummy::default())),
-            dialect: Dialect::Tags(crate::dialect::Tags::default()),
-            snapshot: std::collections::HashMap::new(),
-            prompt_inputs: vec![prompt.clone()],
-        };
+        let mut state = Session::new(
+            temp_dir.path().to_path_buf(),
+            Dialect::Tags(crate::dialect::Tags::default()),
+            Model::Dummy(crate::model::Dummy::default()),
+        );
+        state.prompt_inputs.push(prompt.clone());
 
         let workspace = RustWorkspace::discover(&prompt, &state)?;
 
-        assert_eq!(
-            workspace.manifest_path(),
-            temp_dir.path().join("crate1/Cargo.toml")
-        );
+        assert_eq!(workspace.root_path, temp_dir.path().join("crate1"));
 
         Ok(())
     }
@@ -197,13 +183,12 @@ mod tests {
             ..Default::default()
         };
 
-        let state = State {
-            working_directory: temp_dir.path().to_path_buf(),
-            model: Some(Model::Dummy(crate::model::Dummy::default())),
-            dialect: Dialect::Tags(crate::dialect::Tags::default()),
-            snapshot: std::collections::HashMap::new(),
-            prompt_inputs: vec![prompt.clone()],
-        };
+        let mut state = Session::new(
+            temp_dir.path().to_path_buf(),
+            Dialect::Tags(crate::dialect::Tags::default()),
+            Model::Dummy(crate::model::Dummy::default()),
+        );
+        state.prompt_inputs.push(prompt.clone());
 
         let result = RustWorkspace::discover(&prompt, &state);
 
@@ -220,13 +205,12 @@ mod tests {
 
         let prompt = PromptInput::default();
 
-        let state = State {
-            working_directory: temp_dir.path().to_path_buf(),
-            model: Some(Model::Dummy(crate::model::Dummy::default())),
-            dialect: Dialect::Tags(crate::dialect::Tags::default()),
-            snapshot: std::collections::HashMap::new(),
-            prompt_inputs: vec![prompt.clone()],
-        };
+        let mut state = Session::new(
+            temp_dir.path().to_path_buf(),
+            Dialect::Tags(crate::dialect::Tags::default()),
+            Model::Dummy(crate::model::Dummy::default()),
+        );
+        state.prompt_inputs.push(prompt.clone());
 
         let result = RustWorkspace::discover(&prompt, &state);
 
@@ -254,13 +238,12 @@ mod tests {
             ..Default::default()
         };
 
-        let state = State {
-            working_directory: temp_dir1.path().to_path_buf(),
-            model: Some(Model::Dummy(crate::model::Dummy::default())),
-            dialect: Dialect::Tags(crate::dialect::Tags::default()),
-            snapshot: std::collections::HashMap::new(),
-            prompt_inputs: vec![prompt.clone()],
-        };
+        let mut state = Session::new(
+            temp_dir1.path().to_path_buf(),
+            Dialect::Tags(crate::dialect::Tags::default()),
+            Model::Dummy(crate::model::Dummy::default()),
+        );
+        state.prompt_inputs.push(prompt.clone());
 
         let result = RustWorkspace::discover(&prompt, &state);
 
