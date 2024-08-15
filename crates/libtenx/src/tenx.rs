@@ -85,14 +85,11 @@ impl Tenx {
     async fn process_prompt(
         &self,
         state: &mut Session,
-        mut prompt: PromptInput,
+        prompt: PromptInput,
         sender: Option<mpsc::Sender<String>>,
         state_store: &SessionStore,
     ) -> Result<()> {
         state.prompt_inputs.push(prompt.clone());
-        for doc in &mut prompt.docs {
-            doc.resolve()?;
-        }
         let mut model = state.model.take().unwrap();
         let ops = model
             .prompt(&self.config, &state.dialect, state, sender)

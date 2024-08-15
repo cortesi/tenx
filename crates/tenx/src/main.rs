@@ -11,8 +11,8 @@ use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{fmt, EnvFilter};
 
 use libtenx::{
-    self, dialect::Dialect, model::Claude, model::Model, Config, Contents, Context, ContextData,
-    ContextType, DocType, Docs, PromptInput, Session, SessionStore, Tenx,
+    self, dialect::Dialect, model::Claude, model::Model, Config, Context, ContextData, ContextType,
+    PromptInput, Session, SessionStore, Tenx,
 };
 
 mod edit;
@@ -76,18 +76,6 @@ enum Commands {
         #[clap(required = true, value_parser)]
         files: Vec<PathBuf>,
 
-        /// Specifies files to attach (but not edit)
-        #[clap(short, long, value_parser)]
-        attach: Vec<PathBuf>,
-
-        /// Add documentation file
-        #[clap(long, value_parser)]
-        docs: Vec<PathBuf>,
-
-        /// Add ruskel documentation
-        #[clap(long)]
-        ruskel: Vec<String>,
-
         /// User prompt for the edit operation
         #[clap(long)]
         prompt: Option<String>,
@@ -101,18 +89,6 @@ enum Commands {
         /// Specifies files to edit
         #[clap(value_parser)]
         files: Option<Vec<PathBuf>>,
-
-        /// Specifies files to attach (but not edit)
-        #[clap(short, long, value_parser)]
-        attach: Vec<PathBuf>,
-
-        /// Add documentation file
-        #[clap(long, value_parser)]
-        docs: Vec<PathBuf>,
-
-        /// Add ruskel documentation
-        #[clap(long)]
-        ruskel: Vec<String>,
 
         /// User prompt for the edit operation
         #[clap(long)]
@@ -136,26 +112,6 @@ enum Commands {
     Show,
 }
 
-/// Creates a vector of Docs from the provided paths and ruskel strings
-fn create_docs(docs: &Vec<PathBuf>, ruskel: &[String]) -> Result<Vec<Docs>> {
-    let mut result = Vec::new();
-    for path in docs {
-        result.push(Docs {
-            ty: DocType::Text,
-            name: path.file_name().unwrap().to_string_lossy().into_owned(),
-            contents: Contents::Path(path.clone()),
-        });
-    }
-    for name in ruskel.iter() {
-        result.push(Docs {
-            ty: DocType::Ruskel,
-            name: name.to_string(),
-            contents: Contents::Unresolved(name.to_string()),
-        });
-    }
-    Ok(result)
-}
-
 /// Creates a Config from CLI arguments
 fn create_config(cli: &Cli) -> Result<Config> {
     let mut config =
@@ -176,9 +132,6 @@ async fn main() -> Result<()> {
     match &cli.command {
         Commands::Start {
             files,
-            attach,
-            docs,
-            ruskel,
             prompt,
             prompt_file,
         } => {
@@ -199,26 +152,19 @@ async fn main() -> Result<()> {
 
             let user_prompt = if let Some(p) = prompt {
                 PromptInput {
-                    attach_paths: attach.clone(),
                     edit_paths: files.clone(),
                     user_prompt: p.clone(),
-                    docs: create_docs(docs, ruskel)?,
                 }
             } else if let Some(file_path) = prompt_file {
                 let prompt_content =
                     fs::read_to_string(file_path).context("Failed to read prompt file")?;
                 PromptInput {
-                    attach_paths: attach.clone(),
                     edit_paths: files.clone(),
                     user_prompt: prompt_content,
-                    docs: create_docs(docs, ruskel)?,
                 }
             } else {
-                match edit::edit_prompt(files, attach)? {
-                    Some(mut p) => {
-                        p.docs = create_docs(docs, ruskel)?;
-                        p
-                    }
+                match edit::edit_prompt(files)? {
+                    Some(p) => p,
                     None => return Ok(()),
                 }
             };
@@ -231,9 +177,6 @@ async fn main() -> Result<()> {
         }
         Commands::Resume {
             files,
-            attach,
-            docs,
-            ruskel,
             prompt,
             prompt_file,
         } => {
@@ -249,27 +192,20 @@ async fn main() -> Result<()> {
 
             let user_prompt = if let Some(p) = prompt {
                 PromptInput {
-                    attach_paths: attach.clone(),
                     edit_paths: files.clone().unwrap_or_default(),
                     user_prompt: p.clone(),
-                    docs: create_docs(docs, ruskel)?,
                 }
             } else if let Some(file_path) = prompt_file {
                 let prompt_content =
                     fs::read_to_string(file_path).context("Failed to read prompt file")?;
                 PromptInput {
-                    attach_paths: attach.clone(),
                     edit_paths: files.clone().unwrap_or_default(),
                     user_prompt: prompt_content,
-                    docs: create_docs(docs, ruskel)?,
                 }
             } else {
                 let f = files.clone().unwrap_or_default();
-                match edit::edit_prompt(&f, attach)? {
-                    Some(mut p) => {
-                        p.docs = create_docs(docs, ruskel)?;
-                        p
-                    }
+                match edit::edit_prompt(&f)? {
+                    Some(p) => p,
                     None => return Ok(()),
                 }
             };

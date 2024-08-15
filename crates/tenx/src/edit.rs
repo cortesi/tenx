@@ -14,7 +14,7 @@ fn get_editor() -> String {
 }
 
 /// Renders the initial text for the user to edit.
-fn render_initial_text(files: &[PathBuf], attach: &[PathBuf]) -> String {
+fn render_initial_text(files: &[PathBuf]) -> String {
     let mut text = String::from(indoc! {r#"
             
             # Enter your prompt above. You may edit the file lists below."
@@ -23,10 +23,6 @@ fn render_initial_text(files: &[PathBuf], attach: &[PathBuf]) -> String {
     });
     text.push_str(&format!("{}\n", EDITABLE_FILES_HEADING));
     for file in files {
-        text.push_str(&format!("{}\n", file.display()));
-    }
-    text.push_str(&format!("\n{}\n", CONTEXT_FILES_HEADING));
-    for file in attach {
         text.push_str(&format!("{}\n", file.display()));
     }
     text.push('\n');
@@ -59,17 +55,15 @@ fn parse_edited_text(input: &str) -> PromptInput {
     }
 
     PromptInput {
-        attach_paths,
         edit_paths,
         user_prompt: user_prompt.trim().to_string(),
-        docs: vec![],
     }
 }
 
 /// Opens an editor for the user to input their prompt.
-pub fn edit_prompt(files: &[PathBuf], attach: &[PathBuf]) -> Result<Option<PromptInput>> {
+pub fn edit_prompt(files: &[PathBuf]) -> Result<Option<PromptInput>> {
     let mut temp_file = NamedTempFile::new()?;
-    let initial_text = render_initial_text(files, attach);
+    let initial_text = render_initial_text(files);
     temp_file.write_all(initial_text.as_bytes())?;
     temp_file.flush()?;
     let editor = get_editor();
@@ -117,13 +111,6 @@ mod tests {
         assert_eq!(
             prompt.edit_paths,
             vec![PathBuf::from("src/main.rs"), PathBuf::from("src/lib.rs")]
-        );
-        assert_eq!(
-            prompt.attach_paths,
-            vec![
-                PathBuf::from("tests/test_main.rs"),
-                PathBuf::from("README.md")
-            ]
         );
     }
 }

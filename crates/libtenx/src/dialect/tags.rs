@@ -36,8 +36,6 @@ impl DialectProvider for Tags {
 
     fn render_prompt(&self, p: &PromptInput) -> Result<String> {
         let mut rendered = String::new();
-        rendered.push_str("<input>\n");
-
         // Add editable files
         for path in &p.edit_paths {
             let contents = fs::read_to_string(path)?;
@@ -48,29 +46,8 @@ impl DialectProvider for Tags {
             ));
         }
 
-        // Add context files
-        for path in &p.attach_paths {
-            let contents = fs::read_to_string(path)?;
-            rendered.push_str(&format!(
-                "\n<context path=\"{}\">\n{}</context>\n\n",
-                path.display(),
-                contents
-            ));
-        }
-
-        // Add docs
-        for doc in &p.docs {
-            if let Ok(contents) = doc.to_string() {
-                rendered.push_str(&format!(
-                    "\n<doc name=\"{}\" type=\"{:?}\">\n{}</doc>\n\n",
-                    doc.name, doc.ty, contents
-                ));
-            }
-        }
-
         // Add user prompt
         rendered.push_str(&format!("\n<prompt>\n{}\n</prompt>\n\n", p.user_prompt));
-        rendered.push_str("</input>");
         Ok(rendered)
     }
 
