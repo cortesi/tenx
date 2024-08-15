@@ -5,18 +5,18 @@ use super::ModelProvider;
 use async_trait::async_trait;
 use tokio::sync::mpsc;
 
-use crate::{dialect::Dialect, Config, Operations, Result, Session};
+use crate::{dialect::Dialect, ChangeSet, Config, Result, Session};
 
 /// A dummy model for testing purposes.
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]
 pub struct Dummy {
-    operations: Operations,
+    change_set: ChangeSet,
 }
 
 impl Dummy {
     /// Creates a new Dummy model with predefined operations.
-    pub fn new(operations: Operations) -> Self {
-        Self { operations }
+    pub fn new(change_set: ChangeSet) -> Self {
+        Self { change_set }
     }
 }
 
@@ -28,8 +28,8 @@ impl ModelProvider for Dummy {
         _dialect: &Dialect,
         _state: &Session,
         _sender: Option<mpsc::Sender<String>>,
-    ) -> Result<Operations> {
-        Ok(self.operations.clone())
+    ) -> Result<ChangeSet> {
+        Ok(self.change_set.clone())
     }
 
     fn pretty_print(&self) -> String {

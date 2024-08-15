@@ -9,7 +9,7 @@ pub use dummy::Dummy;
 use async_trait::async_trait;
 use tokio::sync::mpsc;
 
-use crate::{dialect::Dialect, Config, Operations, Result, Session};
+use crate::{dialect::Dialect, ChangeSet, Config, Result, Session};
 
 /// Implemented by types that expose a prompt operation.
 #[async_trait]
@@ -20,7 +20,7 @@ pub trait ModelProvider {
         dialect: &Dialect,
         state: &Session,
         sender: Option<mpsc::Sender<String>>,
-    ) -> Result<Operations>;
+    ) -> Result<ChangeSet>;
 
     fn pretty_print(&self) -> String;
 }
@@ -39,7 +39,7 @@ impl ModelProvider for Model {
         dialect: &Dialect,
         state: &Session,
         sender: Option<mpsc::Sender<String>>,
-    ) -> Result<Operations> {
+    ) -> Result<ChangeSet> {
         match self {
             Model::Claude(c) => c.prompt(config, dialect, state, sender).await,
             Model::Dummy(d) => d.prompt(config, dialect, state, sender).await,

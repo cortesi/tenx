@@ -22,8 +22,8 @@ pub enum TenxError {
     #[error("Parse error: {0}")]
     Parse(String),
 
-    #[error("Error applying operation: {0}")]
-    Operation(String),
+    #[error("Error applying change: {0}")]
+    Change(String),
 
     #[error("Resolution error: {0}")]
     Resolve(String),

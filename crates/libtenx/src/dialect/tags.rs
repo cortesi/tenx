@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 
 use super::{DialectProvider, PromptInput};
-use crate::{Operation, Operations, Replace, Result, Session, TenxError, WriteFile};
+use crate::{Change, ChangeSet, Replace, Result, Session, TenxError, WriteFile};
 
 const SYSTEM: &str = include_str!("./tags-system.txt");
 
@@ -51,7 +51,7 @@ impl DialectProvider for Tags {
         Ok(rendered)
     }
 
-    /// Parses a response string containing XML-like tags and returns a `Operations` struct.
+    /// Parses a response string containing XML-like tags and returns a `ChangeSet` struct.
     ///
     /// The input string should contain one or more of the following tags:
     ///
@@ -70,12 +70,12 @@ impl DialectProvider for Tags {
     /// </replace>
     /// ```
     ///
-    /// The function parses these tags and populates an `Operations` struct with
+    /// The function parses these tags and populates an `ChangeSet` struct with
     /// `WriteFile` entries for `<write_file>` tags and `Replace` entries for `<replace>` tags.
     /// Whitespace is trimmed from the content of all tags. Any text outside of recognized tags is
     /// ignored.
-    fn parse(&self, response: &str) -> Result<Operations> {
-        let mut operations = Operations::default();
+    fn parse(&self, response: &str) -> Result<ChangeSet> {
+        let mut change_set = ChangeSet::default();
         let mut lines = response.lines().peekable();
 
         while let Some(line) = lines.next() {
@@ -83,7 +83,7 @@ impl DialectProvider for Tags {
             if trimmed.starts_with("<write_file ") {
                 let path = extract_path(trimmed)?;
                 let content = parse_content(&mut lines, "write_file")?;
-                operations.operations.push(Operation::Write(WriteFile {
+                change_set.changes.push(Change::Write(WriteFile {
                     path: path.into(),
                     content,
                 }));
@@ -91,7 +91,7 @@ impl DialectProvider for Tags {
                 let path = extract_path(trimmed)?;
                 let old = parse_nested_content(&mut lines, "old")?;
                 let new = parse_nested_content(&mut lines, "new")?;
-                operations.operations.push(Operation::Replace(Replace {
+                change_set.changes.push(Change::Replace(Replace {
                     path: path.into(),
                     old,
                     new,
@@ -99,7 +99,7 @@ impl DialectProvider for Tags {
             }
             // Ignore other lines
         }
-        Ok(operations)
+        Ok(change_set)
     }
 }
 
@@ -183,26 +183,26 @@ mod tests {
         "#;
 
         let result = d.parse(input).unwrap();
-        assert_eq!(result.operations.len(), 2);
+        assert_eq!(result.changes.len(), 2);
 
-        match &result.operations[0] {
-            Operation::Write(write_file) => {
+        match &result.changes[0] {
+            Change::Write(write_file) => {
                 assert_eq!(write_file.path.as_os_str(), "/path/to/file2.txt");
                 assert_eq!(
                     write_file.content.trim(),
                     "This is the content of the file."
                 );
             }
-            _ => panic!("Expected WriteFile operation for /path/to/file2.txt"),
+            _ => panic!("Expected WriteFile for /path/to/file2.txt"),
         }
 
-        match &result.operations[1] {
-            Operation::Replace(replace) => {
+        match &result.changes[1] {
+            Change::Replace(replace) => {
                 assert_eq!(replace.path.as_os_str(), "/path/to/file.txt");
                 assert_eq!(replace.old.trim(), "Old content");
                 assert_eq!(replace.new.trim(), "New content");
             }
-            _ => panic!("Expected Replace operation for /path/to/file.txt"),
+            _ => panic!("Expected Replace for /path/to/file.txt"),
         }
     }
 }

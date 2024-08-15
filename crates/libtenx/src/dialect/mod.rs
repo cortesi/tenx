@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 mod tags;
 
-use crate::{Operations, PromptInput, Result, Session};
+use crate::{ChangeSet, PromptInput, Result, Session};
 
 pub use tags::*;
 
@@ -16,7 +16,7 @@ pub trait DialectProvider {
     /// Render the immutable context to be sent to the model
     fn render_context(&self, p: &Session) -> Result<String>;
     /// Parse a model's response into concrete operations
-    fn parse(&self, txt: &str) -> Result<Operations>;
+    fn parse(&self, txt: &str) -> Result<ChangeSet>;
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -43,7 +43,7 @@ impl DialectProvider for Dialect {
         }
     }
 
-    fn parse(&self, txt: &str) -> Result<Operations> {
+    fn parse(&self, txt: &str) -> Result<ChangeSet> {
         match self {
             Dialect::Tags(t) => t.parse(txt),
         }

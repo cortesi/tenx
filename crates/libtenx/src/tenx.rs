@@ -6,9 +6,7 @@ use std::{
 use tokio::sync::mpsc;
 use tracing::warn;
 
-use crate::{
-    model::ModelProvider, Operation, Operations, PromptInput, Result, Session, SessionStore,
-};
+use crate::{model::ModelProvider, Change, ChangeSet, PromptInput, Result, Session, SessionStore};
 
 #[derive(Debug, Default)]
 pub struct Config {
@@ -107,21 +105,21 @@ impl Tenx {
         }
     }
 
-    fn apply_all(_state: &mut Session, operations: &Operations) -> Result<()> {
-        for operation in &operations.operations {
-            Self::apply(operation)?;
+    fn apply_all(_state: &mut Session, change_set: &ChangeSet) -> Result<()> {
+        for change in &change_set.changes {
+            Self::apply(change)?;
         }
         Ok(())
     }
 
-    fn apply(operation: &Operation) -> Result<()> {
-        match operation {
-            Operation::Replace(replace) => {
+    fn apply(change: &Change) -> Result<()> {
+        match change {
+            Change::Replace(replace) => {
                 let current_content = fs::read_to_string(&replace.path)?;
                 let new_content = replace.apply(&current_content)?;
                 fs::write(&replace.path, &new_content)?;
             }
-            Operation::Write(write_file) => {
+            Change::Write(write_file) => {
                 fs::write(&write_file.path, &write_file.content)?;
             }
         }
@@ -132,7 +130,7 @@ impl Tenx {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{dialect::Dialect, model::Model, operations::Operation, operations::Replace};
+    use crate::{changes::Change, changes::Replace, dialect::Dialect, model::Model};
     use std::fs;
     use tempfile::tempdir;
 
@@ -153,8 +151,8 @@ mod tests {
         let mut state = Session::new(
             Some(temp_dir.path().to_path_buf()),
             Dialect::Tags(crate::dialect::Tags::default()),
-            Model::Dummy(crate::model::Dummy::new(Operations {
-                operations: vec![Operation::Replace(Replace {
+            Model::Dummy(crate::model::Dummy::new(ChangeSet {
+                changes: vec![Change::Replace(Replace {
                     path: file_path.clone(),
                     old: "Initial content".to_string(),
                     new: "Updated content".to_string(),
