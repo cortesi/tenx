@@ -67,6 +67,67 @@ impl Claude {
         }
         Ok(operations)
     }
+
+    /// Updates the context messages in the conversation.
+    ///
+    /// This method handles several scenarios:
+    /// - If the context is empty, it removes any existing context messages.
+    /// - If the conversation is empty, it appends the new context messages.
+    /// - If the conversation has existing context messages, it replaces them.
+    /// - If the conversation has messages but no context, it inserts the context at the start.
+    ///
+    /// # Arguments
+    ///
+    /// * `session` - The current session.
+    /// * `dialect` - The dialect used for rendering context.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` if the operation was successful, or an error if context rendering fails.
+    fn update_context_messages(&mut self, session: &Session) -> Result<()> {
+        let context = session.dialect.render_context(session)?;
+        if session.context.is_empty() {
+            // Remove existing context messages if present
+            self.conversation.messages.retain(|msg|
+                !(msg.role == misanthropy::Role::User && msg.content.iter().any(|c|
+                    matches!(c, misanthropy::Content::Text { text } if text.starts_with(CONTEXT_LEADIN))
+                ))
+            );
+            return Ok(());
+        }
+
+        let ctx_u = misanthropy::Message {
+            role: misanthropy::Role::User,
+            content: vec![misanthropy::Content::Text {
+                text: format!("{}\n{}", CONTEXT_LEADIN, context),
+            }],
+        };
+        let ctx_a = misanthropy::Message {
+            role: misanthropy::Role::Assistant,
+            content: vec![misanthropy::Content::Text {
+                text: "Got it. What would you like me to do?".to_string(),
+            }],
+        };
+
+        if self.conversation.messages.is_empty() {
+            // Append context messages if conversation is empty
+            self.conversation.messages = vec![ctx_u, ctx_a];
+        } else if self.conversation.messages.len() >= 2
+            && self.conversation.messages[0].role == misanthropy::Role::User
+            && self.conversation.messages[0].content.iter().any(|c|
+                matches!(c, misanthropy::Content::Text { text } if text.starts_with(CONTEXT_LEADIN))
+            ) {
+            // Replace existing context messages
+            self.conversation.messages[0] = ctx_u;
+            self.conversation.messages[1] = ctx_a;
+        } else {
+            // Insert context messages at the start
+            self.conversation.messages.insert(0, ctx_a);
+            self.conversation.messages.insert(0, ctx_u);
+        }
+
+        Ok(())
+    }
 }
 
 impl Default for Claude {
@@ -113,35 +174,16 @@ impl ModelProvider for Claude {
         &mut self,
         config: &Config,
         dialect: &Dialect,
-        state: &Session,
+        session: &Session,
         sender: Option<mpsc::Sender<String>>,
     ) -> Result<Operations> {
         self.conversation.system = Some(dialect.system());
-        let prompt = state
+        let prompt = session
             .prompt_inputs
             .last()
             .ok_or(TenxError::Internal("no prompt inputs".into()))?;
 
-        let context = dialect.render_context(state)?;
-        let ctx_u = misanthropy::Message {
-            role: misanthropy::Role::User,
-            content: vec![misanthropy::Content::Text {
-                text: format!("{}\n{}", CONTEXT_LEADIN, context),
-            }],
-        };
-        let ctx_a = misanthropy::Message {
-            role: misanthropy::Role::Assistant,
-            content: vec![misanthropy::Content::Text {
-                text: "Got it. What would you like me to do?".to_string(),
-            }],
-        };
-        if self.conversation.messages.is_empty() {
-            self.conversation.messages = vec![ctx_u, ctx_a];
-        } else {
-            assert!(self.conversation.messages.len() >= 2);
-            self.conversation.messages[0] = ctx_u;
-            self.conversation.messages[1] = ctx_a;
-        }
+        self.update_context_messages(session)?;
 
         let txt = dialect.render_prompt(prompt)?;
         self.conversation.messages.push(misanthropy::Message {
@@ -155,3 +197,73 @@ impl ModelProvider for Claude {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{dialect::Dialect, Context};
+
+    #[test]
+    fn test_update_context_messages() -> Result<()> {
+        let mut claude = Claude::default();
+        let mut session = Session::new(
+            ".",
+            Dialect::Tags(crate::dialect::Tags {}),
+            crate::model::Model::Claude(claude.clone()),
+        );
+
+        // Test empty context
+        claude.update_context_messages(&session)?;
+        assert!(claude.conversation.messages.is_empty());
+
+        // Test adding context to empty conversation
+        session.add_context(Context {
+            ty: crate::session::ContextType::File,
+            name: "test".to_string(),
+            data: crate::session::ContextData::Resolved("Test context".to_string()),
+        });
+        claude.update_context_messages(&session)?;
+        assert_eq!(claude.conversation.messages.len(), 2);
+        if let misanthropy::Content::Text { text } = &claude.conversation.messages[0].content[0] {
+            assert!(text.starts_with(CONTEXT_LEADIN));
+        } else {
+            panic!("Expected Text content");
+        }
+
+        // Test replacing existing context
+        session.add_context(Context {
+            ty: crate::session::ContextType::File,
+            name: "test2".to_string(),
+            data: crate::session::ContextData::Resolved("New test context".to_string()),
+        });
+        claude.update_context_messages(&session)?;
+        assert_eq!(claude.conversation.messages.len(), 2);
+        if let misanthropy::Content::Text { text } = &claude.conversation.messages[0].content[0] {
+            assert!(text.contains("New test context"));
+        } else {
+            panic!("Expected Text content");
+        }
+
+        // Test inserting context at start of non-empty conversation
+        claude.conversation.messages.push(misanthropy::Message {
+            role: misanthropy::Role::User,
+            content: vec![misanthropy::Content::Text {
+                text: "User message".to_string(),
+            }],
+        });
+        claude.update_context_messages(&session)?;
+
+        assert_eq!(claude.conversation.messages.len(), 3);
+        if let misanthropy::Content::Text { text } = &claude.conversation.messages[0].content[0] {
+            assert!(text.starts_with(CONTEXT_LEADIN));
+        } else {
+            panic!("Expected Text content");
+        }
+        if let misanthropy::Content::Text { text } = &claude.conversation.messages[2].content[0] {
+            assert_eq!(text, "User message");
+        } else {
+            panic!("Expected Text content");
+        }
+
+        Ok(())
+    }
+}

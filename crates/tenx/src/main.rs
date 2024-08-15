@@ -11,8 +11,8 @@ use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{fmt, EnvFilter};
 
 use libtenx::{
-    self, dialect::Dialect, model::Claude, model::Model, Config, Contents, DocType, Docs,
-    PromptInput, Session, SessionStore, Tenx,
+    self, dialect::Dialect, model::Claude, model::Model, Config, Contents, Context, ContextData,
+    ContextType, DocType, Docs, PromptInput, Session, SessionStore, Tenx,
 };
 
 mod edit;
@@ -121,6 +121,16 @@ enum Commands {
         /// Path to a file containing the prompt
         #[clap(long)]
         prompt_file: Option<PathBuf>,
+    },
+    /// Create a new session
+    Create {
+        /// Specifies files to add as context
+        #[clap(value_parser)]
+        files: Vec<PathBuf>,
+
+        /// Add ruskel documentation
+        #[clap(long)]
+        ruskel: Vec<String>,
     },
     /// Show the current state
     Show,
@@ -268,6 +278,36 @@ async fn main() -> Result<()> {
 
             print_task.await?;
             info!("\n\n{}", "Changes applied successfully".green().bold());
+            Ok(())
+        }
+        Commands::Create { files, ruskel } => {
+            let config = create_config(&cli)?;
+            let tx = Tenx::new(config);
+            let mut state = Session::new(
+                std::env::current_dir()?,
+                Dialect::Tags(libtenx::dialect::Tags::default()),
+                Model::Claude(Claude::default()),
+            );
+
+            for file in files {
+                let content = fs::read_to_string(file)?;
+                state.add_context(Context {
+                    ty: ContextType::File,
+                    name: file.file_name().unwrap().to_string_lossy().into_owned(),
+                    data: ContextData::Resolved(content),
+                });
+            }
+
+            for ruskel_doc in ruskel {
+                state.add_context(Context {
+                    ty: ContextType::Ruskel,
+                    name: ruskel_doc.clone(),
+                    data: ContextData::Unresolved(ruskel_doc.clone()),
+                });
+            }
+
+            tx.create(state)?;
+            info!("New session created successfully");
             Ok(())
         }
         Commands::Show => {

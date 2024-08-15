@@ -107,11 +107,11 @@ impl Session {
         self.context.push(context);
     }
 
-    /// Pretty prints the State information.
+    /// Pretty prints the Session information.
     pub fn pretty_print(&self) -> String {
         let mut output = String::new();
         output.push_str(&format!(
-            "{}\n{:?}\n\n",
+            "{} {:?}\n",
             "Working Directory:".blue().bold(),
             self.working_directory
         ));
@@ -123,18 +123,15 @@ impl Session {
         output.push('\n');
 
         output.push_str(&format!(
-            "{}\n{:?}\n\n",
+            "{} {:?}\n",
             "Dialect:".blue().bold(),
             self.dialect
         ));
 
-        output.push_str(&format!("{}\n", "Model:".blue().bold()));
-        output.push_str(
-            &self
-                .model
-                .as_ref()
-                .map_or(String::new(), |m| m.pretty_print()),
-        );
+        output.push_str(&format!("{}\n", "Context:".blue().bold()));
+        for context in &self.context {
+            output.push_str(&format!("  - {:?}: {}\n", context.ty, context.name));
+        }
 
         output
     }
@@ -221,4 +218,3 @@ mod tests {
         Ok(())
     }
 }
-

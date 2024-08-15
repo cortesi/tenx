@@ -41,6 +41,13 @@ impl Tenx {
         Self { config }
     }
 
+    /// Creates a new session, saves it to the store, and returns it.
+    pub fn create(&self, session: Session) -> Result<Session> {
+        let state_store = SessionStore::new(self.config.state_dir.as_ref())?;
+        state_store.save(&session)?;
+        Ok(session)
+    }
+
     /// Resets all files in the state snapshot to their original contents.
     pub fn reset(state: &Session) -> Result<()> {
         for (path, content) in &state.snapshot {
