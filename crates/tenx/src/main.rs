@@ -113,7 +113,7 @@ enum Commands {
 }
 
 /// Creates a Config from CLI arguments
-fn create_config(cli: &Cli) -> Result<Config> {
+fn load_config(cli: &Cli) -> Result<Config> {
     let mut config =
         Config::default().with_anthropic_key(cli.anthropic_key.clone().unwrap_or_default());
     if let Some(state_dir) = cli.state_dir.clone() {
@@ -135,7 +135,7 @@ async fn main() -> Result<()> {
             prompt,
             prompt_file,
         } => {
-            let config = create_config(&cli)?;
+            let config = load_config(&cli)?;
             let tx = Tenx::new(config);
             let mut state = Session::new(
                 std::env::current_dir()?,
@@ -180,7 +180,7 @@ async fn main() -> Result<()> {
             prompt,
             prompt_file,
         } => {
-            let config = create_config(&cli)?;
+            let config = load_config(&cli)?;
             let tx = Tenx::new(config);
 
             let (sender, mut receiver) = mpsc::channel(100);
@@ -217,7 +217,7 @@ async fn main() -> Result<()> {
             Ok(())
         }
         Commands::Create { files, ruskel } => {
-            let config = create_config(&cli)?;
+            let config = load_config(&cli)?;
             let tx = Tenx::new(config);
             let mut state = Session::new(
                 std::env::current_dir()?,
@@ -242,14 +242,14 @@ async fn main() -> Result<()> {
                 });
             }
 
-            tx.create(state)?;
+            tx.save(state)?;
             info!("New session created successfully");
             Ok(())
         }
         Commands::Show => {
-            let config = create_config(&cli)?;
-            let state_store = SessionStore::new(config.state_dir.as_ref())?;
-            let state = state_store.load(&std::env::current_dir()?)?;
+            let config = load_config(&cli)?;
+            let session_store = SessionStore::new(config.state_dir.as_ref())?;
+            let state = session_store.load(&std::env::current_dir()?)?;
             println!("{}", state.pretty_print());
             Ok(())
         }

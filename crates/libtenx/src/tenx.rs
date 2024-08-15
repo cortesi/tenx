@@ -41,10 +41,10 @@ impl Tenx {
         Self { config }
     }
 
-    /// Creates a new session, saves it to the store, and returns it.
-    pub fn create(&self, session: Session) -> Result<Session> {
-        let state_store = SessionStore::new(self.config.state_dir.as_ref())?;
-        state_store.save(&session)?;
+    /// Saves a session to the store.
+    pub fn save(&self, session: Session) -> Result<Session> {
+        let session_store = SessionStore::new(self.config.state_dir.as_ref())?;
+        session_store.save(&session)?;
         Ok(session)
     }
 
@@ -63,9 +63,9 @@ impl Tenx {
         prompt: PromptInput,
         sender: Option<mpsc::Sender<String>>,
     ) -> Result<()> {
-        let state_store = SessionStore::new(self.config.state_dir.as_ref())?;
-        state_store.save(state)?;
-        self.process_prompt(state, prompt, sender, &state_store)
+        let session_store = SessionStore::new(self.config.state_dir.as_ref())?;
+        session_store.save(state)?;
+        self.process_prompt(state, prompt, sender, &session_store)
             .await
     }
 
@@ -75,9 +75,9 @@ impl Tenx {
         prompt: PromptInput,
         sender: Option<mpsc::Sender<String>>,
     ) -> Result<()> {
-        let state_store = SessionStore::new(self.config.state_dir.as_ref())?;
-        let mut state = state_store.load(&std::env::current_dir()?)?;
-        self.process_prompt(&mut state, prompt, sender, &state_store)
+        let session_store = SessionStore::new(self.config.state_dir.as_ref())?;
+        let mut state = session_store.load(&std::env::current_dir()?)?;
+        self.process_prompt(&mut state, prompt, sender, &session_store)
             .await
     }
 
@@ -87,7 +87,7 @@ impl Tenx {
         state: &mut Session,
         prompt: PromptInput,
         sender: Option<mpsc::Sender<String>>,
-        state_store: &SessionStore,
+        session_store: &SessionStore,
     ) -> Result<()> {
         state.prompt_inputs.push(prompt.clone());
         let mut model = state.model.take().unwrap();
@@ -97,7 +97,7 @@ impl Tenx {
         state.model = Some(model);
         match Self::apply_all(state, &ops) {
             Ok(_) => {
-                state_store.save(state)?;
+                session_store.save(state)?;
                 Ok(())
             }
             Err(e) => {
