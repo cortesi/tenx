@@ -73,13 +73,13 @@ mod tests {
         let state_store = SessionStore::open(Some(temp_dir.path()))?;
 
         let state = Session::new(
-            Some("/test/dir".into()),
+            Some(temp_dir.path().to_path_buf()),
             dialect::Dialect::Tags(dialect::Tags {}),
             model::Model::Claude(model::Claude::default()),
         );
         state_store.save(&state)?;
 
-        let loaded_state = state_store.load("/test/dir")?;
+        let loaded_state = state_store.load(temp_dir.path().canonicalize().unwrap())?;
         assert_eq!(loaded_state.working_directory, state.working_directory);
         assert_eq!(loaded_state.dialect, state.dialect);
         Ok(())

@@ -75,7 +75,7 @@ impl Session {
     /// Creates a new Context with the specified working directory and dialect.
     pub fn new(working_directory: Option<PathBuf>, dialect: Dialect, model: Model) -> Self {
         Self {
-            working_directory: find_working_dir(working_directory),
+            working_directory: find_working_dir(working_directory).canonicalize().unwrap(),
             model: Some(model),
             dialect,
             prompt_inputs: vec![],
@@ -103,7 +103,10 @@ impl Session {
         let path = path.as_ref();
         let normalized_path = if path.is_relative() {
             if let Ok(current_dir) = env::current_dir() {
-                let absolute_path = current_dir.join(path);
+                let absolute_path = current_dir
+                    .join(path)
+                    .canonicalize()
+                    .map_err(TenxError::Io)?;
                 absolute_path
                     .strip_prefix(&self.working_directory)
                     .unwrap_or(&absolute_path)
@@ -166,3 +169,60 @@ impl Session {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::testutils::TempEnv;
+    use std::fs;
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_add_path() -> Result<()> {
+        let temp_dir = tempdir()?;
+        let working_dir = temp_dir.path().join("working");
+        fs::create_dir(&working_dir)?;
+        let sub_dir = working_dir.join("subdir");
+        fs::create_dir(&sub_dir)?;
+
+        let mut session = Session::new(
+            Some(working_dir.clone()),
+            Dialect::Tags(crate::dialect::Tags {}),
+            Model::Dummy(crate::model::Dummy::default()),
+        );
+
+        // Test 1: Current dir is the working directory
+        {
+            let _temp_env = TempEnv::new(&working_dir)?;
+            fs::File::create(working_dir.join("file.txt"))?;
+            session.add_path("file.txt")?;
+            assert_eq!(session.context.last().unwrap().name, "file.txt");
+        }
+
+        // Test 2: Current dir is under the working directory
+        {
+            let _temp_env = TempEnv::new(&sub_dir)?;
+            fs::File::create(sub_dir.join("subfile.txt"))?;
+            session.add_path("subfile.txt")?;
+            assert_eq!(session.context.last().unwrap().name, "subdir/subfile.txt");
+        }
+
+        // Test 3: Current dir is outside the working directory
+        {
+            let outside_dir = temp_dir.path().join("outside");
+            fs::create_dir(&outside_dir)?;
+            let _temp_env = TempEnv::new(&outside_dir)?;
+            fs::File::create(outside_dir.join("outsidefile.txt"))?;
+            session.add_path("outsidefile.txt")?;
+            assert_eq!(
+                session.context.last().unwrap().name,
+                outside_dir
+                    .join("outsidefile.txt")
+                    .canonicalize()
+                    .unwrap()
+                    .to_string_lossy()
+            );
+        }
+
+        Ok(())
+    }
+}
