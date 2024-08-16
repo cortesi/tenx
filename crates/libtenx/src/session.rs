@@ -9,13 +9,13 @@ use serde::{Deserialize, Serialize};
 
 use crate::{dialect::Dialect, model::Model, prompt::PromptInput, Result, TenxError};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ContextType {
     Ruskel,
     File,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub enum ContextData {
     /// Unresolved content that should be read from a file
     Path(PathBuf),
@@ -24,7 +24,7 @@ pub enum ContextData {
 }
 
 /// Reference material included in the prompt.
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct Context {
     /// The type of documentation.
     pub ty: ContextType,
@@ -93,9 +93,17 @@ impl Session {
             .collect()
     }
 
-    /// Adds a new context to the session.
+    /// Adds a new context to the session, ignoring duplicates.
+    ///
+    /// If a context with the same name and type already exists, it will not be added again.
     pub fn add_context(&mut self, context: Context) {
-        self.context.push(context);
+        if !self
+            .context
+            .iter()
+            .any(|c| c.name == context.name && c.ty == context.ty)
+        {
+            self.context.push(context);
+        }
     }
 
     /// Adds a file path context to the session, normalizing relative paths.
@@ -117,7 +125,7 @@ impl Session {
         } else {
             path.to_path_buf()
         };
-        self.context.push(Context {
+        self.add_context(Context {
             ty: ContextType::File,
             name: normalized_path.to_string_lossy().into_owned(),
             data: ContextData::Path(normalized_path),
@@ -132,7 +140,7 @@ impl Session {
             .render(false, false)
             .map_err(|e| TenxError::Resolve(e.to_string()))?;
 
-        self.context.push(Context {
+        self.add_context(Context {
             ty: ContextType::Ruskel,
             name,
             data: ContextData::String(resolved),
@@ -172,6 +180,33 @@ mod tests {
     use crate::testutils::TempEnv;
     use std::fs;
     use tempfile::tempdir;
+
+    #[test]
+    fn test_add_context_ignores_duplicates() {
+        let mut session = Session::new(
+            None,
+            Dialect::Tags(crate::dialect::Tags {}),
+            Model::Dummy(crate::model::Dummy::default()),
+        );
+
+        let context1 = Context {
+            ty: ContextType::File,
+            name: "test.txt".to_string(),
+            data: ContextData::String("content".to_string()),
+        };
+        let context2 = Context {
+            ty: ContextType::File,
+            name: "test.txt".to_string(),
+            data: ContextData::String("different content".to_string()),
+        };
+
+        session.add_context(context1.clone());
+        session.add_context(context2);
+
+        assert_eq!(session.context.len(), 1);
+        assert_eq!(session.context[0].name, "test.txt");
+        assert_eq!(session.context[0].body().unwrap(), "content");
+    }
 
     #[test]
     fn test_add_path() -> Result<()> {
@@ -223,3 +258,4 @@ mod tests {
         Ok(())
     }
 }
+
