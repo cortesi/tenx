@@ -69,6 +69,7 @@ pub struct Session {
     pub model: Option<Model>,
     pub prompt_inputs: Vec<PromptInput>,
     pub context: Vec<Context>,
+    pub editable: Vec<PathBuf>,
 }
 
 impl Session {
@@ -80,17 +81,8 @@ impl Session {
             dialect,
             prompt_inputs: vec![],
             context: vec![],
+            editable: vec![],
         }
-    }
-
-    /// Returns a vector of unique paths that have occurred in the prompt_inputs for the session.
-    pub fn edit_paths(&self) -> Vec<PathBuf> {
-        self.prompt_inputs
-            .iter()
-            .flat_map(|input| input.edit_paths.clone())
-            .collect::<std::collections::HashSet<_>>()
-            .into_iter()
-            .collect()
     }
 
     /// Adds a new context to the session, ignoring duplicates.
@@ -106,30 +98,44 @@ impl Session {
         }
     }
 
-    /// Adds a file path context to the session, normalizing relative paths.
-    pub fn add_ctx_path<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
+    /// Normalizes a path relative to the working directory.
+    fn normalize_path<P: AsRef<Path>>(&self, path: P) -> Result<PathBuf> {
         let path = path.as_ref();
-        let normalized_path = if path.is_relative() {
+        if path.is_relative() {
             if let Ok(current_dir) = env::current_dir() {
                 let absolute_path = current_dir
                     .join(path)
                     .canonicalize()
                     .map_err(TenxError::Io)?;
-                absolute_path
+                Ok(absolute_path
                     .strip_prefix(&self.working_directory)
                     .unwrap_or(&absolute_path)
-                    .to_path_buf()
+                    .to_path_buf())
             } else {
-                self.working_directory.join(path)
+                Ok(self.working_directory.join(path))
             }
         } else {
-            path.to_path_buf()
-        };
+            Ok(path.to_path_buf())
+        }
+    }
+
+    /// Adds a file path context to the session, normalizing relative paths.
+    pub fn add_ctx_path<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
+        let normalized_path = self.normalize_path(path)?;
         self.add_context(Context {
             ty: ContextType::File,
             name: normalized_path.to_string_lossy().into_owned(),
             data: ContextData::Path(normalized_path),
         });
+        Ok(())
+    }
+
+    /// Adds an editable file path to the session, normalizing relative paths.
+    pub fn add_editable<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
+        let normalized_path = self.normalize_path(path)?;
+        if !self.editable.contains(&normalized_path) {
+            self.editable.push(normalized_path);
+        }
         Ok(())
     }
 
@@ -166,7 +172,7 @@ impl Session {
             output.push_str(&format!("  - {:?}: {}\n", context.ty, context.name));
         }
         output.push_str(&format!("{}\n", "Edit Paths:".blue().bold()));
-        for path in self.edit_paths() {
+        for path in self.editable.iter() {
             output.push_str(&format!("  - {}\n", path.display()));
         }
 

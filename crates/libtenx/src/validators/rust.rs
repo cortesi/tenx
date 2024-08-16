@@ -34,7 +34,7 @@ struct RustWorkspace {
 
 impl RustWorkspace {
     pub fn discover(session: &Session) -> Result<Self> {
-        let common_ancestor = Self::find_common_ancestor(&session.edit_paths())?;
+        let common_ancestor = Self::find_common_ancestor(&session.editable)?;
         let root_path = Self::find_workspace_root(&common_ancestor)?;
 
         Ok(RustWorkspace { root_path })
@@ -91,11 +91,12 @@ mod tests {
         create_dummy_project(temp_dir.path()).unwrap();
 
         let _temp_env = TempEnv::new(temp_dir.path())?;
+        let edit_paths = vec![
+            temp_dir.path().join("crate1/src/lib.rs"),
+            temp_dir.path().join("crate2/src/lib.rs"),
+        ];
         let prompt = PromptInput {
-            edit_paths: vec![
-                temp_dir.path().join("crate1/src/lib.rs"),
-                temp_dir.path().join("crate2/src/lib.rs"),
-            ],
+            edit_paths: edit_paths.clone(),
             ..Default::default()
         };
 
@@ -105,6 +106,9 @@ mod tests {
             Model::Dummy(crate::model::Dummy::default()),
         );
         session.prompt_inputs.push(prompt.clone());
+        for p in edit_paths {
+            session.add_editable(&p)?;
+        }
 
         let checker = CargoChecker;
         assert!(checker.validate(&prompt, &session).is_ok());
@@ -119,11 +123,13 @@ mod tests {
 
         let _temp_env = TempEnv::new(temp_dir.path())?;
 
+        let edit_paths = vec![
+            temp_dir.path().join("crate1/src/lib.rs"),
+            temp_dir.path().join("crate2/src/lib.rs"),
+        ];
+
         let prompt = PromptInput {
-            edit_paths: vec![
-                temp_dir.path().join("crate1/src/lib.rs"),
-                temp_dir.path().join("crate2/src/lib.rs"),
-            ],
+            edit_paths: edit_paths.clone(),
             ..Default::default()
         };
 
@@ -133,6 +139,9 @@ mod tests {
             Model::Dummy(crate::model::Dummy::default()),
         );
         session.prompt_inputs.push(prompt.clone());
+        for p in edit_paths {
+            session.add_editable(&p)?;
+        }
 
         let workspace = RustWorkspace::discover(&session)?;
         assert_eq!(workspace.root_path, temp_dir.path());
@@ -147,8 +156,10 @@ mod tests {
 
         let _temp_env = TempEnv::new(temp_dir.path())?;
 
+        let edit_paths = vec![temp_dir.path().join("crate1/src/lib.rs")];
+
         let prompt = PromptInput {
-            edit_paths: vec![temp_dir.path().join("crate1/src/lib.rs")],
+            edit_paths: edit_paths.clone(),
             ..Default::default()
         };
 
@@ -158,6 +169,9 @@ mod tests {
             Model::Dummy(crate::model::Dummy::default()),
         );
         state.prompt_inputs.push(prompt.clone());
+        for p in edit_paths {
+            state.add_editable(&p)?;
+        }
 
         let workspace = RustWorkspace::discover(&state)?;
 
@@ -177,14 +191,15 @@ mod tests {
             ..Default::default()
         };
 
-        let mut state = Session::new(
+        let mut session = Session::new(
             Some(temp_dir.path().to_path_buf()),
             Dialect::Tags(crate::dialect::Tags::default()),
             Model::Dummy(crate::model::Dummy::default()),
         );
-        state.prompt_inputs.push(prompt.clone());
+        session.prompt_inputs.push(prompt.clone());
+        session.add_editable(temp_dir.path())?;
 
-        let result = RustWorkspace::discover(&state);
+        let result = RustWorkspace::discover(&session);
 
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().ends_with("root not found"));
