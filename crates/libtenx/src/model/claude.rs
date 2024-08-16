@@ -327,7 +327,7 @@ mod tests {
         session.add_context(Context {
             ty: crate::session::ContextType::File,
             name: "test".to_string(),
-            data: crate::session::ContextData::Resolved("Test context".to_string()),
+            data: crate::session::ContextData::String("Test context".to_string()),
         });
         claude.update_context_messages(&session)?;
         assert_eq!(claude.conversation.messages.len(), 2);
@@ -341,7 +341,7 @@ mod tests {
         session.add_context(Context {
             ty: crate::session::ContextType::File,
             name: "test2".to_string(),
-            data: crate::session::ContextData::Resolved("New test context".to_string()),
+            data: crate::session::ContextData::String("New test context".to_string()),
         });
         claude.update_context_messages(&session)?;
         assert_eq!(claude.conversation.messages.len(), 2);

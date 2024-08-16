@@ -20,7 +20,7 @@ pub enum ContextData {
     /// Unresolved content that should be read from a file
     Path(PathBuf),
     /// Resolved content that can be passed to the model.
-    Resolved(String),
+    String(String),
 }
 
 /// Reference material included in the prompt.
@@ -38,7 +38,7 @@ impl Context {
     /// Converts a Docs to a string representation.
     pub fn body(&self) -> Result<String> {
         match &self.data {
-            ContextData::Resolved(content) => Ok(content.clone()),
+            ContextData::String(content) => Ok(content.clone()),
             ContextData::Path(path) => Ok(std::fs::read_to_string(path).map_err(TenxError::Io)?),
         }
     }
@@ -99,7 +99,7 @@ impl Session {
     }
 
     /// Adds a file path context to the session, normalizing relative paths.
-    pub fn add_path<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
+    pub fn add_ctx_path<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
         let path = path.as_ref();
         let normalized_path = if path.is_relative() {
             if let Ok(current_dir) = env::current_dir() {
@@ -117,19 +117,16 @@ impl Session {
         } else {
             path.to_path_buf()
         };
-
-        let name = normalized_path.to_string_lossy().into_owned();
-
         self.context.push(Context {
             ty: ContextType::File,
-            name,
+            name: normalized_path.to_string_lossy().into_owned(),
             data: ContextData::Path(normalized_path),
         });
         Ok(())
     }
 
     /// Adds a Ruskel context to the session and resolves it.
-    pub fn add_ruskel(&mut self, name: String) -> Result<()> {
+    pub fn add_ctx_ruskel(&mut self, name: String) -> Result<()> {
         let ruskel = Ruskel::new(&name);
         let resolved = ruskel
             .render(false, false)
@@ -138,7 +135,7 @@ impl Session {
         self.context.push(Context {
             ty: ContextType::Ruskel,
             name,
-            data: ContextData::Resolved(resolved),
+            data: ContextData::String(resolved),
         });
         Ok(())
     }
@@ -194,7 +191,7 @@ mod tests {
         {
             let _temp_env = TempEnv::new(&working_dir)?;
             fs::File::create(working_dir.join("file.txt"))?;
-            session.add_path("file.txt")?;
+            session.add_ctx_path("file.txt")?;
             assert_eq!(session.context.last().unwrap().name, "file.txt");
         }
 
@@ -202,7 +199,7 @@ mod tests {
         {
             let _temp_env = TempEnv::new(&sub_dir)?;
             fs::File::create(sub_dir.join("subfile.txt"))?;
-            session.add_path("subfile.txt")?;
+            session.add_ctx_path("subfile.txt")?;
             assert_eq!(session.context.last().unwrap().name, "subdir/subfile.txt");
         }
 
@@ -212,7 +209,7 @@ mod tests {
             fs::create_dir(&outside_dir)?;
             let _temp_env = TempEnv::new(&outside_dir)?;
             fs::File::create(outside_dir.join("outsidefile.txt"))?;
-            session.add_path("outsidefile.txt")?;
+            session.add_ctx_path("outsidefile.txt")?;
             assert_eq!(
                 session.context.last().unwrap().name,
                 outside_dir

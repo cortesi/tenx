@@ -11,8 +11,7 @@ use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{fmt, EnvFilter};
 
 use libtenx::{
-    self, dialect::Dialect, model::Claude, model::Model, Config, PromptInput, Session,
-    SessionStore, Tenx,
+    self, dialect::Dialect, model::Claude, model::Model, Config, PromptInput, Session, Tenx,
 };
 
 mod edit;
@@ -132,11 +131,11 @@ async fn main() -> Result<()> {
             let mut session = tx.load_session::<PathBuf>(None)?;
 
             for file in files {
-                session.add_path(file)?;
+                session.add_ctx_path(file)?;
             }
 
             for ruskel_doc in ruskel {
-                session.add_ruskel(ruskel_doc.clone())?;
+                session.add_ctx_ruskel(ruskel_doc.clone())?;
             }
 
             tx.save_session(session)?;
@@ -153,11 +152,11 @@ async fn main() -> Result<()> {
             );
 
             for file in files {
-                session.add_path(file)?;
+                session.add_ctx_path(file)?;
             }
 
             for ruskel_doc in ruskel {
-                session.add_ruskel(ruskel_doc.clone())?;
+                session.add_ctx_ruskel(ruskel_doc.clone())?;
             }
 
             tx.save_session(session)?;
@@ -214,4 +213,3 @@ async fn main() -> Result<()> {
         }
     }
 }
-
