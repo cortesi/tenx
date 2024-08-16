@@ -60,9 +60,9 @@ struct Cli {
     #[clap(long, env = "ANTHROPIC_API_KEY", hide_env_values = true, global = true)]
     anthropic_key: Option<String>,
 
-    /// State directory
+    /// Session storage directory (~/.config/tenx/state by default)
     #[clap(long, global = true)]
-    state_dir: Option<PathBuf>,
+    session_store: Option<PathBuf>,
 
     #[clap(subcommand)]
     command: Commands,
@@ -104,7 +104,7 @@ enum Commands {
         #[clap(long)]
         ruskel: Vec<String>,
     },
-    /// Show the current state
+    /// Show the current session
     Show,
 }
 
@@ -112,8 +112,8 @@ enum Commands {
 fn load_config(cli: &Cli) -> Result<Config> {
     let mut config =
         Config::default().with_anthropic_key(cli.anthropic_key.clone().unwrap_or_default());
-    if let Some(state_dir) = cli.state_dir.clone() {
-        config = config.with_state_dir(state_dir);
+    if let Some(session_store_dir) = cli.session_store.clone() {
+        config = config.with_session_store_dir(session_store_dir);
     }
     Ok(config)
 }
@@ -129,38 +129,38 @@ async fn main() -> Result<()> {
         Commands::Add { files, ruskel } => {
             let config = load_config(&cli)?;
             let tx = Tenx::new(config);
-            let mut state = tx.load_session::<PathBuf>(None)?;
+            let mut session = tx.load_session::<PathBuf>(None)?;
 
             for file in files {
-                state.add_path(file)?;
+                session.add_path(file)?;
             }
 
             for ruskel_doc in ruskel {
-                state.add_ruskel(ruskel_doc.clone())?;
+                session.add_ruskel(ruskel_doc.clone())?;
             }
 
-            tx.save_session(state)?;
+            tx.save_session(session)?;
             info!("Context added to session successfully");
             Ok(())
         }
         Commands::New { files, ruskel } => {
             let config = load_config(&cli)?;
             let tx = Tenx::new(config);
-            let mut state = Session::new(
+            let mut session = Session::new(
                 None,
                 Dialect::Tags(libtenx::dialect::Tags::default()),
                 Model::Claude(Claude::default()),
             );
 
             for file in files {
-                state.add_path(file)?;
+                session.add_path(file)?;
             }
 
             for ruskel_doc in ruskel {
-                state.add_ruskel(ruskel_doc.clone())?;
+                session.add_ruskel(ruskel_doc.clone())?;
             }
 
-            tx.save_session(state)?;
+            tx.save_session(session)?;
             info!("New session created successfully");
             Ok(())
         }
@@ -207,9 +207,9 @@ async fn main() -> Result<()> {
         }
         Commands::Show => {
             let config = load_config(&cli)?;
-            let session_store = SessionStore::open(config.state_dir.as_ref())?;
-            let state = session_store.load(&std::env::current_dir()?)?;
-            println!("{}", state.pretty_print());
+            let tx = Tenx::new(config);
+            let session = tx.load_session::<PathBuf>(None)?;
+            println!("{}", session.pretty_print());
             Ok(())
         }
     }

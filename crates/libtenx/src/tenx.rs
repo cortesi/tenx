@@ -1,4 +1,3 @@
-use crate::session;
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -12,7 +11,7 @@ use crate::{model::ModelProvider, Change, ChangeSet, PromptInput, Result, Sessio
 #[derive(Debug, Default)]
 pub struct Config {
     pub anthropic_key: String,
-    pub state_dir: Option<PathBuf>,
+    pub session_store_dir: Option<PathBuf>,
 }
 
 impl Config {
@@ -23,8 +22,8 @@ impl Config {
     }
 
     /// Sets the state directory.
-    pub fn with_state_dir<P: AsRef<Path>>(mut self, dir: P) -> Self {
-        self.state_dir = Some(dir.as_ref().to_path_buf());
+    pub fn with_session_store_dir<P: AsRef<Path>>(mut self, dir: P) -> Self {
+        self.session_store_dir = Some(dir.as_ref().to_path_buf());
         self
     }
 }
@@ -42,7 +41,7 @@ impl Tenx {
 
     /// Saves a session to the store.
     pub fn save_session(&self, session: Session) -> Result<Session> {
-        let session_store = SessionStore::open(self.config.state_dir.as_ref())?;
+        let session_store = SessionStore::open(self.config.session_store_dir.as_ref())?;
         session_store.save(&session)?;
         Ok(session)
     }
@@ -50,7 +49,7 @@ impl Tenx {
     /// Loads a session from the store based on the working directory.
     pub fn load_session<P: AsRef<Path>>(&self, path: Option<P>) -> Result<Session> {
         let working_dir = crate::session::find_working_dir(path);
-        let session_store = SessionStore::open(self.config.state_dir.as_ref())?;
+        let session_store = SessionStore::open(self.config.session_store_dir.as_ref())?;
         session_store.load(working_dir)
     }
 
@@ -67,7 +66,7 @@ impl Tenx {
         prompt: PromptInput,
         sender: Option<mpsc::Sender<String>>,
     ) -> Result<()> {
-        let session_store = SessionStore::open(self.config.state_dir.as_ref())?;
+        let session_store = SessionStore::open(self.config.session_store_dir.as_ref())?;
         session_store.save(state)?;
         self.process_prompt(state, prompt, sender, &session_store)
             .await
@@ -79,7 +78,7 @@ impl Tenx {
         prompt: PromptInput,
         sender: Option<mpsc::Sender<String>>,
     ) -> Result<()> {
-        let session_store = SessionStore::open(self.config.state_dir.as_ref())?;
+        let session_store = SessionStore::open(self.config.session_store_dir.as_ref())?;
         let mut state = session_store.load(&std::env::current_dir()?)?;
         self.process_prompt(&mut state, prompt, sender, &session_store)
             .await
@@ -148,7 +147,7 @@ mod tests {
         let file_path = temp_dir.path().join("test.txt");
         fs::write(&file_path, "Initial content")?;
 
-        let config = Config::default().with_state_dir(temp_dir.path());
+        let config = Config::default().with_session_store_dir(temp_dir.path());
         let tenx = Tenx::new(config);
         let prompt = PromptInput {
             edit_paths: vec![file_path.clone()],
