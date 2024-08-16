@@ -94,7 +94,7 @@ enum Commands {
         ruskel: Vec<String>,
     },
     /// Add context to an existing session
-    Add {
+    AddCtx {
         /// Specifies files to add as context
         #[clap(value_parser)]
         files: Vec<PathBuf>,
@@ -102,6 +102,12 @@ enum Commands {
         /// Add ruskel documentation
         #[clap(long)]
         ruskel: Vec<String>,
+    },
+    /// Add editable files to an existing session
+    AddEdit {
+        /// Specifies files to add as editable
+        #[clap(value_parser)]
+        files: Vec<PathBuf>,
     },
     /// Show the current session
     Show,
@@ -125,7 +131,7 @@ async fn main() -> Result<()> {
     subscriber.init();
 
     match &cli.command {
-        Commands::Add { files, ruskel } => {
+        Commands::AddCtx { files, ruskel } => {
             let config = load_config(&cli)?;
             let tx = Tenx::new(config);
             let mut session = tx.load_session::<PathBuf>(None)?;
@@ -204,6 +210,19 @@ async fn main() -> Result<()> {
             info!("\n\n{}", "Changes applied successfully".green().bold());
             Ok(())
         }
+        Commands::AddEdit { files } => {
+            let config = load_config(&cli)?;
+            let tx = Tenx::new(config);
+            let mut session = tx.load_session::<PathBuf>(None)?;
+
+            for file in files {
+                session.add_editable(file)?;
+            }
+
+            tx.save_session(session)?;
+            info!("Editable files added to session successfully");
+            Ok(())
+        }
         Commands::Show => {
             let config = load_config(&cli)?;
             let tx = Tenx::new(config);
@@ -213,3 +232,4 @@ async fn main() -> Result<()> {
         }
     }
 }
+
