@@ -94,6 +94,16 @@ enum Commands {
         #[clap(long)]
         ruskel: Vec<String>,
     },
+    /// Add context to an existing session
+    Add {
+        /// Specifies files to add as context
+        #[clap(value_parser)]
+        files: Vec<PathBuf>,
+
+        /// Add ruskel documentation
+        #[clap(long)]
+        ruskel: Vec<String>,
+    },
     /// Show the current state
     Show,
 }
@@ -185,5 +195,23 @@ async fn main() -> Result<()> {
             println!("{}", state.pretty_print());
             Ok(())
         }
+        Commands::Add { files, ruskel } => {
+            let config = load_config(&cli)?;
+            let tx = Tenx::new(config);
+            let mut state = tx.load_session::<PathBuf>(None)?;
+
+            for file in files {
+                state.add_path(file)?;
+            }
+
+            for ruskel_doc in ruskel {
+                state.add_ruskel(ruskel_doc.clone())?;
+            }
+
+            tx.save_session(state)?;
+            info!("Context added to session successfully");
+            Ok(())
+        }
     }
 }
+
