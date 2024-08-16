@@ -71,7 +71,7 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// Resume an existing conversation
-    Resume {
+    Edit {
         /// Specifies files to edit
         #[clap(value_parser)]
         files: Option<Vec<PathBuf>>,
@@ -85,7 +85,7 @@ enum Commands {
         prompt_file: Option<PathBuf>,
     },
     /// Create a new session
-    Create {
+    New {
         /// Specifies files to add as context
         #[clap(value_parser)]
         files: Vec<PathBuf>,
@@ -126,7 +126,45 @@ async fn main() -> Result<()> {
     subscriber.init();
 
     match &cli.command {
-        Commands::Resume {
+        Commands::Add { files, ruskel } => {
+            let config = load_config(&cli)?;
+            let tx = Tenx::new(config);
+            let mut state = tx.load_session::<PathBuf>(None)?;
+
+            for file in files {
+                state.add_path(file)?;
+            }
+
+            for ruskel_doc in ruskel {
+                state.add_ruskel(ruskel_doc.clone())?;
+            }
+
+            tx.save_session(state)?;
+            info!("Context added to session successfully");
+            Ok(())
+        }
+        Commands::New { files, ruskel } => {
+            let config = load_config(&cli)?;
+            let tx = Tenx::new(config);
+            let mut state = Session::new(
+                None,
+                Dialect::Tags(libtenx::dialect::Tags::default()),
+                Model::Claude(Claude::default()),
+            );
+
+            for file in files {
+                state.add_path(file)?;
+            }
+
+            for ruskel_doc in ruskel {
+                state.add_ruskel(ruskel_doc.clone())?;
+            }
+
+            tx.save_session(state)?;
+            info!("New session created successfully");
+            Ok(())
+        }
+        Commands::Edit {
             files,
             prompt,
             prompt_file,
@@ -167,49 +205,11 @@ async fn main() -> Result<()> {
             info!("\n\n{}", "Changes applied successfully".green().bold());
             Ok(())
         }
-        Commands::Create { files, ruskel } => {
-            let config = load_config(&cli)?;
-            let tx = Tenx::new(config);
-            let mut state = Session::new(
-                None,
-                Dialect::Tags(libtenx::dialect::Tags::default()),
-                Model::Claude(Claude::default()),
-            );
-
-            for file in files {
-                state.add_path(file)?;
-            }
-
-            for ruskel_doc in ruskel {
-                state.add_ruskel(ruskel_doc.clone())?;
-            }
-
-            tx.save_session(state)?;
-            info!("New session created successfully");
-            Ok(())
-        }
         Commands::Show => {
             let config = load_config(&cli)?;
             let session_store = SessionStore::open(config.state_dir.as_ref())?;
             let state = session_store.load(&std::env::current_dir()?)?;
             println!("{}", state.pretty_print());
-            Ok(())
-        }
-        Commands::Add { files, ruskel } => {
-            let config = load_config(&cli)?;
-            let tx = Tenx::new(config);
-            let mut state = tx.load_session::<PathBuf>(None)?;
-
-            for file in files {
-                state.add_path(file)?;
-            }
-
-            for ruskel_doc in ruskel {
-                state.add_ruskel(ruskel_doc.clone())?;
-            }
-
-            tx.save_session(state)?;
-            info!("Context added to session successfully");
             Ok(())
         }
     }
