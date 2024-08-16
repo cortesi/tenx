@@ -3,7 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::Session;
+use crate::{Result, Session, TenxError};
 
 /// Normalizes a path for use as a filename by replacing problematic characters.
 pub fn normalize_path(path: &Path) -> String {
@@ -43,12 +43,11 @@ impl SessionStore {
     }
 
     /// Loads a State from a file based on the given working directory.
-    pub fn load<P: AsRef<Path>>(&self, working_directory: P) -> std::io::Result<Session> {
+    pub fn load<P: AsRef<Path>>(&self, working_directory: P) -> Result<Session> {
         let file_name = normalize_path(working_directory.as_ref());
         let file_path = self.base_dir.join(file_name);
         let serialized = fs::read_to_string(file_path)?;
-        serde_json::from_str(&serialized)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
+        serde_json::from_str(&serialized).map_err(|e| TenxError::Internal(format!("{}", e)))
     }
 }
 
@@ -69,7 +68,7 @@ mod tests {
     }
 
     #[test]
-    fn test_state_store() -> std::io::Result<()> {
+    fn test_state_store() -> Result<()> {
         let temp_dir = TempDir::new().unwrap();
         let state_store = SessionStore::open(Some(temp_dir.path()))?;
 

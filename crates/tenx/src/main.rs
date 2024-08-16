@@ -174,7 +174,7 @@ async fn main() -> Result<()> {
                 state.add_ruskel(ruskel_doc.clone())?;
             }
 
-            tx.save(state)?;
+            tx.save_session(state)?;
             info!("New session created successfully");
             Ok(())
         }

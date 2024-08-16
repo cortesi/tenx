@@ -1,3 +1,4 @@
+use crate::session;
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -40,10 +41,17 @@ impl Tenx {
     }
 
     /// Saves a session to the store.
-    pub fn save(&self, session: Session) -> Result<Session> {
+    pub fn save_session(&self, session: Session) -> Result<Session> {
         let session_store = SessionStore::open(self.config.state_dir.as_ref())?;
         session_store.save(&session)?;
         Ok(session)
+    }
+
+    /// Loads a session from the store based on the working directory.
+    pub fn load_session<P: AsRef<Path>>(&self, path: Option<P>) -> Result<Session> {
+        let working_dir = crate::session::find_working_dir(path);
+        let session_store = SessionStore::open(self.config.state_dir.as_ref())?;
+        session_store.load(working_dir)
     }
 
     /// Resets all files in the state snapshot to their original contents.
@@ -169,3 +177,4 @@ mod tests {
         Ok(())
     }
 }
+
