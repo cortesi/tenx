@@ -70,20 +70,6 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Start a new conversation
-    Start {
-        /// Specifies files to edit
-        #[clap(required = true, value_parser)]
-        files: Vec<PathBuf>,
-
-        /// User prompt for the edit operation
-        #[clap(long)]
-        prompt: Option<String>,
-
-        /// Path to a file containing the prompt
-        #[clap(long)]
-        prompt_file: Option<PathBuf>,
-    },
     /// Resume an existing conversation
     Resume {
         /// Specifies files to edit
@@ -130,51 +116,6 @@ async fn main() -> Result<()> {
     subscriber.init();
 
     match &cli.command {
-        Commands::Start {
-            files,
-            prompt,
-            prompt_file,
-        } => {
-            let config = load_config(&cli)?;
-            let tx = Tenx::new(config);
-            let mut state = Session::new(
-                None,
-                Dialect::Tags(libtenx::dialect::Tags::default()),
-                Model::Claude(Claude::default()),
-            );
-
-            let (sender, mut receiver) = mpsc::channel(100);
-            let print_task = tokio::spawn(async move {
-                while let Some(chunk) = receiver.recv().await {
-                    print!("{}", chunk);
-                }
-            });
-
-            let user_prompt = if let Some(p) = prompt {
-                PromptInput {
-                    edit_paths: files.clone(),
-                    user_prompt: p.clone(),
-                }
-            } else if let Some(file_path) = prompt_file {
-                let prompt_content =
-                    fs::read_to_string(file_path).context("Failed to read prompt file")?;
-                PromptInput {
-                    edit_paths: files.clone(),
-                    user_prompt: prompt_content,
-                }
-            } else {
-                match edit::edit_prompt(files)? {
-                    Some(p) => p,
-                    None => return Ok(()),
-                }
-            };
-
-            tx.start(&mut state, user_prompt, Some(sender)).await?;
-
-            print_task.await?;
-            info!("\n\n{}", "Changes applied successfully".green().bold());
-            Ok(())
-        }
         Commands::Resume {
             files,
             prompt,
