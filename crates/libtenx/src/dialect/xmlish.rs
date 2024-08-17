@@ -1,5 +1,6 @@
 //! Simple helpers for parsing xml-ish content
 
+use crate::error::{Result, TenxError};
 use std::collections::HashMap;
 
 /// Represents an XML-like tag with a name and attributes.
@@ -45,6 +46,38 @@ pub fn parse_open(line: &str) -> Option<Tag> {
 pub fn is_close(line: &str, tag_name: &str) -> bool {
     let trimmed = line.trim();
     trimmed == format!("</{}>", tag_name)
+}
+
+/// Parses a block of XML-like content, starting with an opening tag and ending with a matching closing tag.
+pub fn parse_block<I>(tag_name: &str, lines: &mut I) -> Result<(Tag, Vec<String>)>
+where
+    I: Iterator<Item = String>,
+{
+    let opening_line = lines
+        .next()
+        .ok_or_else(|| TenxError::Parse("Expected opening tag".into()))?;
+    let tag =
+        parse_open(&opening_line).ok_or_else(|| TenxError::Parse("Invalid opening tag".into()))?;
+
+    if tag.name != tag_name {
+        return Err(TenxError::Parse(format!(
+            "Expected tag {}, found {}",
+            tag_name, tag.name
+        )));
+    }
+
+    let mut contents = Vec::new();
+    for line in lines {
+        if is_close(&line, tag_name) {
+            return Ok((tag, contents));
+        }
+        contents.push(line);
+    }
+
+    Err(TenxError::Parse(format!(
+        "Closing tag not found for {}",
+        tag_name
+    )))
 }
 
 #[cfg(test)]
@@ -96,6 +129,23 @@ mod tests {
         assert!(!is_close("< /tag>", "tag"));
         assert!(!is_close("</tag >", "tag"));
         assert!(!is_close("</tag attr=\"value\">", "tag"));
+    }
+
+    #[test]
+    fn test_parse_block() {
+        let input = vec![
+            "<test attr=\"value\">",
+            "Content line 1",
+            "Content line 2",
+            "</test>",
+        ];
+        let mut iter = input.into_iter().map(String::from);
+        let result = parse_block("test", &mut iter);
+        assert!(result.is_ok());
+        let (tag, contents) = result.unwrap();
+        assert_eq!(tag.name, "test");
+        assert_eq!(tag.attributes.get("attr"), Some(&"value".to_string()));
+        assert_eq!(contents, vec!["Content line 1", "Content line 2"]);
     }
 }
 
