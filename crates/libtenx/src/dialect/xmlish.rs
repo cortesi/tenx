@@ -5,8 +5,8 @@ use std::collections::HashMap;
 
 /// Represents an XML-like tag with a name and attributes.
 pub struct Tag {
-    name: String,
-    attributes: HashMap<String, String>,
+    pub name: String,
+    pub attributes: HashMap<String, String>,
 }
 
 impl Tag {

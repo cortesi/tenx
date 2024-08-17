@@ -5,7 +5,7 @@ use std::{fs, path::PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-use super::{DialectProvider, PromptInput};
+use super::{xmlish, DialectProvider, PromptInput};
 use crate::{Change, Patch, Replace, Result, Session, TenxError, WriteFile};
 
 const SYSTEM: &str = include_str!("./tags-system.txt");
@@ -81,84 +81,49 @@ impl DialectProvider for Tags {
     /// ignored.
     fn parse(&self, response: &str) -> Result<Patch> {
         let mut change_set = Patch::default();
-        let mut lines = response.lines().peekable();
+        let mut lines = response.lines().map(String::from).peekable();
 
-        while let Some(line) = lines.next() {
-            let trimmed = line.trim();
-            if trimmed.starts_with("<write_file ") {
-                let path = extract_path(trimmed)?;
-                let content = parse_content(&mut lines, "write_file")?;
-                change_set.changes.push(Change::Write(WriteFile {
-                    path: path.into(),
-                    content,
-                }));
-            } else if trimmed.starts_with("<replace ") {
-                let path = extract_path(trimmed)?;
-                let old = parse_nested_content(&mut lines, "old")?;
-                let new = parse_nested_content(&mut lines, "new")?;
-                change_set.changes.push(Change::Replace(Replace {
-                    path: path.into(),
-                    old,
-                    new,
-                }));
+        while let Some(line) = lines.peek() {
+            if let Some(tag) = xmlish::parse_open(line) {
+                match tag.name.as_str() {
+                    "write_file" => {
+                        let path = tag
+                            .attributes
+                            .get("path")
+                            .ok_or_else(|| TenxError::Parse("Missing path attribute".into()))?
+                            .clone();
+                        let (_, content) = xmlish::parse_block("write_file", &mut lines)?;
+                        change_set.changes.push(Change::Write(WriteFile {
+                            path: path.into(),
+                            content: content.join("\n"),
+                        }));
+                    }
+                    "replace" => {
+                        let path = tag
+                            .attributes
+                            .get("path")
+                            .ok_or_else(|| TenxError::Parse("Missing path attribute".into()))?
+                            .clone();
+                        let (_, replace_content) = xmlish::parse_block("replace", &mut lines)?;
+                        let mut replace_lines = replace_content.into_iter().peekable();
+                        let (_, old) = xmlish::parse_block("old", &mut replace_lines)?;
+                        let (_, new) = xmlish::parse_block("new", &mut replace_lines)?;
+                        change_set.changes.push(Change::Replace(Replace {
+                            path: path.into(),
+                            old: old.join("\n"),
+                            new: new.join("\n"),
+                        }));
+                    }
+                    _ => {
+                        lines.next();
+                    }
+                }
+            } else {
+                lines.next();
             }
-            // Ignore other lines
         }
         Ok(change_set)
     }
-}
-
-fn extract_path(line: &str) -> Result<String> {
-    let start = line
-        .find("path=\"")
-        .ok_or_else(|| TenxError::Parse("Missing path attribute".to_string()))?;
-    let end = line[start + 6..]
-        .find('"')
-        .ok_or_else(|| TenxError::Parse("Malformed path attribute".to_string()))?;
-    Ok(line[start + 6..start + 6 + end].to_string())
-}
-
-fn parse_content<'a, I>(lines: &mut I, end_tag: &str) -> Result<String>
-where
-    I: Iterator<Item = &'a str>,
-{
-    let mut content = String::new();
-    for line in lines {
-        if line.trim() == format!("</{}>", end_tag) {
-            return Ok(content.trim().to_string());
-        }
-        content.push_str(line);
-        content.push('\n');
-    }
-    Err(TenxError::Parse(format!(
-        "Missing closing tag for {}",
-        end_tag
-    )))
-}
-
-fn parse_nested_content<'a, I>(lines: &mut I, tag: &str) -> Result<String>
-where
-    I: Iterator<Item = &'a str>,
-{
-    let opening_tag = format!("<{}>", tag);
-    let closing_tag = format!("</{}>", tag);
-
-    // Skip lines until we find the opening tag
-    for line in lines.by_ref() {
-        if line.trim() == opening_tag {
-            break;
-        }
-    }
-
-    let mut content = String::new();
-    for line in lines {
-        if line.trim() == closing_tag {
-            return Ok(content.trim().to_string());
-        }
-        content.push_str(line);
-        content.push('\n');
-    }
-    Err(TenxError::Parse(format!("Missing closing tag for {}", tag)))
 }
 
 #[cfg(test)]
@@ -211,3 +176,4 @@ mod tests {
         }
     }
 }
+
