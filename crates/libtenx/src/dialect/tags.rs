@@ -6,7 +6,7 @@ use std::{fs, path::PathBuf};
 use serde::{Deserialize, Serialize};
 
 use super::{DialectProvider, PromptInput};
-use crate::{Change, ChangeSet, Replace, Result, Session, TenxError, WriteFile};
+use crate::{Change, Patch, Replace, Result, Session, TenxError, WriteFile};
 
 const SYSTEM: &str = include_str!("./tags-system.txt");
 
@@ -25,7 +25,6 @@ impl DialectProvider for Tags {
 
         let mut rendered = String::new();
         rendered.push_str("<context>\n");
-
         for ctx in &s.context {
             rendered.push_str(&format!(
                 "<item name=\"{}\" type=\"{:?}\">\n{}\n</item>\n",
@@ -34,7 +33,6 @@ impl DialectProvider for Tags {
                 ctx.body()?
             ));
         }
-
         rendered.push_str("</context>");
         Ok(rendered)
     }
@@ -58,7 +56,7 @@ impl DialectProvider for Tags {
         Ok(rendered)
     }
 
-    /// Parses a response string containing XML-like tags and returns a `ChangeSet` struct.
+    /// Parses a response string containing XML-like tags and returns a `Patch` struct.
     ///
     /// The input string should contain one or more of the following tags:
     ///
@@ -77,12 +75,12 @@ impl DialectProvider for Tags {
     /// </replace>
     /// ```
     ///
-    /// The function parses these tags and populates an `ChangeSet` struct with
+    /// The function parses these tags and populates an `Patch` struct with
     /// `WriteFile` entries for `<write_file>` tags and `Replace` entries for `<replace>` tags.
     /// Whitespace is trimmed from the content of all tags. Any text outside of recognized tags is
     /// ignored.
-    fn parse(&self, response: &str) -> Result<ChangeSet> {
-        let mut change_set = ChangeSet::default();
+    fn parse(&self, response: &str) -> Result<Patch> {
+        let mut change_set = Patch::default();
         let mut lines = response.lines().peekable();
 
         while let Some(line) = lines.next() {
@@ -213,3 +211,4 @@ mod tests {
         }
     }
 }
+

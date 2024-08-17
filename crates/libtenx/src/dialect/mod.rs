@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 mod tags;
 
-use crate::{ChangeSet, PromptInput, Result, Session};
+use crate::{Patch, PromptInput, Result, Session};
 
 pub use tags::*;
 
@@ -23,7 +23,7 @@ pub trait DialectProvider {
     fn render_context(&self, p: &Session) -> Result<String>;
 
     /// Parse a model's response into concrete operations
-    fn parse(&self, txt: &str) -> Result<ChangeSet>;
+    fn parse(&self, txt: &str) -> Result<Patch>;
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -56,7 +56,7 @@ impl DialectProvider for Dialect {
         }
     }
 
-    fn parse(&self, txt: &str) -> Result<ChangeSet> {
+    fn parse(&self, txt: &str) -> Result<Patch> {
         match self {
             Dialect::Tags(t) => t.parse(txt),
         }

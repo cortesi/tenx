@@ -62,8 +62,8 @@ impl Claude {
         Ok(streamed_response.response)
     }
 
-    fn extract_changes(&self) -> Result<changes::ChangeSet> {
-        let mut cset = changes::ChangeSet::default();
+    fn extract_changes(&self) -> Result<changes::Patch> {
+        let mut cset = changes::Patch::default();
         for message in &self.conversation.messages {
             if message.role == Role::Assistant {
                 for content in &message.content {
@@ -191,7 +191,7 @@ impl ModelProvider for Claude {
         dialect: &Dialect,
         session: &Session,
         sender: Option<mpsc::Sender<String>>,
-    ) -> Result<changes::ChangeSet> {
+    ) -> Result<changes::Patch> {
         self.conversation.system = Some(dialect.system());
         let prompt = session
             .prompt_inputs
@@ -235,8 +235,8 @@ impl ModelProvider for Claude {
 /// `WriteFile` entries for `<write_file>` tags and `Replace` entries for `<replace>` tags.
 /// Whitespace is trimmed from the content of all tags. Any text outside of recognized tags is
 /// ignored.
-pub fn parse_response_text(response: &str) -> Result<changes::ChangeSet> {
-    let mut cset = changes::ChangeSet::default();
+pub fn parse_response_text(response: &str) -> Result<changes::Patch> {
+    let mut cset = changes::Patch::default();
     let mut lines = response.lines().peekable();
 
     while let Some(line) = lines.next() {

@@ -6,7 +6,7 @@ use std::{
 use tokio::sync::mpsc;
 use tracing::warn;
 
-use crate::{model::ModelProvider, Change, ChangeSet, PromptInput, Result, Session, SessionStore};
+use crate::{model::ModelProvider, Change, Patch, PromptInput, Result, Session, SessionStore};
 
 #[derive(Debug, Default)]
 pub struct Config {
@@ -116,7 +116,7 @@ impl Tenx {
         }
     }
 
-    fn apply_all(_state: &mut Session, change_set: &ChangeSet) -> Result<()> {
+    fn apply_all(_state: &mut Session, change_set: &Patch) -> Result<()> {
         for change in &change_set.changes {
             Self::apply(change)?;
         }
@@ -160,7 +160,8 @@ mod tests {
         let mut state = Session::new(
             Some(temp_dir.path().to_path_buf()),
             Dialect::Tags(crate::dialect::Tags::default()),
-            Model::Dummy(crate::model::Dummy::new(ChangeSet {
+            Model::Dummy(crate::model::Dummy::new(Patch {
+                comment: None,
                 changes: vec![Change::Replace(Replace {
                     path: file_path.clone(),
                     old: "Initial content".to_string(),

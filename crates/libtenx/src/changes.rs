@@ -58,8 +58,9 @@ pub enum Change {
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
-pub struct ChangeSet {
+pub struct Patch {
     pub changes: Vec<Change>,
+    pub comment: Option<String>,
 }
 
 #[cfg(test)]
