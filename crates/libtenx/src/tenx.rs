@@ -72,15 +72,14 @@ impl Tenx {
             .await
     }
 
-    /// Resumes a session by loading the state and sending a prompt to the model.
+/// Resumes a session by sending a prompt to the model.
     pub async fn resume(
         &self,
-        prompt: PromptInput,
+        session: &mut Session,
         sender: Option<mpsc::Sender<String>>,
     ) -> Result<()> {
         let session_store = SessionStore::open(self.config.session_store_dir.as_ref())?;
-        let mut state = session_store.load(&std::env::current_dir()?)?;
-        self.process_prompt(&mut state, prompt, sender, &session_store)
+        self.process_prompt(session, session.prompt_inputs.last().unwrap().clone(), sender, &session_store)
             .await
     }
 
@@ -176,4 +175,3 @@ mod tests {
         Ok(())
     }
 }
-

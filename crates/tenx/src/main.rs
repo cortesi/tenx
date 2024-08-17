@@ -184,6 +184,7 @@ async fn main() -> Result<()> {
                 }
             });
 
+            let mut session = tx.load_session::<PathBuf>(None)?;
             let user_prompt = if let Some(p) = prompt {
                 PromptInput {
                     edit_paths: files.clone().unwrap_or_default(),
@@ -203,8 +204,12 @@ async fn main() -> Result<()> {
                     None => return Ok(()),
                 }
             };
+            session.prompt_inputs.push(user_prompt);
+            for f in files.clone().unwrap_or_default() {
+                session.add_editable(f)?;
+            }
 
-            tx.resume(user_prompt, Some(sender)).await?;
+            tx.resume(&mut session, Some(sender)).await?;
 
             print_task.await?;
             info!("\n\n{}", "Changes applied successfully".green().bold());
@@ -232,4 +237,3 @@ async fn main() -> Result<()> {
         }
     }
 }
-
