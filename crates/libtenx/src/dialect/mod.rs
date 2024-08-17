@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 mod tags;
+mod xmlish;
 
 use crate::{Patch, PromptInput, Result, Session};
 
