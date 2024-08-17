@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 mod tags;
 
@@ -11,10 +12,16 @@ pub use tags::*;
 pub trait DialectProvider {
     /// Return the system prompt for this dialect
     fn system(&self) -> String;
+
     /// Render a prompt to send to the model
     fn render_prompt(&self, p: &PromptInput) -> Result<String>;
+
+    /// Render the editable context section
+    fn render_editables(&self, paths: Vec<PathBuf>) -> Result<String>;
+
     /// Render the immutable context to be sent to the model
     fn render_context(&self, p: &Session) -> Result<String>;
+
     /// Parse a model's response into concrete operations
     fn parse(&self, txt: &str) -> Result<ChangeSet>;
 }
@@ -34,6 +41,12 @@ impl DialectProvider for Dialect {
     fn render_context(&self, s: &Session) -> Result<String> {
         match self {
             Dialect::Tags(t) => t.render_context(s),
+        }
+    }
+
+    fn render_editables(&self, paths: Vec<PathBuf>) -> Result<String> {
+        match self {
+            Dialect::Tags(t) => t.render_editables(paths),
         }
     }
 

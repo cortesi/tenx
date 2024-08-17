@@ -72,15 +72,20 @@ impl Tenx {
             .await
     }
 
-/// Resumes a session by sending a prompt to the model.
+    /// Resumes a session by sending a prompt to the model.
     pub async fn resume(
         &self,
         session: &mut Session,
         sender: Option<mpsc::Sender<String>>,
     ) -> Result<()> {
         let session_store = SessionStore::open(self.config.session_store_dir.as_ref())?;
-        self.process_prompt(session, session.prompt_inputs.last().unwrap().clone(), sender, &session_store)
-            .await
+        self.process_prompt(
+            session,
+            session.prompt_inputs.last().unwrap().clone(),
+            sender,
+            &session_store,
+        )
+        .await
     }
 
     /// Common logic for processing a prompt and updating the state.
@@ -149,9 +154,7 @@ mod tests {
         let config = Config::default().with_session_store_dir(temp_dir.path());
         let tenx = Tenx::new(config);
         let prompt = PromptInput {
-            edit_paths: vec![file_path.clone()],
             user_prompt: "Test prompt".to_string(),
-            ..Default::default()
         };
 
         let mut state = Session::new(
@@ -166,6 +169,7 @@ mod tests {
             })),
         );
         state.prompt_inputs.push(prompt.clone());
+        state.add_editable(&file_path)?;
 
         tenx.start(&mut state, prompt, None).await?;
 
@@ -175,3 +179,4 @@ mod tests {
         Ok(())
     }
 }
+

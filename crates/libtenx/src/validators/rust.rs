@@ -96,7 +96,6 @@ mod tests {
             temp_dir.path().join("crate2/src/lib.rs"),
         ];
         let prompt = PromptInput {
-            edit_paths: edit_paths.clone(),
             ..Default::default()
         };
 
@@ -129,7 +128,6 @@ mod tests {
         ];
 
         let prompt = PromptInput {
-            edit_paths: edit_paths.clone(),
             ..Default::default()
         };
 
@@ -159,7 +157,6 @@ mod tests {
         let edit_paths = vec![temp_dir.path().join("crate1/src/lib.rs")];
 
         let prompt = PromptInput {
-            edit_paths: edit_paths.clone(),
             ..Default::default()
         };
 
@@ -187,7 +184,6 @@ mod tests {
         let _temp_env = TempEnv::new(temp_dir.path())?;
 
         let prompt = PromptInput {
-            edit_paths: vec![temp_dir.path().to_path_buf()],
             ..Default::default()
         };
 
@@ -239,11 +235,12 @@ mod tests {
 
         let _temp_env = TempEnv::new(&temp_dir1)?;
 
+        let edit_paths = vec![
+            temp_dir1.path().to_path_buf(),
+            temp_dir2.path().to_path_buf(),
+        ];
+
         let prompt = PromptInput {
-            edit_paths: vec![
-                temp_dir1.path().to_path_buf(),
-                temp_dir2.path().to_path_buf(),
-            ],
             ..Default::default()
         };
 
@@ -253,6 +250,9 @@ mod tests {
             Model::Dummy(crate::model::Dummy::default()),
         );
         state.prompt_inputs.push(prompt.clone());
+        for f in edit_paths {
+            state.add_editable(&f)?;
+        }
 
         let result = RustWorkspace::discover(&state);
 

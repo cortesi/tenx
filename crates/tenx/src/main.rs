@@ -187,14 +187,12 @@ async fn main() -> Result<()> {
             let mut session = tx.load_session::<PathBuf>(None)?;
             let user_prompt = if let Some(p) = prompt {
                 PromptInput {
-                    edit_paths: files.clone().unwrap_or_default(),
                     user_prompt: p.clone(),
                 }
             } else if let Some(file_path) = prompt_file {
                 let prompt_content =
                     fs::read_to_string(file_path).context("Failed to read prompt file")?;
                 PromptInput {
-                    edit_paths: files.clone().unwrap_or_default(),
                     user_prompt: prompt_content,
                 }
             } else {

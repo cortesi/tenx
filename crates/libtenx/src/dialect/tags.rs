@@ -1,8 +1,9 @@
 //! Defines an interaction style where files are sent to the model in XML-like tags, and model
 //! responses are parsed from similar tags.
 
+use std::{fs, path::PathBuf};
+
 use serde::{Deserialize, Serialize};
-use std::fs;
 
 use super::{DialectProvider, PromptInput};
 use crate::{Change, ChangeSet, Replace, Result, Session, TenxError, WriteFile};
@@ -18,6 +19,10 @@ impl DialectProvider for Tags {
     }
 
     fn render_context(&self, s: &Session) -> Result<String> {
+        if self.system().is_empty() {
+            return Ok("There is no non-editable context.".into());
+        }
+
         let mut rendered = String::new();
         rendered.push_str("<context>\n");
 
@@ -34,19 +39,21 @@ impl DialectProvider for Tags {
         Ok(rendered)
     }
 
-    fn render_prompt(&self, p: &PromptInput) -> Result<String> {
+    fn render_editables(&self, paths: Vec<PathBuf>) -> Result<String> {
         let mut rendered = String::new();
-        // Add editable files
-        for path in &p.edit_paths {
-            let contents = fs::read_to_string(path)?;
+        for path in paths {
+            let contents = fs::read_to_string(&path)?;
             rendered.push_str(&format!(
-                "\n<editable path=\"{}\">\n{}</editable>\n\n",
+                "<editable path=\"{}\">\n{}</editable>\n\n",
                 path.display(),
                 contents
             ));
         }
+        Ok(rendered)
+    }
 
-        // Add user prompt
+    fn render_prompt(&self, p: &PromptInput) -> Result<String> {
+        let mut rendered = String::new();
         rendered.push_str(&format!("\n<prompt>\n{}\n</prompt>\n\n", p.user_prompt));
         Ok(rendered)
     }

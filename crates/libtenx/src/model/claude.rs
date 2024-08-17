@@ -14,9 +14,17 @@ use crate::{
 const DEFAULT_MODEL: &str = "claude-3-5-sonnet-20240620";
 const MAX_TOKENS: u32 = 8192;
 const CONTEXT_LEADIN: &str = "Here is some immutable context that you may not edit.\n";
+const EDITABLE_LEADIN: &str =
+    "Here are the editable files. You will modify only these, nothing else.\n";
 
 use tokio::sync::mpsc;
 
+/// A model that interacts with the Anthropic API. This general design of the model is to:
+///
+/// - Have a large, cached system prompt with many examples.
+/// - Emit both the non-editable context and the editable context as pre-primed messages in the
+/// prompt.
+/// - Edit the conversation to keep the most up-to-date editable files frontmost.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Claude {
     conversation: misanthropy::MessagesRequest,
@@ -86,45 +94,51 @@ impl Claude {
     ///
     /// Returns `Ok(())` if the operation was successful, or an error if context rendering fails.
     fn update_context_messages(&mut self, session: &Session) -> Result<()> {
-        let context = session.dialect.render_context(session)?;
-        if session.context.is_empty() {
-            // Remove existing context messages if present
-            self.conversation.messages.retain(|msg|
-                !(msg.role == misanthropy::Role::User && msg.content.iter().any(|c|
-                    matches!(c, misanthropy::Content::Text { text } if text.starts_with(CONTEXT_LEADIN))
-                ))
-            );
-            return Ok(());
-        }
-
-        let ctx_u = misanthropy::Message {
-            role: misanthropy::Role::User,
-            content: vec![misanthropy::Content::Text {
-                text: format!("{}\n{}", CONTEXT_LEADIN, context),
-            }],
-        };
-        let ctx_a = misanthropy::Message {
-            role: misanthropy::Role::Assistant,
-            content: vec![misanthropy::Content::Text {
-                text: "Got it. What would you like me to do?".to_string(),
-            }],
-        };
-
+        let preamble = vec![
+            misanthropy::Message {
+                role: misanthropy::Role::User,
+                content: vec![misanthropy::Content::Text {
+                    text: format!(
+                        "{}\n{}",
+                        CONTEXT_LEADIN,
+                        session.dialect.render_context(session)?
+                    ),
+                }],
+            },
+            misanthropy::Message {
+                role: misanthropy::Role::Assistant,
+                content: vec![misanthropy::Content::Text {
+                    text: "Got it.".to_string(),
+                }],
+            },
+            misanthropy::Message {
+                role: misanthropy::Role::User,
+                content: vec![misanthropy::Content::Text {
+                    text: format!(
+                        "{}\n{}",
+                        EDITABLE_LEADIN,
+                        session.dialect.render_editables(session.editable.clone())?
+                    ),
+                }],
+            },
+            misanthropy::Message {
+                role: misanthropy::Role::Assistant,
+                content: vec![misanthropy::Content::Text {
+                    text: "Got it.".to_string(),
+                }],
+            },
+        ];
         if self.conversation.messages.is_empty() {
             // Append context messages if conversation is empty
-            self.conversation.messages = vec![ctx_u, ctx_a];
-        } else if self.conversation.messages.len() >= 2
-            && self.conversation.messages[0].role == misanthropy::Role::User
-            && self.conversation.messages[0].content.iter().any(|c|
-                matches!(c, misanthropy::Content::Text { text } if text.starts_with(CONTEXT_LEADIN))
-            ) {
-            // Replace existing context messages
-            self.conversation.messages[0] = ctx_u;
-            self.conversation.messages[1] = ctx_a;
+            self.conversation.messages.extend(preamble);
         } else {
-            // Insert context messages at the start
-            self.conversation.messages.insert(0, ctx_a);
-            self.conversation.messages.insert(0, ctx_u);
+            // Replace leading messages - we can assume that the conversation has at least the
+            // preamble length.
+            let mut i = 0;
+            while i < preamble.len() {
+                self.conversation.messages[i] = preamble[i].clone();
+                i += 1;
+            }
         }
 
         Ok(())
@@ -321,7 +335,7 @@ mod tests {
 
         // Test empty context
         claude.update_context_messages(&session)?;
-        assert!(claude.conversation.messages.is_empty());
+        assert_eq!(claude.conversation.messages.len(), 4);
 
         // Test adding context to empty conversation
         session.add_context(Context {
@@ -330,7 +344,7 @@ mod tests {
             data: crate::session::ContextData::String("Test context".to_string()),
         });
         claude.update_context_messages(&session)?;
-        assert_eq!(claude.conversation.messages.len(), 2);
+        assert_eq!(claude.conversation.messages.len(), 4);
         if let misanthropy::Content::Text { text } = &claude.conversation.messages[0].content[0] {
             assert!(text.starts_with(CONTEXT_LEADIN));
         } else {
@@ -344,7 +358,7 @@ mod tests {
             data: crate::session::ContextData::String("New test context".to_string()),
         });
         claude.update_context_messages(&session)?;
-        assert_eq!(claude.conversation.messages.len(), 2);
+        assert_eq!(claude.conversation.messages.len(), 4);
         if let misanthropy::Content::Text { text } = &claude.conversation.messages[0].content[0] {
             assert!(text.contains("New test context"));
         } else {
@@ -360,13 +374,13 @@ mod tests {
         });
         claude.update_context_messages(&session)?;
 
-        assert_eq!(claude.conversation.messages.len(), 3);
+        assert_eq!(claude.conversation.messages.len(), 5);
         if let misanthropy::Content::Text { text } = &claude.conversation.messages[0].content[0] {
             assert!(text.starts_with(CONTEXT_LEADIN));
         } else {
             panic!("Expected Text content");
         }
-        if let misanthropy::Content::Text { text } = &claude.conversation.messages[2].content[0] {
+        if let misanthropy::Content::Text { text } = &claude.conversation.messages[4].content[0] {
             assert_eq!(text, "User message");
         } else {
             panic!("Expected Text content");

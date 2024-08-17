@@ -55,7 +55,6 @@ fn parse_edited_text(input: &str) -> PromptInput {
     }
 
     PromptInput {
-        edit_paths,
         user_prompt: user_prompt.trim().to_string(),
     }
 }
@@ -107,10 +106,6 @@ mod tests {
         assert_eq!(
             prompt.user_prompt,
             "This is a user prompt\nwith multiple lines."
-        );
-        assert_eq!(
-            prompt.edit_paths,
-            vec![PathBuf::from("src/main.rs"), PathBuf::from("src/lib.rs")]
         );
     }
 }
