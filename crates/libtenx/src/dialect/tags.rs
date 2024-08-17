@@ -114,6 +114,10 @@ impl DialectProvider for Tags {
                             new: new.join("\n"),
                         }));
                     }
+                    "comment" => {
+                        let (_, content) = xmlish::parse_block("comment", &mut lines)?;
+                        change_set.comment = Some(content.join("\n"));
+                    }
                     _ => {
                         lines.next();
                     }
@@ -136,7 +140,10 @@ mod tests {
         let d = Tags {};
 
         let input = r#"
-            ignored
+            <comment>
+                This is a comment.
+            </comment>
+           ignored
             <write_file path="/path/to/file2.txt">
                 This is the content of the file.
             </write_file>
@@ -154,6 +161,10 @@ mod tests {
 
         let result = d.parse(input).unwrap();
         assert_eq!(result.changes.len(), 2);
+        assert_eq!(
+            result.comment.unwrap().trim(),
+            "This is a comment.".to_string()
+        );
 
         match &result.changes[0] {
             Change::Write(write_file) => {
@@ -176,4 +187,3 @@ mod tests {
         }
     }
 }
-
