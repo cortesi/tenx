@@ -37,7 +37,8 @@ pub fn session(session: &Session) -> Result<String> {
             if let Some(patch) = &step.patch {
                 if let Some(comment) = &patch.comment {
                     output.push_str(&format!(
-                        "    comment: {}\n",
+                        "    {} {}\n",
+                        "comment:".blue().bold(),
                         comment.lines().next().unwrap_or("")
                     ));
                 }
@@ -50,7 +51,7 @@ pub fn session(session: &Session) -> Result<String> {
                     })
                     .collect();
                 if !modified_files.is_empty() {
-                    output.push_str("    modified:\n");
+                    output.push_str(&format!("    {}", "modified:\n".blue().bold()));
                     for file in modified_files {
                         output.push_str(&format!("      - {}\n", session.relpath(file).display()));
                     }

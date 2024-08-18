@@ -64,18 +64,16 @@ impl Claude {
         dialect: &Dialect,
         req: &misanthropy::MessagesRequest,
     ) -> Result<patch::Patch> {
-        let mut cset = patch::Patch::default();
         if let Some(message) = &req.messages.last() {
             if message.role == Role::Assistant {
                 for content in &message.content {
                     if let Content::Text { text } = content {
-                        let parsed_ops = dialect.parse(text)?;
-                        cset.changes.extend(parsed_ops.changes);
+                        return dialect.parse(text);
                     }
                 }
             }
         }
-        Ok(cset)
+        Err(TenxError::Internal("No patch to parse.".into()))
     }
 
     fn request(&self, session: &Session) -> Result<misanthropy::MessagesRequest> {
