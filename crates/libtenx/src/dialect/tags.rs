@@ -13,7 +13,7 @@ use crate::{
 
 const SYSTEM: &str = include_str!("./tags-system.txt");
 
-#[derive(Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Default, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct Tags {}
 
 impl DialectProvider for Tags {

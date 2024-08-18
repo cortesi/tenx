@@ -23,7 +23,7 @@ use tokio::sync::mpsc;
 /// - Emit both the non-editable context and the editable context as pre-primed messages in the
 ///   prompt.
 /// - Edit the conversation to keep the most up-to-date editable files frontmost.
-#[derive(Default, Debug, Serialize, Deserialize, Clone)]
+#[derive(Default, Debug, Serialize, Deserialize)]
 pub struct Claude {}
 
 impl Claude {
@@ -78,11 +78,7 @@ impl Claude {
         Ok(cset)
     }
 
-    fn request(
-        &self,
-        dialect: &Dialect,
-        session: &Session,
-    ) -> Result<misanthropy::MessagesRequest> {
+    fn request(&self, session: &Session) -> Result<misanthropy::MessagesRequest> {
         let mut req = misanthropy::MessagesRequest {
             model: DEFAULT_MODEL.to_string(),
             max_tokens: MAX_TOKENS,
@@ -120,7 +116,7 @@ impl Claude {
                     }],
                 },
             ],
-            system: Some(dialect.system()),
+            system: Some(session.dialect.system()),
             temperature: None,
             stream: true,
             tools: vec![],
@@ -131,14 +127,14 @@ impl Claude {
             req.messages.push(misanthropy::Message {
                 role: misanthropy::Role::User,
                 content: vec![misanthropy::Content::Text {
-                    text: dialect.render_prompt(&s.prompt)?,
+                    text: session.dialect.render_prompt(&s.prompt)?,
                 }],
             });
             if let Some(patch) = &s.patch {
                 req.messages.push(misanthropy::Message {
                     role: misanthropy::Role::Assistant,
                     content: vec![misanthropy::Content::Text {
-                        text: dialect.render_patch(patch)?,
+                        text: session.dialect.render_patch(patch)?,
                     }],
                 });
             }
@@ -152,15 +148,15 @@ impl ModelProvider for Claude {
     async fn prompt(
         &mut self,
         config: &Config,
-        dialect: &Dialect,
         session: &Session,
         sender: Option<mpsc::Sender<String>>,
     ) -> Result<patch::Patch> {
-        let mut req = self.request(dialect, session)?;
+        let mut req = self.request(session)?;
+        println!("Request: {:#?}", req);
         let resp = self
             .stream_response(&config.anthropic_key, &req, sender)
             .await?;
         req.merge_response(&resp);
-        self.extract_changes(dialect, &req)
+        self.extract_changes(&session.dialect, &req)
     }
 }

@@ -30,7 +30,7 @@ pub trait DialectProvider {
     fn render_patch(&self, patch: &Patch) -> Result<String>;
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub enum Dialect {
     Tags(Tags),
 }

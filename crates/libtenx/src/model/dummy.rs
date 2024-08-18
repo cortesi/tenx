@@ -3,10 +3,10 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
 use super::ModelProvider;
-use crate::{dialect::Dialect, patch::Patch, Config, Result, Session};
+use crate::{patch::Patch, Config, Result, Session};
 
 /// A dummy model for testing purposes.
-#[derive(Debug, Serialize, Deserialize, Default, Clone)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Dummy {
     change_set: Patch,
 }
@@ -23,7 +23,6 @@ impl ModelProvider for Dummy {
     async fn prompt(
         &mut self,
         _config: &Config,
-        _dialect: &Dialect,
         _state: &Session,
         _sender: Option<mpsc::Sender<String>>,
     ) -> Result<Patch> {

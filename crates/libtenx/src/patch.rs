@@ -1,4 +1,5 @@
 use crate::{Result, TenxError};
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
@@ -61,6 +62,7 @@ pub enum Change {
 pub struct Patch {
     pub changes: Vec<Change>,
     pub comment: Option<String>,
+    pub cache: HashMap<PathBuf, String>,
 }
 
 #[cfg(test)]
@@ -100,3 +102,4 @@ mod tests {
         assert_eq!(result, expected_output);
     }
 }
+

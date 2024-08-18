@@ -75,11 +75,9 @@ impl Tenx {
         session_store: &SessionStore,
     ) -> Result<()> {
         let mut model = session.model.take().unwrap();
-        let ops = model
-            .prompt(&self.config, &session.dialect, session, sender)
-            .await?;
+        let patch = model.prompt(&self.config, session, sender).await?;
         session.model = Some(model);
-        match session.apply_patch(&ops) {
+        match session.apply_patch(&patch) {
             Ok(_) => {
                 session_store.save(session)?;
                 Ok(())
