@@ -4,6 +4,7 @@ use std::{
 };
 
 use libruskel::Ruskel;
+use pathdiff::diff_paths;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -99,25 +100,25 @@ impl Session {
         }
     }
 
-    /// Converts a path relative to the root directory to a path relative to the current working directory.
-    pub fn cwd_path(&self, path: &Path) -> Result<PathBuf> {
-        let absolute_path = self.root.join(path);
-        env::current_dir()
-            .map_err(|e| TenxError::fio(e, path))?
-            .join(
-                absolute_path
-                    .strip_prefix(&self.root)
-                    .unwrap_or(&absolute_path),
-            )
+    /// Calculates the relative path from the root to the given absolute path.
+    pub fn relpath(&self, path: &Path) -> PathBuf {
+        diff_paths(path, &self.root).unwrap_or_else(|| path.to_path_buf())
+    }
+
+    /// Converts a path relative to the root directory to an absolute path
+    pub fn abspath(&self, path: &Path) -> Result<PathBuf> {
+        self.root
+            .join(path)
             .canonicalize()
             .map_err(|e| TenxError::fio(e, path))
     }
 
+    /// Returns the absolute paths of the editables for this session.
     pub fn editables(&self) -> Result<Vec<PathBuf>> {
         self.editable
             .clone()
             .iter()
-            .map(|p| self.cwd_path(p))
+            .map(|p| self.abspath(p))
             .collect()
     }
 
@@ -232,14 +233,14 @@ impl Session {
         for change in &patch.changes {
             match change {
                 Change::Replace(replace) => {
-                    let path = self.cwd_path(&replace.path)?;
+                    let path = self.abspath(&replace.path)?;
                     let current_content =
                         fs::read_to_string(&path).map_err(|e| TenxError::fio(e, path.clone()))?;
                     let new_content = replace.apply(&current_content)?;
                     fs::write(&path, &new_content).map_err(|e| TenxError::fio(e, path.clone()))?;
                 }
                 Change::Write(write_file) => {
-                    fs::write(self.cwd_path(&write_file.path)?, &write_file.content)
+                    fs::write(self.abspath(&write_file.path)?, &write_file.content)
                         .map_err(|e| TenxError::fio(e, write_file.path.clone()))?;
                 }
             }
@@ -250,8 +251,7 @@ impl Session {
     /// Rolls back the changes made by a patch, using the cached file contents.
     pub fn rollback(&self, patch: &Patch) -> Result<()> {
         for (path, content) in &patch.cache {
-            fs::write(self.cwd_path(path)?, content)
-                .map_err(|e| TenxError::fio(e, path.clone()))?;
+            fs::write(self.abspath(path)?, content).map_err(|e| TenxError::fio(e, path.clone()))?;
         }
         Ok(())
     }

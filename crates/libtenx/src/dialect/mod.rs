@@ -11,6 +11,9 @@ pub use tags::*;
 /// A dialect encapsulates a particular style of interaction with a model. It defines the system
 /// prompt, how to render a user's prompt, and how to parse a model's response.
 pub trait DialectProvider {
+    /// Return the name of this dialect
+    fn name(&self) -> &'static str;
+
     /// Return the system prompt for this dialect
     fn system(&self) -> String;
 
@@ -36,6 +39,12 @@ pub enum Dialect {
 }
 
 impl DialectProvider for Dialect {
+    fn name(&self) -> &'static str {
+        match self {
+            Dialect::Tags(t) => t.name(),
+        }
+    }
+
     fn system(&self) -> String {
         match self {
             Dialect::Tags(t) => t.system(),
@@ -72,4 +81,3 @@ impl DialectProvider for Dialect {
         }
     }
 }
-

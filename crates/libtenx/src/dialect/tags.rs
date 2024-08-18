@@ -17,6 +17,10 @@ const SYSTEM: &str = include_str!("./tags-system.txt");
 pub struct Tags {}
 
 impl DialectProvider for Tags {
+    fn name(&self) -> &'static str {
+        "tags"
+    }
+
     fn system(&self) -> String {
         SYSTEM.to_string()
     }
@@ -219,4 +223,3 @@ mod tests {
         }
     }
 }
-

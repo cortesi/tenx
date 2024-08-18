@@ -2343,6 +2343,7 @@ dependencies = [
  "indoc",
  "libruskel",
  "misanthropy",
+ "pathdiff",
  "pretty_assertions",
  "quick-xml",
  "serde",

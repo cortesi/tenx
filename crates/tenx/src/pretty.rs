@@ -1,4 +1,4 @@
-use libtenx::{Result, Session};
+use libtenx::{dialect::DialectProvider, Result, Session};
 
 use colored::*;
 
@@ -7,21 +7,26 @@ pub fn session(session: &Session) -> Result<String> {
     let mut output = String::new();
     output.push_str(&format!(
         "{} {}\n",
-        "Rooot Directory:".blue().bold(),
+        "root:".blue().bold(),
         session.root.display()
     ));
     output.push_str(&format!(
-        "{} {:?}\n",
-        "Dialect:".blue().bold(),
-        session.dialect
+        "{} {}\n",
+        "dialect:".blue().bold(),
+        session.dialect.name()
     ));
-    output.push_str(&format!("{}\n", "Context:".blue().bold()));
-    for context in &session.context {
-        output.push_str(&format!("  - {:?}: {}\n", context.ty, context.name));
+    if !session.context.is_empty() {
+        output.push_str(&format!("{}\n", "context:".blue().bold()));
+        for context in &session.context {
+            output.push_str(&format!("  - {:?}: {}\n", context.ty, context.name));
+        }
     }
-    output.push_str(&format!("{}\n", "Edit Paths:".blue().bold()));
-    for path in session.editables()? {
-        output.push_str(&format!("  - {}\n", path.display()));
+    let editables = session.editables()?;
+    if !editables.is_empty() {
+        output.push_str(&format!("{}\n", "edit:".blue().bold()));
+        for path in editables {
+            output.push_str(&format!("  - {}\n", session.relpath(&path).display()));
+        }
     }
     Ok(output)
 }
