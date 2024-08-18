@@ -59,19 +59,6 @@ impl Tenx {
         Ok(())
     }
 
-    /// Sends a prompt to the model and updates the state.
-    pub async fn start(
-        &self,
-        state: &mut Session,
-        prompt: PromptInput,
-        sender: Option<mpsc::Sender<String>>,
-    ) -> Result<()> {
-        let session_store = SessionStore::open(self.config.session_store_dir.as_ref())?;
-        session_store.save(state)?;
-        self.process_prompt(state, prompt, sender, &session_store)
-            .await
-    }
-
     /// Resumes a session by sending a prompt to the model.
     pub async fn resume(
         &self,
@@ -79,38 +66,31 @@ impl Tenx {
         sender: Option<mpsc::Sender<String>>,
     ) -> Result<()> {
         let session_store = SessionStore::open(self.config.session_store_dir.as_ref())?;
-        self.process_prompt(
-            session,
-            session.steps.last().unwrap().prompt.clone(),
-            sender,
-            &session_store,
-        )
-        .await
+        self.process_prompt(session, sender, &session_store).await
     }
 
-    /// Common logic for processing a prompt and updating the state.
+    /// Common logic for processing a prompt and updating the state. The prompt that will be
+    /// processed is the final prompt in the step list.
     async fn process_prompt(
         &self,
-        state: &mut Session,
-        prompt: PromptInput,
+        session: &mut Session,
         sender: Option<mpsc::Sender<String>>,
         session_store: &SessionStore,
     ) -> Result<()> {
-        state.add_prompt(prompt.clone());
-        let mut model = state.model.take().unwrap();
+        let mut model = session.model.take().unwrap();
         let ops = model
-            .prompt(&self.config, &state.dialect, state, sender)
+            .prompt(&self.config, &session.dialect, session, sender)
             .await?;
-        state.model = Some(model);
-        match Self::apply_all(state, &ops) {
+        session.model = Some(model);
+        match Self::apply_all(session, &ops) {
             Ok(_) => {
-                session_store.save(state)?;
+                session_store.save(session)?;
                 Ok(())
             }
             Err(e) => {
                 warn!("{}", e);
                 warn!("Resetting state...");
-                Self::reset(state)?;
+                Self::reset(session)?;
                 Err(e)
             }
         }
@@ -134,49 +114,6 @@ impl Tenx {
                 fs::write(&write_file.path, &write_file.content)?;
             }
         }
-        Ok(())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::{changes::Change, changes::Replace, dialect::Dialect, model::Model};
-    use std::fs;
-    use tempfile::tempdir;
-
-    #[tokio::test]
-    async fn test_start() -> Result<()> {
-        let temp_dir = tempdir()?;
-        let file_path = temp_dir.path().join("test.txt");
-        fs::write(&file_path, "Initial content")?;
-
-        let config = Config::default().with_session_store_dir(temp_dir.path());
-        let tenx = Tenx::new(config);
-        let prompt = PromptInput {
-            user_prompt: "Test prompt".to_string(),
-        };
-
-        let mut session = Session::new(
-            Some(temp_dir.path().to_path_buf()),
-            Dialect::Tags(crate::dialect::Tags::default()),
-            Model::Dummy(crate::model::Dummy::new(Patch {
-                comment: None,
-                changes: vec![Change::Replace(Replace {
-                    path: file_path.clone(),
-                    old: "Initial content".to_string(),
-                    new: "Updated content".to_string(),
-                })],
-            })),
-        );
-        session.add_prompt(prompt.clone());
-        session.add_editable(&file_path)?;
-
-        tenx.start(&mut session, prompt, None).await?;
-
-        let updated_content = fs::read_to_string(&file_path)?;
-        assert_eq!(updated_content, "Updated content");
-
         Ok(())
     }
 }
