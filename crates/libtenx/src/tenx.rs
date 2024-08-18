@@ -54,7 +54,7 @@ impl Tenx {
     }
 
     /// Resets all files in the state snapshot to their original contents.
-    pub fn reset(state: &Session) -> Result<()> {
+    pub fn reset(_state: &Session) -> Result<()> {
         // FIXME
         Ok(())
     }

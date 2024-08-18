@@ -1,10 +1,8 @@
-use colored::*;
-use serde::{Deserialize, Serialize};
-
-use super::ModelProvider;
 use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
+use super::ModelProvider;
 use crate::{dialect::Dialect, Config, Patch, Result, Session};
 
 /// A dummy model for testing purposes.
@@ -30,9 +28,5 @@ impl ModelProvider for Dummy {
         _sender: Option<mpsc::Sender<String>>,
     ) -> Result<Patch> {
         Ok(self.change_set.clone())
-    }
-
-    fn pretty_print(&self) -> String {
-        format!("{}\n", "Dummy Model".bold().yellow())
     }
 }

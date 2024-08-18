@@ -21,8 +21,6 @@ pub trait ModelProvider {
         state: &Session,
         sender: Option<mpsc::Sender<String>>,
     ) -> Result<Patch>;
-
-    fn pretty_print(&self) -> String;
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -43,13 +41,6 @@ impl ModelProvider for Model {
         match self {
             Model::Claude(c) => c.prompt(config, dialect, state, sender).await,
             Model::Dummy(d) => d.prompt(config, dialect, state, sender).await,
-        }
-    }
-
-    fn pretty_print(&self) -> String {
-        match self {
-            Model::Claude(c) => c.pretty_print(),
-            Model::Dummy(d) => d.pretty_print(),
         }
     }
 }
