@@ -37,10 +37,10 @@ impl Tenx {
     }
 
     /// Saves a session to the store.
-    pub fn save_session(&self, session: Session) -> Result<Session> {
+    pub fn save_session(&self, session: &Session) -> Result<()> {
         let session_store = SessionStore::open(self.config.session_store_dir.clone())?;
-        session_store.save(&session)?;
-        Ok(session)
+        session_store.save(session)?;
+        Ok(())
     }
 
     /// Retries the last prompt in the session.

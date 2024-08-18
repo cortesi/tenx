@@ -147,7 +147,7 @@ async fn main() -> Result<()> {
                 session.add_ctx_ruskel(ruskel_doc.clone())?;
             }
 
-            tx.save_session(session)?;
+            tx.save_session(&session)?;
             info!("Context added to session successfully");
             Ok(())
         }
@@ -185,8 +185,8 @@ async fn main() -> Result<()> {
                 session.add_ctx_ruskel(ruskel_doc.clone())?;
             }
 
-            tx.save_session(session)?;
-            info!("New session created successfully");
+            tx.save_session(&session)?;
+            info!("new session: {}", session.root.display());
             Ok(())
         }
         Commands::Edit {
@@ -242,7 +242,7 @@ async fn main() -> Result<()> {
                 session.add_editable(file)?;
             }
 
-            tx.save_session(session)?;
+            tx.save_session(&session)?;
             info!("Editable files added to session successfully");
             Ok(())
         }
