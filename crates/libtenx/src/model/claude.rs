@@ -65,7 +65,7 @@ impl Claude {
         req: &misanthropy::MessagesRequest,
     ) -> Result<patch::Patch> {
         let mut cset = patch::Patch::default();
-        for message in &req.messages {
+        if let Some(message) = &req.messages.last() {
             if message.role == Role::Assistant {
                 for content in &message.content {
                     if let Content::Text { text } = content {
