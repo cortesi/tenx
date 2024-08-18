@@ -20,33 +20,41 @@ pub struct SessionStore {
 impl SessionStore {
     /// Creates a new StateStore with the specified base directory.
     /// Creates a new StateStore with the specified base directory.
-    pub fn open<P: AsRef<Path>>(base_dir: Option<P>) -> std::io::Result<Self> {
-        let base_dir = base_dir
-            .map(|p| p.as_ref().to_path_buf())
-            .unwrap_or_else(|| {
-                dirs::home_dir()
-                    .expect("Failed to get home directory")
-                    .join(".config")
-                    .join("tenx")
-                    .join("state")
-            });
-        fs::create_dir_all(&base_dir)?;
+    pub fn open(base_dir: Option<PathBuf>) -> Result<Self> {
+        let base_dir = base_dir.unwrap_or_else(|| {
+            dirs::home_dir()
+                .expect("Failed to get home directory")
+                .join(".config")
+                .join("tenx")
+                .join("state")
+        });
+        fs::create_dir_all(&base_dir).map_err(|e| TenxError::fio(e, &base_dir))?;
         Ok(Self { base_dir })
     }
 
     /// Saves the given State to a file.
-    pub fn save(&self, state: &Session) -> std::io::Result<()> {
+    pub fn save(&self, state: &Session) -> Result<()> {
         let file_name = normalize_path(&state.root);
         let file_path = self.base_dir.join(file_name);
-        let serialized = serde_json::to_string(state)?;
-        fs::write(file_path, serialized)
+        let serialized = serde_json::to_string(state)
+            .map_err(|e| TenxError::SessionStore(format!("serialization failed: {}", e)))?;
+        fs::write(file_path.clone(), serialized).map_err(|e| {
+            TenxError::SessionStore(format!(
+                "could not write to {}, error {}",
+                file_path.display(),
+                e
+            ))
+        })?;
+        Ok(())
     }
 
     /// Loads a State from a file based on the given working directory.
     pub fn load<P: AsRef<Path>>(&self, working_directory: P) -> Result<Session> {
         let file_name = normalize_path(working_directory.as_ref());
         let file_path = self.base_dir.join(file_name);
-        let serialized = fs::read_to_string(file_path)?;
+        let serialized = fs::read_to_string(file_path.clone()).map_err(|e| {
+            TenxError::SessionStore(format!("read failed {}, error {}", file_path.display(), e))
+        })?;
         serde_json::from_str(&serialized).map_err(|e| TenxError::Internal(format!("{}", e)))
     }
 }
@@ -70,14 +78,14 @@ mod tests {
     #[test]
     fn test_state_store() -> Result<()> {
         let temp_dir = TempDir::new().unwrap();
-        let state_store = SessionStore::open(Some(temp_dir.path()))?;
+        let state_store = SessionStore::open(Some(temp_dir.path().into())).unwrap();
 
         let state = Session::new(
             Some(temp_dir.path().to_path_buf()),
             dialect::Dialect::Tags(dialect::Tags {}),
             model::Model::Claude(model::Claude::default()),
         );
-        state_store.save(&state)?;
+        state_store.save(&state).unwrap();
 
         let loaded_state = state_store.load(temp_dir.path().canonicalize().unwrap())?;
         assert_eq!(loaded_state.root, state.root);

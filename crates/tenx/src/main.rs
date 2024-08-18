@@ -45,7 +45,7 @@ fn create_subscriber(verbosity: u8) -> impl Subscriber {
 #[clap(name = "tenx")]
 #[clap(author = "Aldo Cortesi")]
 #[clap(version = "0.1.0")]
-#[clap(about = "AI-powered command-line assistant for Rust", long_about = None)]
+#[clap(about = "AI-powered coding assistant", long_about = None)]
 struct Cli {
     /// Increase output verbosity
     #[clap(short, long, action = clap::ArgAction::Count, global = true, default_value = "1")]

@@ -1,5 +1,12 @@
 
 
+# Ethos
+
+- *tenx* is a sharp, ergonomic terminal coding tool for experts
+- *libtenx* is a *library* that higher level tools can be built on
+- Tenx is designed to be generic, but development will focus on what objective
+  benchmarks show to be the best current coding models
+
 
 
 # Sessions

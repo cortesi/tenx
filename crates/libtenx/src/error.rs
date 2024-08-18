@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use thiserror::Error;
 
 pub type Result<T> = std::result::Result<T, TenxError>;
@@ -7,8 +8,11 @@ pub enum TenxError {
     #[error("Failed to render query: {0}")]
     Render(String),
 
-    #[error("IO error: {0}")]
-    Io(#[from] std::io::Error),
+    #[error("File IO error: {path}: {source}")]
+    FileIo {
+        source: std::io::Error,
+        path: PathBuf,
+    },
 
     #[error("No paths provided")]
     NoPathsProvided,
@@ -28,8 +32,21 @@ pub enum TenxError {
     #[error("Resolution error: {0}")]
     Resolve(String),
 
+    #[error("Session store error: {0}")]
+    SessionStore(String),
+
     #[error("Internal error: {0}")]
     Internal(String),
+}
+
+impl TenxError {
+    /// Constructs a FileIo error from an IO error and a path-like argument.
+    pub fn fio<P: AsRef<std::path::Path>>(err: std::io::Error, path: P) -> Self {
+        TenxError::FileIo {
+            source: err,
+            path: path.as_ref().to_path_buf(),
+        }
+    }
 }
 
 impl From<misanthropy::Error> for TenxError {
@@ -37,3 +54,4 @@ impl From<misanthropy::Error> for TenxError {
         TenxError::Model(error.to_string())
     }
 }
+

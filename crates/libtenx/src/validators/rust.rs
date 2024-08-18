@@ -61,7 +61,9 @@ impl RustWorkspace {
         let mut current_dir = if start_dir.is_absolute() {
             start_dir.to_path_buf()
         } else {
-            std::env::current_dir()?.join(start_dir)
+            std::env::current_dir()
+                .map_err(|e| TenxError::Internal(format!("could not get current dir: {}", e)))?
+                .join(start_dir)
         };
 
         loop {
@@ -90,7 +92,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         create_dummy_project(temp_dir.path()).unwrap();
 
-        let _temp_env = TempEnv::new(temp_dir.path())?;
+        let _temp_env = TempEnv::new(temp_dir.path()).unwrap();
         let edit_paths = vec![
             temp_dir.path().join("crate1/src/lib.rs"),
             temp_dir.path().join("crate2/src/lib.rs"),
@@ -120,7 +122,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         create_dummy_project(temp_dir.path()).unwrap();
 
-        let _temp_env = TempEnv::new(temp_dir.path())?;
+        let _temp_env = TempEnv::new(temp_dir.path()).unwrap();
 
         let edit_paths = vec![
             temp_dir.path().join("crate1/src/lib.rs"),
@@ -143,8 +145,8 @@ mod tests {
 
         let workspace = RustWorkspace::discover(&session)?;
         assert_eq!(
-            workspace.root_path.canonicalize()?,
-            temp_dir.path().canonicalize()?
+            workspace.root_path.canonicalize().unwrap(),
+            temp_dir.path().canonicalize().unwrap()
         );
 
         Ok(())
@@ -155,7 +157,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         create_dummy_project(temp_dir.path()).unwrap();
 
-        let _temp_env = TempEnv::new(temp_dir.path())?;
+        let _temp_env = TempEnv::new(temp_dir.path()).unwrap();
 
         let edit_paths = vec![temp_dir.path().join("crate1/src/lib.rs")];
 
@@ -176,8 +178,8 @@ mod tests {
         let workspace = RustWorkspace::discover(&session)?;
 
         assert_eq!(
-            workspace.root_path.canonicalize()?,
-            temp_dir.path().join("crate1").canonicalize()?
+            workspace.root_path.canonicalize().unwrap(),
+            temp_dir.path().join("crate1").canonicalize().unwrap()
         );
 
         Ok(())
@@ -187,7 +189,7 @@ mod tests {
     fn test_no_cargo_toml() -> Result<()> {
         let temp_dir = TempDir::new().unwrap();
 
-        let _temp_env = TempEnv::new(temp_dir.path())?;
+        let _temp_env = TempEnv::new(temp_dir.path()).unwrap();
 
         let prompt = PromptInput {
             ..Default::default()
@@ -212,7 +214,7 @@ mod tests {
     #[test]
     fn test_no_paths_provided() -> Result<()> {
         let temp_dir = TempDir::new().unwrap();
-        let _temp_env = TempEnv::new(temp_dir.path())?;
+        let _temp_env = TempEnv::new(temp_dir.path()).unwrap();
 
         let prompt = PromptInput::default();
 
@@ -239,7 +241,7 @@ mod tests {
         let temp_dir1 = TempDir::new().unwrap();
         let temp_dir2 = TempDir::new().unwrap();
 
-        let _temp_env = TempEnv::new(&temp_dir1)?;
+        let _temp_env = TempEnv::new(&temp_dir1).unwrap();
 
         let edit_paths = vec![
             temp_dir1.path().to_path_buf(),

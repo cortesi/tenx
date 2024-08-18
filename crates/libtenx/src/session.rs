@@ -45,7 +45,9 @@ impl Context {
     pub fn body(&self) -> Result<String> {
         match &self.data {
             ContextData::String(content) => Ok(content.clone()),
-            ContextData::Path(path) => Ok(std::fs::read_to_string(path).map_err(TenxError::Io)?),
+            ContextData::Path(path) => {
+                Ok(std::fs::read_to_string(path).map_err(|e| TenxError::fio(e, path.clone()))?)
+            }
         }
     }
 }
@@ -102,14 +104,14 @@ impl Session {
     pub fn cwd_path(&self, path: &Path) -> Result<PathBuf> {
         let absolute_path = self.root.join(path);
         env::current_dir()
-            .map_err(TenxError::Io)?
+            .map_err(|e| TenxError::fio(e, path))?
             .join(
                 absolute_path
                     .strip_prefix(&self.root)
                     .unwrap_or(&absolute_path),
             )
             .canonicalize()
-            .map_err(TenxError::Io)
+            .map_err(|e| TenxError::fio(e, path))
     }
 
     pub fn editables(&self) -> Result<Vec<PathBuf>> {
@@ -178,7 +180,8 @@ impl Session {
                 let absolute_path = current_dir
                     .join(path)
                     .canonicalize()
-                    .map_err(TenxError::Io)?;
+                    .map_err(|e| TenxError::fio(e, path))?;
+
                 Ok(absolute_path
                     .strip_prefix(&self.root)
                     .unwrap_or(&absolute_path)
@@ -256,12 +259,14 @@ impl Session {
             match change {
                 Change::Replace(replace) => {
                     let path = self.cwd_path(&replace.path)?;
-                    let current_content = fs::read_to_string(&path)?;
+                    let current_content =
+                        fs::read_to_string(&path).map_err(|e| TenxError::fio(e, path.clone()))?;
                     let new_content = replace.apply(&current_content)?;
-                    fs::write(&path, &new_content)?;
+                    fs::write(&path, &new_content).map_err(|e| TenxError::fio(e, path.clone()))?;
                 }
                 Change::Write(write_file) => {
-                    fs::write(self.cwd_path(&write_file.path)?, &write_file.content)?;
+                    fs::write(self.cwd_path(&write_file.path)?, &write_file.content)
+                        .map_err(|e| TenxError::fio(e, write_file.path.clone()))?;
                 }
             }
         }
@@ -271,7 +276,8 @@ impl Session {
     /// Rolls back the changes made by a patch, using the cached file contents.
     pub fn rollback(&self, patch: &Patch) -> Result<()> {
         for (path, content) in &patch.cache {
-            fs::write(self.cwd_path(path)?, content)?;
+            fs::write(self.cwd_path(path)?, content)
+                .map_err(|e| TenxError::fio(e, path.clone()))?;
         }
         Ok(())
     }
@@ -313,11 +319,11 @@ mod tests {
 
     #[test]
     fn test_add_path() -> Result<()> {
-        let temp_dir = tempdir()?;
+        let temp_dir = tempdir().unwrap();
         let working_dir = temp_dir.path().join("working");
-        fs::create_dir(&working_dir)?;
+        fs::create_dir(&working_dir).unwrap();
         let sub_dir = working_dir.join("subdir");
-        fs::create_dir(&sub_dir)?;
+        fs::create_dir(&sub_dir).unwrap();
 
         let mut session = Session::new(
             Some(working_dir.clone()),
@@ -327,16 +333,16 @@ mod tests {
 
         // Test 1: Current dir is the working directory
         {
-            let _temp_env = TempEnv::new(&working_dir)?;
-            fs::File::create(working_dir.join("file.txt"))?;
+            let _temp_env = TempEnv::new(&working_dir).unwrap();
+            fs::File::create(working_dir.join("file.txt")).unwrap();
             session.add_ctx_path("file.txt")?;
             assert_eq!(session.context.last().unwrap().name, "file.txt");
         }
 
         // Test 2: Current dir is under the working directory
         {
-            let _temp_env = TempEnv::new(&sub_dir)?;
-            fs::File::create(sub_dir.join("subfile.txt"))?;
+            let _temp_env = TempEnv::new(&sub_dir).unwrap();
+            fs::File::create(sub_dir.join("subfile.txt")).unwrap();
             session.add_ctx_path("subfile.txt")?;
             assert_eq!(session.context.last().unwrap().name, "subdir/subfile.txt");
         }
@@ -344,9 +350,9 @@ mod tests {
         // Test 3: Current dir is outside the working directory
         {
             let outside_dir = temp_dir.path().join("outside");
-            fs::create_dir(&outside_dir)?;
-            let _temp_env = TempEnv::new(&outside_dir)?;
-            fs::File::create(outside_dir.join("outsidefile.txt"))?;
+            fs::create_dir(&outside_dir).unwrap();
+            let _temp_env = TempEnv::new(&outside_dir).unwrap();
+            fs::File::create(outside_dir.join("outsidefile.txt")).unwrap();
             session.add_ctx_path("outsidefile.txt")?;
             assert_eq!(
                 session.context.last().unwrap().name,
