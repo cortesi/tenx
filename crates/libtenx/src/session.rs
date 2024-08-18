@@ -42,12 +42,11 @@ pub struct Context {
 
 impl Context {
     /// Converts a Docs to a string representation.
-    pub fn body(&self) -> Result<String> {
+    pub fn body(&self, session: &Session) -> Result<String> {
         match &self.data {
             ContextData::String(content) => Ok(content.clone()),
-            ContextData::Path(path) => {
-                Ok(std::fs::read_to_string(path).map_err(|e| TenxError::fio(e, path.clone()))?)
-            }
+            ContextData::Path(path) => Ok(std::fs::read_to_string(session.abspath(path)?)
+                .map_err(|e| TenxError::fio(e, path.clone()))?),
         }
     }
 }
@@ -288,7 +287,7 @@ mod tests {
 
         assert_eq!(session.context.len(), 1);
         assert_eq!(session.context[0].name, "test.txt");
-        assert_eq!(session.context[0].body().unwrap(), "content");
+        assert_eq!(session.context[0].body(&session).unwrap(), "content");
     }
 
     #[test]

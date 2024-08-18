@@ -37,7 +37,7 @@ impl DialectProvider for Tags {
                 "<item name=\"{}\" type=\"{:?}\">\n{}\n</item>\n",
                 ctx.name,
                 ctx.ty,
-                ctx.body()?
+                ctx.body(s)?
             ));
         }
         rendered.push_str("</context>");
