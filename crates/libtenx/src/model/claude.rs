@@ -6,9 +6,8 @@ use serde::{Deserialize, Serialize};
 
 use super::ModelProvider;
 use crate::{
-    changes,
     dialect::{Dialect, DialectProvider},
-    Config, Result, Session, TenxError,
+    patch, Config, Result, Session, TenxError,
 };
 
 const DEFAULT_MODEL: &str = "claude-3-5-sonnet-20240620";
@@ -62,8 +61,8 @@ impl Claude {
         Ok(streamed_response.response)
     }
 
-    fn extract_changes(&self, dialect: &Dialect) -> Result<changes::Patch> {
-        let mut cset = changes::Patch::default();
+    fn extract_changes(&self, dialect: &Dialect) -> Result<patch::Patch> {
+        let mut cset = patch::Patch::default();
         for message in &self.conversation.messages {
             if message.role == Role::Assistant {
                 for content in &message.content {
@@ -191,7 +190,7 @@ impl ModelProvider for Claude {
         dialect: &Dialect,
         session: &Session,
         sender: Option<mpsc::Sender<String>>,
-    ) -> Result<changes::Patch> {
+    ) -> Result<patch::Patch> {
         self.conversation.system = Some(dialect.system());
         let prompt = session
             .steps
@@ -284,4 +283,3 @@ mod tests {
         Ok(())
     }
 }
-

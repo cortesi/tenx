@@ -6,7 +6,7 @@ use std::{
 use tokio::sync::mpsc;
 use tracing::warn;
 
-use crate::{model::ModelProvider, Change, Patch, PromptInput, Result, Session, SessionStore};
+use crate::{model::ModelProvider, Change, Patch, Result, Session, SessionStore};
 
 #[derive(Debug, Default)]
 pub struct Config {
