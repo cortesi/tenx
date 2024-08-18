@@ -15,6 +15,7 @@ use libtenx::{
 };
 
 mod edit;
+mod pretty;
 
 struct NoTime;
 
@@ -249,7 +250,7 @@ async fn main() -> Result<()> {
             let config = load_config(&cli)?;
             let tx = Tenx::new(config);
             let session = tx.load_session::<PathBuf>(None)?;
-            println!("{}", session.pretty_print());
+            println!("{}", pretty::session(&session)?);
             Ok(())
         }
     }

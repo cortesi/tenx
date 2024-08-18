@@ -3,7 +3,6 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use colored::*;
 use libruskel::Ruskel;
 use serde::{Deserialize, Serialize};
 
@@ -227,31 +226,6 @@ impl Session {
             data: ContextData::String(resolved),
         });
         Ok(())
-    }
-
-    /// Pretty prints the Session information.
-    pub fn pretty_print(&self) -> String {
-        let mut output = String::new();
-        output.push_str(&format!(
-            "{} {}\n",
-            "Rooot Directory:".blue().bold(),
-            self.root.display()
-        ));
-        output.push_str(&format!(
-            "{} {:?}\n",
-            "Dialect:".blue().bold(),
-            self.dialect
-        ));
-        output.push_str(&format!("{}\n", "Context:".blue().bold()));
-        for context in &self.context {
-            output.push_str(&format!("  - {:?}: {}\n", context.ty, context.name));
-        }
-        output.push_str(&format!("{}\n", "Edit Paths:".blue().bold()));
-        for path in self.editable.iter() {
-            output.push_str(&format!("  - {}\n", path.display()));
-        }
-
-        output
     }
 
     pub fn apply_patch(&mut self, patch: &Patch) -> Result<()> {
