@@ -194,13 +194,15 @@ impl ModelProvider for Claude {
     ) -> Result<changes::Patch> {
         self.conversation.system = Some(dialect.system());
         let prompt = session
-            .prompt_inputs
+            .steps
             .last()
-            .ok_or(TenxError::Internal("no prompt inputs".into()))?;
+            .ok_or(TenxError::Internal("no steps".into()))?
+            .prompt
+            .clone();
 
         self.update_context_messages(session)?;
 
-        let txt = dialect.render_prompt(prompt)?;
+        let txt = dialect.render_prompt(&prompt)?;
         self.conversation.messages.push(misanthropy::Message {
             role: misanthropy::Role::User,
             content: vec![misanthropy::Content::Text { text: txt }],
@@ -282,3 +284,4 @@ mod tests {
         Ok(())
     }
 }
+

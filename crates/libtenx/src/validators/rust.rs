@@ -104,7 +104,7 @@ mod tests {
             Dialect::Tags(crate::dialect::Tags::default()),
             Model::Dummy(crate::model::Dummy::default()),
         );
-        session.prompt_inputs.push(prompt.clone());
+        session.add_prompt(prompt.clone());
         for p in edit_paths {
             session.add_editable(&p)?;
         }
@@ -136,7 +136,7 @@ mod tests {
             Dialect::Tags(crate::dialect::Tags::default()),
             Model::Dummy(crate::model::Dummy::default()),
         );
-        session.prompt_inputs.push(prompt.clone());
+        session.add_prompt(prompt);
         for p in edit_paths {
             session.add_editable(&p)?;
         }
@@ -160,17 +160,17 @@ mod tests {
             ..Default::default()
         };
 
-        let mut state = Session::new(
+        let mut session = Session::new(
             Some(temp_dir.path().to_path_buf()),
             Dialect::Tags(crate::dialect::Tags::default()),
             Model::Dummy(crate::model::Dummy::default()),
         );
-        state.prompt_inputs.push(prompt.clone());
+        session.add_prompt(prompt);
         for p in edit_paths {
-            state.add_editable(&p)?;
+            session.add_editable(&p)?;
         }
 
-        let workspace = RustWorkspace::discover(&state)?;
+        let workspace = RustWorkspace::discover(&session)?;
 
         assert_eq!(workspace.root_path, temp_dir.path().join("crate1"));
 
@@ -192,7 +192,7 @@ mod tests {
             Dialect::Tags(crate::dialect::Tags::default()),
             Model::Dummy(crate::model::Dummy::default()),
         );
-        session.prompt_inputs.push(prompt.clone());
+        session.add_prompt(prompt);
         session.add_editable(temp_dir.path())?;
 
         let result = RustWorkspace::discover(&session);
@@ -210,14 +210,14 @@ mod tests {
 
         let prompt = PromptInput::default();
 
-        let mut state = Session::new(
+        let mut session = Session::new(
             Some(temp_dir.path().to_path_buf()),
             Dialect::Tags(crate::dialect::Tags::default()),
             Model::Dummy(crate::model::Dummy::default()),
         );
-        state.prompt_inputs.push(prompt.clone());
+        session.add_prompt(prompt);
 
-        let result = RustWorkspace::discover(&state);
+        let result = RustWorkspace::discover(&session);
 
         assert!(result.is_err());
         assert!(result
@@ -244,20 +244,21 @@ mod tests {
             ..Default::default()
         };
 
-        let mut state = Session::new(
+        let mut session = Session::new(
             Some(temp_dir1.path().to_path_buf()),
             Dialect::Tags(crate::dialect::Tags::default()),
             Model::Dummy(crate::model::Dummy::default()),
         );
-        state.prompt_inputs.push(prompt.clone());
+        session.add_prompt(prompt);
         for f in edit_paths {
-            state.add_editable(&f)?;
+            session.add_editable(&f)?;
         }
 
-        let result = RustWorkspace::discover(&state);
+        let result = RustWorkspace::discover(&session);
 
         assert!(result.is_err());
 
         Ok(())
     }
 }
+

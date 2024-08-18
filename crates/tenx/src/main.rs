@@ -202,7 +202,7 @@ async fn main() -> Result<()> {
                     None => return Ok(()),
                 }
             };
-            session.prompt_inputs.push(user_prompt);
+            session.add_prompt(user_prompt);
             for f in files.clone().unwrap_or_default() {
                 session.add_editable(f)?;
             }

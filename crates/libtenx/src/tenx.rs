@@ -81,7 +81,7 @@ impl Tenx {
         let session_store = SessionStore::open(self.config.session_store_dir.as_ref())?;
         self.process_prompt(
             session,
-            session.prompt_inputs.last().unwrap().clone(),
+            session.steps.last().unwrap().prompt.clone(),
             sender,
             &session_store,
         )
@@ -96,7 +96,7 @@ impl Tenx {
         sender: Option<mpsc::Sender<String>>,
         session_store: &SessionStore,
     ) -> Result<()> {
-        state.prompt_inputs.push(prompt.clone());
+        state.add_prompt(prompt.clone());
         let mut model = state.model.take().unwrap();
         let ops = model
             .prompt(&self.config, &state.dialect, state, sender)
@@ -157,7 +157,7 @@ mod tests {
             user_prompt: "Test prompt".to_string(),
         };
 
-        let mut state = Session::new(
+        let mut session = Session::new(
             Some(temp_dir.path().to_path_buf()),
             Dialect::Tags(crate::dialect::Tags::default()),
             Model::Dummy(crate::model::Dummy::new(Patch {
@@ -169,10 +169,10 @@ mod tests {
                 })],
             })),
         );
-        state.prompt_inputs.push(prompt.clone());
-        state.add_editable(&file_path)?;
+        session.add_prompt(prompt.clone());
+        session.add_editable(&file_path)?;
 
-        tenx.start(&mut state, prompt, None).await?;
+        tenx.start(&mut session, prompt, None).await?;
 
         let updated_content = fs::read_to_string(&file_path)?;
         assert_eq!(updated_content, "Updated content");

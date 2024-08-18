@@ -7,7 +7,7 @@ use colored::*;
 use libruskel::Ruskel;
 use serde::{Deserialize, Serialize};
 
-use crate::{dialect::Dialect, model::Model, prompt::PromptInput, Result, TenxError};
+use crate::{dialect::Dialect, model::Model, prompt::PromptInput, Patch, Result, TenxError};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ContextType {
@@ -61,13 +61,20 @@ pub fn find_working_dir<P: AsRef<Path>>(path: Option<P>) -> PathBuf {
     env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
 }
 
-/// The serializable state of Tenx, which persists between invocations.
+/// A single step in the session - basically a prompt and a patch.
+#[derive(Debug, Deserialize, Serialize)]
+pub struct Step {
+    pub prompt: PromptInput,
+    pub patch: Option<Patch>,
+}
+
+/// A serializable session, which persists between invocations.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Session {
     pub working_directory: PathBuf,
     pub dialect: Dialect,
     pub model: Option<Model>,
-    pub prompt_inputs: Vec<PromptInput>,
+    pub steps: Vec<Step>,
     pub context: Vec<Context>,
     pub editable: Vec<PathBuf>,
 }
@@ -79,10 +86,18 @@ impl Session {
             working_directory: find_working_dir(working_directory).canonicalize().unwrap(),
             model: Some(model),
             dialect,
-            prompt_inputs: vec![],
+            steps: vec![],
             context: vec![],
             editable: vec![],
         }
+    }
+
+    /// Adds a new prompt to the session.
+    pub fn add_prompt(&mut self, prompt: PromptInput) {
+        self.steps.push(Step {
+            prompt,
+            patch: None,
+        });
     }
 
     /// Adds a new context to the session, ignoring duplicates.
