@@ -111,6 +111,8 @@ enum Commands {
     },
     /// Show the current session
     Show,
+    /// Retry the last prompt
+    Retry,
 }
 
 /// Creates a Config from CLI arguments
@@ -146,6 +148,23 @@ async fn main() -> Result<()> {
 
             tx.save_session(session)?;
             info!("Context added to session successfully");
+            Ok(())
+        }
+        Commands::Retry => {
+            let config = load_config(&cli)?;
+            let tx = Tenx::new(config);
+
+            let (sender, mut receiver) = mpsc::channel(100);
+            let print_task = tokio::spawn(async move {
+                while let Some(chunk) = receiver.recv().await {
+                    print!("{}", chunk);
+                }
+            });
+
+            tx.retry::<PathBuf>(None, Some(sender)).await?;
+
+            print_task.await?;
+            info!("\n\n{}", "Changes applied successfully".green().bold());
             Ok(())
         }
         Commands::New { files, ruskel } => {

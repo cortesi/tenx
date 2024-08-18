@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use super::ModelProvider;
 use crate::{
     dialect::{Dialect, DialectProvider},
-    patch, Config, Result, Session,
+    patch, Config, Result, Session, TenxError,
 };
 
 const DEFAULT_MODEL: &str = "claude-3-5-sonnet-20240620";
@@ -151,8 +151,10 @@ impl ModelProvider for Claude {
         session: &Session,
         sender: Option<mpsc::Sender<String>>,
     ) -> Result<patch::Patch> {
+        if !session.pending_prompt() {
+            return Err(TenxError::Internal("No prompt to process.".into()));
+        }
         let mut req = self.request(session)?;
-        println!("Request: {:#?}", req);
         let resp = self
             .stream_response(&config.anthropic_key, &req, sender)
             .await?;

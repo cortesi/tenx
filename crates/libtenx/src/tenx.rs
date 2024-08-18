@@ -43,6 +43,19 @@ impl Tenx {
         Ok(session)
     }
 
+    /// Retries the last prompt in the session.
+    pub async fn retry<P: AsRef<Path>>(
+        &self,
+        path: Option<P>,
+        sender: Option<mpsc::Sender<String>>,
+    ) -> Result<()> {
+        let mut session = self.load_session(path)?;
+        session.retry();
+        let session_store = SessionStore::open(self.config.session_store_dir.as_ref())?;
+        self.process_prompt(&mut session, sender, &session_store)
+            .await
+    }
+
     /// Loads a session from the store based on the working directory.
     pub fn load_session<P: AsRef<Path>>(&self, path: Option<P>) -> Result<Session> {
         let working_dir = crate::session::find_working_dir(path);
@@ -79,6 +92,7 @@ impl Tenx {
         session.model = Some(model);
         match session.apply_patch(&patch) {
             Ok(_) => {
+                session.add_patch(patch);
                 session_store.save(session)?;
                 Ok(())
             }

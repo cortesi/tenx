@@ -98,6 +98,30 @@ impl Session {
         }
     }
 
+    /// Sets the patch in the last step to None, allowing for a retry.
+    /// Sets the patch in the last step to None, allowing for a retry.
+    pub fn retry(&mut self) {
+        if let Some(step) = self.steps.last_mut() {
+            step.patch = None;
+        }
+    }
+
+    /// Does this session have a pending prompt?
+    pub fn pending_prompt(&self) -> bool {
+        if let Some(step) = self.steps.last() {
+            step.patch.is_none()
+        } else {
+            false
+        }
+    }
+
+    /// Adds a patch to the final step
+    pub fn add_patch(&mut self, patch: Patch) {
+        if let Some(step) = self.steps.last_mut() {
+            step.patch = Some(patch);
+        }
+    }
+
     /// Adds a new prompt to the session.
     pub fn add_prompt(&mut self, prompt: PromptInput) {
         self.steps.push(Step {
