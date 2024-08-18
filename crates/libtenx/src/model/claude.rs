@@ -105,7 +105,7 @@ impl Claude {
                         text: format!(
                             "{}\n{}",
                             EDITABLE_LEADIN,
-                            session.dialect.render_editables(session.editable.clone())?
+                            session.dialect.render_editables(session.editables()?)?
                         ),
                     }],
                 },

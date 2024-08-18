@@ -58,7 +58,7 @@ impl Tenx {
 
     /// Loads a session from the store based on the working directory.
     pub fn load_session<P: AsRef<Path>>(&self, path: Option<P>) -> Result<Session> {
-        let working_dir = crate::session::find_working_dir(path);
+        let working_dir = crate::session::find_root(path);
         let session_store = SessionStore::open(self.config.session_store_dir.as_ref())?;
         session_store.load(working_dir)
     }

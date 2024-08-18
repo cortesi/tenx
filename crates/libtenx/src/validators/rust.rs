@@ -34,7 +34,7 @@ struct RustWorkspace {
 
 impl RustWorkspace {
     pub fn discover(session: &Session) -> Result<Self> {
-        let common_ancestor = Self::find_common_ancestor(&session.editable)?;
+        let common_ancestor = Self::find_common_ancestor(&session.editables()?)?;
         let root_path = Self::find_workspace_root(&common_ancestor)?;
 
         Ok(RustWorkspace { root_path })
@@ -142,7 +142,10 @@ mod tests {
         }
 
         let workspace = RustWorkspace::discover(&session)?;
-        assert_eq!(workspace.root_path, temp_dir.path());
+        assert_eq!(
+            workspace.root_path.canonicalize()?,
+            temp_dir.path().canonicalize()?
+        );
 
         Ok(())
     }
@@ -172,7 +175,10 @@ mod tests {
 
         let workspace = RustWorkspace::discover(&session)?;
 
-        assert_eq!(workspace.root_path, temp_dir.path().join("crate1"));
+        assert_eq!(
+            workspace.root_path.canonicalize()?,
+            temp_dir.path().join("crate1").canonicalize()?
+        );
 
         Ok(())
     }

@@ -51,7 +51,7 @@ impl Context {
 }
 
 /// Finds the working directory based on the given path or git repo root.
-pub fn find_working_dir<P: AsRef<Path>>(path: Option<P>) -> PathBuf {
+pub fn find_root<P: AsRef<Path>>(path: Option<P>) -> PathBuf {
     if let Some(p) = path {
         return p.as_ref().to_path_buf();
     }
@@ -77,25 +77,47 @@ pub struct Step {
 /// A serializable session, which persists between invocations.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Session {
-    pub working_directory: PathBuf,
+    pub root: PathBuf,
     pub dialect: Dialect,
     pub model: Option<Model>,
     pub steps: Vec<Step>,
     pub context: Vec<Context>,
-    pub editable: Vec<PathBuf>,
+    editable: Vec<PathBuf>,
 }
 
 impl Session {
-    /// Creates a new Context with the specified working directory and dialect.
-    pub fn new(working_directory: Option<PathBuf>, dialect: Dialect, model: Model) -> Self {
+    /// Creates a new Context with the specified root directory and dialect.
+    pub fn new(root: Option<PathBuf>, dialect: Dialect, model: Model) -> Self {
         Self {
-            working_directory: find_working_dir(working_directory).canonicalize().unwrap(),
+            root: find_root(root).canonicalize().unwrap(),
             model: Some(model),
             dialect,
             steps: vec![],
             context: vec![],
             editable: vec![],
         }
+    }
+
+    /// Converts a path relative to the root directory to a path relative to the current working directory.
+    pub fn cwd_path(&self, path: &Path) -> Result<PathBuf> {
+        let absolute_path = self.root.join(path);
+        env::current_dir()
+            .map_err(TenxError::Io)?
+            .join(
+                absolute_path
+                    .strip_prefix(&self.root)
+                    .unwrap_or(&absolute_path),
+            )
+            .canonicalize()
+            .map_err(TenxError::Io)
+    }
+
+    pub fn editables(&self) -> Result<Vec<PathBuf>> {
+        self.editable
+            .clone()
+            .iter()
+            .map(|p| self.cwd_path(p))
+            .collect()
     }
 
     /// Rolls back the last patch and sets it to None, allowing for a retry.
@@ -148,7 +170,7 @@ impl Session {
         }
     }
 
-    /// Normalizes a path relative to the working directory.
+    /// Normalizes a path relative to the root directory.
     fn normalize_path<P: AsRef<Path>>(&self, path: P) -> Result<PathBuf> {
         let path = path.as_ref();
         if path.is_relative() {
@@ -158,11 +180,11 @@ impl Session {
                     .canonicalize()
                     .map_err(TenxError::Io)?;
                 Ok(absolute_path
-                    .strip_prefix(&self.working_directory)
+                    .strip_prefix(&self.root)
                     .unwrap_or(&absolute_path)
                     .to_path_buf())
             } else {
-                Ok(self.working_directory.join(path))
+                Ok(self.root.join(path))
             }
         } else {
             Ok(path.to_path_buf())
@@ -208,9 +230,9 @@ impl Session {
     pub fn pretty_print(&self) -> String {
         let mut output = String::new();
         output.push_str(&format!(
-            "{} {:?}\n",
-            "Working Directory:".blue().bold(),
-            self.working_directory
+            "{} {}\n",
+            "Rooot Directory:".blue().bold(),
+            self.root.display()
         ));
         output.push_str(&format!(
             "{} {:?}\n",
@@ -233,12 +255,13 @@ impl Session {
         for change in &patch.changes {
             match change {
                 Change::Replace(replace) => {
-                    let current_content = fs::read_to_string(&replace.path)?;
+                    let path = self.cwd_path(&replace.path)?;
+                    let current_content = fs::read_to_string(&path)?;
                     let new_content = replace.apply(&current_content)?;
-                    fs::write(&replace.path, &new_content)?;
+                    fs::write(&path, &new_content)?;
                 }
                 Change::Write(write_file) => {
-                    fs::write(&write_file.path, &write_file.content)?;
+                    fs::write(self.cwd_path(&write_file.path)?, &write_file.content)?;
                 }
             }
         }
@@ -248,7 +271,7 @@ impl Session {
     /// Rolls back the changes made by a patch, using the cached file contents.
     pub fn rollback(&self, patch: &Patch) -> Result<()> {
         for (path, content) in &patch.cache {
-            fs::write(path, content)?;
+            fs::write(self.cwd_path(path)?, content)?;
         }
         Ok(())
     }
@@ -338,3 +361,4 @@ mod tests {
         Ok(())
     }
 }
+

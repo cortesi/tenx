@@ -36,7 +36,7 @@ impl SessionStore {
 
     /// Saves the given State to a file.
     pub fn save(&self, state: &Session) -> std::io::Result<()> {
-        let file_name = normalize_path(&state.working_directory);
+        let file_name = normalize_path(&state.root);
         let file_path = self.base_dir.join(file_name);
         let serialized = serde_json::to_string(state)?;
         fs::write(file_path, serialized)
@@ -80,7 +80,7 @@ mod tests {
         state_store.save(&state)?;
 
         let loaded_state = state_store.load(temp_dir.path().canonicalize().unwrap())?;
-        assert_eq!(loaded_state.working_directory, state.working_directory);
+        assert_eq!(loaded_state.root, state.root);
         assert_eq!(loaded_state.dialect, state.dialect);
         Ok(())
     }
