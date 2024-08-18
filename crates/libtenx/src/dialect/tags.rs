@@ -128,6 +128,33 @@ impl DialectProvider for Tags {
         }
         Ok(change_set)
     }
+
+    fn render_patch(&self, patch: &Patch) -> Result<String> {
+        let mut rendered = String::new();
+        if let Some(comment) = &patch.comment {
+            rendered.push_str(&format!("<comment>\n{}\n</comment>\n\n", comment));
+        }
+        for change in &patch.changes {
+            match change {
+                Change::Write(write_file) => {
+                    rendered.push_str(&format!(
+                        "<write_file path=\"{}\">\n{}\n</write_file>\n\n",
+                        write_file.path.display(),
+                        write_file.content
+                    ));
+                }
+                Change::Replace(replace) => {
+                    rendered.push_str(&format!(
+                        "<replace path=\"{}\">\n<old>\n{}\n</old>\n<new>\n{}\n</new>\n</replace>\n\n",
+                        replace.path.display(),
+                        replace.old,
+                        replace.new
+                    ));
+                }
+            }
+        }
+        Ok(rendered)
+    }
 }
 
 #[cfg(test)]
@@ -187,3 +214,4 @@ mod tests {
         }
     }
 }
+

@@ -25,6 +25,9 @@ pub trait DialectProvider {
 
     /// Parse a model's response into concrete operations
     fn parse(&self, txt: &str) -> Result<Patch>;
+
+    /// Render a Patch into a string representation
+    fn render_patch(&self, patch: &Patch) -> Result<String>;
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -60,6 +63,12 @@ impl DialectProvider for Dialect {
     fn parse(&self, txt: &str) -> Result<Patch> {
         match self {
             Dialect::Tags(t) => t.parse(txt),
+        }
+    }
+
+    fn render_patch(&self, patch: &Patch) -> Result<String> {
+        match self {
+            Dialect::Tags(t) => t.render_patch(patch),
         }
     }
 }
