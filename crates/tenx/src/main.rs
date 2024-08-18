@@ -69,7 +69,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Resume an existing conversation
+    /// Perform an AI-assisted edit
     Edit {
         /// Specifies files to edit
         #[clap(value_parser)]
@@ -109,10 +109,10 @@ enum Commands {
         #[clap(value_parser)]
         files: Vec<PathBuf>,
     },
-    /// Show the current session
-    Show,
     /// Retry the last prompt
     Retry,
+    /// Show the current session
+    Show,
 }
 
 /// Creates a Config from CLI arguments
@@ -254,3 +254,4 @@ async fn main() -> Result<()> {
         }
     }
 }
+

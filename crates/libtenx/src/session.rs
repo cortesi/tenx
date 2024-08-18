@@ -98,12 +98,17 @@ impl Session {
         }
     }
 
-    /// Sets the patch in the last step to None, allowing for a retry.
-    /// Sets the patch in the last step to None, allowing for a retry.
-    pub fn retry(&mut self) {
+    /// Rolls back the last patch and sets it to None, allowing for a retry.
+    pub fn retry(&mut self) -> Result<()> {
+        if let Some(step) = self.steps.last() {
+            if let Some(patch) = &step.patch {
+                self.rollback(patch)?;
+            }
+        }
         if let Some(step) = self.steps.last_mut() {
             step.patch = None;
         }
+        Ok(())
     }
 
     /// Does this session have a pending prompt?
@@ -236,6 +241,14 @@ impl Session {
                     fs::write(&write_file.path, &write_file.content)?;
                 }
             }
+        }
+        Ok(())
+    }
+
+    /// Rolls back the changes made by a patch, using the cached file contents.
+    pub fn rollback(&self, patch: &Patch) -> Result<()> {
+        for (path, content) in &patch.cache {
+            fs::write(path, content)?;
         }
         Ok(())
     }
