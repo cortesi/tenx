@@ -113,7 +113,11 @@ enum Commands {
     /// Retry the last prompt
     Retry,
     /// Show the current session
-    Show,
+    Show {
+        /// Print the entire session object verbosely
+        #[clap(long)]
+        raw: bool,
+    },
 }
 
 /// Creates a Config from CLI arguments
@@ -148,7 +152,7 @@ async fn main() -> Result<()> {
             }
 
             tx.save_session(&session)?;
-            info!("Context added to session successfully");
+            info!("context added");
             Ok(())
         }
         Commands::Retry => {
@@ -165,7 +169,7 @@ async fn main() -> Result<()> {
             tx.retry::<PathBuf>(None, Some(sender)).await?;
 
             print_task.await?;
-            info!("\n\n{}", "Changes applied successfully".green().bold());
+            info!("\n\n{}", "changes applied".green().bold());
             Ok(())
         }
         Commands::New { files, ruskel } => {
@@ -230,7 +234,8 @@ async fn main() -> Result<()> {
             tx.resume(&mut session, Some(sender)).await?;
 
             print_task.await?;
-            info!("\n\n{}", "Changes applied successfully".green().bold());
+            println!("\n");
+            info!("\n\n{}", "changes applied".green().bold());
             Ok(())
         }
         Commands::AddEdit { files } => {
@@ -243,14 +248,18 @@ async fn main() -> Result<()> {
             }
 
             tx.save_session(&session)?;
-            info!("Editable files added to session successfully");
+            info!("editable files added");
             Ok(())
         }
-        Commands::Show => {
+        Commands::Show { raw } => {
             let config = load_config(&cli)?;
             let tx = Tenx::new(config);
             let session = tx.load_session::<PathBuf>(None)?;
-            println!("{}", pretty::session(&session)?);
+            if *raw {
+                println!("{:#?}", session);
+            } else {
+                println!("{}", pretty::session(&session)?);
+            }
             Ok(())
         }
     }
