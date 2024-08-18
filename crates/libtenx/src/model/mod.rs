@@ -9,7 +9,7 @@ pub use dummy::Dummy;
 use async_trait::async_trait;
 use tokio::sync::mpsc;
 
-use crate::{dialect::Dialect, Config, Patch, Result, Session};
+use crate::{dialect::Dialect, patch::Patch, Config, Result, Session};
 
 /// Implemented by types that expose a prompt operation.
 #[async_trait]

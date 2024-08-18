@@ -1,5 +1,5 @@
 use std::{
-    env,
+    env, fs,
     path::{Path, PathBuf},
 };
 
@@ -7,7 +7,13 @@ use colored::*;
 use libruskel::Ruskel;
 use serde::{Deserialize, Serialize};
 
-use crate::{dialect::Dialect, model::Model, prompt::PromptInput, Patch, Result, TenxError};
+use crate::{
+    dialect::Dialect,
+    model::Model,
+    patch::{Change, Patch},
+    prompt::PromptInput,
+    Result, TenxError,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ContextType {
@@ -192,6 +198,22 @@ impl Session {
         }
 
         output
+    }
+
+    pub fn apply_patch(&mut self, patch: &Patch) -> Result<()> {
+        for change in &patch.changes {
+            match change {
+                Change::Replace(replace) => {
+                    let current_content = fs::read_to_string(&replace.path)?;
+                    let new_content = replace.apply(&current_content)?;
+                    fs::write(&replace.path, &new_content)?;
+                }
+                Change::Write(write_file) => {
+                    fs::write(&write_file.path, &write_file.content)?;
+                }
+            }
+        }
+        Ok(())
     }
 }
 

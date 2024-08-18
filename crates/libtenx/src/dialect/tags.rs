@@ -6,7 +6,10 @@ use std::{fs, path::PathBuf};
 use serde::{Deserialize, Serialize};
 
 use super::{xmlish, DialectProvider, PromptInput};
-use crate::{Change, Patch, Replace, Result, Session, TenxError, WriteFile};
+use crate::{
+    patch::{Change, Patch, Replace, WriteFile},
+    Result, Session, TenxError,
+};
 
 const SYSTEM: &str = include_str!("./tags-system.txt");
 

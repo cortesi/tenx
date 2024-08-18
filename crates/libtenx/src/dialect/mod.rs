@@ -4,7 +4,7 @@ use std::path::PathBuf;
 mod tags;
 mod xmlish;
 
-use crate::{Patch, PromptInput, Result, Session};
+use crate::{patch::Patch, prompt::PromptInput, Result, Session};
 
 pub use tags::*;
 
@@ -72,3 +72,4 @@ impl DialectProvider for Dialect {
         }
     }
 }
+

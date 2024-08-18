@@ -11,7 +11,7 @@ use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{fmt, EnvFilter};
 
 use libtenx::{
-    self, dialect::Dialect, model::Claude, model::Model, Config, PromptInput, Session, Tenx,
+    self, dialect::Dialect, model::Claude, model::Model, prompt::PromptInput, Config, Session, Tenx,
 };
 
 mod edit;

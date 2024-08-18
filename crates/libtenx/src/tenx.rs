@@ -1,12 +1,9 @@
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
 use tokio::sync::mpsc;
 use tracing::warn;
 
-use crate::{model::ModelProvider, Change, Patch, Result, Session, SessionStore};
+use crate::{model::ModelProvider, Result, Session, SessionStore};
 
 #[derive(Debug, Default)]
 pub struct Config {
@@ -82,7 +79,7 @@ impl Tenx {
             .prompt(&self.config, &session.dialect, session, sender)
             .await?;
         session.model = Some(model);
-        match Self::apply_all(session, &ops) {
+        match session.apply_patch(&ops) {
             Ok(_) => {
                 session_store.save(session)?;
                 Ok(())
@@ -94,27 +91,6 @@ impl Tenx {
                 Err(e)
             }
         }
-    }
-
-    fn apply_all(_state: &mut Session, change_set: &Patch) -> Result<()> {
-        for change in &change_set.changes {
-            Self::apply(change)?;
-        }
-        Ok(())
-    }
-
-    fn apply(change: &Change) -> Result<()> {
-        match change {
-            Change::Replace(replace) => {
-                let current_content = fs::read_to_string(&replace.path)?;
-                let new_content = replace.apply(&current_content)?;
-                fs::write(&replace.path, &new_content)?;
-            }
-            Change::Write(write_file) => {
-                fs::write(&write_file.path, &write_file.content)?;
-            }
-        }
-        Ok(())
     }
 }
 

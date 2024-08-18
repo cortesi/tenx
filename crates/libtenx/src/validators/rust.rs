@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use super::Validator;
-use crate::{PromptInput, Result, Session, TenxError};
+use crate::{prompt::PromptInput, Result, Session, TenxError};
 
 pub struct CargoChecker;
 

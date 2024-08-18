@@ -3,7 +3,7 @@ use std::{fs, io::Write, path::PathBuf, process::Command};
 use tempfile::NamedTempFile;
 
 use indoc::indoc;
-use libtenx::PromptInput;
+use libtenx::prompt::PromptInput;
 
 const EDITABLE_FILES_HEADING: &str = "### Editable files:";
 const CONTEXT_FILES_HEADING: &str = "### Context files:";

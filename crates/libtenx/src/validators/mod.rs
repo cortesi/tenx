@@ -1,7 +1,7 @@
 mod rust;
 pub use rust::*;
 
-use crate::{PromptInput, Result, Session};
+use crate::{prompt::PromptInput, Result, Session};
 
 pub trait Validator {
     /// Performs a check on the given PromptInput and State.

@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
 use super::ModelProvider;
-use crate::{dialect::Dialect, Config, Patch, Result, Session};
+use crate::{dialect::Dialect, patch::Patch, Config, Result, Session};
 
 /// A dummy model for testing purposes.
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]
