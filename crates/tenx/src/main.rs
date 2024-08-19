@@ -118,6 +118,20 @@ enum Commands {
         #[clap(long)]
         raw: bool,
     },
+    /// Start a new session, edit the prompt, and run it
+    Oneshot {
+        /// Specifies files to edit
+        #[clap(value_parser)]
+        files: Vec<PathBuf>,
+
+        /// Add ruskel documentation as context
+        #[clap(long)]
+        ruskel: Vec<String>,
+
+        /// Add files as context
+        #[clap(long)]
+        ctx: Vec<PathBuf>,
+    },
 }
 
 /// Creates a Config from CLI arguments
@@ -138,6 +152,47 @@ async fn main() -> Result<()> {
     subscriber.init();
 
     match &cli.command {
+        Commands::Oneshot { files, ruskel, ctx } => {
+            let config = load_config(&cli)?;
+            let tx = Tenx::new(config);
+            let mut session = Session::new(
+                None,
+                Dialect::Tags(libtenx::dialect::Tags::default()),
+                Model::Claude(Claude::default()),
+            );
+
+            for file in ctx {
+                session.add_ctx_path(file)?;
+            }
+
+            for ruskel_doc in ruskel {
+                session.add_ctx_ruskel(ruskel_doc.clone())?;
+            }
+
+            for file in files {
+                session.add_editable(file)?;
+            }
+
+            let user_prompt = match edit::edit_prompt(files)? {
+                Some(p) => p,
+                None => return Ok(()),
+            };
+            session.add_prompt(user_prompt);
+
+            let (sender, mut receiver) = mpsc::channel(100);
+            let print_task = tokio::spawn(async move {
+                while let Some(chunk) = receiver.recv().await {
+                    print!("{}", chunk);
+                }
+            });
+
+            tx.resume(&mut session, Some(sender)).await?;
+
+            print_task.await?;
+            println!("\n");
+            info!("\n\n{}", "changes applied".green().bold());
+            Ok(())
+        }
         Commands::AddCtx { files, ruskel } => {
             let config = load_config(&cli)?;
             let tx = Tenx::new(config);
