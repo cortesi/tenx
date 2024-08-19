@@ -69,6 +69,7 @@ struct Cli {
 }
 
 #[derive(Subcommand)]
+#[clap(subcommand_required = true, arg_required_else_help = true)]
 enum Commands {
     /// Perform an AI-assisted edit
     Edit {
