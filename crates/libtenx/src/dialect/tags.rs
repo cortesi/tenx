@@ -99,7 +99,9 @@ impl DialectProvider for Tags {
                         let path = tag
                             .attributes
                             .get("path")
-                            .ok_or_else(|| TenxError::Parse("Missing path attribute".into()))?
+                            .ok_or_else(|| {
+                                TenxError::ResponseParse("Missing path attribute".into())
+                            })?
                             .clone();
                         let (_, content) = xmlish::parse_block("write_file", &mut lines)?;
                         change_set.changes.push(Change::Write(WriteFile {
@@ -111,7 +113,9 @@ impl DialectProvider for Tags {
                         let path = tag
                             .attributes
                             .get("path")
-                            .ok_or_else(|| TenxError::Parse("Missing path attribute".into()))?
+                            .ok_or_else(|| {
+                                TenxError::ResponseParse("Missing path attribute".into())
+                            })?
                             .clone();
                         let (_, replace_content) = xmlish::parse_block("replace", &mut lines)?;
                         let mut replace_lines = replace_content.into_iter().peekable();

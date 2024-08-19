@@ -46,9 +46,10 @@ impl Replace {
             }
         }
 
-        Err(TenxError::Change(
-            "Could not find the text to replace".to_string(),
-        ))
+        Err(TenxError::Retry {
+            user: "Could not find the text to replace".to_string(),
+            model: "Invalid replace specification - could not find the text to replace".to_string(),
+        })
     }
 }
 

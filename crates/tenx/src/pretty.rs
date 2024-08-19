@@ -31,7 +31,7 @@ pub fn session(session: &Session) -> Result<String> {
     if !session.steps.is_empty() {
         output.push_str(&format!("{}\n", "steps:".blue().bold()));
         for (i, step) in session.steps.iter().enumerate() {
-            output.push_str(&format!("  {}: ", format!("{}", i).blue().bold()));
+            output.push_str(&format!("  {}: ", format!("{}", i).cyan().bold()));
             output.push_str(step.prompt.user_prompt.lines().next().unwrap_or(""));
             output.push('\n');
             if let Some(patch) = &step.patch {
@@ -61,4 +61,3 @@ pub fn session(session: &Session) -> Result<String> {
     }
     Ok(output)
 }
-

@@ -14,6 +14,9 @@ pub enum TenxError {
         path: PathBuf,
     },
 
+    #[error("Retry error: {user}")]
+    Retry { user: String, model: String },
+
     #[error("No paths provided")]
     NoPathsProvided,
 
@@ -23,8 +26,8 @@ pub enum TenxError {
     #[error("Model error: {0}")]
     Model(String),
 
-    #[error("Parse error: {0}")]
-    Parse(String),
+    #[error("Error parsing response from model: {0}")]
+    ResponseParse(String),
 
     #[error("Error applying change: {0}")]
     Change(String),
@@ -54,4 +57,3 @@ impl From<misanthropy::Error> for TenxError {
         TenxError::Model(error.to_string())
     }
 }
-

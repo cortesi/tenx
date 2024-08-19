@@ -55,12 +55,12 @@ where
 {
     let opening_line = lines
         .next()
-        .ok_or_else(|| TenxError::Parse("Expected opening tag".into()))?;
-    let tag =
-        parse_open(&opening_line).ok_or_else(|| TenxError::Parse("Invalid opening tag".into()))?;
+        .ok_or_else(|| TenxError::ResponseParse("Expected opening tag".into()))?;
+    let tag = parse_open(&opening_line)
+        .ok_or_else(|| TenxError::ResponseParse("Invalid opening tag".into()))?;
 
     if tag.name != tag_name {
-        return Err(TenxError::Parse(format!(
+        return Err(TenxError::ResponseParse(format!(
             "Expected tag {}, found {}",
             tag_name, tag.name
         )));
@@ -74,7 +74,7 @@ where
         contents.push(line);
     }
 
-    Err(TenxError::Parse(format!(
+    Err(TenxError::ResponseParse(format!(
         "Closing tag not found for {}",
         tag_name
     )))
@@ -148,4 +148,3 @@ mod tests {
         assert_eq!(contents, vec!["Content line 1", "Content line 2"]);
     }
 }
-
