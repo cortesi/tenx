@@ -1,7 +1,7 @@
 use std::{fs, io, path::PathBuf};
 
 use anyhow::{Context as AnyhowContext, Result};
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand};
 use colored::*;
 use tokio::sync::mpsc;
 use tracing::{info, Subscriber};
@@ -65,11 +65,10 @@ struct Cli {
     session_store: Option<PathBuf>,
 
     #[clap(subcommand)]
-    command: Commands,
+    command: Option<Commands>,
 }
 
 #[derive(Subcommand)]
-#[clap(subcommand_required = true, arg_required_else_help = true)]
 enum Commands {
     /// Perform an AI-assisted edit
     Edit {
@@ -148,176 +147,193 @@ fn load_config(cli: &Cli) -> Result<Config> {
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
+
     let verbosity = if cli.quiet { 0 } else { cli.verbose };
     let subscriber = create_subscriber(verbosity);
     subscriber.init();
 
     match &cli.command {
-        Commands::Oneshot { files, ruskel, ctx } => {
-            let config = load_config(&cli)?;
-            let tx = Tenx::new(config);
-            let mut session = Session::new(
-                None,
-                Dialect::Tags(libtenx::dialect::Tags::default()),
-                Model::Claude(Claude::default()),
-            );
+        Some(cmd) => match cmd {
+            Commands::Oneshot { files, ruskel, ctx } => {
+                let config = load_config(&cli)?;
+                let tx = Tenx::new(config);
+                let mut session = Session::new(
+                    None,
+                    Dialect::Tags(libtenx::dialect::Tags::default()),
+                    Model::Claude(Claude::default()),
+                );
 
-            for file in ctx {
-                session.add_ctx_path(file)?;
-            }
-
-            for ruskel_doc in ruskel {
-                session.add_ctx_ruskel(ruskel_doc.clone())?;
-            }
-
-            for file in files {
-                session.add_editable(file)?;
-            }
-
-            let user_prompt = match edit::edit_prompt(files)? {
-                Some(p) => p,
-                None => return Ok(()),
-            };
-            session.add_prompt(user_prompt);
-
-            let (sender, mut receiver) = mpsc::channel(100);
-            let print_task = tokio::spawn(async move {
-                while let Some(chunk) = receiver.recv().await {
-                    print!("{}", chunk);
+                for file in ctx {
+                    session.add_ctx_path(file)?;
                 }
-            });
 
-            tx.resume(&mut session, Some(sender)).await?;
-
-            print_task.await?;
-            println!("\n");
-            info!("\n\n{}", "changes applied".green().bold());
-            Ok(())
-        }
-        Commands::AddCtx { files, ruskel } => {
-            let config = load_config(&cli)?;
-            let tx = Tenx::new(config);
-            let mut session = tx.load_session::<PathBuf>(None)?;
-
-            for file in files {
-                session.add_ctx_path(file)?;
-            }
-
-            for ruskel_doc in ruskel {
-                session.add_ctx_ruskel(ruskel_doc.clone())?;
-            }
-
-            tx.save_session(&session)?;
-            info!("context added");
-            Ok(())
-        }
-        Commands::Retry => {
-            let config = load_config(&cli)?;
-            let tx = Tenx::new(config);
-
-            let (sender, mut receiver) = mpsc::channel(100);
-            let print_task = tokio::spawn(async move {
-                while let Some(chunk) = receiver.recv().await {
-                    print!("{}", chunk);
+                for ruskel_doc in ruskel {
+                    session.add_ctx_ruskel(ruskel_doc.clone())?;
                 }
-            });
 
-            tx.retry::<PathBuf>(None, Some(sender)).await?;
-
-            print_task.await?;
-            info!("\n\n{}", "changes applied".green().bold());
-            Ok(())
-        }
-        Commands::New { files, ruskel } => {
-            let config = load_config(&cli)?;
-            let tx = Tenx::new(config);
-            let mut session = Session::new(
-                None,
-                Dialect::Tags(libtenx::dialect::Tags::default()),
-                Model::Claude(Claude::default()),
-            );
-
-            for file in files {
-                session.add_ctx_path(file)?;
-            }
-
-            for ruskel_doc in ruskel {
-                session.add_ctx_ruskel(ruskel_doc.clone())?;
-            }
-
-            tx.save_session(&session)?;
-            info!("new session: {}", session.root.display());
-            Ok(())
-        }
-        Commands::Edit {
-            files,
-            prompt,
-            prompt_file,
-        } => {
-            let config = load_config(&cli)?;
-            let tx = Tenx::new(config);
-
-            let (sender, mut receiver) = mpsc::channel(100);
-            let print_task = tokio::spawn(async move {
-                while let Some(chunk) = receiver.recv().await {
-                    print!("{}", chunk);
+                for file in files {
+                    session.add_editable(file)?;
                 }
-            });
 
-            let mut session = tx.load_session::<PathBuf>(None)?;
-            let user_prompt = if let Some(p) = prompt {
-                PromptInput {
-                    user_prompt: p.clone(),
-                }
-            } else if let Some(file_path) = prompt_file {
-                let prompt_content =
-                    fs::read_to_string(file_path).context("Failed to read prompt file")?;
-                PromptInput {
-                    user_prompt: prompt_content,
-                }
-            } else {
-                let f = files.clone().unwrap_or_default();
-                match edit::edit_prompt(&f)? {
+                let user_prompt = match edit::edit_prompt(files)? {
                     Some(p) => p,
                     None => return Ok(()),
+                };
+                session.add_prompt(user_prompt);
+
+                let (sender, mut receiver) = mpsc::channel(100);
+                let print_task = tokio::spawn(async move {
+                    while let Some(chunk) = receiver.recv().await {
+                        print!("{}", chunk);
+                    }
+                });
+
+                tx.resume(&mut session, Some(sender)).await?;
+
+                print_task.await?;
+                println!("\n");
+                info!("\n\n{}", "changes applied".green().bold());
+                Ok(())
+            }
+            Commands::AddCtx { files, ruskel } => {
+                let config = load_config(&cli)?;
+                let tx = Tenx::new(config);
+                let mut session = tx.load_session::<PathBuf>(None)?;
+
+                for file in files {
+                    session.add_ctx_path(file)?;
                 }
-            };
-            session.add_prompt(user_prompt);
-            for f in files.clone().unwrap_or_default() {
-                session.add_editable(f)?;
+
+                for ruskel_doc in ruskel {
+                    session.add_ctx_ruskel(ruskel_doc.clone())?;
+                }
+
+                tx.save_session(&session)?;
+                info!("context added");
+                Ok(())
             }
+            Commands::Retry => {
+                let config = load_config(&cli)?;
+                let tx = Tenx::new(config);
 
-            tx.resume(&mut session, Some(sender)).await?;
+                let (sender, mut receiver) = mpsc::channel(100);
+                let print_task = tokio::spawn(async move {
+                    while let Some(chunk) = receiver.recv().await {
+                        print!("{}", chunk);
+                    }
+                });
 
-            print_task.await?;
-            println!("\n");
-            info!("\n\n{}", "changes applied".green().bold());
-            Ok(())
-        }
-        Commands::AddEdit { files } => {
-            let config = load_config(&cli)?;
-            let tx = Tenx::new(config);
-            let mut session = tx.load_session::<PathBuf>(None)?;
+                tx.retry::<PathBuf>(None, Some(sender)).await?;
 
-            for file in files {
-                session.add_editable(file)?;
+                print_task.await?;
+                info!("\n\n{}", "changes applied".green().bold());
+                Ok(())
             }
+            Commands::New { files, ruskel } => {
+                let config = load_config(&cli)?;
+                let tx = Tenx::new(config);
+                let mut session = Session::new(
+                    None,
+                    Dialect::Tags(libtenx::dialect::Tags::default()),
+                    Model::Claude(Claude::default()),
+                );
 
-            tx.save_session(&session)?;
-            info!("editable files added");
-            Ok(())
-        }
-        Commands::Show { raw } => {
-            let config = load_config(&cli)?;
-            let tx = Tenx::new(config);
-            let session = tx.load_session::<PathBuf>(None)?;
-            if *raw {
-                println!("{:#?}", session);
-            } else {
-                println!("{}", pretty::session(&session)?);
+                for file in files {
+                    session.add_ctx_path(file)?;
+                }
+
+                for ruskel_doc in ruskel {
+                    session.add_ctx_ruskel(ruskel_doc.clone())?;
+                }
+
+                tx.save_session(&session)?;
+                info!("new session: {}", session.root.display());
+                Ok(())
             }
+            Commands::Edit {
+                files,
+                prompt,
+                prompt_file,
+            } => {
+                let config = load_config(&cli)?;
+                let tx = Tenx::new(config);
+
+                let (sender, mut receiver) = mpsc::channel(100);
+                let print_task = tokio::spawn(async move {
+                    while let Some(chunk) = receiver.recv().await {
+                        print!("{}", chunk);
+                    }
+                });
+
+                let mut session = tx.load_session::<PathBuf>(None)?;
+                let user_prompt = if let Some(p) = prompt {
+                    PromptInput {
+                        user_prompt: p.clone(),
+                    }
+                } else if let Some(file_path) = prompt_file {
+                    let prompt_content =
+                        fs::read_to_string(file_path).context("Failed to read prompt file")?;
+                    PromptInput {
+                        user_prompt: prompt_content,
+                    }
+                } else {
+                    let f = files.clone().unwrap_or_default();
+                    match edit::edit_prompt(&f)? {
+                        Some(p) => p,
+                        None => return Ok(()),
+                    }
+                };
+                session.add_prompt(user_prompt);
+                for f in files.clone().unwrap_or_default() {
+                    session.add_editable(f)?;
+                }
+
+                tx.resume(&mut session, Some(sender)).await?;
+
+                print_task.await?;
+                println!("\n");
+                info!("\n\n{}", "changes applied".green().bold());
+                Ok(())
+            }
+            Commands::AddEdit { files } => {
+                let config = load_config(&cli)?;
+                let tx = Tenx::new(config);
+                let mut session = tx.load_session::<PathBuf>(None)?;
+
+                for file in files {
+                    session.add_editable(file)?;
+                }
+
+                tx.save_session(&session)?;
+                info!("editable files added");
+                Ok(())
+            }
+            Commands::Show { raw } => {
+                let config = load_config(&cli)?;
+                let tx = Tenx::new(config);
+                let session = tx.load_session::<PathBuf>(None)?;
+                if *raw {
+                    println!("{:#?}", session);
+                } else {
+                    println!("{}", pretty::session(&session)?);
+                }
+                Ok(())
+            }
+        },
+        None => {
+            // This incredibly clunky way of doing things is because Clap is just broken when it
+            // comes to specifying required subcommands in combination with Optional flags. The
+            // clues to this awful situation are cunningly hidden among half a dozen issues and PRs
+            // on the clap repo, e.g.
+            //
+            // https://github.com/clap-rs/clap/issues/5358
+            //
+            // In future, we can try making subcommands non-optional and removing this catchall and
+            // see if this has been fixed.
+            let help = Cli::command().render_help();
+            println!("{help}");
+            // Print help and exit
             Ok(())
         }
     }
 }
-
