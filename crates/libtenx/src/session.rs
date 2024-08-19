@@ -228,22 +228,46 @@ impl Session {
         Ok(())
     }
 
-    pub fn apply_patch(&mut self, patch: &Patch) -> Result<()> {
+    pub fn apply_patch(&mut self, patch: &mut Patch) -> Result<()> {
+        // First, enter all the modified files into the patch cache
+        for change in &patch.changes {
+            let path = match change {
+                Change::Replace(replace) => &replace.path,
+                Change::Write(write_file) => &write_file.path,
+            };
+            let abs_path = self.abspath(path)?;
+            if !patch.cache.contains_key(path) {
+                let content = fs::read_to_string(&abs_path)
+                    .map_err(|e| TenxError::fio(e, abs_path.clone()))?;
+                patch.cache.insert(path.clone(), content);
+            }
+        }
+
+        // Next, make a clone copy of the cache
+        let mut modified_cache = patch.cache.clone();
+
+        // Now all modifications are applied to the cloned cache one after the other
         for change in &patch.changes {
             match change {
                 Change::Replace(replace) => {
-                    let path = self.abspath(&replace.path)?;
-                    let current_content =
-                        fs::read_to_string(&path).map_err(|e| TenxError::fio(e, path.clone()))?;
-                    let new_content = replace.apply(&current_content)?;
-                    fs::write(&path, &new_content).map_err(|e| TenxError::fio(e, path.clone()))?;
+                    let current_content = modified_cache.get(&replace.path).ok_or_else(|| {
+                        TenxError::Internal("File not found in cache".to_string())
+                    })?;
+                    let new_content = replace.apply(current_content)?;
+                    modified_cache.insert(replace.path.clone(), new_content);
                 }
                 Change::Write(write_file) => {
-                    fs::write(self.abspath(&write_file.path)?, &write_file.content)
-                        .map_err(|e| TenxError::fio(e, write_file.path.clone()))?;
+                    modified_cache.insert(write_file.path.clone(), write_file.content.clone());
                 }
             }
         }
+
+        // Finally, write all files to disk
+        for (path, content) in modified_cache {
+            let abs_path = self.abspath(&path)?;
+            fs::write(&abs_path, content).map_err(|e| TenxError::fio(e, abs_path.clone()))?;
+        }
+
         Ok(())
     }
 
@@ -340,3 +364,4 @@ mod tests {
         Ok(())
     }
 }
+
