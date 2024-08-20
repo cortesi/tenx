@@ -9,11 +9,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     dialect::Dialect,
-    model::Model,
+    model::{Model, ModelProvider},
     patch::{Change, Patch},
     prompt::PromptInput,
-    Result, TenxError,
+    Config, Result, TenxError,
 };
+use tokio::sync::mpsc;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ContextType {
@@ -274,6 +275,21 @@ impl Session {
         }
         Ok(())
     }
+
+    /// Prompts the current model with the session's state and returns the resulting patch.
+    pub async fn prompt(
+        &mut self,
+        config: &Config,
+        sender: Option<mpsc::Sender<String>>,
+    ) -> Result<Patch> {
+        let mut model = self
+            .model
+            .take()
+            .ok_or_else(|| TenxError::Internal("No model available".into()))?;
+        let patch = model.prompt(config, self, sender).await?;
+        self.model = Some(model);
+        Ok(patch)
+    }
 }
 
 #[cfg(test)]
@@ -360,3 +376,4 @@ mod tests {
         Ok(())
     }
 }
+

@@ -87,9 +87,8 @@ impl Tenx {
         sender: Option<mpsc::Sender<String>>,
         session_store: &SessionStore,
     ) -> Result<()> {
-        let mut model = session.model.take().unwrap();
-        let mut patch = model.prompt(&self.config, session, sender).await?;
-        session.model = Some(model);
+        session_store.save(session)?;
+        let mut patch = session.prompt(&self.config, sender).await?;
         match session.apply_patch(&mut patch) {
             Ok(_) => {
                 session.add_patch(patch);
@@ -98,8 +97,6 @@ impl Tenx {
             }
             Err(e) => {
                 warn!("{}", e);
-                warn!("Resetting state...");
-                Self::reset(session)?;
                 Err(e)
             }
         }
