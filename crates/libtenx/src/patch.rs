@@ -66,10 +66,42 @@ pub struct Patch {
     pub cache: HashMap<PathBuf, String>,
 }
 
+impl Patch {
+    /// Returns a vector of PathBufs for all files changed in the patch.
+    pub fn changed_files(&self) -> Vec<PathBuf> {
+        self.changes
+            .iter()
+            .map(|change| match change {
+                Change::Write(write_file) => write_file.path.clone(),
+                Change::Replace(replace) => replace.path.clone(),
+            })
+            .collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
+
+    #[test]
+    fn test_changed_files() {
+        let mut patch = Patch::default();
+        patch.changes.push(Change::Write(WriteFile {
+            path: PathBuf::from("file1.txt"),
+            content: "content".to_string(),
+        }));
+        patch.changes.push(Change::Replace(Replace {
+            path: PathBuf::from("file2.txt"),
+            old: "old".to_string(),
+            new: "new".to_string(),
+        }));
+
+        let changed_files = patch.changed_files();
+        assert_eq!(changed_files.len(), 2);
+        assert!(changed_files.contains(&PathBuf::from("file1.txt")));
+        assert!(changed_files.contains(&PathBuf::from("file2.txt")));
+    }
 
     #[test]
     fn test_replace_apply() {
@@ -103,3 +135,4 @@ mod tests {
         assert_eq!(result, expected_output);
     }
 }
+

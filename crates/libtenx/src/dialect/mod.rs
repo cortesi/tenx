@@ -26,11 +26,11 @@ pub trait DialectProvider {
     /// Render the immutable context to be sent to the model
     fn render_context(&self, p: &Session) -> Result<String>;
 
-    /// Parse a model's response into concrete operations
-    fn parse(&self, txt: &str) -> Result<Patch>;
-
     /// Render a Patch into a string representation
     fn render_patch(&self, patch: &Patch) -> Result<String>;
+
+    /// Parse a model's response into concrete operations
+    fn parse(&self, txt: &str) -> Result<Patch>;
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
@@ -81,3 +81,4 @@ impl DialectProvider for Dialect {
         }
     }
 }
+

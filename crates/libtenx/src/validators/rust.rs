@@ -2,12 +2,12 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use super::Validator;
-use crate::{prompt::PromptInput, Result, Session, TenxError};
+use crate::{Result, Session, TenxError};
 
 pub struct CargoChecker;
 
 impl Validator for CargoChecker {
-    fn validate(&self, _prompt: &PromptInput, state: &Session) -> Result<()> {
+    fn validate(&self, state: &Session) -> Result<()> {
         let workspace = RustWorkspace::discover(state)?;
         let output = Command::new("cargo")
             .arg("check")
@@ -82,9 +82,12 @@ impl RustWorkspace {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dialect::Dialect;
-    use crate::model::Model;
-    use crate::testutils::{create_dummy_project, TempEnv};
+    use crate::{
+        dialect::Dialect,
+        model::Model,
+        prompt::PromptInput,
+        testutils::{create_dummy_project, TempEnv},
+    };
     use tempfile::TempDir;
 
     #[test]
@@ -112,7 +115,7 @@ mod tests {
         }
 
         let checker = CargoChecker;
-        assert!(checker.validate(&prompt, &session).is_ok());
+        assert!(checker.validate(&session).is_ok());
 
         Ok(())
     }
@@ -269,4 +272,3 @@ mod tests {
         Ok(())
     }
 }
-

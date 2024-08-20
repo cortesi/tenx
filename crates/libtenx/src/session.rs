@@ -230,16 +230,12 @@ impl Session {
 
     pub fn apply_patch(&mut self, patch: &mut Patch) -> Result<()> {
         // First, enter all the modified files into the patch cache
-        for change in &patch.changes {
-            let path = match change {
-                Change::Replace(replace) => &replace.path,
-                Change::Write(write_file) => &write_file.path,
-            };
-            let abs_path = self.abspath(path)?;
-            if !patch.cache.contains_key(path) {
+        for path in patch.changed_files() {
+            let abs_path = self.abspath(&path)?;
+            if let std::collections::hash_map::Entry::Vacant(e) = patch.cache.entry(path) {
                 let content = fs::read_to_string(&abs_path)
                     .map_err(|e| TenxError::fio(e, abs_path.clone()))?;
-                patch.cache.insert(path.clone(), content);
+                e.insert(content);
             }
         }
 
@@ -364,4 +360,3 @@ mod tests {
         Ok(())
     }
 }
-
