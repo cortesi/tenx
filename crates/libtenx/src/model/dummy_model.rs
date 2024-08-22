@@ -7,11 +7,11 @@ use crate::{patch::Patch, Config, Result, Session};
 
 /// A dummy model for testing purposes.
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Dummy {
+pub struct DummyModel {
     change_set: Result<Patch>,
 }
 
-impl Dummy {
+impl DummyModel {
     /// Creates a new Dummy model with predefined operations.
     pub fn from_patch(change_set: Patch) -> Self {
         Self {
@@ -20,7 +20,7 @@ impl Dummy {
     }
 }
 
-impl Default for Dummy {
+impl Default for DummyModel {
     fn default() -> Self {
         Self {
             change_set: Ok(Patch::default()),
@@ -29,7 +29,7 @@ impl Default for Dummy {
 }
 
 #[async_trait]
-impl ModelProvider for Dummy {
+impl ModelProvider for DummyModel {
     async fn prompt(
         &mut self,
         _config: &Config,

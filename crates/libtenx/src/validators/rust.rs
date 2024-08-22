@@ -116,7 +116,7 @@ mod tests {
         let mut session = Session::new(
             Some(temp_dir.path().to_path_buf()),
             Dialect::Tags(crate::dialect::Tags::default()),
-            Model::Dummy(crate::model::Dummy::default()),
+            Model::Dummy(crate::model::DummyModel::default()),
         );
         session.add_prompt(prompt.clone());
         for p in edit_paths {
@@ -148,7 +148,7 @@ mod tests {
         let mut session = Session::new(
             Some(temp_dir.path().to_path_buf()),
             Dialect::Tags(crate::dialect::Tags::default()),
-            Model::Dummy(crate::model::Dummy::default()),
+            Model::Dummy(crate::model::DummyModel::default()),
         );
         session.add_prompt(prompt);
         for p in edit_paths {
@@ -180,7 +180,7 @@ mod tests {
         let mut session = Session::new(
             Some(temp_dir.path().to_path_buf()),
             Dialect::Tags(crate::dialect::Tags::default()),
-            Model::Dummy(crate::model::Dummy::default()),
+            Model::Dummy(crate::model::DummyModel::default()),
         );
         session.add_prompt(prompt);
         for p in edit_paths {
@@ -210,7 +210,7 @@ mod tests {
         let mut session = Session::new(
             Some(temp_dir.path().to_path_buf()),
             Dialect::Tags(crate::dialect::Tags::default()),
-            Model::Dummy(crate::model::Dummy::default()),
+            Model::Dummy(crate::model::DummyModel::default()),
         );
         session.add_prompt(prompt);
         session.add_editable(temp_dir.path())?;
@@ -233,7 +233,7 @@ mod tests {
         let mut session = Session::new(
             Some(temp_dir.path().to_path_buf()),
             Dialect::Tags(crate::dialect::Tags::default()),
-            Model::Dummy(crate::model::Dummy::default()),
+            Model::Dummy(crate::model::DummyModel::default()),
         );
         session.add_prompt(prompt);
 
@@ -267,7 +267,7 @@ mod tests {
         let mut session = Session::new(
             Some(temp_dir1.path().to_path_buf()),
             Dialect::Tags(crate::dialect::Tags::default()),
-            Model::Dummy(crate::model::Dummy::default()),
+            Model::Dummy(crate::model::DummyModel::default()),
         );
         session.add_prompt(prompt);
         for f in edit_paths {

@@ -1,11 +1,13 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+mod dummy_dialect;
 mod tags;
 mod xmlish;
 
 use crate::{patch::Patch, prompt::PromptInput, Result, Session};
 
+pub use dummy_dialect::*;
 pub use tags::*;
 
 /// A dialect encapsulates a particular style of interaction with a model. It defines the system
@@ -81,4 +83,3 @@ impl DialectProvider for Dialect {
         }
     }
 }
-

@@ -1,10 +1,10 @@
 use serde::{Deserialize, Serialize};
 
 mod claude;
-mod dummy;
+mod dummy_model;
 
 pub use claude::Claude;
-pub use dummy::Dummy;
+pub use dummy_model::DummyModel;
 
 use async_trait::async_trait;
 use tokio::sync::mpsc;
@@ -25,7 +25,7 @@ pub trait ModelProvider {
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Model {
     Claude(Claude),
-    Dummy(Dummy),
+    Dummy(DummyModel),
 }
 
 #[async_trait]

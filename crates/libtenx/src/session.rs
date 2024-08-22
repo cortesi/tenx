@@ -313,7 +313,7 @@ mod tests {
         let mut session = Session::new(
             None,
             Dialect::Tags(crate::dialect::Tags {}),
-            Model::Dummy(crate::model::Dummy::default()),
+            Model::Dummy(crate::model::DummyModel::default()),
         );
 
         let context1 = Context {
@@ -346,7 +346,7 @@ mod tests {
         let mut session = Session::new(
             Some(working_dir.clone()),
             Dialect::Tags(crate::dialect::Tags {}),
-            Model::Dummy(crate::model::Dummy::default()),
+            Model::Dummy(crate::model::DummyModel::default()),
         );
 
         // Test 1: Current dir is the working directory
