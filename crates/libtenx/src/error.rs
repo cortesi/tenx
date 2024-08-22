@@ -1,18 +1,17 @@
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use thiserror::Error;
 
 pub type Result<T> = std::result::Result<T, TenxError>;
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Serialize, Deserialize, Clone)]
 pub enum TenxError {
     #[error("Failed to render query: {0}")]
     Render(String),
 
-    #[error("File IO error: {path}: {source}")]
-    FileIo {
-        source: std::io::Error,
-        path: PathBuf,
-    },
+    // We want error to be serializable, so can't include the source untransformed
+    #[error("File IO error: {path}: {src}")]
+    FileIo { src: String, path: PathBuf },
 
     #[error("No paths provided")]
     NoPathsProvided,
@@ -58,7 +57,7 @@ impl TenxError {
     /// Constructs a FileIo error from an IO error and a path-like argument.
     pub fn fio<P: AsRef<std::path::Path>>(err: std::io::Error, path: P) -> Self {
         TenxError::FileIo {
-            source: err,
+            src: err.to_string(),
             path: path.as_ref().to_path_buf(),
         }
     }

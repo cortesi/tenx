@@ -6,15 +6,25 @@ use super::ModelProvider;
 use crate::{patch::Patch, Config, Result, Session};
 
 /// A dummy model for testing purposes.
-#[derive(Debug, Serialize, Deserialize, Default)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Dummy {
-    change_set: Patch,
+    change_set: Result<Patch>,
 }
 
 impl Dummy {
     /// Creates a new Dummy model with predefined operations.
-    pub fn new(change_set: Patch) -> Self {
-        Self { change_set }
+    pub fn from_patch(change_set: Patch) -> Self {
+        Self {
+            change_set: Ok(change_set),
+        }
+    }
+}
+
+impl Default for Dummy {
+    fn default() -> Self {
+        Self {
+            change_set: Ok(Patch::default()),
+        }
     }
 }
 
@@ -26,6 +36,6 @@ impl ModelProvider for Dummy {
         _state: &Session,
         _sender: Option<mpsc::Sender<String>>,
     ) -> Result<Patch> {
-        Ok(self.change_set.clone())
+        self.change_set.clone()
     }
 }
