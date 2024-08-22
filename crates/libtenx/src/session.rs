@@ -74,6 +74,7 @@ pub fn find_root<P: AsRef<Path>>(path: Option<P>) -> PathBuf {
 pub struct Step {
     pub prompt: PromptInput,
     pub patch: Option<Patch>,
+    pub err: Option<TenxError>,
 }
 
 /// A serializable session, which persists between invocations.
@@ -145,9 +146,16 @@ impl Session {
     }
 
     /// Adds a patch to the final step
-    pub fn add_patch(&mut self, patch: &Patch) {
+    pub fn set_last_patch(&mut self, patch: &Patch) {
         if let Some(step) = self.steps.last_mut() {
             step.patch = Some(patch.clone());
+        }
+    }
+
+    /// Adds a patch to the final step
+    pub fn set_last_error(&mut self, err: &TenxError) {
+        if let Some(step) = self.steps.last_mut() {
+            step.err = Some(err.clone());
         }
     }
 
@@ -156,6 +164,7 @@ impl Session {
         self.steps.push(Step {
             prompt,
             patch: None,
+            err: None,
         });
     }
 

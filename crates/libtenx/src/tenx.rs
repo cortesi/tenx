@@ -99,7 +99,10 @@ impl Tenx {
         session_store: &SessionStore,
     ) -> Result<()> {
         session_store.save(session)?;
-        self.run_preflight_validators(session)?;
+        if let Err(e) = self.run_preflight_validators(session) {
+            session.set_last_error(&e);
+            return Err(e);
+        }
 
         let mut retry_count = 0;
         loop {
@@ -109,6 +112,7 @@ impl Tenx {
             {
                 Ok(()) => return Ok(()),
                 Err(e) => {
+                    session.set_last_error(&e);
                     if let Some(model_message) = e.should_retry() {
                         retry_count += 1;
                         if retry_count >= self.config.retry_limit {
@@ -137,12 +141,24 @@ impl Tenx {
         sender: Option<mpsc::Sender<String>>,
         session_store: &SessionStore,
     ) -> Result<()> {
-        let mut patch = session.prompt(&self.config, sender).await?;
-        session.add_patch(&patch);
+        let mut patch = match session.prompt(&self.config, sender).await {
+            Ok(patch) => patch,
+            Err(e) => {
+                session.set_last_error(&e);
+                return Err(e);
+            }
+        };
+        session.set_last_patch(&patch);
         session_store.save(session)?;
-        session.apply_patch(&mut patch)?;
+        if let Err(e) = session.apply_patch(&mut patch) {
+            session.set_last_error(&e);
+            return Err(e);
+        }
         session_store.save(session)?;
-        self.run_post_patch_validators(session)?;
+        if let Err(e) = self.run_post_patch_validators(session) {
+            session.set_last_error(&e);
+            return Err(e);
+        }
         Ok(())
     }
 
@@ -162,4 +178,3 @@ impl Tenx {
         Ok(())
     }
 }
-

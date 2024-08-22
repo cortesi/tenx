@@ -57,7 +57,12 @@ pub fn session(session: &Session) -> Result<String> {
                     }
                 }
             }
+            if let Some(err) = &step.err {
+                output.push_str(&format!("    {}\n", "error:".yellow().bold()));
+                output.push_str(&format!("      {}\n", err));
+            }
         }
     }
     Ok(output)
 }
+
