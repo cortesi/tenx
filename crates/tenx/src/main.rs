@@ -64,6 +64,10 @@ struct Cli {
     #[clap(long, global = true)]
     session_store: Option<PathBuf>,
 
+    /// Number of times to retry a prompt before failing
+    #[clap(long, global = true)]
+    retry_limit: Option<usize>,
+
     #[clap(subcommand)]
     command: Option<Commands>,
 }
@@ -140,6 +144,9 @@ fn load_config(cli: &Cli) -> Result<Config> {
         Config::default().with_anthropic_key(cli.anthropic_key.clone().unwrap_or_default());
     if let Some(session_store_dir) = cli.session_store.clone() {
         config = config.with_session_store_dir(session_store_dir);
+    }
+    if let Some(retry_limit) = cli.retry_limit {
+        config = config.with_retry_limit(retry_limit);
     }
     Ok(config)
 }
@@ -337,3 +344,4 @@ async fn main() -> Result<()> {
         }
     }
 }
+

@@ -5,10 +5,21 @@ use tracing::warn;
 
 use crate::{prompt::PromptInput, Result, Session, SessionStore};
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Config {
     pub anthropic_key: String,
     pub session_store_dir: Option<PathBuf>,
+    pub retry_limit: usize,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            anthropic_key: String::new(),
+            session_store_dir: None,
+            retry_limit: 3,
+        }
+    }
 }
 
 impl Config {
@@ -21,6 +32,12 @@ impl Config {
     /// Sets the state directory.
     pub fn with_session_store_dir<P: AsRef<Path>>(mut self, dir: P) -> Self {
         self.session_store_dir = Some(dir.as_ref().to_path_buf());
+        self
+    }
+
+    /// Sets the retry limit.
+    pub fn with_retry_limit(mut self, limit: usize) -> Self {
+        self.retry_limit = limit;
         self
     }
 }
@@ -84,6 +101,7 @@ impl Tenx {
         session_store.save(session)?;
         self.run_preflight_validators(session)?;
 
+        let mut retry_count = 0;
         loop {
             match self
                 .execute_prompt_cycle(session, sender.clone(), session_store)
@@ -92,7 +110,15 @@ impl Tenx {
                 Ok(()) => return Ok(()),
                 Err(e) => {
                     if let Some(model_message) = e.should_retry() {
-                        warn!("Retryable error: {}", e);
+                        retry_count += 1;
+                        if retry_count >= self.config.retry_limit {
+                            warn!("Retry limit reached. Last error: {}", e);
+                            return Err(e);
+                        }
+                        warn!(
+                            "Retryable error (attempt {}/{}): {}",
+                            retry_count, self.config.retry_limit, e
+                        );
                         session.add_prompt(PromptInput {
                             user_prompt: model_message.to_string(),
                         });
