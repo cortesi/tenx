@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use tokio::sync::mpsc;
 use tracing::warn;
 
-use crate::{Result, Session, SessionStore};
+use crate::{prompt::PromptInput, Result, Session, SessionStore};
 
 #[derive(Debug, Default)]
 pub struct Config {
@@ -88,17 +88,42 @@ impl Tenx {
         session_store: &SessionStore,
     ) -> Result<()> {
         session_store.save(session)?;
-        let mut patch = session.prompt(&self.config, sender).await?;
-        match session.apply_patch(&mut patch) {
-            Ok(_) => {
-                session.add_patch(patch);
-                session_store.save(session)?;
-                Ok(())
-            }
-            Err(e) => {
-                warn!("{}", e);
-                Err(e)
+        loop {
+            let result = session.prompt(&self.config, sender.clone()).await;
+            match result {
+                Ok(mut patch) => match session.apply_patch(&mut patch) {
+                    Ok(_) => {
+                        session.add_patch(patch);
+                        session_store.save(session)?;
+                        return Ok(());
+                    }
+                    Err(e) => {
+                        if let Some(model_message) = e.should_retry() {
+                            warn!("Retryable error: {}", e);
+                            session.add_prompt(PromptInput {
+                                user_prompt: model_message.to_string(),
+                            });
+                            continue;
+                        } else {
+                            warn!("Non-retryable error: {}", e);
+                            return Err(e);
+                        }
+                    }
+                },
+                Err(e) => {
+                    if let Some(model_message) = e.should_retry() {
+                        warn!("Retryable error: {}", e);
+                        session.add_prompt(PromptInput {
+                            user_prompt: model_message.to_string(),
+                        });
+                        continue;
+                    } else {
+                        warn!("Non-retryable error: {}", e);
+                        return Err(e);
+                    }
+                }
             }
         }
     }
 }
+
