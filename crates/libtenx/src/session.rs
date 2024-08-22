@@ -145,9 +145,9 @@ impl Session {
     }
 
     /// Adds a patch to the final step
-    pub fn add_patch(&mut self, patch: Patch) {
+    pub fn add_patch(&mut self, patch: &Patch) {
         if let Some(step) = self.steps.last_mut() {
-            step.patch = Some(patch);
+            step.patch = Some(patch.clone());
         }
     }
 
@@ -376,4 +376,3 @@ mod tests {
         Ok(())
     }
 }
-

@@ -63,12 +63,6 @@ impl Tenx {
         session_store.load(working_dir)
     }
 
-    /// Resets all files in the state snapshot to their original contents.
-    pub fn reset(_state: &Session) -> Result<()> {
-        // FIXME
-        Ok(())
-    }
-
     /// Resumes a session by sending a prompt to the model.
     pub async fn resume(
         &self,
@@ -88,35 +82,20 @@ impl Tenx {
         session_store: &SessionStore,
     ) -> Result<()> {
         session_store.save(session)?;
+        self.run_preflight_validators(session)?;
+
         loop {
-            let result = session.prompt(&self.config, sender.clone()).await;
-            match result {
-                Ok(mut patch) => match session.apply_patch(&mut patch) {
-                    Ok(_) => {
-                        session.add_patch(patch);
-                        session_store.save(session)?;
-                        return Ok(());
-                    }
-                    Err(e) => {
-                        if let Some(model_message) = e.should_retry() {
-                            warn!("Retryable error: {}", e);
-                            session.add_prompt(PromptInput {
-                                user_prompt: model_message.to_string(),
-                            });
-                            continue;
-                        } else {
-                            warn!("Non-retryable error: {}", e);
-                            return Err(e);
-                        }
-                    }
-                },
+            match self
+                .execute_prompt_cycle(session, sender.clone(), session_store)
+                .await
+            {
+                Ok(()) => return Ok(()),
                 Err(e) => {
                     if let Some(model_message) = e.should_retry() {
                         warn!("Retryable error: {}", e);
                         session.add_prompt(PromptInput {
                             user_prompt: model_message.to_string(),
                         });
-                        continue;
                     } else {
                         warn!("Non-retryable error: {}", e);
                         return Err(e);
@@ -124,6 +103,37 @@ impl Tenx {
                 }
             }
         }
+    }
+
+    async fn execute_prompt_cycle(
+        &self,
+        session: &mut Session,
+        sender: Option<mpsc::Sender<String>>,
+        session_store: &SessionStore,
+    ) -> Result<()> {
+        let mut patch = session.prompt(&self.config, sender).await?;
+        session.add_patch(&patch);
+        session_store.save(session)?;
+        session.apply_patch(&mut patch)?;
+        session_store.save(session)?;
+        self.run_post_patch_validators(session)?;
+        Ok(())
+    }
+
+    fn run_preflight_validators(&self, session: &mut Session) -> Result<()> {
+        let preflight_validators = crate::validators::preflight(session)?;
+        for validator in preflight_validators {
+            validator.validate(session)?;
+        }
+        Ok(())
+    }
+
+    fn run_post_patch_validators(&self, session: &mut Session) -> Result<()> {
+        let post_patch_validators = crate::validators::post_patch(session)?;
+        for validator in post_patch_validators {
+            validator.validate(session)?;
+        }
+        Ok(())
     }
 }
 
