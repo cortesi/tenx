@@ -178,3 +178,62 @@ impl Tenx {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        dialect::{Dialect, DummyDialect},
+        model::Model,
+        patch::{Change, Patch, WriteFile},
+    };
+    use std::fs;
+    use tempfile::tempdir;
+
+    #[tokio::test]
+    async fn test_tenx_process_prompt() -> Result<()> {
+        let temp_dir = tempdir().unwrap();
+        let config = Config::default()
+            .with_session_store_dir(temp_dir.path())
+            .with_retry_limit(1);
+        let tenx = Tenx::new(config);
+
+        // Create test.txt file
+        let test_file_path = temp_dir.path().join("test.txt");
+        fs::write(&test_file_path, "Initial content").unwrap();
+
+        let mut session = Session::new(
+            Some(temp_dir.path().to_path_buf()),
+            Dialect::Dummy(DummyDialect::default()),
+            Model::Dummy(crate::model::DummyModel::from_patch(Patch {
+                changes: vec![Change::Write(WriteFile {
+                    path: PathBuf::from("test.txt"),
+                    content: "Updated content".to_string(),
+                })],
+                comment: Some("Test comment".to_string()),
+                cache: Default::default(),
+            })),
+        );
+        session.add_prompt(PromptInput {
+            user_prompt: "Test prompt".to_string(),
+        });
+        session.add_editable(test_file_path.clone())?;
+
+        let session_store = SessionStore::open(Some(temp_dir.path().to_path_buf()))?;
+        tenx.process_prompt(&mut session, None, &session_store)
+            .await?;
+
+        assert_eq!(session.steps.len(), 1);
+        assert!(session.steps[0].patch.is_some());
+        assert_eq!(
+            session.steps[0].patch.as_ref().unwrap().comment,
+            Some("Test comment".to_string())
+        );
+
+        let file_content = fs::read_to_string(&test_file_path).unwrap();
+        assert_eq!(file_content, "Updated content");
+
+        Ok(())
+    }
+}
+

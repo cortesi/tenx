@@ -1,15 +1,31 @@
 use crate::{dialect::DialectProvider, patch::Patch, prompt::PromptInput, Result, Session};
 use std::path::PathBuf;
 
+use serde::{Deserialize, Serialize};
+
 /// A dummy dialect for testing purposes.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct DummyDialect {
-    parse_result: Result<Patch>,
+    parse_results: Vec<Result<Patch>>,
+    current_index: usize,
 }
 
 impl DummyDialect {
-    /// Creates a new DummyDialect with a specified parse result.
-    pub fn new(parse_result: Result<Patch>) -> Self {
-        Self { parse_result }
+    /// Creates a new DummyDialect with specified parse results.
+    pub fn new(parse_results: Vec<Result<Patch>>) -> Self {
+        Self {
+            parse_results,
+            current_index: 0,
+        }
+    }
+}
+
+impl Default for DummyDialect {
+    fn default() -> Self {
+        Self {
+            parse_results: vec![Ok(Patch::default())],
+            current_index: 0,
+        }
     }
 }
 
@@ -39,7 +55,12 @@ impl DialectProvider for DummyDialect {
     }
 
     fn parse(&self, _txt: &str) -> Result<Patch> {
-        self.parse_result.clone()
+        if self.current_index < self.parse_results.len() {
+            let result = self.parse_results[self.current_index].clone();
+            Ok(result?)
+        } else {
+            panic!("No more parse results available");
+        }
     }
 }
 

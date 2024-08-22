@@ -38,48 +38,56 @@ pub trait DialectProvider {
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub enum Dialect {
     Tags(Tags),
+    Dummy(DummyDialect),
 }
 
 impl DialectProvider for Dialect {
     fn name(&self) -> &'static str {
         match self {
             Dialect::Tags(t) => t.name(),
+            Dialect::Dummy(d) => d.name(),
         }
     }
 
     fn system(&self) -> String {
         match self {
             Dialect::Tags(t) => t.system(),
+            Dialect::Dummy(d) => d.system(),
         }
     }
 
     fn render_context(&self, s: &Session) -> Result<String> {
         match self {
             Dialect::Tags(t) => t.render_context(s),
+            Dialect::Dummy(d) => d.render_context(s),
         }
     }
 
     fn render_editables(&self, paths: Vec<PathBuf>) -> Result<String> {
         match self {
             Dialect::Tags(t) => t.render_editables(paths),
+            Dialect::Dummy(d) => d.render_editables(paths),
         }
     }
 
     fn render_prompt(&self, p: &PromptInput) -> Result<String> {
         match self {
             Dialect::Tags(t) => t.render_prompt(p),
+            Dialect::Dummy(d) => d.render_prompt(p),
         }
     }
 
     fn parse(&self, txt: &str) -> Result<Patch> {
         match self {
             Dialect::Tags(t) => t.parse(txt),
+            Dialect::Dummy(d) => d.parse(txt),
         }
     }
 
     fn render_patch(&self, patch: &Patch) -> Result<String> {
         match self {
             Dialect::Tags(t) => t.render_patch(patch),
+            Dialect::Dummy(d) => d.render_patch(patch),
         }
     }
 }
