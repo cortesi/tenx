@@ -7,22 +7,31 @@ use crate::{Result, Session, TenxError};
 pub struct CargoChecker;
 
 impl Validator for CargoChecker {
+    fn name(&self) -> &'static str {
+        "CargoChecker"
+    }
+
     fn validate(&self, state: &Session) -> Result<()> {
         let workspace = RustWorkspace::discover(state)?;
         let output = Command::new("cargo")
             .arg("check")
             .current_dir(&workspace.root_path)
             .output()
-            .map_err(|e| TenxError::Workspace(format!("Failed to execute cargo check: {}", e)))?;
+            .map_err(|e| TenxError::Validation {
+                name: self.name().to_string(),
+                user: format!("Failed to execute cargo check: {}", e),
+                model: e.to_string(),
+            })?;
 
         if output.status.success() {
             Ok(())
         } else {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            Err(TenxError::Workspace(format!(
-                "Cargo check failed: {}",
-                stderr
-            )))
+            Err(TenxError::Validation {
+                name: self.name().to_string(),
+                user: "Cargo check failed".to_string(),
+                model: stderr.to_string(),
+            })
         }
     }
 }

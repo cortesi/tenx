@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use tokio::sync::mpsc;
 use tracing::warn;
 
-use crate::{model::ModelProvider, Result, Session, SessionStore};
+use crate::{Result, Session, SessionStore};
 
 #[derive(Debug, Default)]
 pub struct Config {

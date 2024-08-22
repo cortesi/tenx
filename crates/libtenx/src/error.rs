@@ -14,9 +14,6 @@ pub enum TenxError {
         path: PathBuf,
     },
 
-    #[error("Retry error: {user}")]
-    Retry { user: String, model: String },
-
     #[error("No paths provided")]
     NoPathsProvided,
 
@@ -40,6 +37,21 @@ pub enum TenxError {
 
     #[error("Internal error: {0}")]
     Internal(String),
+
+    /// A patch error, which could cause a retry.
+    #[error("Error applying patch: {user}")]
+    Patch { user: String, model: String },
+
+    /// A patch error, which could cause a retry.
+    #[error("Error applying {name} validation: {user}")]
+    Validation {
+        /// The name of the validator that failed
+        name: String,
+        /// An error to display to the user
+        user: String,
+        /// An error to the model, often the full tool output
+        model: String,
+    },
 }
 
 impl TenxError {
@@ -50,6 +62,15 @@ impl TenxError {
             path: path.as_ref().to_path_buf(),
         }
     }
+
+    /// Returns the model response if the error is retryable, otherwise None.
+    pub fn should_retry(&self) -> Option<&str> {
+        match self {
+            TenxError::Validation { model, .. } => Some(model),
+            TenxError::Patch { model, .. } => Some(model),
+            _ => None,
+        }
+    }
 }
 
 impl From<misanthropy::Error> for TenxError {
@@ -57,3 +78,4 @@ impl From<misanthropy::Error> for TenxError {
         TenxError::Model(error.to_string())
     }
 }
+

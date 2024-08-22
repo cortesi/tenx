@@ -46,7 +46,7 @@ impl Replace {
             }
         }
 
-        Err(TenxError::Retry {
+        Err(TenxError::Patch {
             user: "Could not find the text to replace".to_string(),
             model: "Invalid replace specification - could not find the text to replace".to_string(),
         })
@@ -135,4 +135,3 @@ mod tests {
         assert_eq!(result, expected_output);
     }
 }
-
