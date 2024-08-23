@@ -17,7 +17,7 @@ impl Default for Config {
         Self {
             anthropic_key: String::new(),
             session_store_dir: None,
-            retry_limit: 3,
+            retry_limit: 7,
         }
     }
 }
@@ -197,8 +197,6 @@ mod tests {
             .with_session_store_dir(temp_dir.path())
             .with_retry_limit(1);
         let tenx = Tenx::new(config);
-
-        // Create test.txt file
         let test_file_path = temp_dir.path().join("test.txt");
         fs::write(&test_file_path, "Initial content").unwrap();
 

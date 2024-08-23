@@ -159,7 +159,7 @@ impl Session {
         }
     }
 
-    /// Adds a new prompt to the session.
+    /// Adds a new step tot he session, and sets the step prompt.
     pub fn add_prompt(&mut self, prompt: PromptInput) {
         self.steps.push(Step {
             prompt,
