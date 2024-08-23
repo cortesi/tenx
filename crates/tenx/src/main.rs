@@ -322,7 +322,7 @@ async fn main() -> Result<()> {
                 if *raw {
                     println!("{:#?}", session);
                 } else {
-                    println!("{}", pretty::session(&session)?);
+                    println!("{}", pretty::session(&session, false)?);
                 }
                 Ok(())
             }
@@ -344,4 +344,3 @@ async fn main() -> Result<()> {
         }
     }
 }
-
