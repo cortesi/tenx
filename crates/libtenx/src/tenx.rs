@@ -155,7 +155,7 @@ impl Tenx {
         sender: Option<mpsc::Sender<String>>,
         session_store: &SessionStore,
     ) -> Result<()> {
-        let mut patch = match session.prompt(&self.config, sender).await {
+        let patch = match session.prompt(&self.config, sender).await {
             Ok(patch) => patch,
             Err(e) => {
                 session.set_last_error(&e);
@@ -164,7 +164,7 @@ impl Tenx {
         };
         session.set_last_patch(&patch);
         session_store.save(session)?;
-        if let Err(e) = session.apply_patch(&mut patch) {
+        if let Err(e) = session.apply_last_patch() {
             session.set_last_error(&e);
             return Err(e);
         }

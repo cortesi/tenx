@@ -235,6 +235,8 @@ impl Session {
         Ok(())
     }
 
+    /// Apply a patch, entering the modified files into the patch cache. It is the caller's
+    /// responsibility to save the patch back the the sesison if needed.
     pub fn apply_patch(&mut self, patch: &mut Patch) -> Result<()> {
         // First, enter all the modified files into the patch cache
         for path in patch.changed_files() {
@@ -323,6 +325,20 @@ impl Session {
         let patch = model.prompt(config, self, sender).await?;
         self.model = Some(model);
         Ok(patch)
+    }
+
+    /// Applies the final patch in the session.
+    pub fn apply_last_patch(&mut self) -> Result<()> {
+        let mut last_patch = self
+            .steps
+            .last()
+            .and_then(|step| step.patch.clone())
+            .ok_or_else(|| TenxError::Internal("No patch in the last step".into()))?;
+        self.apply_patch(&mut last_patch)?;
+        if let Some(last_step) = self.steps.last_mut() {
+            last_step.patch = Some(last_patch);
+        }
+        Ok(())
     }
 }
 
