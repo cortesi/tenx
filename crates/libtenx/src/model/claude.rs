@@ -121,21 +121,19 @@ impl Claude {
             tool_choice: misanthropy::ToolChoice::Auto,
             stop_sequences: vec![],
         };
-        for (i, s) in session.steps().iter().enumerate() {
+        for (i, _) in session.steps().iter().enumerate() {
             req.messages.push(misanthropy::Message {
                 role: misanthropy::Role::User,
                 content: vec![misanthropy::Content::Text {
                     text: session.dialect.render_step_request(session, i)?,
                 }],
             });
-            if let Some(patch) = &s.patch {
-                req.messages.push(misanthropy::Message {
-                    role: misanthropy::Role::Assistant,
-                    content: vec![misanthropy::Content::Text {
-                        text: session.dialect.render_patch(patch)?,
-                    }],
-                });
-            }
+            req.messages.push(misanthropy::Message {
+                role: misanthropy::Role::Assistant,
+                content: vec![misanthropy::Content::Text {
+                    text: session.dialect.render_step_response(session, i)?,
+                }],
+            });
         }
         Ok(req)
     }
@@ -164,4 +162,3 @@ impl ModelProvider for Claude {
         self.extract_changes(&session.dialect, &req)
     }
 }
-

@@ -50,7 +50,7 @@ impl DialectProvider for DummyDialect {
         Ok(String::new())
     }
 
-    fn render_patch(&self, _patch: &Patch) -> Result<String> {
+    fn render_step_response(&self, _session: &Session, _offset: usize) -> Result<String> {
         Ok(String::new())
     }
 
@@ -63,4 +63,3 @@ impl DialectProvider for DummyDialect {
         }
     }
 }
-

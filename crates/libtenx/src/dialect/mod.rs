@@ -5,7 +5,7 @@ mod dummy_dialect;
 mod tags;
 mod xmlish;
 
-use crate::{patch::Patch, prompt::PromptInput, Result, Session};
+use crate::{patch::Patch, Result, Session};
 
 pub use dummy_dialect::*;
 pub use tags::*;
@@ -19,18 +19,18 @@ pub trait DialectProvider {
     /// Return the system prompt for this dialect
     fn system(&self) -> String;
 
-    /// Render the request portion of a step.
-    fn render_step_request(&self, session: &Session, offset: usize) -> Result<String>;
-
-    /// Render the editable context section
-    fn render_editables(&self, paths: Vec<PathBuf>) -> Result<String>;
-
     /// Render the immutable context to be sent to the model. This is included once in the
     /// conversation.
     fn render_context(&self, p: &Session) -> Result<String>;
 
-    /// Render a Patch into a string representation
-    fn render_patch(&self, patch: &Patch) -> Result<String>;
+    /// Render the request portion of a step.
+    fn render_step_request(&self, session: &Session, offset: usize) -> Result<String>;
+
+    /// Render the response portion of a step.
+    fn render_step_response(&self, session: &Session, offset: usize) -> Result<String>;
+
+    /// Render the editable context section
+    fn render_editables(&self, paths: Vec<PathBuf>) -> Result<String>;
 
     /// Parse a model's response into concrete operations
     fn parse(&self, txt: &str) -> Result<Patch>;
@@ -85,10 +85,10 @@ impl DialectProvider for Dialect {
         }
     }
 
-    fn render_patch(&self, patch: &Patch) -> Result<String> {
+    fn render_step_response(&self, session: &Session, offset: usize) -> Result<String> {
         match self {
-            Dialect::Tags(t) => t.render_patch(patch),
-            Dialect::Dummy(d) => d.render_patch(patch),
+            Dialect::Tags(t) => t.render_step_response(session, offset),
+            Dialect::Dummy(d) => d.render_step_response(session, offset),
         }
     }
 }
