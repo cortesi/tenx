@@ -63,4 +63,3 @@ impl DialectProvider for DummyDialect {
         }
     }
 }
-

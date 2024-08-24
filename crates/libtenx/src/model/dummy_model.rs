@@ -43,4 +43,3 @@ impl ModelProvider for DummyModel {
         self.change_set.clone()
     }
 }
-

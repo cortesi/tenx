@@ -67,7 +67,7 @@ impl Tenx {
         sender: Option<mpsc::Sender<String>>,
     ) -> Result<()> {
         let mut session = self.load_session(path)?;
-        session.retry()?;
+        session.rollback_last()?;
         let session_store = SessionStore::open(self.config.session_store_dir.clone())?;
         self.process_prompt(&mut session, sender, &session_store)
             .await

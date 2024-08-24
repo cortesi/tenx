@@ -164,4 +164,3 @@ impl ModelProvider for Claude {
         self.extract_changes(&session.dialect, &req)
     }
 }
-

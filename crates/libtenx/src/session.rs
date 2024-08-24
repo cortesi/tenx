@@ -123,19 +123,6 @@ impl Session {
             .collect()
     }
 
-    /// Rolls back the last patch and sets it to None, allowing for a retry.
-    pub fn retry(&mut self) -> Result<()> {
-        if let Some(step) = self.steps.last() {
-            if let Some(patch) = &step.patch {
-                self.rollback(patch)?;
-            }
-        }
-        if let Some(step) = self.steps.last_mut() {
-            step.patch = None;
-        }
-        Ok(())
-    }
-
     /// Does this session have a pending prompt?
     pub fn pending_prompt(&self) -> bool {
         if let Some(step) = self.steps.last() {
@@ -165,7 +152,9 @@ impl Session {
     pub fn add_prompt(&mut self, prompt: PromptInput) -> Result<()> {
         if let Some(last_step) = self.steps.last() {
             if last_step.patch.is_none() && last_step.err.is_none() {
-                return Err(TenxError::Internal("Cannot add a new prompt while the previous step is incomplete".into()));
+                return Err(TenxError::Internal(
+                    "Cannot add a new prompt while the previous step is incomplete".into(),
+                ));
             }
         }
         self.steps.push(Step {
@@ -293,6 +282,34 @@ impl Session {
         Ok(())
     }
 
+    /// Trims the session to a specific step, removing and rolling back all subsequent steps.
+    pub fn trim(&mut self, offset: usize) -> Result<()> {
+        if offset >= self.steps.len() {
+            return Err(TenxError::Internal("Invalid rollback offset".into()));
+        }
+
+        for step in self.steps.iter().rev().take(self.steps.len() - offset - 1) {
+            if let Some(patch) = &step.patch {
+                self.rollback(patch)?;
+            }
+        }
+
+        self.steps.truncate(offset + 1);
+        Ok(())
+    }
+
+    /// Rolls back the changes in the last step, if any, and sets the Patch and error to None.
+    pub fn rollback_last(&mut self) -> Result<()> {
+        if let Some(patch) = self.steps.last().and_then(|step| step.patch.as_ref()) {
+            self.rollback(patch)?;
+        }
+        if let Some(last_step) = self.steps.last_mut() {
+            last_step.patch = None;
+            last_step.err = None;
+        }
+        Ok(())
+    }
+
     /// Prompts the current model with the session's state and returns the resulting patch.
     pub async fn prompt(
         &mut self,
@@ -312,6 +329,7 @@ impl Session {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::patch::{Change, Patch, WriteFile};
     use crate::testutils::TempEnv;
     use std::fs;
     use tempfile::tempdir;
@@ -389,6 +407,56 @@ mod tests {
                     .to_string_lossy()
             );
         }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_trim() -> Result<()> {
+        let temp_dir = tempdir().unwrap();
+        let working_dir = temp_dir.path().to_path_buf();
+        let file_path = working_dir.join("test.txt");
+
+        let mut session = Session::new(
+            Some(working_dir.clone()),
+            Dialect::Tags(crate::dialect::Tags {}),
+            Model::Dummy(crate::model::DummyModel::default()),
+        );
+
+        // Create initial file
+        fs::write(&file_path, "Initial content").unwrap();
+
+        // Add three steps
+        for i in 1..=3 {
+            let content = format!("Content {}", i);
+            let patch = Patch {
+                changes: vec![Change::Write(WriteFile {
+                    path: PathBuf::from("test.txt"),
+                    content: content.clone(),
+                })],
+                comment: Some(format!("Step {}", i)),
+                cache: [(
+                    PathBuf::from("test.txt"),
+                    fs::read_to_string(&file_path).unwrap(),
+                )]
+                .into_iter()
+                .collect(),
+            };
+            session.add_prompt(PromptInput {
+                user_prompt: format!("Prompt {}", i),
+            })?;
+            session.set_last_patch(&patch);
+            session.apply_patch(&mut patch.clone())?;
+        }
+
+        assert_eq!(session.steps.len(), 3);
+        assert_eq!(fs::read_to_string(&file_path).unwrap(), "Content 3");
+
+        // Rollback to the first step
+        session.trim(0)?;
+
+        assert_eq!(session.steps.len(), 1);
+        assert_eq!(fs::read_to_string(&file_path).unwrap(), "Content 1");
 
         Ok(())
     }
