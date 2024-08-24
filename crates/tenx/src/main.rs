@@ -11,7 +11,7 @@ use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{fmt, EnvFilter};
 
 use libtenx::{
-    self, dialect::Dialect, model::Claude, model::Model, prompt::PromptInput, Config, Session, Tenx,
+    self, dialect::Dialect, model::Claude, model::Model, model::ModelProvider, prompt::PromptInput, Config, Session, Tenx,
 };
 
 mod edit;
@@ -143,6 +143,10 @@ enum Commands {
         /// Print the entire session object verbosely
         #[clap(long)]
         raw: bool,
+
+        /// Output the rendered session
+        #[clap(long)]
+        render: bool,
     },
 }
 
@@ -331,12 +335,18 @@ async fn main() -> Result<()> {
                 info!("editable files added");
                 Ok(())
             }
-            Commands::Show { raw } => {
+            Commands::Show { raw, render } => {
                 let config = load_config(&cli)?;
                 let tx = Tenx::new(config);
                 let session = tx.load_session::<PathBuf>(None)?;
                 if *raw {
                     println!("{:#?}", session);
+                } else if *render {
+                    if let Some(model) = &session.model {
+                        println!("{}", model.render(&session)?);
+                    } else {
+                        println!("No model available in the session.");
+                    }
                 } else {
                     println!("{}", pretty::session(&session, false)?);
                 }
@@ -360,4 +370,3 @@ async fn main() -> Result<()> {
         }
     }
 }
-

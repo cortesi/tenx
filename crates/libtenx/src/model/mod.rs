@@ -24,6 +24,9 @@ pub trait ModelProvider {
         session: &Session,
         sender: Option<mpsc::Sender<String>>,
     ) -> Result<Patch>;
+
+    /// Render a session for display to the user.
+    fn render(&self, session: &Session) -> Result<String>;
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -50,6 +53,13 @@ impl ModelProvider for Model {
         match self {
             Model::Claude(c) => c.send(config, session, sender).await,
             Model::Dummy(d) => d.send(config, session, sender).await,
+        }
+    }
+
+    fn render(&self, session: &Session) -> Result<String> {
+        match self {
+            Model::Claude(c) => c.render(session),
+            Model::Dummy(d) => d.render(session),
         }
     }
 }

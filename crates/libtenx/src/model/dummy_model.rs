@@ -42,4 +42,8 @@ impl ModelProvider for DummyModel {
     ) -> Result<Patch> {
         self.change_set.clone()
     }
+
+    fn render(&self, _session: &Session) -> Result<String> {
+        Ok("Dummy model render".to_string())
+    }
 }

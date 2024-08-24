@@ -2,12 +2,14 @@ use tracing::warn;
 
 use misanthropy::{Anthropic, Content, ContentBlockDelta, Role, StreamEvent};
 use serde::{Deserialize, Serialize};
+use serde_json;
 
 use super::ModelProvider;
 use crate::{
     dialect::{Dialect, DialectProvider},
     patch, Config, Result, Session, TenxError,
 };
+use std::convert::From;
 
 const DEFAULT_MODEL: &str = "claude-3-5-sonnet-20240620";
 const MAX_TOKENS: u32 = 8192;
@@ -25,6 +27,12 @@ use tokio::sync::mpsc;
 /// - Edit the conversation to keep the most up-to-date editable files frontmost.
 #[derive(Default, Debug, Serialize, Deserialize)]
 pub struct Claude {}
+
+impl From<serde_json::Error> for TenxError {
+    fn from(error: serde_json::Error) -> Self {
+        TenxError::Internal(error.to_string())
+    }
+}
 
 impl Claude {
     async fn stream_response(
@@ -161,4 +169,11 @@ impl ModelProvider for Claude {
         req.merge_response(&resp);
         self.extract_changes(&session.dialect, &req)
     }
+
+    fn render(&self, session: &Session) -> Result<String> {
+        let req = self.request(session)?;
+        let json = serde_json::to_string_pretty(&req)?;
+        Ok(json)
+    }
 }
+
