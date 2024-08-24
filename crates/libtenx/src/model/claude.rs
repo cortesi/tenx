@@ -143,6 +143,10 @@ impl Claude {
 
 #[async_trait::async_trait]
 impl ModelProvider for Claude {
+    fn name(&self) -> &'static str {
+        "claude"
+    }
+
     async fn prompt(
         &mut self,
         config: &Config,
@@ -160,3 +164,4 @@ impl ModelProvider for Claude {
         self.extract_changes(&session.dialect, &req)
     }
 }
+

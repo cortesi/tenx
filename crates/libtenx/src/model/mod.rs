@@ -14,6 +14,9 @@ use crate::{patch::Patch, Config, Result, Session};
 /// Implemented by types that expose a prompt operation.
 #[async_trait]
 pub trait ModelProvider {
+    /// Returns the name of the model provider.
+    fn name(&self) -> &'static str;
+
     async fn prompt(
         &mut self,
         config: &Config,
@@ -30,6 +33,13 @@ pub enum Model {
 
 #[async_trait]
 impl ModelProvider for Model {
+    fn name(&self) -> &'static str {
+        match self {
+            Model::Claude(c) => c.name(),
+            Model::Dummy(d) => d.name(),
+        }
+    }
+
     async fn prompt(
         &mut self,
         config: &Config,

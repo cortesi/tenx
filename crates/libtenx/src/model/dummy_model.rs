@@ -30,6 +30,10 @@ impl Default for DummyModel {
 
 #[async_trait]
 impl ModelProvider for DummyModel {
+    fn name(&self) -> &'static str {
+        "dummy"
+    }
+
     async fn prompt(
         &mut self,
         _config: &Config,
@@ -39,3 +43,4 @@ impl ModelProvider for DummyModel {
         self.change_set.clone()
     }
 }
+

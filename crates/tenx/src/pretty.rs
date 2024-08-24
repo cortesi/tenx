@@ -1,5 +1,5 @@
 use colored::*;
-use libtenx::{dialect::DialectProvider, Result, Session, TenxError};
+use libtenx::{dialect::DialectProvider, model::ModelProvider, Result, Session, TenxError};
 use std::collections::HashSet;
 use terminal_size::{terminal_size, Width};
 use textwrap::{wrap, Options};
@@ -31,6 +31,14 @@ fn print_session_info(session: &Session) -> String {
         "{} {}\n",
         "dialect:".blue().bold(),
         session.dialect.name()
+    ));
+    output.push_str(&format!(
+        "{} {}\n",
+        "model:".blue().bold(),
+        session
+            .model
+            .as_ref()
+            .map_or_else(|| "None".to_string(), |m| m.name().to_string())
     ));
     output
 }
