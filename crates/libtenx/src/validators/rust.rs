@@ -14,7 +14,7 @@ impl Validator for CargoChecker {
     fn validate(&self, state: &Session) -> Result<()> {
         let workspace = RustWorkspace::discover(state)?;
         let output = Command::new("cargo")
-            .args(["check", "--workspace", "--tests"])
+            .args(["check", "--tests"])
             .current_dir(&workspace.root_path)
             .output()
             .map_err(|e| TenxError::Validation {

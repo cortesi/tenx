@@ -115,7 +115,10 @@ enum Commands {
         files: Vec<PathBuf>,
     },
     /// Retry the last prompt
-    Retry,
+    Retry {
+        /// The step offset to retry from
+        step_offset: Option<usize>,
+    },
     /// Show the current session
     Show {
         /// Print the entire session object verbosely
@@ -219,7 +222,7 @@ async fn main() -> Result<()> {
                 info!("context added");
                 Ok(())
             }
-            Commands::Retry => {
+            Commands::Retry { step_offset } => {
                 let config = load_config(&cli)?;
                 let tx = Tenx::new(config);
 
@@ -230,7 +233,7 @@ async fn main() -> Result<()> {
                     }
                 });
 
-                tx.retry::<PathBuf>(None, Some(sender)).await?;
+                tx.retry::<PathBuf>(None, Some(sender), *step_offset).await?;
 
                 print_task.await?;
                 info!("\n\n{}", "changes applied".green().bold());
