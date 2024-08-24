@@ -197,21 +197,29 @@ impl Session {
 
     /// Normalizes a path relative to the root directory.
     fn normalize_path<P: AsRef<Path>>(&self, path: P) -> Result<PathBuf> {
+        self.normalize_path_with_cwd(
+            path,
+            env::current_dir().map_err(|e| TenxError::fio(e, "."))?,
+        )
+    }
+
+    /// Normalizes a path relative to the root directory with a given current working directory.
+    fn normalize_path_with_cwd<P: AsRef<Path>>(
+        &self,
+        path: P,
+        current_dir: PathBuf,
+    ) -> Result<PathBuf> {
         let path = path.as_ref();
         if path.is_relative() {
-            if let Ok(current_dir) = env::current_dir() {
-                let absolute_path = current_dir
-                    .join(path)
-                    .canonicalize()
-                    .map_err(|e| TenxError::fio(e, path))?;
+            let absolute_path = current_dir
+                .join(path)
+                .canonicalize()
+                .map_err(|e| TenxError::fio(e, path))?;
 
-                Ok(absolute_path
-                    .strip_prefix(&self.root)
-                    .unwrap_or(&absolute_path)
-                    .to_path_buf())
-            } else {
-                Ok(self.root.join(path))
-            }
+            Ok(absolute_path
+                .strip_prefix(&self.root)
+                .unwrap_or(&absolute_path)
+                .to_path_buf())
         } else {
             Ok(path.to_path_buf())
         }
@@ -363,7 +371,6 @@ impl Session {
 mod tests {
     use super::*;
     use crate::patch::{Change, Patch, WriteFile};
-    use crate::testutils::TempEnv;
     use std::fs;
     use tempfile::tempdir;
 
@@ -396,14 +403,14 @@ mod tests {
     }
 
     #[test]
-    fn test_add_path() -> Result<()> {
+    fn test_normalize_path_with_cwd() -> Result<()> {
         let temp_dir = tempdir().unwrap();
         let root = temp_dir.path().join("root");
         fs::create_dir(&root).unwrap();
         let sub_dir = root.join("subdir");
         fs::create_dir(&sub_dir).unwrap();
 
-        let mut session = Session::new(
+        let session = Session::new(
             root.clone(),
             Dialect::Tags(crate::dialect::Tags {}),
             Model::Dummy(crate::model::DummyModel::default()),
@@ -411,35 +418,41 @@ mod tests {
 
         // Test 1: Current dir is the root directory
         {
-            let _temp_env = TempEnv::new(&root).unwrap();
             fs::File::create(root.join("file.txt")).unwrap();
-            session.add_ctx_path("file.txt")?;
-            assert_eq!(session.context.last().unwrap().name, "file.txt");
+            let result = session.normalize_path_with_cwd("file.txt", root.clone())?;
+            assert_eq!(result, PathBuf::from("file.txt"));
         }
 
         // Test 2: Current dir is under the root directory
         {
-            let _temp_env = TempEnv::new(&sub_dir).unwrap();
             fs::File::create(sub_dir.join("subfile.txt")).unwrap();
-            session.add_ctx_path("subfile.txt")?;
-            assert_eq!(session.context.last().unwrap().name, "subdir/subfile.txt");
+            let result = session.normalize_path_with_cwd("subfile.txt", sub_dir.clone())?;
+            assert_eq!(result, PathBuf::from("subdir/subfile.txt"));
         }
 
         // Test 3: Current dir is outside the root directory
         {
             let outside_dir = temp_dir.path().join("outside");
             fs::create_dir(&outside_dir).unwrap();
-            let _temp_env = TempEnv::new(&outside_dir).unwrap();
             fs::File::create(outside_dir.join("outsidefile.txt")).unwrap();
-            session.add_ctx_path("outsidefile.txt")?;
+            let result = session.normalize_path_with_cwd("outsidefile.txt", outside_dir.clone())?;
+            let expected = outside_dir
+                .join("outsidefile.txt")
+                .strip_prefix(&root)
+                .unwrap_or(&outside_dir.join("outsidefile.txt"))
+                .to_path_buf();
             assert_eq!(
-                session.context.last().unwrap().name,
-                outside_dir
-                    .join("outsidefile.txt")
-                    .canonicalize()
-                    .unwrap()
-                    .to_string_lossy()
+                result.canonicalize().unwrap(),
+                expected.canonicalize().unwrap()
             );
+        }
+
+        // Test 4: Absolute path
+        {
+            let abs_path = root.join("abs_file.txt");
+            fs::File::create(&abs_path).unwrap();
+            let result = session.normalize_path_with_cwd(&abs_path, root.clone())?;
+            assert_eq!(result, abs_path);
         }
 
         Ok(())
