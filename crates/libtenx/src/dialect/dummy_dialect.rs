@@ -1,4 +1,4 @@
-use crate::{dialect::DialectProvider, patch::Patch, prompt::PromptInput, Result, Session};
+use crate::{dialect::DialectProvider, patch::Patch, Result, Session};
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
@@ -38,7 +38,7 @@ impl DialectProvider for DummyDialect {
         String::new()
     }
 
-    fn render_prompt(&self, _p: &PromptInput) -> Result<String> {
+    fn render_step_request(&self, _session: &Session, _offset: usize) -> Result<String> {
         Ok(String::new())
     }
 
@@ -63,3 +63,4 @@ impl DialectProvider for DummyDialect {
         }
     }
 }
+

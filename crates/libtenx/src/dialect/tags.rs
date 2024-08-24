@@ -5,7 +5,7 @@ use std::{fs, path::PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-use super::{xmlish, DialectProvider, PromptInput};
+use super::{xmlish, DialectProvider};
 use crate::{
     patch::{Change, Patch, Replace, WriteFile},
     Result, Session, TenxError,
@@ -59,9 +59,16 @@ impl DialectProvider for Tags {
         Ok(rendered)
     }
 
-    fn render_prompt(&self, p: &PromptInput) -> Result<String> {
+    fn render_step_request(&self, session: &Session, offset: usize) -> Result<String> {
+        let prompt = session
+            .steps()
+            .get(offset)
+            .ok_or_else(|| TenxError::Internal("Invalid prompt offset".into()))?;
         let mut rendered = String::new();
-        rendered.push_str(&format!("\n<prompt>\n{}\n</prompt>\n\n", p.user_prompt));
+        rendered.push_str(&format!(
+            "\n<prompt>\n{}\n</prompt>\n\n",
+            prompt.prompt.user_prompt
+        ));
         Ok(rendered)
     }
 
@@ -227,3 +234,4 @@ mod tests {
         }
     }
 }
+

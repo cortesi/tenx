@@ -19,8 +19,8 @@ pub trait DialectProvider {
     /// Return the system prompt for this dialect
     fn system(&self) -> String;
 
-    /// Render a prompt to send to the model
-    fn render_prompt(&self, p: &PromptInput) -> Result<String>;
+    /// Render the request portion of a step.
+    fn render_step_request(&self, session: &Session, offset: usize) -> Result<String>;
 
     /// Render the editable context section
     fn render_editables(&self, paths: Vec<PathBuf>) -> Result<String>;
@@ -71,10 +71,10 @@ impl DialectProvider for Dialect {
         }
     }
 
-    fn render_prompt(&self, p: &PromptInput) -> Result<String> {
+    fn render_step_request(&self, session: &Session, offset: usize) -> Result<String> {
         match self {
-            Dialect::Tags(t) => t.render_prompt(p),
-            Dialect::Dummy(d) => d.render_prompt(p),
+            Dialect::Tags(t) => t.render_step_request(session, offset),
+            Dialect::Dummy(d) => d.render_step_request(session, offset),
         }
     }
 
@@ -92,3 +92,4 @@ impl DialectProvider for Dialect {
         }
     }
 }
+
