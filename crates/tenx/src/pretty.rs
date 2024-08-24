@@ -8,7 +8,7 @@ const DEFAULT_WIDTH: usize = 80;
 const INDENT: &str = "  ";
 
 /// Pretty prints the Session information.
-pub fn session(session: &Session, verbose: bool) -> Result<String> {
+pub fn session(session: &Session, full: bool) -> Result<String> {
     let width = terminal_size()
         .map(|(Width(w), _)| w as usize)
         .unwrap_or(DEFAULT_WIDTH);
@@ -16,7 +16,7 @@ pub fn session(session: &Session, verbose: bool) -> Result<String> {
     output.push_str(&print_session_info(session));
     output.push_str(&print_context(session));
     output.push_str(&print_editables(session)?);
-    output.push_str(&print_steps(session, verbose, width)?);
+    output.push_str(&print_steps(session, full, width)?);
     Ok(output)
 }
 
@@ -70,13 +70,13 @@ fn print_editables(session: &Session) -> Result<String> {
     Ok(output)
 }
 
-fn print_steps(session: &Session, verbose: bool, width: usize) -> Result<String> {
+fn print_steps(session: &Session, full: bool, width: usize) -> Result<String> {
     let mut output = String::new();
     if !session.steps.is_empty() {
         output.push_str(&format!("{}\n", "steps:".blue().bold()));
         for (i, step) in session.steps.iter().enumerate() {
             output.push_str(&format!("{}{}: ", INDENT, format!("{}", i).cyan().bold()));
-            let prompt = if verbose {
+            let prompt = if full {
                 step.prompt.user_prompt.clone()
             } else {
                 step.prompt
@@ -90,7 +90,7 @@ fn print_steps(session: &Session, verbose: bool, width: usize) -> Result<String>
             output.push_str(&wrapped_block(&prompt, width, INDENT.len() * 2));
             output.push('\n');
             if let Some(patch) = &step.patch {
-                output.push_str(&print_patch(session, patch, verbose, width));
+                output.push_str(&print_patch(session, patch, full, width));
             }
             if let Some(err) = &step.err {
                 output.push_str(&format!(
@@ -98,8 +98,8 @@ fn print_steps(session: &Session, verbose: bool, width: usize) -> Result<String>
                     INDENT.repeat(2),
                     "error:".yellow().bold()
                 ));
-                if verbose {
-                    output.push_str(&wrapped_block(&verbose_error(err), width, INDENT.len() * 3));
+                if full {
+                    output.push_str(&wrapped_block(&full_error(err), width, INDENT.len() * 3));
                 } else {
                     output.push_str(&wrapped_block(&format!("{}", err), width, INDENT.len() * 3));
                 }
@@ -113,7 +113,7 @@ fn print_steps(session: &Session, verbose: bool, width: usize) -> Result<String>
 fn print_patch(
     session: &Session,
     patch: &libtenx::patch::Patch,
-    verbose: bool,
+    full: bool,
     width: usize,
 ) -> String {
     let mut output = String::new();
@@ -123,7 +123,7 @@ fn print_patch(
             INDENT.repeat(2),
             "comment:".blue().bold()
         ));
-        let comment_text = if verbose {
+        let comment_text = if full {
             comment.clone()
         } else {
             comment.lines().next().unwrap_or("").to_string()
@@ -157,7 +157,7 @@ fn print_patch(
 }
 
 /// Pretty prints a TenxError with full details.
-pub fn verbose_error(error: &TenxError) -> String {
+pub fn full_error(error: &TenxError) -> String {
     match error {
         TenxError::Validation { name, user, model } => {
             format!(

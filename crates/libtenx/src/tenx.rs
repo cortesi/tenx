@@ -72,7 +72,7 @@ impl Tenx {
     ) -> Result<()> {
         let mut session = self.load_session(path)?;
         if let Some(offset) = step_offset {
-            session.trim(offset)?;
+            session.reset(offset)?;
         }
         session.rollback_last()?;
         let session_store = SessionStore::open(self.config.session_store_dir.clone())?;

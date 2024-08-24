@@ -282,8 +282,8 @@ impl Session {
         Ok(())
     }
 
-    /// Trims the session to a specific step, removing and rolling back all subsequent steps.
-    pub fn trim(&mut self, offset: usize) -> Result<()> {
+    /// Resets the session to a specific step, removing and rolling back all subsequent steps.
+    pub fn reset(&mut self, offset: usize) -> Result<()> {
         if offset >= self.steps.len() {
             return Err(TenxError::Internal("Invalid rollback offset".into()));
         }
@@ -412,7 +412,7 @@ mod tests {
     }
 
     #[test]
-    fn test_trim() -> Result<()> {
+    fn test_reset() -> Result<()> {
         let temp_dir = tempdir().unwrap();
         let working_dir = temp_dir.path().to_path_buf();
         let file_path = working_dir.join("test.txt");
@@ -453,7 +453,7 @@ mod tests {
         assert_eq!(fs::read_to_string(&file_path).unwrap(), "Content 3");
 
         // Rollback to the first step
-        session.trim(0)?;
+        session.reset(0)?;
 
         assert_eq!(session.steps.len(), 1);
         assert_eq!(fs::read_to_string(&file_path).unwrap(), "Content 1");

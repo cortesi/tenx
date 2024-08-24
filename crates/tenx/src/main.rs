@@ -233,7 +233,8 @@ async fn main() -> Result<()> {
                     }
                 });
 
-                tx.retry::<PathBuf>(None, Some(sender), *step_offset).await?;
+                tx.retry::<PathBuf>(None, Some(sender), *step_offset)
+                    .await?;
 
                 print_task.await?;
                 info!("\n\n{}", "changes applied".green().bold());
@@ -347,3 +348,4 @@ async fn main() -> Result<()> {
         }
     }
 }
+
