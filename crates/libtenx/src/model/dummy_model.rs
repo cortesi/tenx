@@ -34,7 +34,7 @@ impl ModelProvider for DummyModel {
         "dummy"
     }
 
-    async fn prompt(
+    async fn send(
         &mut self,
         _config: &Config,
         _state: &Session,

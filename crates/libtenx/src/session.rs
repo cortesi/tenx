@@ -330,7 +330,7 @@ impl Session {
             .model
             .take()
             .ok_or_else(|| TenxError::Internal("No model available".into()))?;
-        let patch = model.prompt(config, self, sender).await?;
+        let patch = model.send(config, self, sender).await?;
         self.model = Some(model);
         Ok(patch)
     }

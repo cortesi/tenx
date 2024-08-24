@@ -17,10 +17,11 @@ pub trait ModelProvider {
     /// Returns the name of the model provider.
     fn name(&self) -> &'static str;
 
-    async fn prompt(
+    /// Render and send a session to the model.
+    async fn send(
         &mut self,
         config: &Config,
-        state: &Session,
+        session: &Session,
         sender: Option<mpsc::Sender<String>>,
     ) -> Result<Patch>;
 }
@@ -40,15 +41,15 @@ impl ModelProvider for Model {
         }
     }
 
-    async fn prompt(
+    async fn send(
         &mut self,
         config: &Config,
-        state: &Session,
+        session: &Session,
         sender: Option<mpsc::Sender<String>>,
     ) -> Result<Patch> {
         match self {
-            Model::Claude(c) => c.prompt(config, state, sender).await,
-            Model::Dummy(d) => d.prompt(config, state, sender).await,
+            Model::Claude(c) => c.send(config, session, sender).await,
+            Model::Dummy(d) => d.send(config, session, sender).await,
         }
     }
 }

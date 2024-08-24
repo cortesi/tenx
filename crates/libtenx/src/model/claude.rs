@@ -145,7 +145,7 @@ impl ModelProvider for Claude {
         "claude"
     }
 
-    async fn prompt(
+    async fn send(
         &mut self,
         config: &Config,
         session: &Session,
