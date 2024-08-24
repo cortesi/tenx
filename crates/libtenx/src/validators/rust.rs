@@ -118,7 +118,7 @@ mod tests {
             Dialect::Tags(crate::dialect::Tags::default()),
             Model::Dummy(crate::model::DummyModel::default()),
         );
-        session.add_prompt(prompt.clone());
+        session.add_prompt(prompt.clone())?;
         for p in edit_paths {
             session.add_editable(&p)?;
         }
@@ -150,7 +150,7 @@ mod tests {
             Dialect::Tags(crate::dialect::Tags::default()),
             Model::Dummy(crate::model::DummyModel::default()),
         );
-        session.add_prompt(prompt);
+        session.add_prompt(prompt)?;
         for p in edit_paths {
             session.add_editable(&p)?;
         }
@@ -182,7 +182,7 @@ mod tests {
             Dialect::Tags(crate::dialect::Tags::default()),
             Model::Dummy(crate::model::DummyModel::default()),
         );
-        session.add_prompt(prompt);
+        session.add_prompt(prompt)?;
         for p in edit_paths {
             session.add_editable(&p)?;
         }
@@ -212,7 +212,7 @@ mod tests {
             Dialect::Tags(crate::dialect::Tags::default()),
             Model::Dummy(crate::model::DummyModel::default()),
         );
-        session.add_prompt(prompt);
+        session.add_prompt(prompt)?;
         session.add_editable(temp_dir.path())?;
 
         let result = RustWorkspace::discover(&session);
@@ -235,7 +235,7 @@ mod tests {
             Dialect::Tags(crate::dialect::Tags::default()),
             Model::Dummy(crate::model::DummyModel::default()),
         );
-        session.add_prompt(prompt);
+        session.add_prompt(prompt)?;
 
         let result = RustWorkspace::discover(&session);
 
@@ -269,7 +269,7 @@ mod tests {
             Dialect::Tags(crate::dialect::Tags::default()),
             Model::Dummy(crate::model::DummyModel::default()),
         );
-        session.add_prompt(prompt);
+        session.add_prompt(prompt)?;
         for f in edit_paths {
             session.add_editable(&f)?;
         }

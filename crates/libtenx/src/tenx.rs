@@ -125,7 +125,7 @@ impl Tenx {
                         );
                         session.add_prompt(PromptInput {
                             user_prompt: model_message.to_string(),
-                        });
+                        })?;
                     } else {
                         warn!("Non-retryable error: {}", e);
                         return Err(e);
@@ -214,7 +214,7 @@ mod tests {
         );
         session.add_prompt(PromptInput {
             user_prompt: "Test prompt".to_string(),
-        });
+        })?;
         session.add_editable(test_file_path.clone())?;
 
         let session_store = SessionStore::open(Some(temp_dir.path().to_path_buf()))?;

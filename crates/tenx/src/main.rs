@@ -186,7 +186,7 @@ async fn main() -> Result<()> {
                     Some(p) => p,
                     None => return Ok(()),
                 };
-                session.add_prompt(user_prompt);
+                session.add_prompt(user_prompt)?;
 
                 let (sender, mut receiver) = mpsc::channel(100);
                 let print_task = tokio::spawn(async move {
@@ -290,7 +290,7 @@ async fn main() -> Result<()> {
                         None => return Ok(()),
                     }
                 };
-                session.add_prompt(user_prompt);
+                session.add_prompt(user_prompt)?;
                 for f in files.clone().unwrap_or_default() {
                     session.add_editable(f)?;
                 }

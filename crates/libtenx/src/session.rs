@@ -159,13 +159,21 @@ impl Session {
         }
     }
 
-    /// Adds a new step tot he session, and sets the step prompt.
-    pub fn add_prompt(&mut self, prompt: PromptInput) {
+    /// Adds a new step to the session, and sets the step prompt.
+    ///
+    /// Returns an error if the last step doesn't have either a patch or an error.
+    pub fn add_prompt(&mut self, prompt: PromptInput) -> Result<()> {
+        if let Some(last_step) = self.steps.last() {
+            if last_step.patch.is_none() && last_step.err.is_none() {
+                return Err(TenxError::Internal("Cannot add a new prompt while the previous step is incomplete".into()));
+            }
+        }
         self.steps.push(Step {
             prompt,
             patch: None,
             err: None,
         });
+        Ok(())
     }
 
     /// Adds a new context to the session, ignoring duplicates.
