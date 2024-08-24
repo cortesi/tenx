@@ -1,3 +1,4 @@
+//! This module implements the Claude model provider for the tenx system.
 use tracing::warn;
 
 use misanthropy::{Anthropic, Content, ContentBlockDelta, Role, StreamEvent};
@@ -9,13 +10,18 @@ use crate::{
     dialect::{Dialect, DialectProvider},
     patch, Config, Result, Session, TenxError,
 };
+use std::collections::HashSet;
 use std::convert::From;
+use std::path::PathBuf;
 
 const DEFAULT_MODEL: &str = "claude-3-5-sonnet-20240620";
 const MAX_TOKENS: u32 = 8192;
 const CONTEXT_LEADIN: &str = "Here is some immutable context that you may not edit.\n";
 const EDITABLE_LEADIN: &str =
     "Here are the editable files. You will modify only these, nothing else.\n";
+const EDITABLE_UPDATE_LEADIN: &str = "Here are the updated files.";
+const OMITTED_FILES_LEADIN: &str =
+    "These files have been omitted since they were updated later in the conversation:";
 
 use tokio::sync::mpsc;
 
@@ -84,6 +90,49 @@ impl Claude {
         Err(TenxError::Internal("No patch to parse.".into()))
     }
 
+    /// Filters the given files based on whether they will be modified in future steps.
+    ///
+    /// Returns a tuple of (included, omitted) files.
+    fn filter_files(
+        &self,
+        files: &[PathBuf],
+        session: &Session,
+        step_offset: usize,
+    ) -> (Vec<PathBuf>, Vec<PathBuf>) {
+        let mut future_modified_files = HashSet::new();
+        for step in session.steps().iter().skip(step_offset + 1) {
+            if let Some(patch) = &step.patch {
+                future_modified_files.extend(patch.changed_files());
+            }
+        }
+        let (included, omitted): (Vec<_>, Vec<_>) = files
+            .iter()
+            .partition(|file| !future_modified_files.contains(*file));
+        (
+            included.into_iter().cloned().collect(),
+            omitted.into_iter().cloned().collect(),
+        )
+    }
+
+    /// Renders the editable files and appends a list of omitted files if any.
+    ///
+    /// Returns a formatted string containing the rendered editables and omitted files.
+    fn render_editables_with_omitted(
+        &self,
+        session: &Session,
+        files: Vec<PathBuf>,
+        omitted: Vec<PathBuf>,
+    ) -> Result<String> {
+        let mut result = session.dialect.render_editables(files)?;
+        if !omitted.is_empty() {
+            result.push_str(&format!("\n{}\n", OMITTED_FILES_LEADIN));
+            for file in omitted {
+                result.push_str(&format!("- {}\n", file.display()));
+            }
+        }
+        Ok(result)
+    }
+
     fn request(&self, session: &Session) -> Result<misanthropy::MessagesRequest> {
         let mut req = misanthropy::MessagesRequest {
             model: DEFAULT_MODEL.to_string(),
@@ -108,11 +157,11 @@ impl Claude {
                 misanthropy::Message {
                     role: misanthropy::Role::User,
                     content: vec![misanthropy::Content::Text {
-                        text: format!(
-                            "{}\n{}",
-                            EDITABLE_LEADIN,
-                            session.dialect.render_editables(session.editables()?)?
-                        ),
+                        text: format!("{}\n{}", EDITABLE_LEADIN, {
+                            let (included, omitted) =
+                                self.filter_files(&session.editables()?, session, 0);
+                            self.render_editables_with_omitted(session, included, omitted)?
+                        }),
                     }],
                 },
                 misanthropy::Message {
@@ -129,19 +178,38 @@ impl Claude {
             tool_choice: misanthropy::ToolChoice::Auto,
             stop_sequences: vec![],
         };
-        for (i, _) in session.steps().iter().enumerate() {
+        for (i, s) in session.steps().iter().enumerate() {
             req.messages.push(misanthropy::Message {
                 role: misanthropy::Role::User,
                 content: vec![misanthropy::Content::Text {
                     text: session.dialect.render_step_request(session, i)?,
                 }],
             });
-            req.messages.push(misanthropy::Message {
-                role: misanthropy::Role::Assistant,
-                content: vec![misanthropy::Content::Text {
-                    text: session.dialect.render_step_response(session, i)?,
-                }],
-            });
+            if let Some(patch) = &s.patch {
+                req.messages.push(misanthropy::Message {
+                    role: misanthropy::Role::Assistant,
+                    content: vec![misanthropy::Content::Text {
+                        text: session.dialect.render_step_response(session, i)?,
+                    }],
+                });
+                let (included, omitted) = self.filter_files(&patch.changed_files(), session, i);
+                req.messages.push(misanthropy::Message {
+                    role: misanthropy::Role::User,
+                    content: vec![misanthropy::Content::Text {
+                        text: format!(
+                            "{}\n{}",
+                            EDITABLE_UPDATE_LEADIN,
+                            self.render_editables_with_omitted(session, included, omitted)?
+                        ),
+                    }],
+                });
+                req.messages.push(misanthropy::Message {
+                    role: misanthropy::Role::Assistant,
+                    content: vec![misanthropy::Content::Text {
+                        text: "Got it.".to_string(),
+                    }],
+                });
+            }
         }
         Ok(req)
     }
@@ -176,4 +244,3 @@ impl ModelProvider for Claude {
         Ok(json)
     }
 }
-
