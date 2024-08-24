@@ -74,35 +74,6 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Perform an AI-assisted edit
-    Edit {
-        /// Specifies files to edit
-        #[clap(value_parser)]
-        files: Option<Vec<PathBuf>>,
-
-        /// User prompt for the edit operation
-        #[clap(long)]
-        prompt: Option<String>,
-
-        /// Path to a file containing the prompt
-        #[clap(long)]
-        prompt_file: Option<PathBuf>,
-    },
-    /// Reset the session to a specific step
-    Reset {
-        /// The step offset to reset to
-        step_offset: usize,
-    },
-    /// Create a new session
-    New {
-        /// Specifies files to add as context
-        #[clap(value_parser)]
-        files: Vec<PathBuf>,
-
-        /// Add ruskel documentation
-        #[clap(long)]
-        ruskel: Vec<String>,
-    },
     /// Add context to an existing session
     AddCtx {
         /// Specifies files to add as context
@@ -119,16 +90,29 @@ enum Commands {
         #[clap(value_parser)]
         files: Vec<PathBuf>,
     },
-    /// Retry the last prompt
-    Retry {
-        /// The step offset to retry from
-        step_offset: Option<usize>,
-    },
-    /// Show the current session
-    Show {
-        /// Print the entire session object verbosely
+    /// Perform an AI-assisted edit
+    Edit {
+        /// Specifies files to edit
+        #[clap(value_parser)]
+        files: Option<Vec<PathBuf>>,
+
+        /// User prompt for the edit operation
         #[clap(long)]
-        raw: bool,
+        prompt: Option<String>,
+
+        /// Path to a file containing the prompt
+        #[clap(long)]
+        prompt_file: Option<PathBuf>,
+    },
+    /// Create a new session
+    New {
+        /// Specifies files to add as context
+        #[clap(value_parser)]
+        files: Vec<PathBuf>,
+
+        /// Add ruskel documentation
+        #[clap(long)]
+        ruskel: Vec<String>,
     },
     /// Start a new session, edit the prompt, and run it
     Oneshot {
@@ -143,6 +127,22 @@ enum Commands {
         /// Add files as context
         #[clap(long)]
         ctx: Vec<PathBuf>,
+    },
+    /// Reset the session to a specific step
+    Reset {
+        /// The step offset to reset to
+        step_offset: usize,
+    },
+    /// Retry the last prompt
+    Retry {
+        /// The step offset to retry from
+        step_offset: Option<usize>,
+    },
+    /// Show the current session
+    Show {
+        /// Print the entire session object verbosely
+        #[clap(long)]
+        raw: bool,
     },
 }
 

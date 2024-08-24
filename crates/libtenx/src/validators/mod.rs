@@ -28,7 +28,7 @@ pub fn preflight(state: &Session) -> Result<Vec<Box<dyn Validator>>> {
 /// Returns a list of post-patch checkers based on the given state.
 pub fn post_patch(state: &Session) -> Result<Vec<Box<dyn Validator>>> {
     let mut validators: Vec<Box<dyn Validator>> = vec![];
-    if let Some(last_step) = state.steps.last() {
+    if let Some(last_step) = state.steps().last() {
         if let Some(patch) = &last_step.patch {
             if patch
                 .changed_files()

@@ -32,7 +32,7 @@ impl DialectProvider for Tags {
 
         let mut rendered = String::new();
         rendered.push_str("<context>\n");
-        for ctx in &s.context {
+        for ctx in s.context() {
             rendered.push_str(&format!(
                 "<item name=\"{}\" type=\"{:?}\">\n{}\n</item>\n",
                 ctx.name,

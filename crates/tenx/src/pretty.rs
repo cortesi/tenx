@@ -45,9 +45,9 @@ fn print_session_info(session: &Session) -> String {
 
 fn print_context(session: &Session) -> String {
     let mut output = String::new();
-    if !session.context.is_empty() {
+    if !session.context().is_empty() {
         output.push_str(&format!("{}\n", "context:".blue().bold()));
-        for context in &session.context {
+        for context in session.context() {
             output.push_str(&format!("{}- {:?}: {}\n", INDENT, context.ty, context.name));
         }
     }
@@ -72,9 +72,9 @@ fn print_editables(session: &Session) -> Result<String> {
 
 fn print_steps(session: &Session, full: bool, width: usize) -> Result<String> {
     let mut output = String::new();
-    if !session.steps.is_empty() {
+    if !session.steps().is_empty() {
         output.push_str(&format!("{}\n", "steps:".blue().bold()));
-        for (i, step) in session.steps.iter().enumerate() {
+        for (i, step) in session.steps().iter().enumerate() {
             output.push_str(&format!("{}{}: ", INDENT, format!("{}", i).cyan().bold()));
             let prompt = if full {
                 step.prompt.user_prompt.clone()

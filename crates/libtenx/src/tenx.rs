@@ -235,10 +235,10 @@ mod tests {
         tenx.process_prompt(&mut session, None, &session_store)
             .await?;
 
-        assert_eq!(session.steps.len(), 1);
-        assert!(session.steps[0].patch.is_some());
+        assert_eq!(session.steps().len(), 1);
+        assert!(session.steps()[0].patch.is_some());
         assert_eq!(
-            session.steps[0].patch.as_ref().unwrap().comment,
+            session.steps()[0].patch.as_ref().unwrap().comment,
             Some("Test comment".to_string())
         );
 

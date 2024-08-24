@@ -25,7 +25,8 @@ pub trait DialectProvider {
     /// Render the editable context section
     fn render_editables(&self, paths: Vec<PathBuf>) -> Result<String>;
 
-    /// Render the immutable context to be sent to the model
+    /// Render the immutable context to be sent to the model. This is included once in the
+    /// conversation.
     fn render_context(&self, p: &Session) -> Result<String>;
 
     /// Render a Patch into a string representation

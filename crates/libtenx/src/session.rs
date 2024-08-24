@@ -83,8 +83,8 @@ pub struct Session {
     pub root: PathBuf,
     pub dialect: Dialect,
     pub model: Option<Model>,
-    pub steps: Vec<Step>,
-    pub context: Vec<Context>,
+    steps: Vec<Step>,
+    context: Vec<Context>,
     editable: Vec<PathBuf>,
 }
 
@@ -99,6 +99,14 @@ impl Session {
             context: vec![],
             editable: vec![],
         }
+    }
+
+    pub fn steps(&self) -> &Vec<Step> {
+        &self.steps
+    }
+
+    pub fn context(&self) -> &Vec<Context> {
+        &self.context
     }
 
     /// Calculates the relative path from the root to the given absolute path.
