@@ -52,21 +52,18 @@ impl Context {
     }
 }
 
-/// Finds the working directory based on the given path or git repo root.
-pub fn find_root<P: AsRef<Path>>(path: Option<P>) -> PathBuf {
-    if let Some(p) = path {
-        return p.as_ref().to_path_buf();
-    }
-    let mut current_dir = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+/// Finds the root directory based on the current working directory or git repo root.
+pub fn find_root(current_dir: &Path) -> PathBuf {
+    let mut dir = current_dir.to_path_buf();
     loop {
-        if current_dir.join(".git").is_dir() {
-            return current_dir;
+        if dir.join(".git").is_dir() {
+            return dir;
         }
-        if !current_dir.pop() {
+        if !dir.pop() {
             break;
         }
     }
-    env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
+    current_dir.to_path_buf()
 }
 
 /// A single step in the session - basically a prompt and a patch.
@@ -91,8 +88,12 @@ pub struct Session {
 impl Session {
     /// Creates a new Context with the specified root directory and dialect.
     pub fn new(root: Option<PathBuf>, dialect: Dialect, model: Model) -> Self {
+        let root = root.map_or_else(
+            || find_root(&env::current_dir().unwrap_or_else(|_| PathBuf::from("."))),
+            |path| path,
+        );
         Self {
-            root: find_root(root).canonicalize().unwrap(),
+            root: root.canonicalize().unwrap(),
             model: Some(model),
             dialect,
             steps: vec![],
@@ -388,26 +389,26 @@ mod tests {
     #[test]
     fn test_add_path() -> Result<()> {
         let temp_dir = tempdir().unwrap();
-        let working_dir = temp_dir.path().join("working");
-        fs::create_dir(&working_dir).unwrap();
-        let sub_dir = working_dir.join("subdir");
+        let root = temp_dir.path().join("root");
+        fs::create_dir(&root).unwrap();
+        let sub_dir = root.join("subdir");
         fs::create_dir(&sub_dir).unwrap();
 
         let mut session = Session::new(
-            Some(working_dir.clone()),
+            Some(root.clone()),
             Dialect::Tags(crate::dialect::Tags {}),
             Model::Dummy(crate::model::DummyModel::default()),
         );
 
-        // Test 1: Current dir is the working directory
+        // Test 1: Current dir is the root directory
         {
-            let _temp_env = TempEnv::new(&working_dir).unwrap();
-            fs::File::create(working_dir.join("file.txt")).unwrap();
+            let _temp_env = TempEnv::new(&root).unwrap();
+            fs::File::create(root.join("file.txt")).unwrap();
             session.add_ctx_path("file.txt")?;
             assert_eq!(session.context.last().unwrap().name, "file.txt");
         }
 
-        // Test 2: Current dir is under the working directory
+        // Test 2: Current dir is under the root directory
         {
             let _temp_env = TempEnv::new(&sub_dir).unwrap();
             fs::File::create(sub_dir.join("subfile.txt")).unwrap();
@@ -415,7 +416,7 @@ mod tests {
             assert_eq!(session.context.last().unwrap().name, "subdir/subfile.txt");
         }
 
-        // Test 3: Current dir is outside the working directory
+        // Test 3: Current dir is outside the root directory
         {
             let outside_dir = temp_dir.path().join("outside");
             fs::create_dir(&outside_dir).unwrap();
@@ -438,11 +439,11 @@ mod tests {
     #[test]
     fn test_reset() -> Result<()> {
         let temp_dir = tempdir().unwrap();
-        let working_dir = temp_dir.path().to_path_buf();
-        let file_path = working_dir.join("test.txt");
+        let root_dir = temp_dir.path().to_path_buf();
+        let file_path = root_dir.join("test.txt");
 
         let mut session = Session::new(
-            Some(working_dir.clone()),
+            Some(root_dir.clone()),
             Dialect::Tags(crate::dialect::Tags {}),
             Model::Dummy(crate::model::DummyModel::default()),
         );
@@ -485,3 +486,4 @@ mod tests {
         Ok(())
     }
 }
+

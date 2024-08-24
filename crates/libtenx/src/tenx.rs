@@ -1,9 +1,14 @@
-use std::path::{Path, PathBuf};
+use std::{
+    env,
+    path::{Path, PathBuf},
+};
 
 use tokio::sync::mpsc;
 use tracing::warn;
 
-use crate::{prompt::PromptInput, Result, Session, SessionStore};
+use crate::{
+    prompt::PromptInput, session_store::normalize_path, Result, Session, SessionStore, TenxError,
+};
 
 #[derive(Debug)]
 pub struct Config {
@@ -64,27 +69,32 @@ impl Tenx {
     ///
     /// If `step_offset` is provided, all steps beyond this offset are trimmed before retrying.
     /// If `step_offset` is None, only the last step is rolled back.
-    pub async fn retry<P: AsRef<Path>>(
+    pub async fn retry(
         &self,
-        path: Option<P>,
+        session: &mut Session,
         sender: Option<mpsc::Sender<String>>,
         step_offset: Option<usize>,
     ) -> Result<()> {
-        let mut session = self.load_session(path)?;
         if let Some(offset) = step_offset {
             session.reset(offset)?;
         }
         session.rollback_last()?;
         let session_store = SessionStore::open(self.config.session_store_dir.clone())?;
-        self.process_prompt(&mut session, sender, &session_store)
-            .await
+        self.process_prompt(session, sender, &session_store).await
     }
 
-    /// Loads a session from the store based on the working directory.
-    pub fn load_session<P: AsRef<Path>>(&self, path: Option<P>) -> Result<Session> {
-        let working_dir = crate::session::find_root(path);
+    /// Loads a session from the store based on the given path.
+    pub fn load_session<P: AsRef<Path>>(&self, path: P) -> Result<Session> {
+        let root = crate::session::find_root(path.as_ref());
         let session_store = SessionStore::open(self.config.session_store_dir.clone())?;
-        session_store.load(working_dir)
+        let name = normalize_path(&root);
+        session_store.load(name)
+    }
+
+    /// Loads a session from the store based on the current working directory.
+    pub fn load_session_cwd(&self) -> Result<Session> {
+        let current_dir = env::current_dir().map_err(|e| TenxError::fio(e, "."))?;
+        self.load_session(current_dir)
     }
 
     /// Resumes a session by sending a prompt to the model.
@@ -98,10 +108,9 @@ impl Tenx {
     }
 
     /// Resets the session to a specific step.
-    pub fn reset<P: AsRef<Path>>(&self, path: Option<P>, offset: usize) -> Result<()> {
-        let mut session = self.load_session(path)?;
+    pub fn reset(&self, session: &mut Session, offset: usize) -> Result<()> {
         session.reset(offset)?;
-        self.save_session(&session)
+        self.save_session(session)
     }
 
     /// Common logic for processing a prompt and updating the state. The prompt that will be

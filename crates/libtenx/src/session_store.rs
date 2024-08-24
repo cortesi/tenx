@@ -38,23 +38,14 @@ impl SessionStore {
         let file_path = self.base_dir.join(file_name);
         let serialized = serde_json::to_string(state)
             .map_err(|e| TenxError::SessionStore(format!("serialization failed: {}", e)))?;
-        fs::write(file_path.clone(), serialized).map_err(|e| {
-            TenxError::SessionStore(format!(
-                "could not write to {}, error {}",
-                file_path.display(),
-                e
-            ))
-        })?;
+        fs::write(&file_path, serialized).map_err(|e| TenxError::fio(e, &file_path))?;
         Ok(())
     }
 
-    /// Loads a State from a file based on the given working directory.
-    pub fn load<P: AsRef<Path>>(&self, working_directory: P) -> Result<Session> {
-        let file_name = normalize_path(working_directory.as_ref());
-        let file_path = self.base_dir.join(file_name);
-        let serialized = fs::read_to_string(file_path.clone()).map_err(|e| {
-            TenxError::SessionStore(format!("read failed {}, error {}", file_path.display(), e))
-        })?;
+    /// Loads a State from a file based on the given name.
+    pub fn load<S: AsRef<str>>(&self, name: S) -> Result<Session> {
+        let file_path = self.base_dir.join(name.as_ref());
+        let serialized = fs::read_to_string(&file_path).map_err(|e| TenxError::fio(e, &file_path))?;
         serde_json::from_str(&serialized).map_err(|e| TenxError::Internal(format!("{}", e)))
     }
 }
@@ -87,7 +78,8 @@ mod tests {
         );
         state_store.save(&state).unwrap();
 
-        let loaded_state = state_store.load(temp_dir.path().canonicalize().unwrap())?;
+        let name = normalize_path(&state.root);
+        let loaded_state = state_store.load(name)?;
         assert_eq!(loaded_state.root, state.root);
         assert_eq!(loaded_state.dialect, state.dialect);
         Ok(())

@@ -11,7 +11,8 @@ use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{fmt, EnvFilter};
 
 use libtenx::{
-    self, dialect::Dialect, model::Claude, model::Model, model::ModelProvider, prompt::PromptInput, Config, Session, Tenx,
+    self, dialect::Dialect, model::Claude, model::Model, model::ModelProvider, prompt::PromptInput,
+    Config, Session, Tenx,
 };
 
 mod edit;
@@ -217,14 +218,15 @@ async fn main() -> Result<()> {
             Commands::Reset { step_offset } => {
                 let config = load_config(&cli)?;
                 let tx = Tenx::new(config);
-                tx.reset::<PathBuf>(None, *step_offset)?;
+                let mut session = tx.load_session_cwd()?;
+                tx.reset(&mut session, *step_offset)?;
                 info!("Session reset to step {}", step_offset);
                 Ok(())
             }
             Commands::AddCtx { files, ruskel } => {
                 let config = load_config(&cli)?;
                 let tx = Tenx::new(config);
-                let mut session = tx.load_session::<PathBuf>(None)?;
+                let mut session = tx.load_session_cwd()?;
 
                 for file in files {
                     session.add_ctx_path(file)?;
@@ -249,8 +251,8 @@ async fn main() -> Result<()> {
                     }
                 });
 
-                tx.retry::<PathBuf>(None, Some(sender), *step_offset)
-                    .await?;
+                let mut session = tx.load_session_cwd()?;
+                tx.retry(&mut session, Some(sender), *step_offset).await?;
 
                 print_task.await?;
                 info!("\n\n{}", "changes applied".green().bold());
@@ -292,7 +294,7 @@ async fn main() -> Result<()> {
                     }
                 });
 
-                let mut session = tx.load_session::<PathBuf>(None)?;
+                let mut session = tx.load_session_cwd()?;
                 let user_prompt = if let Some(p) = prompt {
                     PromptInput {
                         user_prompt: p.clone(),
@@ -325,7 +327,7 @@ async fn main() -> Result<()> {
             Commands::AddEdit { files } => {
                 let config = load_config(&cli)?;
                 let tx = Tenx::new(config);
-                let mut session = tx.load_session::<PathBuf>(None)?;
+                let mut session = tx.load_session_cwd()?;
 
                 for file in files {
                     session.add_editable(file)?;
@@ -338,7 +340,7 @@ async fn main() -> Result<()> {
             Commands::Show { raw, render } => {
                 let config = load_config(&cli)?;
                 let tx = Tenx::new(config);
-                let session = tx.load_session::<PathBuf>(None)?;
+                let session = tx.load_session_cwd()?;
                 if *raw {
                     println!("{:#?}", session);
                 } else if *render {
