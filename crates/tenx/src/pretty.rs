@@ -78,7 +78,8 @@ fn print_steps(session: &Session, verbose: bool, width: usize) -> Result<String>
                     .unwrap_or("")
                     .to_string()
             };
-            output.push_str(&wrap_text(&prompt, width, INDENT.len() + 3));
+            output.push('\n');
+            output.push_str(&wrapped_block(&prompt, width, INDENT.len() * 2));
             output.push('\n');
             if let Some(patch) = &step.patch {
                 output.push_str(&print_patch(session, patch, verbose, width));
@@ -90,9 +91,9 @@ fn print_steps(session: &Session, verbose: bool, width: usize) -> Result<String>
                     "error:".yellow().bold()
                 ));
                 if verbose {
-                    output.push_str(&wrap_text(&verbose_error(err), width, INDENT.len() * 3));
+                    output.push_str(&wrapped_block(&verbose_error(err), width, INDENT.len() * 3));
                 } else {
-                    output.push_str(&wrap_text(&format!("{}", err), width, INDENT.len() * 3));
+                    output.push_str(&wrapped_block(&format!("{}", err), width, INDENT.len() * 3));
                 }
                 output.push('\n');
             }
@@ -110,7 +111,7 @@ fn print_patch(
     let mut output = String::new();
     if let Some(comment) = &patch.comment {
         output.push_str(&format!(
-            "{}{} ",
+            "{}{}\n",
             INDENT.repeat(2),
             "comment:".blue().bold()
         ));
@@ -119,7 +120,7 @@ fn print_patch(
         } else {
             comment.lines().next().unwrap_or("").to_string()
         };
-        output.push_str(&wrap_text(&comment_text, width, INDENT.len() * 2 + 9));
+        output.push_str(&wrapped_block(&comment_text, width, INDENT.len() * 3));
         output.push('\n');
     }
     let modified_files: HashSet<_> = patch
@@ -166,11 +167,10 @@ pub fn verbose_error(error: &TenxError) -> String {
     }
 }
 
-fn wrap_text(text: &str, width: usize, initial_indent: usize) -> String {
-    let ident = " ".repeat(initial_indent);
-    let options = Options::new(width)
+fn wrapped_block(text: &str, width: usize, indent: usize) -> String {
+    let ident = " ".repeat(indent);
+    let options = Options::new(width - indent)
         .initial_indent(&ident)
         .subsequent_indent(&ident);
     wrap(text, &options).join("\n")
 }
-
