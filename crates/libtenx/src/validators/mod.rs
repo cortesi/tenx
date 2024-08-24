@@ -20,6 +20,7 @@ pub fn preflight(state: &Session) -> Result<Vec<Box<dyn Validator>>> {
         .any(|path| path.extension().map_or(false, |ext| ext == "rs"))
     {
         validators.push(Box::new(CargoChecker));
+        validators.push(Box::new(CargoTester));
     }
 
     Ok(validators)
@@ -36,8 +37,10 @@ pub fn post_patch(state: &Session) -> Result<Vec<Box<dyn Validator>>> {
                 .any(|path| path.extension().map_or(false, |ext| ext == "rs"))
             {
                 validators.push(Box::new(CargoChecker));
+                validators.push(Box::new(CargoTester));
             }
         }
     }
     Ok(validators)
 }
+

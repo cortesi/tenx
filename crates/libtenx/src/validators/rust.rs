@@ -5,6 +5,7 @@ use super::Validator;
 use crate::{Result, Session, TenxError};
 
 pub struct CargoChecker;
+pub struct CargoTester;
 
 impl Validator for CargoChecker {
     fn name(&self) -> &'static str {
@@ -12,27 +13,41 @@ impl Validator for CargoChecker {
     }
 
     fn validate(&self, state: &Session) -> Result<()> {
-        let workspace = RustWorkspace::discover(state)?;
-        let output = Command::new("cargo")
-            .args(["check", "--tests"])
-            .current_dir(&workspace.root_path)
-            .output()
-            .map_err(|e| TenxError::Validation {
-                name: self.name().to_string(),
-                user: format!("Failed to execute cargo check: {}", e),
-                model: e.to_string(),
-            })?;
+        run_cargo_command(self.name(), state, &["check", "--tests"])
+    }
+}
 
-        if output.status.success() {
-            Ok(())
-        } else {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            Err(TenxError::Validation {
-                name: self.name().to_string(),
-                user: "Cargo check failed".to_string(),
-                model: stderr.to_string(),
-            })
-        }
+impl Validator for CargoTester {
+    fn name(&self) -> &'static str {
+        "CargoTester"
+    }
+
+    fn validate(&self, state: &Session) -> Result<()> {
+        run_cargo_command(self.name(), state, &["test"])
+    }
+}
+
+fn run_cargo_command(name: &str, state: &Session, args: &[&str]) -> Result<()> {
+    let workspace = RustWorkspace::discover(state)?;
+    let output = Command::new("cargo")
+        .args(args)
+        .current_dir(&workspace.root_path)
+        .output()
+        .map_err(|e| TenxError::Validation {
+            name: name.to_string(),
+            user: format!("Failed to execute cargo command: {}", e),
+            model: e.to_string(),
+        })?;
+
+    if output.status.success() {
+        Ok(())
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        Err(TenxError::Validation {
+            name: name.to_string(),
+            user: format!("Cargo {} failed", args[0]),
+            model: stderr.to_string(),
+        })
     }
 }
 
@@ -261,4 +276,3 @@ mod tests {
         Ok(())
     }
 }
-
