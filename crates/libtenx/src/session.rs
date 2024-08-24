@@ -77,7 +77,8 @@ pub struct Step {
 /// A serializable session, which persists between invocations.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Session {
-    /// The session root directory
+    /// The session root directory. This is always an absolute path. Context and editable files are
+    /// always relative to the root.
     pub root: PathBuf,
     /// The dialect used in the session
     pub dialect: Dialect,

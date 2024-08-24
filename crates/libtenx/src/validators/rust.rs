@@ -67,14 +67,7 @@ impl RustWorkspace {
     }
 
     fn find_workspace_root(start_dir: &Path) -> Result<PathBuf> {
-        let mut current_dir = if start_dir.is_absolute() {
-            start_dir.to_path_buf()
-        } else {
-            std::env::current_dir()
-                .map_err(|e| TenxError::Internal(format!("could not get current dir: {}", e)))?
-                .join(start_dir)
-        };
-
+        let mut current_dir = start_dir.to_path_buf();
         loop {
             let cargo_toml = current_dir.join("Cargo.toml");
             if cargo_toml.exists() {
@@ -92,10 +85,7 @@ impl RustWorkspace {
 mod tests {
     use super::*;
     use crate::{
-        dialect::Dialect,
-        model::Model,
-        prompt::PromptInput,
-        testutils::{create_dummy_project, TempEnv},
+        dialect::Dialect, model::Model, prompt::PromptInput, testutils::create_dummy_project,
     };
     use tempfile::TempDir;
 
@@ -104,7 +94,6 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         create_dummy_project(temp_dir.path()).unwrap();
 
-        let _temp_env = TempEnv::new(temp_dir.path()).unwrap();
         let edit_paths = vec![
             temp_dir.path().join("crate1/src/lib.rs"),
             temp_dir.path().join("crate2/src/lib.rs"),
@@ -133,8 +122,6 @@ mod tests {
     fn test_discover_workspace() -> Result<()> {
         let temp_dir = TempDir::new().unwrap();
         create_dummy_project(temp_dir.path()).unwrap();
-
-        let _temp_env = TempEnv::new(temp_dir.path()).unwrap();
 
         let edit_paths = vec![
             temp_dir.path().join("crate1/src/lib.rs"),
@@ -169,8 +156,6 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         create_dummy_project(temp_dir.path()).unwrap();
 
-        let _temp_env = TempEnv::new(temp_dir.path()).unwrap();
-
         let edit_paths = vec![temp_dir.path().join("crate1/src/lib.rs")];
 
         let prompt = PromptInput {
@@ -201,8 +186,6 @@ mod tests {
     fn test_no_cargo_toml() -> Result<()> {
         let temp_dir = TempDir::new().unwrap();
 
-        let _temp_env = TempEnv::new(temp_dir.path()).unwrap();
-
         let prompt = PromptInput {
             ..Default::default()
         };
@@ -226,7 +209,6 @@ mod tests {
     #[test]
     fn test_no_paths_provided() -> Result<()> {
         let temp_dir = TempDir::new().unwrap();
-        let _temp_env = TempEnv::new(temp_dir.path()).unwrap();
 
         let prompt = PromptInput::default();
 
@@ -252,8 +234,6 @@ mod tests {
     fn test_no_common_ancestor() -> Result<()> {
         let temp_dir1 = TempDir::new().unwrap();
         let temp_dir2 = TempDir::new().unwrap();
-
-        let _temp_env = TempEnv::new(&temp_dir1).unwrap();
 
         let edit_paths = vec![
             temp_dir1.path().to_path_buf(),
@@ -281,3 +261,4 @@ mod tests {
         Ok(())
     }
 }
+

@@ -1,26 +1,7 @@
 #![cfg(test)]
 
-use std::env;
 use std::fs;
-use std::path::{Path, PathBuf};
-
-pub struct TempEnv {
-    original_dir: PathBuf,
-}
-
-impl TempEnv {
-    pub fn new<P: AsRef<Path>>(temp_dir: P) -> std::io::Result<Self> {
-        let original_dir = env::current_dir()?;
-        env::set_current_dir(temp_dir)?;
-        Ok(TempEnv { original_dir })
-    }
-}
-
-impl Drop for TempEnv {
-    fn drop(&mut self) {
-        let _ = env::set_current_dir(&self.original_dir);
-    }
-}
+use std::path::Path;
 
 pub fn create_dummy_project(temp_dir: &Path) -> std::io::Result<()> {
     // Create workspace Cargo.toml
