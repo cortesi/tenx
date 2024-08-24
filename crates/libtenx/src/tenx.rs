@@ -97,6 +97,13 @@ impl Tenx {
         self.process_prompt(session, sender, &session_store).await
     }
 
+    /// Resets the session to a specific step.
+    pub fn reset<P: AsRef<Path>>(&self, path: Option<P>, offset: usize) -> Result<()> {
+        let mut session = self.load_session(path)?;
+        session.reset(offset)?;
+        self.save_session(&session)
+    }
+
     /// Common logic for processing a prompt and updating the state. The prompt that will be
     /// processed is the final prompt in the step list.
     async fn process_prompt(
@@ -241,4 +248,3 @@ mod tests {
         Ok(())
     }
 }
-

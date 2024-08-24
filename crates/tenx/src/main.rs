@@ -88,6 +88,11 @@ enum Commands {
         #[clap(long)]
         prompt_file: Option<PathBuf>,
     },
+    /// Reset the session to a specific step
+    Reset {
+        /// The step offset to reset to
+        step_offset: usize,
+    },
     /// Create a new session
     New {
         /// Specifies files to add as context
@@ -203,6 +208,13 @@ async fn main() -> Result<()> {
                 print_task.await?;
                 println!("\n");
                 info!("\n\n{}", "changes applied".green().bold());
+                Ok(())
+            }
+            Commands::Reset { step_offset } => {
+                let config = load_config(&cli)?;
+                let tx = Tenx::new(config);
+                tx.reset::<PathBuf>(None, *step_offset)?;
+                info!("Session reset to step {}", step_offset);
                 Ok(())
             }
             Commands::AddCtx { files, ruskel } => {
