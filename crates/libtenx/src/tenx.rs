@@ -94,7 +94,8 @@ impl Tenx {
     /// Loads a session from the store based on the current working directory.
     pub fn load_session_cwd(&self) -> Result<Session> {
         let current_dir = env::current_dir().map_err(|e| TenxError::fio(e, "."))?;
-        self.load_session(current_dir)
+        let root = crate::session::find_root(&current_dir);
+        self.load_session(root)
     }
 
     /// Resumes a session by sending a prompt to the model.
@@ -224,7 +225,7 @@ mod tests {
         fs::write(&test_file_path, "Initial content").unwrap();
 
         let mut session = Session::new(
-            Some(temp_dir.path().to_path_buf()),
+            temp_dir.path().to_path_buf(),
             Dialect::Dummy(DummyDialect::default()),
             Model::Dummy(crate::model::DummyModel::from_patch(Patch {
                 changes: vec![Change::Write(WriteFile {
@@ -257,3 +258,4 @@ mod tests {
         Ok(())
     }
 }
+

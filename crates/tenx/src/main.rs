@@ -177,11 +177,10 @@ async fn main() -> Result<()> {
             Commands::Oneshot { files, ruskel, ctx } => {
                 let config = load_config(&cli)?;
                 let tx = Tenx::new(config);
-                let mut session = Session::new(
-                    None,
+                let mut session = Session::from_cwd(
                     Dialect::Tags(libtenx::dialect::Tags::default()),
                     Model::Claude(Claude::default()),
-                );
+                )?;
 
                 for file in ctx {
                     session.add_ctx_path(file)?;
@@ -261,11 +260,10 @@ async fn main() -> Result<()> {
             Commands::New { files, ruskel } => {
                 let config = load_config(&cli)?;
                 let tx = Tenx::new(config);
-                let mut session = Session::new(
-                    None,
+                let mut session = Session::from_cwd(
                     Dialect::Tags(libtenx::dialect::Tags::default()),
                     Model::Claude(Claude::default()),
-                );
+                )?;
 
                 for file in files {
                     session.add_ctx_path(file)?;
@@ -372,3 +370,4 @@ async fn main() -> Result<()> {
         }
     }
 }
+

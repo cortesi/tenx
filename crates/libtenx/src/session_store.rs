@@ -72,7 +72,7 @@ mod tests {
         let state_store = SessionStore::open(Some(temp_dir.path().into())).unwrap();
 
         let state = Session::new(
-            Some(temp_dir.path().to_path_buf()),
+            temp_dir.path().to_path_buf(),
             dialect::Dialect::Tags(dialect::Tags {}),
             model::Model::Claude(model::Claude::default()),
         );

@@ -114,7 +114,7 @@ mod tests {
         };
 
         let mut session = Session::new(
-            Some(temp_dir.path().to_path_buf()),
+            temp_dir.path().to_path_buf(),
             Dialect::Tags(crate::dialect::Tags::default()),
             Model::Dummy(crate::model::DummyModel::default()),
         );
@@ -146,7 +146,7 @@ mod tests {
         };
 
         let mut session = Session::new(
-            Some(temp_dir.path().to_path_buf()),
+            temp_dir.path().to_path_buf(),
             Dialect::Tags(crate::dialect::Tags::default()),
             Model::Dummy(crate::model::DummyModel::default()),
         );
@@ -178,7 +178,7 @@ mod tests {
         };
 
         let mut session = Session::new(
-            Some(temp_dir.path().to_path_buf()),
+            temp_dir.path().to_path_buf(),
             Dialect::Tags(crate::dialect::Tags::default()),
             Model::Dummy(crate::model::DummyModel::default()),
         );
@@ -208,7 +208,7 @@ mod tests {
         };
 
         let mut session = Session::new(
-            Some(temp_dir.path().to_path_buf()),
+            temp_dir.path().to_path_buf(),
             Dialect::Tags(crate::dialect::Tags::default()),
             Model::Dummy(crate::model::DummyModel::default()),
         );
@@ -231,7 +231,7 @@ mod tests {
         let prompt = PromptInput::default();
 
         let mut session = Session::new(
-            Some(temp_dir.path().to_path_buf()),
+            temp_dir.path().to_path_buf(),
             Dialect::Tags(crate::dialect::Tags::default()),
             Model::Dummy(crate::model::DummyModel::default()),
         );
@@ -265,7 +265,7 @@ mod tests {
         };
 
         let mut session = Session::new(
-            Some(temp_dir1.path().to_path_buf()),
+            temp_dir1.path().to_path_buf(),
             Dialect::Tags(crate::dialect::Tags::default()),
             Model::Dummy(crate::model::DummyModel::default()),
         );
