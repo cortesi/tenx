@@ -73,8 +73,10 @@ User prompt
 You will emit a series of operations on the editable files. You will change
 editable files only, never touching files only provided as context. 
 
-- Tag openers and closers are ALWAYS alone on a new line. 
-- Changes are ALWAYS applied in order to the file, as specified in the most recent <editable> tag.
+- Opening tags may have trailing data: e.g. "<open> first line".
+- Closing tags may have leading data: e.g. "last line </close>".
+- Changes are ALWAYS applied in order to the file, as specified in the most
+  recent <editable> tag.
 - Be minimal and parsimonious, especially with <replace> - output tokens cost
   time and money, so only specify what is necessary for your modifications. 
 

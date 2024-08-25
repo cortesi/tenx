@@ -4,6 +4,7 @@ use crate::error::{Result, TenxError};
 use std::collections::HashMap;
 
 /// Represents an XML-like tag with a name and attributes.
+#[derive(Debug)]
 pub struct Tag {
     pub name: String,
     pub attributes: HashMap<String, String>,
@@ -20,12 +21,13 @@ impl Tag {
 ///
 /// Returns Some(Tag) if successful, None otherwise.
 pub fn parse_open(line: &str) -> Option<Tag> {
-    let trimmed = line.trim();
-    if !trimmed.starts_with('<') || !trimmed.ends_with('>') {
+    let trimmed = line.trim_start();
+    if !trimmed.starts_with('<') {
         return None;
     }
 
-    let content = &trimmed[1..trimmed.len() - 1];
+    let end = trimmed.find('>')?;
+    let content = &trimmed[1..end];
     let mut parts = content.split_whitespace();
 
     let name = parts.next()?.to_string();
@@ -42,10 +44,9 @@ pub fn parse_open(line: &str) -> Option<Tag> {
     Some(Tag::new(name, attributes))
 }
 
-/// Checks if the given line is a well-formed close tag for the specified tag name.
+/// Checks if the given line contains a well-formed close tag for the specified tag name.
 pub fn is_close(line: &str, tag_name: &str) -> bool {
-    let trimmed = line.trim();
-    trimmed == format!("</{}>", tag_name)
+    line.contains(&format!("</{}>", tag_name))
 }
 
 /// Parses a block of XML-like content, starting with an opening tag and ending with a matching closing tag.
@@ -67,8 +68,19 @@ where
     }
 
     let mut contents = Vec::new();
+    if let Some(first_content) = opening_line.split('>').nth(1) {
+        if !first_content.trim().is_empty() {
+            contents.push(first_content.to_string());
+        }
+    }
+
     for line in lines {
         if is_close(&line, tag_name) {
+            if let Some(last_content) = line.split('<').next() {
+                if !last_content.trim().is_empty() {
+                    contents.push(last_content.to_string());
+                }
+            }
             return Ok((tag, contents));
         }
         contents.push(line);
@@ -98,6 +110,7 @@ mod tests {
                 Some(("tag", vec![("attr1", "value1"), ("attr2", "value2")])),
             ),
             (" <tag> ", Some(("tag", vec![]))),
+            ("<tag>trailing content", Some(("tag", vec![]))),
             ("not a tag", None),
             ("<>", None),
             ("<tag", None),
@@ -109,13 +122,23 @@ mod tests {
             match expected {
                 Some((name, attrs)) => {
                     let tag = result.unwrap();
-                    assert_eq!(tag.name, name);
-                    assert_eq!(tag.attributes.len(), attrs.len());
+                    assert_eq!(tag.name, name, "Failed for input: {}", input);
+                    assert_eq!(
+                        tag.attributes.len(),
+                        attrs.len(),
+                        "Failed for input: {}",
+                        input
+                    );
                     for (k, v) in attrs {
-                        assert_eq!(tag.attributes.get(k), Some(&v.to_string()));
+                        assert_eq!(
+                            tag.attributes.get(k),
+                            Some(&v.to_string()),
+                            "Failed for input: {}",
+                            input
+                        );
                     }
                 }
-                None => assert!(result.is_none()),
+                None => assert!(result.is_none(), "Failed for input: {}", input),
             }
         }
     }
@@ -124,6 +147,8 @@ mod tests {
     fn test_is_close() {
         assert!(is_close("</tag>", "tag"));
         assert!(is_close(" </tag> ", "tag"));
+        assert!(is_close("leading content</tag>", "tag"));
+        assert!(is_close("leading content</tag>trailing content", "tag"));
         assert!(!is_close("<tag>", "tag"));
         assert!(!is_close("</tag>", "other"));
         assert!(!is_close("< /tag>", "tag"));
@@ -147,4 +172,57 @@ mod tests {
         assert_eq!(tag.attributes.get("attr"), Some(&"value".to_string()));
         assert_eq!(contents, vec!["Content line 1", "Content line 2"]);
     }
+
+    #[test]
+    fn test_parse_block_with_leading_and_trailing_data() {
+        let input = vec![
+            "<test attr=\"value\">leading data",
+            "Content line 1",
+            "Content line 2",
+            "trailing data</test>",
+        ];
+        let mut iter = input.into_iter().map(String::from);
+        let result = parse_block("test", &mut iter);
+        assert!(result.is_ok(), "parse_block failed: {:?}", result);
+        let (tag, contents) = result.unwrap();
+        assert_eq!(tag.name, "test");
+        assert_eq!(tag.attributes.get("attr"), Some(&"value".to_string()));
+        assert_eq!(
+            contents,
+            vec![
+                "leading data",
+                "Content line 1",
+                "Content line 2",
+                "trailing data",
+            ],
+            "Contents mismatch"
+        );
+    }
+
+    #[test]
+    fn test_parse_block_with_nested_tags() {
+        let input = vec![
+            "<outer>",
+            "  <inner>",
+            "    Inner content",
+            "  </inner>",
+            "  Outer content",
+            "</outer>",
+        ];
+        let mut iter = input.into_iter().map(String::from);
+        let result = parse_block("outer", &mut iter);
+        assert!(result.is_ok());
+        let (tag, contents) = result.unwrap();
+        assert_eq!(tag.name, "outer");
+        assert_eq!(
+            contents,
+            vec![
+                "  <inner>",
+                "    Inner content",
+                "  </inner>",
+                "  Outer content",
+            ]
+        );
+    }
 }
+
