@@ -59,6 +59,16 @@ impl Tenx {
         Self { config }
     }
 
+    /// Helper function to send an event and handle potential errors.
+    fn send_event(sender: &Option<mpsc::Sender<Event>>, event: Event) -> Result<()> {
+        if let Some(sender) = sender {
+            sender
+                .try_send(event)
+                .map_err(|e| TenxError::EventSend(e.to_string()))?;
+        }
+        Ok(())
+    }
+
     /// Saves a session to the store.
     pub fn save_session(&self, session: &Session) -> Result<()> {
         let session_store = SessionStore::open(self.config.session_store_dir.clone())?;
@@ -192,11 +202,7 @@ impl Tenx {
         session: &mut Session,
         sender: &Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
-        if let Some(sender) = sender {
-            sender
-                .try_send(Event::PreflightStart)
-                .map_err(|e| TenxError::EventSend(e.to_string()))?;
-        }
+        Self::send_event(sender, Event::PreflightStart)?;
         let preflight_validators = crate::validators::preflight(session)?;
         for validator in preflight_validators {
             if let Err(e) = validator.validate(session) {
@@ -206,11 +212,7 @@ impl Tenx {
                 return Err(e);
             }
         }
-        if let Some(sender) = sender {
-            sender
-                .try_send(Event::PreflightEnd)
-                .map_err(|e| TenxError::EventSend(e.to_string()))?;
-        }
+        Self::send_event(sender, Event::PreflightEnd)?;
         Ok(())
     }
 
@@ -219,20 +221,12 @@ impl Tenx {
         session: &mut Session,
         sender: &Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
-        if let Some(sender) = sender {
-            sender
-                .try_send(Event::ValidationStart)
-                .map_err(|e| TenxError::EventSend(e.to_string()))?;
-        }
+        Self::send_event(sender, Event::ValidationStart)?;
         let post_patch_validators = crate::validators::post_patch(session)?;
         for validator in post_patch_validators {
             validator.validate(session)?;
         }
-        if let Some(sender) = sender {
-            sender
-                .try_send(Event::ValidationEnd)
-                .map_err(|e| TenxError::EventSend(e.to_string()))?;
-        }
+        Self::send_event(sender, Event::ValidationEnd)?;
         Ok(())
     }
 }

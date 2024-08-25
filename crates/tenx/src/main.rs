@@ -207,8 +207,10 @@ async fn main() -> Result<()> {
                             Event::Snippet(chunk) => print!("{}", chunk),
                             Event::PreflightStart => println!("Starting preflight checks..."),
                             Event::PreflightEnd => println!("Preflight checks completed."),
+                            Event::PreflightOk(name) => println!("\t'{}' passed.", name),
                             Event::ValidationStart => println!("Starting post-patch validation..."),
                             Event::ValidationEnd => println!("Post-patch validation completed."),
+                            Event::ValidateOk(name) => println!("\t'{}' passed.", name),
                         }
                     }
                 });
@@ -256,8 +258,12 @@ async fn main() -> Result<()> {
                             Event::Snippet(chunk) => print!("{}", chunk),
                             Event::PreflightStart => println!("Starting preflight checks..."),
                             Event::PreflightEnd => println!("Preflight checks completed."),
+                            Event::PreflightOk(name) => {
+                                println!("Preflight check '{}' passed.", name)
+                            }
                             Event::ValidationStart => println!("Starting post-patch validation..."),
                             Event::ValidationEnd => println!("Post-patch validation completed."),
+                            Event::ValidateOk(name) => println!("Validation '{}' passed.", name),
                         }
                     }
                 });
@@ -304,8 +310,12 @@ async fn main() -> Result<()> {
                             Event::Snippet(chunk) => print!("{}", chunk),
                             Event::PreflightStart => println!("Starting preflight checks..."),
                             Event::PreflightEnd => println!("Preflight checks completed."),
+                            Event::PreflightOk(name) => {
+                                println!("Preflight check '{}' passed.", name)
+                            }
                             Event::ValidationStart => println!("Starting post-patch validation..."),
                             Event::ValidationEnd => println!("Post-patch validation completed."),
+                            Event::ValidateOk(name) => println!("Validation '{}' passed.", name),
                         }
                     }
                 });
@@ -388,3 +398,4 @@ async fn main() -> Result<()> {
         }
     }
 }
+
