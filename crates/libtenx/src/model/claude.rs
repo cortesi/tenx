@@ -229,7 +229,7 @@ impl ModelProvider for Claude {
         sender: Option<mpsc::Sender<Event>>,
     ) -> Result<patch::Patch> {
         if !session.pending_prompt() {
-            return Err(TenxError::Internal("No prompt to process.".into()));
+            return Err(TenxError::Internal("No pending prompt to process.".into()));
         }
         let mut req = self.request(session)?;
         let resp = self

@@ -91,13 +91,15 @@ impl Tenx {
         self.load_session(root)
     }
 
-    /// Resumes a session by sending a prompt to the model.
+    /// Resumes a session by sending a prompt to the model. If the last step has changes, they are
+    /// rolled back.
     pub async fn resume(
         &self,
         session: &mut Session,
         sender: Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
         let session_store = SessionStore::open(self.config.session_store_dir.clone())?;
+        session.rollback_last()?;
         self.process_prompt(session, sender, &session_store).await
     }
 

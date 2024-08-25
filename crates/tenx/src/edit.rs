@@ -28,14 +28,14 @@ fn render_initial_text(session: &libtenx::Session, step_offset: usize) -> String
             .enumerate()
         {
             text.push_str(&format!("# Step {}\n", step_offset - i - 1));
-            text.push_str("# ====\n\n");
+            text.push_str("# ====\n#\n");
             text.push_str("# Prompt:\n# -------\n");
             for line in step.prompt.user_prompt.lines() {
                 text.push_str(&format!("# {}\n", line));
             }
             if let Some(patch) = &step.patch {
                 if let Some(comment) = &patch.comment {
-                    text.push_str("\n# Response:\n# ---------\n");
+                    text.push_str("#\n# Response:\n# ---------\n");
                     for line in comment.lines() {
                         text.push_str(&format!("# {}\n", line));
                     }
