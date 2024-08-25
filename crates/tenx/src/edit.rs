@@ -65,18 +65,20 @@ pub fn edit_prompt_at_step(session: &Session, step_offset: usize) -> Result<Opti
     let initial_text = render_initial_text(session, step_offset);
     temp_file.write_all(initial_text.as_bytes())?;
     temp_file.flush()?;
+    let initial_metadata = temp_file.as_file().metadata()?;
     let editor = get_editor();
     Command::new(editor)
         .arg(temp_file.path())
         .status()
         .context("Failed to open editor")?;
-    let edited_content =
-        fs::read_to_string(temp_file.path()).context("Failed to read temporary file")?;
-    let prompt = parse_edited_text(&edited_content);
-    if prompt.user_prompt.is_empty() {
-        Ok(None)
-    } else {
+    let final_metadata = temp_file.as_file().metadata()?;
+    if final_metadata.modified()? > initial_metadata.modified()? {
+        let edited_content =
+            fs::read_to_string(temp_file.path()).context("Failed to read temporary file")?;
+        let prompt = parse_edited_text(&edited_content);
         Ok(Some(prompt))
+    } else {
+        Ok(None)
     }
 }
 
