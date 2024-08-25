@@ -45,7 +45,8 @@ impl SessionStore {
     /// Loads a State from a file based on the given name.
     pub fn load<S: AsRef<str>>(&self, name: S) -> Result<Session> {
         let file_path = self.base_dir.join(name.as_ref());
-        let serialized = fs::read_to_string(&file_path).map_err(|e| TenxError::fio(e, &file_path))?;
+        let serialized =
+            fs::read_to_string(&file_path).map_err(|e| TenxError::fio(e, &file_path))?;
         serde_json::from_str(&serialized).map_err(|e| TenxError::Internal(format!("{}", e)))
     }
 }

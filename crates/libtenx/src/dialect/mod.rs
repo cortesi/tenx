@@ -92,4 +92,3 @@ impl DialectProvider for Dialect {
         }
     }
 }
-

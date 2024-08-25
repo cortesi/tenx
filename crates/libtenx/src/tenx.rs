@@ -7,8 +7,8 @@ use tokio::sync::mpsc;
 use tracing::warn;
 
 use crate::{
-    events::Event,
-    prompt::PromptInput, session_store::normalize_path, Result, Session, SessionStore, TenxError,
+    events::Event, prompt::PromptInput, session_store::normalize_path, Result, Session,
+    SessionStore, TenxError,
 };
 
 #[derive(Debug)]
@@ -187,9 +187,15 @@ impl Tenx {
         Ok(())
     }
 
-    fn run_preflight_validators(&self, session: &mut Session, sender: &Option<mpsc::Sender<Event>>) -> Result<()> {
+    fn run_preflight_validators(
+        &self,
+        session: &mut Session,
+        sender: &Option<mpsc::Sender<Event>>,
+    ) -> Result<()> {
         if let Some(sender) = sender {
-            sender.try_send(Event::PreflightStart).map_err(|e| TenxError::EventSend(e.to_string()))?;
+            sender
+                .try_send(Event::PreflightStart)
+                .map_err(|e| TenxError::EventSend(e.to_string()))?;
         }
         let preflight_validators = crate::validators::preflight(session)?;
         for validator in preflight_validators {
@@ -201,21 +207,31 @@ impl Tenx {
             }
         }
         if let Some(sender) = sender {
-            sender.try_send(Event::PreflightEnd).map_err(|e| TenxError::EventSend(e.to_string()))?;
+            sender
+                .try_send(Event::PreflightEnd)
+                .map_err(|e| TenxError::EventSend(e.to_string()))?;
         }
         Ok(())
     }
 
-    fn run_post_patch_validators(&self, session: &mut Session, sender: &Option<mpsc::Sender<Event>>) -> Result<()> {
+    fn run_post_patch_validators(
+        &self,
+        session: &mut Session,
+        sender: &Option<mpsc::Sender<Event>>,
+    ) -> Result<()> {
         if let Some(sender) = sender {
-            sender.try_send(Event::ValidationStart).map_err(|e| TenxError::EventSend(e.to_string()))?;
+            sender
+                .try_send(Event::ValidationStart)
+                .map_err(|e| TenxError::EventSend(e.to_string()))?;
         }
         let post_patch_validators = crate::validators::post_patch(session)?;
         for validator in post_patch_validators {
             validator.validate(session)?;
         }
         if let Some(sender) = sender {
-            sender.try_send(Event::ValidationEnd).map_err(|e| TenxError::EventSend(e.to_string()))?;
+            sender
+                .try_send(Event::ValidationEnd)
+                .map_err(|e| TenxError::EventSend(e.to_string()))?;
         }
         Ok(())
     }

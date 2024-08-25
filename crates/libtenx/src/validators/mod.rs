@@ -43,4 +43,3 @@ pub fn post_patch(state: &Session) -> Result<Vec<Box<dyn Validator>>> {
     }
     Ok(validators)
 }
-
