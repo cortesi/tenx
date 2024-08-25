@@ -91,24 +91,6 @@ impl Tenx {
         self.load_session(root)
     }
 
-    /// Retries a prompt in the session.
-    ///
-    /// If `step_offset` is provided, all steps beyond this offset are trimmed before retrying.
-    /// If `step_offset` is None, only the last step is rolled back.
-    pub async fn retry(
-        &self,
-        session: &mut Session,
-        sender: Option<mpsc::Sender<Event>>,
-        step_offset: Option<usize>,
-    ) -> Result<()> {
-        if let Some(offset) = step_offset {
-            session.reset(offset)?;
-        }
-        session.rollback_last()?;
-        let session_store = SessionStore::open(self.config.session_store_dir.clone())?;
-        self.process_prompt(session, sender, &session_store).await
-    }
-
     /// Resumes a session by sending a prompt to the model.
     pub async fn resume(
         &self,

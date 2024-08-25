@@ -91,6 +91,17 @@ pub struct Session {
 }
 
 impl Session {
+    /// Updates the prompt at a specific step.
+    pub fn update_prompt_at(&mut self, offset: usize, prompt: PromptInput) -> Result<()> {
+        if offset >= self.steps.len() {
+            return Err(TenxError::Internal("Invalid step offset".into()));
+        }
+        self.steps[offset].prompt = prompt;
+        Ok(())
+    }
+}
+
+impl Session {
     /// Creates a new Session with the specified root directory, dialect, and model.
     pub fn new(root: PathBuf, dialect: Dialect, model: Model) -> Self {
         Self {

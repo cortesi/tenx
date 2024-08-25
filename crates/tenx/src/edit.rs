@@ -11,12 +11,12 @@ fn get_editor() -> String {
 }
 
 /// Renders the initial text for the user to edit.
-fn render_initial_text(session: &libtenx::Session) -> String {
+fn render_initial_text(session: &libtenx::Session, step_offset: usize) -> String {
     let mut text = String::new();
     text.push('\n'); // Space for new prompt
 
-    for (i, step) in session.steps().iter().rev().enumerate() {
-        text.push_str(&format!("# Step {}\n", session.steps().len() - i));
+    for (i, step) in session.steps()[..=step_offset].iter().rev().enumerate() {
+        text.push_str(&format!("# Step {}\n", step_offset + 1 - i));
         text.push_str("# ====\n\n");
         text.push_str("# Prompt:\n# -------\n");
         for line in step.prompt.user_prompt.lines() {
@@ -54,8 +54,13 @@ fn parse_edited_text(input: &str) -> PromptInput {
 
 /// Opens an editor for the user to input their prompt.
 pub fn edit_prompt(session: &Session) -> Result<Option<PromptInput>> {
+    edit_prompt_at_step(session, session.steps().len() - 1)
+}
+
+/// Opens an editor for the user to input their prompt at a specific step.
+pub fn edit_prompt_at_step(session: &Session, step_offset: usize) -> Result<Option<PromptInput>> {
     let mut temp_file = NamedTempFile::new()?;
-    let initial_text = render_initial_text(session);
+    let initial_text = render_initial_text(session, step_offset);
     temp_file.write_all(initial_text.as_bytes())?;
     temp_file.flush()?;
     let editor = get_editor();
@@ -152,7 +157,7 @@ mod tests {
             cache: Default::default(),
         });
 
-        let rendered = render_initial_text(&session);
+        let rendered = render_initial_text(&session, 1);
         assert!(rendered.contains(indoc! {"
             # Step 2
             # ====
@@ -181,5 +186,6 @@ mod tests {
             # First response
             # also with multiple lines
         "}));
+        assert!(!rendered.contains("# Step 3"));
     }
 }

@@ -138,10 +138,13 @@ enum Commands {
         /// The step offset to reset to
         step_offset: usize,
     },
-    /// Retry the last prompt
+    /// Retry a prompt
     Retry {
         /// The step offset to retry from
         step_offset: Option<usize>,
+        /// Edit the prompt before retrying
+        #[clap(long)]
+        edit: bool,
     },
     /// Show the current session
     Show {
@@ -272,15 +275,27 @@ async fn main() -> Result<()> {
                 info!("context added");
                 Ok(())
             }
-            Commands::Retry { step_offset } => {
+            Commands::Retry { step_offset, edit } => {
                 let config = load_config(&cli)?;
                 let tx = Tenx::new(config);
+                let mut session = tx.load_session_cwd()?;
+
+                let offset = step_offset.unwrap_or(session.steps().len() - 1);
+                tx.reset(&mut session, offset)?;
+
+                if *edit {
+                    let user_prompt = edit::edit_prompt_at_step(&session, offset)?;
+                    if let Some(prompt) = user_prompt {
+                        session.update_prompt_at(offset, prompt)?;
+                    } else {
+                        return Ok(());
+                    }
+                }
 
                 let (sender, receiver) = mpsc::channel(100);
                 let print_task = tokio::spawn(print_events(receiver));
 
-                let mut session = tx.load_session_cwd()?;
-                tx.retry(&mut session, Some(sender), *step_offset).await?;
+                tx.resume(&mut session, Some(sender)).await?;
 
                 print_task.await?;
                 info!("\n\n{}", "changes applied".green().bold());
