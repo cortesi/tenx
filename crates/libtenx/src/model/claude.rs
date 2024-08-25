@@ -8,6 +8,7 @@ use serde_json;
 use super::ModelProvider;
 use crate::{
     dialect::{Dialect, DialectProvider},
+    events::Event,
     patch, Config, Result, Session, TenxError,
 };
 use std::collections::HashSet;
@@ -45,7 +46,7 @@ impl Claude {
         &mut self,
         api_key: &str,
         req: &misanthropy::MessagesRequest,
-        sender: Option<mpsc::Sender<String>>,
+        sender: Option<mpsc::Sender<Event>>,
     ) -> Result<misanthropy::MessagesResponse> {
         let anthropic = Anthropic::new(api_key);
         let mut streamed_response = anthropic.messages_stream(req)?;
@@ -55,7 +56,7 @@ impl Claude {
                 StreamEvent::ContentBlockDelta { delta, .. } => {
                     if let ContentBlockDelta::TextDelta { text } = delta {
                         if let Some(sender) = &sender {
-                            if let Err(e) = sender.send(text).await {
+                            if let Err(e) = sender.send(Event::Snippet(text)).await {
                                 warn!("Error sending message to channel: {:?}", e);
                             }
                         }
@@ -225,7 +226,7 @@ impl ModelProvider for Claude {
         &mut self,
         config: &Config,
         session: &Session,
-        sender: Option<mpsc::Sender<String>>,
+        sender: Option<mpsc::Sender<Event>>,
     ) -> Result<patch::Patch> {
         if !session.pending_prompt() {
             return Err(TenxError::Internal("No prompt to process.".into()));

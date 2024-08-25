@@ -9,7 +9,7 @@ pub use dummy_model::DummyModel;
 use async_trait::async_trait;
 use tokio::sync::mpsc;
 
-use crate::{patch::Patch, Config, Result, Session};
+use crate::{events::Event, patch::Patch, Config, Result, Session};
 
 /// Implemented by types that expose a prompt operation.
 #[async_trait]
@@ -22,7 +22,7 @@ pub trait ModelProvider {
         &mut self,
         config: &Config,
         session: &Session,
-        sender: Option<mpsc::Sender<String>>,
+        sender: Option<mpsc::Sender<Event>>,
     ) -> Result<Patch>;
 
     /// Render a session for display to the user.
@@ -48,7 +48,7 @@ impl ModelProvider for Model {
         &mut self,
         config: &Config,
         session: &Session,
-        sender: Option<mpsc::Sender<String>>,
+        sender: Option<mpsc::Sender<Event>>,
     ) -> Result<Patch> {
         match self {
             Model::Claude(c) => c.send(config, session, sender).await,

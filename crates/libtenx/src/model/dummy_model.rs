@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
 use super::ModelProvider;
-use crate::{patch::Patch, Config, Result, Session};
+use crate::{events::Event, patch::Patch, Config, Result, Session};
 
 /// A dummy model for testing purposes.
 #[derive(Debug, Serialize, Deserialize)]
@@ -38,7 +38,7 @@ impl ModelProvider for DummyModel {
         &mut self,
         _config: &Config,
         _state: &Session,
-        _sender: Option<mpsc::Sender<String>>,
+        _sender: Option<mpsc::Sender<Event>>,
     ) -> Result<Patch> {
         self.change_set.clone()
     }

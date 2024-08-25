@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     dialect::Dialect,
+    events::Event,
     model::{Model, ModelProvider},
     patch::{Change, Patch},
     prompt::PromptInput,
@@ -342,7 +343,7 @@ impl Session {
     pub async fn prompt(
         &mut self,
         config: &Config,
-        sender: Option<mpsc::Sender<String>>,
+        sender: Option<mpsc::Sender<Event>>,
     ) -> Result<Patch> {
         let mut model = self
             .model
@@ -509,4 +510,3 @@ mod tests {
         Ok(())
     }
 }
-

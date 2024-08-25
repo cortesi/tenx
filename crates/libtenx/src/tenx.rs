@@ -7,6 +7,7 @@ use tokio::sync::mpsc;
 use tracing::warn;
 
 use crate::{
+    events::Event,
     prompt::PromptInput, session_store::normalize_path, Result, Session, SessionStore, TenxError,
 };
 
@@ -72,7 +73,7 @@ impl Tenx {
     pub async fn retry(
         &self,
         session: &mut Session,
-        sender: Option<mpsc::Sender<String>>,
+        sender: Option<mpsc::Sender<Event>>,
         step_offset: Option<usize>,
     ) -> Result<()> {
         if let Some(offset) = step_offset {
@@ -102,7 +103,7 @@ impl Tenx {
     pub async fn resume(
         &self,
         session: &mut Session,
-        sender: Option<mpsc::Sender<String>>,
+        sender: Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
         let session_store = SessionStore::open(self.config.session_store_dir.clone())?;
         self.process_prompt(session, sender, &session_store).await
@@ -119,7 +120,7 @@ impl Tenx {
     async fn process_prompt(
         &self,
         session: &mut Session,
-        sender: Option<mpsc::Sender<String>>,
+        sender: Option<mpsc::Sender<Event>>,
         session_store: &SessionStore,
     ) -> Result<()> {
         session_store.save(session)?;
@@ -162,7 +163,7 @@ impl Tenx {
     async fn execute_prompt_cycle(
         &self,
         session: &mut Session,
-        sender: Option<mpsc::Sender<String>>,
+        sender: Option<mpsc::Sender<Event>>,
         session_store: &SessionStore,
     ) -> Result<()> {
         let patch = match session.prompt(&self.config, sender).await {

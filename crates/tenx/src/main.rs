@@ -12,7 +12,7 @@ use tracing_subscriber::{fmt, EnvFilter};
 
 use libtenx::{
     self, dialect::Dialect, model::Claude, model::Model, model::ModelProvider, prompt::PromptInput,
-    Config, Session, Tenx,
+    Config, Event, Session, Tenx,
 };
 
 mod edit;
@@ -202,8 +202,10 @@ async fn main() -> Result<()> {
 
                 let (sender, mut receiver) = mpsc::channel(100);
                 let print_task = tokio::spawn(async move {
-                    while let Some(chunk) = receiver.recv().await {
-                        print!("{}", chunk);
+                    while let Some(event) = receiver.recv().await {
+                        match event {
+                            Event::Snippet(chunk) => print!("{}", chunk),
+                        }
                     }
                 });
 
@@ -245,8 +247,10 @@ async fn main() -> Result<()> {
 
                 let (sender, mut receiver) = mpsc::channel(100);
                 let print_task = tokio::spawn(async move {
-                    while let Some(chunk) = receiver.recv().await {
-                        print!("{}", chunk);
+                    while let Some(event) = receiver.recv().await {
+                        match event {
+                            Event::Snippet(chunk) => print!("{}", chunk),
+                        }
                     }
                 });
 
@@ -287,8 +291,10 @@ async fn main() -> Result<()> {
 
                 let (sender, mut receiver) = mpsc::channel(100);
                 let print_task = tokio::spawn(async move {
-                    while let Some(chunk) = receiver.recv().await {
-                        print!("{}", chunk);
+                    while let Some(event) = receiver.recv().await {
+                        match event {
+                            Event::Snippet(chunk) => print!("{}", chunk),
+                        }
                     }
                 });
 
