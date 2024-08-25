@@ -48,7 +48,10 @@ impl Replace {
 
         Err(TenxError::Patch {
             user: "Could not find the text to replace".to_string(),
-            model: "Invalid replace specification - could not find the text to replace".to_string(),
+            model: format!(
+                "Invalid replace specification - could not find the following text in the source file:\n{}",
+                self.old
+            )
         })
     }
 }

@@ -124,7 +124,7 @@ impl Tenx {
         session_store: &SessionStore,
     ) -> Result<()> {
         session_store.save(session)?;
-        if let Err(e) = self.run_preflight_validators(session) {
+        if let Err(e) = self.run_preflight_validators(session, &sender) {
             session.set_last_error(&e);
             return Err(e);
         }
@@ -166,7 +166,7 @@ impl Tenx {
         sender: Option<mpsc::Sender<Event>>,
         session_store: &SessionStore,
     ) -> Result<()> {
-        let patch = match session.prompt(&self.config, sender).await {
+        let patch = match session.prompt(&self.config, sender.clone()).await {
             Ok(patch) => patch,
             Err(e) => {
                 session.set_last_error(&e);
@@ -180,14 +180,17 @@ impl Tenx {
             return Err(e);
         }
         session_store.save(session)?;
-        if let Err(e) = self.run_post_patch_validators(session) {
+        if let Err(e) = self.run_post_patch_validators(session, &sender) {
             session.set_last_error(&e);
             return Err(e);
         }
         Ok(())
     }
 
-    fn run_preflight_validators(&self, session: &mut Session) -> Result<()> {
+    fn run_preflight_validators(&self, session: &mut Session, sender: &Option<mpsc::Sender<Event>>) -> Result<()> {
+        if let Some(sender) = sender {
+            sender.try_send(Event::PreflightStart).map_err(|e| TenxError::EventSend(e.to_string()))?;
+        }
         let preflight_validators = crate::validators::preflight(session)?;
         for validator in preflight_validators {
             if let Err(e) = validator.validate(session) {
@@ -197,13 +200,22 @@ impl Tenx {
                 return Err(e);
             }
         }
+        if let Some(sender) = sender {
+            sender.try_send(Event::PreflightEnd).map_err(|e| TenxError::EventSend(e.to_string()))?;
+        }
         Ok(())
     }
 
-    fn run_post_patch_validators(&self, session: &mut Session) -> Result<()> {
+    fn run_post_patch_validators(&self, session: &mut Session, sender: &Option<mpsc::Sender<Event>>) -> Result<()> {
+        if let Some(sender) = sender {
+            sender.try_send(Event::ValidationStart).map_err(|e| TenxError::EventSend(e.to_string()))?;
+        }
         let post_patch_validators = crate::validators::post_patch(session)?;
         for validator in post_patch_validators {
             validator.validate(session)?;
+        }
+        if let Some(sender) = sender {
+            sender.try_send(Event::ValidationEnd).map_err(|e| TenxError::EventSend(e.to_string()))?;
         }
         Ok(())
     }

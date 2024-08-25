@@ -62,6 +62,10 @@ pub enum TenxError {
         /// An error to the model, often the full tool output
         model: String,
     },
+
+    /// An error that occurs when sending an event.
+    #[error("Error sending event: {0}")]
+    EventSend(String),
 }
 
 impl TenxError {
@@ -88,4 +92,3 @@ impl From<misanthropy::Error> for TenxError {
         TenxError::Model(error.to_string())
     }
 }
-

@@ -205,6 +205,10 @@ async fn main() -> Result<()> {
                     while let Some(event) = receiver.recv().await {
                         match event {
                             Event::Snippet(chunk) => print!("{}", chunk),
+                            Event::PreflightStart => println!("Starting preflight checks..."),
+                            Event::PreflightEnd => println!("Preflight checks completed."),
+                            Event::ValidationStart => println!("Starting post-patch validation..."),
+                            Event::ValidationEnd => println!("Post-patch validation completed."),
                         }
                     }
                 });
@@ -250,6 +254,10 @@ async fn main() -> Result<()> {
                     while let Some(event) = receiver.recv().await {
                         match event {
                             Event::Snippet(chunk) => print!("{}", chunk),
+                            Event::PreflightStart => println!("Starting preflight checks..."),
+                            Event::PreflightEnd => println!("Preflight checks completed."),
+                            Event::ValidationStart => println!("Starting post-patch validation..."),
+                            Event::ValidationEnd => println!("Post-patch validation completed."),
                         }
                     }
                 });
@@ -294,6 +302,10 @@ async fn main() -> Result<()> {
                     while let Some(event) = receiver.recv().await {
                         match event {
                             Event::Snippet(chunk) => print!("{}", chunk),
+                            Event::PreflightStart => println!("Starting preflight checks..."),
+                            Event::PreflightEnd => println!("Preflight checks completed."),
+                            Event::ValidationStart => println!("Starting post-patch validation..."),
+                            Event::ValidationEnd => println!("Post-patch validation completed."),
                         }
                     }
                 });
@@ -376,4 +388,3 @@ async fn main() -> Result<()> {
         }
     }
 }
-
