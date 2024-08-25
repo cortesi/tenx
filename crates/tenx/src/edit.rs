@@ -13,11 +13,21 @@ fn get_editor() -> String {
 /// Renders the initial text for the user to edit.
 fn render_initial_text(session: &libtenx::Session, step_offset: usize) -> String {
     let mut text = String::new();
-    text.push('\n'); // Space for new prompt
 
-    if !session.steps().is_empty() {
-        for (i, step) in session.steps()[..=step_offset].iter().rev().enumerate() {
-            text.push_str(&format!("# Step {}\n", step_offset + 1 - i));
+    if let Some(steps) = session.steps().get(..=step_offset) {
+        // Add the current step's prompt uncommented
+        if let Some(current_step) = steps.last() {
+            text.push_str(&current_step.prompt.user_prompt);
+            text.push_str("\n\n");
+        }
+
+        // Add previous steps as comments
+        for (i, step) in steps[..steps.len().saturating_sub(1)]
+            .iter()
+            .rev()
+            .enumerate()
+        {
+            text.push_str(&format!("# Step {}\n", step_offset - i - 1));
             text.push_str("# ====\n\n");
             text.push_str("# Prompt:\n# -------\n");
             for line in step.prompt.user_prompt.lines() {
@@ -122,62 +132,36 @@ mod tests {
         );
         session
             .add_prompt(PromptInput {
-                user_prompt: indoc! {"
-                    First prompt
-                    with multiple lines
-                "}
-                .to_string(),
+                user_prompt: "First prompt\nwith multiple lines".to_string(),
             })
             .unwrap();
         session.set_last_patch(&Patch {
             changes: vec![],
-            comment: Some(
-                indoc! {"
-                First response
-                also with multiple lines
-            "}
-                .to_string(),
-            ),
+            comment: Some("First response\nalso with multiple lines".to_string()),
             cache: Default::default(),
         });
         session
             .add_prompt(PromptInput {
-                user_prompt: indoc! {"
-                    Second prompt
-                    still multiple lines
-                "}
-                .to_string(),
+                user_prompt: "Second prompt\nstill multiple lines".to_string(),
             })
             .unwrap();
         session.set_last_patch(&Patch {
             changes: vec![],
-            comment: Some(
-                indoc! {"
-                Second response
-                yet more lines
-            "}
-                .to_string(),
-            ),
+            comment: Some("Second response\nyet more lines".to_string()),
             cache: Default::default(),
         });
 
-        let rendered = render_initial_text(&session, 1);
-        assert!(rendered.contains(indoc! {"
-            # Step 2
-            # ====
+        let rendered_step_0 = render_initial_text(&session, 0);
+        assert_eq!(rendered_step_0, "First prompt\nwith multiple lines\n\n");
 
-            # Prompt:
-            # -------
-            # Second prompt
-            # still multiple lines
+        let rendered_step_1 = render_initial_text(&session, 1);
+        assert_eq!(
+            rendered_step_1,
+            indoc! {"
+            Second prompt
+            still multiple lines
 
-            # Response:
-            # ---------
-            # Second response
-            # yet more lines
-        "}));
-        assert!(rendered.contains(indoc! {"
-            # Step 1
+            # Step 0
             # ====
 
             # Prompt:
@@ -189,7 +173,9 @@ mod tests {
             # ---------
             # First response
             # also with multiple lines
-        "}));
-        assert!(!rendered.contains("# Step 3"));
+
+
+        "}
+        );
     }
 }
