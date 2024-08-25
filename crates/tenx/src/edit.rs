@@ -1,12 +1,9 @@
 use anyhow::{Context as AnyhowContext, Result};
-use std::{fs, io::Write, path::PathBuf, process::Command};
+use std::{fs, io::Write, process::Command};
 use tempfile::NamedTempFile;
 
-use indoc::indoc;
 use libtenx::prompt::PromptInput;
-
-const EDITABLE_FILES_HEADING: &str = "### Editable files:";
-const CONTEXT_FILES_HEADING: &str = "### Context files:";
+use libtenx::Session;
 
 /// Returns the user's preferred editor.
 fn get_editor() -> String {
@@ -14,43 +11,39 @@ fn get_editor() -> String {
 }
 
 /// Renders the initial text for the user to edit.
-fn render_initial_text(files: &[PathBuf]) -> String {
-    let mut text = String::from(indoc! {r#"
-            
-            # Enter your prompt above. You may edit the file lists below."
+fn render_initial_text(session: &libtenx::Session) -> String {
+    let mut text = String::new();
+    text.push('\n'); // Space for new prompt
 
-        "#
-    });
-    text.push_str(&format!("{}\n", EDITABLE_FILES_HEADING));
-    for file in files {
-        text.push_str(&format!("{}\n", file.display()));
+    for (i, step) in session.steps().iter().rev().enumerate() {
+        text.push_str(&format!("# Step {}\n", session.steps().len() - i));
+        text.push_str("# ====\n\n");
+        text.push_str("# Prompt:\n# -------\n");
+        for line in step.prompt.user_prompt.lines() {
+            text.push_str(&format!("# {}\n", line));
+        }
+        if let Some(patch) = &step.patch {
+            if let Some(comment) = &patch.comment {
+                text.push_str("\n# Response:\n# ---------\n");
+                for line in comment.lines() {
+                    text.push_str(&format!("# {}\n", line));
+                }
+            }
+        }
+        text.push_str("\n\n");
     }
-    text.push('\n');
+
     text
 }
 
 /// Parses the edited text into a Prompt.
 fn parse_edited_text(input: &str) -> PromptInput {
-    let lines = input.lines();
     let mut user_prompt = String::new();
-    let mut edit_paths = Vec::new();
-    let mut attach_paths = Vec::new();
-    let mut current_section = None;
 
-    for line in lines {
-        let trimmed = line.trim();
-        if trimmed == EDITABLE_FILES_HEADING {
-            current_section = Some("editable");
-        } else if trimmed == CONTEXT_FILES_HEADING {
-            current_section = Some("context");
-        } else if trimmed.starts_with('#') || trimmed.is_empty() {
-            continue;
-        } else {
-            match current_section {
-                Some("editable") => edit_paths.push(PathBuf::from(trimmed)),
-                Some("context") => attach_paths.push(PathBuf::from(trimmed)),
-                _ => user_prompt.push_str(&format!("{}\n", line)),
-            }
+    for line in input.lines() {
+        if !line.trim().starts_with('#') && !line.trim().is_empty() {
+            user_prompt.push_str(line);
+            user_prompt.push('\n');
         }
     }
 
@@ -60,9 +53,9 @@ fn parse_edited_text(input: &str) -> PromptInput {
 }
 
 /// Opens an editor for the user to input their prompt.
-pub fn edit_prompt(files: &[PathBuf]) -> Result<Option<PromptInput>> {
+pub fn edit_prompt(session: &Session) -> Result<Option<PromptInput>> {
     let mut temp_file = NamedTempFile::new()?;
-    let initial_text = render_initial_text(files);
+    let initial_text = render_initial_text(session);
     temp_file.write_all(initial_text.as_bytes())?;
     temp_file.flush()?;
     let editor = get_editor();
@@ -83,29 +76,110 @@ pub fn edit_prompt(files: &[PathBuf]) -> Result<Option<PromptInput>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use indoc::indoc;
+    use libtenx::patch::Patch;
+    use std::path::PathBuf;
 
     #[test]
     fn test_parse_edited_text() {
-        let input = format!(
-            indoc! {r#"
-                This is a user prompt
-                with multiple lines.
+        let input = indoc! {"
+            New prompt here
+            with multiple lines
 
-                {}
-                src/main.rs
-                src/lib.rs
+            # Step 2
+            # Prompt:
+            # Previous prompt
+            # with multiple lines
+            # Response:
+            # Previous response
+            # also with multiple lines
 
-                {}
-                tests/test_main.rs
-                README.md
-            "#
-            },
-            EDITABLE_FILES_HEADING, CONTEXT_FILES_HEADING
+            # Step 1
+            # Prompt:
+            # First prompt
+            # Response:
+            # First response
+        "};
+        let prompt = parse_edited_text(input);
+        assert_eq!(prompt.user_prompt, "New prompt here\nwith multiple lines");
+    }
+
+    #[test]
+    fn test_render_initial_text() {
+        let mut session = Session::new(
+            PathBuf::from("/"),
+            libtenx::dialect::Dialect::Dummy(libtenx::dialect::DummyDialect::default()),
+            libtenx::model::Model::Dummy(libtenx::model::DummyModel::default()),
         );
-        let prompt = parse_edited_text(&input);
-        assert_eq!(
-            prompt.user_prompt,
-            "This is a user prompt\nwith multiple lines."
-        );
+        session
+            .add_prompt(PromptInput {
+                user_prompt: indoc! {"
+                    First prompt
+                    with multiple lines
+                "}
+                .to_string(),
+            })
+            .unwrap();
+        session.set_last_patch(&Patch {
+            changes: vec![],
+            comment: Some(
+                indoc! {"
+                First response
+                also with multiple lines
+            "}
+                .to_string(),
+            ),
+            cache: Default::default(),
+        });
+        session
+            .add_prompt(PromptInput {
+                user_prompt: indoc! {"
+                    Second prompt
+                    still multiple lines
+                "}
+                .to_string(),
+            })
+            .unwrap();
+        session.set_last_patch(&Patch {
+            changes: vec![],
+            comment: Some(
+                indoc! {"
+                Second response
+                yet more lines
+            "}
+                .to_string(),
+            ),
+            cache: Default::default(),
+        });
+
+        let rendered = render_initial_text(&session);
+        assert!(rendered.contains(indoc! {"
+            # Step 2
+            # ====
+
+            # Prompt:
+            # -------
+            # Second prompt
+            # still multiple lines
+
+            # Response:
+            # ---------
+            # Second response
+            # yet more lines
+        "}));
+        assert!(rendered.contains(indoc! {"
+            # Step 1
+            # ====
+
+            # Prompt:
+            # -------
+            # First prompt
+            # with multiple lines
+
+            # Response:
+            # ---------
+            # First response
+            # also with multiple lines
+        "}));
     }
 }

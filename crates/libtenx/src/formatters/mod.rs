@@ -19,4 +19,3 @@ pub fn formatters(state: &Session) -> Result<Vec<Box<dyn Formatter>>> {
     }
     Ok(formatters)
 }
-

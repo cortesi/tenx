@@ -231,7 +231,7 @@ async fn main() -> Result<()> {
                     session.add_editable(file)?;
                 }
 
-                let user_prompt = match edit::edit_prompt(files)? {
+                let user_prompt = match edit::edit_prompt(&session)? {
                     Some(p) => p,
                     None => return Ok(()),
                 };
@@ -329,8 +329,7 @@ async fn main() -> Result<()> {
                         user_prompt: prompt_content,
                     }
                 } else {
-                    let f = files.clone().unwrap_or_default();
-                    match edit::edit_prompt(&f)? {
+                    match edit::edit_prompt(&session)? {
                         Some(p) => p,
                         None => return Ok(()),
                     }
