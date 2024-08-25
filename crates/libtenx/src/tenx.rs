@@ -189,7 +189,12 @@ impl Tenx {
     fn run_preflight_validators(&self, session: &mut Session) -> Result<()> {
         let preflight_validators = crate::validators::preflight(session)?;
         for validator in preflight_validators {
-            validator.validate(session)?;
+            if let Err(e) = validator.validate(session) {
+                if let TenxError::Validation { name, user, model } = e {
+                    return Err(TenxError::Preflight { name, user, model });
+                }
+                return Err(e);
+            }
         }
         Ok(())
     }
@@ -258,4 +263,3 @@ mod tests {
         Ok(())
     }
 }
-

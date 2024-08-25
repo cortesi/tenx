@@ -51,6 +51,17 @@ pub enum TenxError {
         /// An error to the model, often the full tool output
         model: String,
     },
+
+    /// A preflight error, which occurs during preflight validation.
+    #[error("Preflight error: {name}: {user}\nDetails:\n{model}")]
+    Preflight {
+        /// The name of the validator that failed
+        name: String,
+        /// An error to display to the user
+        user: String,
+        /// An error to the model, often the full tool output
+        model: String,
+    },
 }
 
 impl TenxError {
@@ -77,3 +88,4 @@ impl From<misanthropy::Error> for TenxError {
         TenxError::Model(error.to_string())
     }
 }
+
