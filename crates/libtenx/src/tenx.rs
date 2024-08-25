@@ -23,7 +23,7 @@ impl Default for Config {
         Self {
             anthropic_key: String::new(),
             session_store_dir: None,
-            retry_limit: 7,
+            retry_limit: 10,
         }
     }
 }
@@ -76,6 +76,21 @@ impl Tenx {
         Ok(())
     }
 
+    /// Loads a session from the store based on the given path.
+    pub fn load_session<P: AsRef<Path>>(&self, path: P) -> Result<Session> {
+        let root = crate::session::find_root(path.as_ref());
+        let session_store = SessionStore::open(self.config.session_store_dir.clone())?;
+        let name = normalize_path(&root);
+        session_store.load(name)
+    }
+
+    /// Loads a session from the store based on the current working directory.
+    pub fn load_session_cwd(&self) -> Result<Session> {
+        let current_dir = env::current_dir().map_err(|e| TenxError::fio(e, "."))?;
+        let root = crate::session::find_root(&current_dir);
+        self.load_session(root)
+    }
+
     /// Retries a prompt in the session.
     ///
     /// If `step_offset` is provided, all steps beyond this offset are trimmed before retrying.
@@ -92,21 +107,6 @@ impl Tenx {
         session.rollback_last()?;
         let session_store = SessionStore::open(self.config.session_store_dir.clone())?;
         self.process_prompt(session, sender, &session_store).await
-    }
-
-    /// Loads a session from the store based on the given path.
-    pub fn load_session<P: AsRef<Path>>(&self, path: P) -> Result<Session> {
-        let root = crate::session::find_root(path.as_ref());
-        let session_store = SessionStore::open(self.config.session_store_dir.clone())?;
-        let name = normalize_path(&root);
-        session_store.load(name)
-    }
-
-    /// Loads a session from the store based on the current working directory.
-    pub fn load_session_cwd(&self) -> Result<Session> {
-        let current_dir = env::current_dir().map_err(|e| TenxError::fio(e, "."))?;
-        let root = crate::session::find_root(&current_dir);
-        self.load_session(root)
     }
 
     /// Resumes a session by sending a prompt to the model.
