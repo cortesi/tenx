@@ -190,10 +190,30 @@ impl Tenx {
             return Err(e);
         }
         session_store.save(session)?;
+        if let Err(e) = self.run_formatters(session, &sender) {
+            session.set_last_error(&e);
+            return Err(e);
+        }
+        session_store.save(session)?;
         if let Err(e) = self.run_post_patch_validators(session, &sender) {
             session.set_last_error(&e);
             return Err(e);
         }
+        Ok(())
+    }
+
+    fn run_formatters(
+        &self,
+        session: &mut Session,
+        sender: &Option<mpsc::Sender<Event>>,
+    ) -> Result<()> {
+        Self::send_event(sender, Event::FormattingStart)?;
+        let formatters = crate::formatters::formatters(session)?;
+        for formatter in formatters {
+            formatter.format(session)?;
+            Self::send_event(sender, Event::FormattingOk(formatter.name().to_string()))?;
+        }
+        Self::send_event(sender, Event::FormattingEnd)?;
         Ok(())
     }
 
@@ -286,3 +306,4 @@ mod tests {
         Ok(())
     }
 }
+

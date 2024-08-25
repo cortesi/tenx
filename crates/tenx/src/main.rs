@@ -183,6 +183,13 @@ async fn print_events(mut receiver: mpsc::Receiver<Event>) {
                 format!("'{}' passed.", name).green(),
                 "✓".green()
             ),
+            Event::FormattingStart => println!("{}", "Starting formatting...".blue()),
+            Event::FormattingEnd => println!("{}", "Formatting completed.".blue()),
+            Event::FormattingOk(name) => println!(
+                "\t{} {}",
+                format!("'{}' completed.", name).green(),
+                "✓".green()
+            ),
             Event::ValidationStart => println!("{}", "Starting post-patch validation...".blue()),
             Event::ValidationEnd => println!("{}", "Post-patch validation completed.".blue()),
             Event::ValidateOk(name) => println!(
@@ -388,4 +395,3 @@ async fn main() -> Result<()> {
         }
     }
 }
-

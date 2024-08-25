@@ -52,8 +52,8 @@ fn run_cargo_command(name: &str, state: &Session, args: &[&str]) -> Result<()> {
 }
 
 #[derive(Debug)]
-struct RustWorkspace {
-    root_path: PathBuf,
+pub struct RustWorkspace {
+    pub root_path: PathBuf,
 }
 
 impl RustWorkspace {

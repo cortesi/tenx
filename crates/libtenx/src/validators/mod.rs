@@ -1,4 +1,4 @@
-mod rust;
+pub mod rust;
 pub use rust::*;
 
 use crate::{Result, Session};
