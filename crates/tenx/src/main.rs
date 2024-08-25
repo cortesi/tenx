@@ -1,4 +1,8 @@
-use std::{fs, io, path::PathBuf};
+use std::{
+    fs,
+    io::{self, Write},
+    path::PathBuf,
+};
 
 use anyhow::{Context as AnyhowContext, Result};
 use clap::{CommandFactory, Parser, Subcommand};
@@ -164,6 +168,32 @@ fn load_config(cli: &Cli) -> Result<Config> {
     Ok(config)
 }
 
+/// Prints events from the event channel
+async fn print_events(mut receiver: mpsc::Receiver<Event>) {
+    while let Some(event) = receiver.recv().await {
+        match event {
+            Event::Snippet(chunk) => {
+                print!("{}", chunk);
+                io::stdout().flush().unwrap();
+            }
+            Event::PreflightStart => println!("{}", "Starting preflight checks...".blue()),
+            Event::PreflightEnd => println!("{}", "Preflight checks completed.".blue()),
+            Event::PreflightOk(name) => println!(
+                "\t{} {}",
+                format!("'{}' passed.", name).green(),
+                "✓".green()
+            ),
+            Event::ValidationStart => println!("{}", "Starting post-patch validation...".blue()),
+            Event::ValidationEnd => println!("{}", "Post-patch validation completed.".blue()),
+            Event::ValidateOk(name) => println!(
+                "\t{} {}",
+                format!("'{}' passed.", name).green(),
+                "✓".green()
+            ),
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -200,20 +230,8 @@ async fn main() -> Result<()> {
                 };
                 session.add_prompt(user_prompt)?;
 
-                let (sender, mut receiver) = mpsc::channel(100);
-                let print_task = tokio::spawn(async move {
-                    while let Some(event) = receiver.recv().await {
-                        match event {
-                            Event::Snippet(chunk) => print!("{}", chunk),
-                            Event::PreflightStart => println!("Starting preflight checks..."),
-                            Event::PreflightEnd => println!("Preflight checks completed."),
-                            Event::PreflightOk(name) => println!("\t'{}' passed.", name),
-                            Event::ValidationStart => println!("Starting post-patch validation..."),
-                            Event::ValidationEnd => println!("Post-patch validation completed."),
-                            Event::ValidateOk(name) => println!("\t'{}' passed.", name),
-                        }
-                    }
-                });
+                let (sender, receiver) = mpsc::channel(100);
+                let print_task = tokio::spawn(print_events(receiver));
 
                 tx.resume(&mut session, Some(sender)).await?;
 
@@ -251,22 +269,8 @@ async fn main() -> Result<()> {
                 let config = load_config(&cli)?;
                 let tx = Tenx::new(config);
 
-                let (sender, mut receiver) = mpsc::channel(100);
-                let print_task = tokio::spawn(async move {
-                    while let Some(event) = receiver.recv().await {
-                        match event {
-                            Event::Snippet(chunk) => print!("{}", chunk),
-                            Event::PreflightStart => println!("Starting preflight checks..."),
-                            Event::PreflightEnd => println!("Preflight checks completed."),
-                            Event::PreflightOk(name) => {
-                                println!("Preflight check '{}' passed.", name)
-                            }
-                            Event::ValidationStart => println!("Starting post-patch validation..."),
-                            Event::ValidationEnd => println!("Post-patch validation completed."),
-                            Event::ValidateOk(name) => println!("Validation '{}' passed.", name),
-                        }
-                    }
-                });
+                let (sender, receiver) = mpsc::channel(100);
+                let print_task = tokio::spawn(print_events(receiver));
 
                 let mut session = tx.load_session_cwd()?;
                 tx.retry(&mut session, Some(sender), *step_offset).await?;
@@ -303,22 +307,8 @@ async fn main() -> Result<()> {
                 let config = load_config(&cli)?;
                 let tx = Tenx::new(config);
 
-                let (sender, mut receiver) = mpsc::channel(100);
-                let print_task = tokio::spawn(async move {
-                    while let Some(event) = receiver.recv().await {
-                        match event {
-                            Event::Snippet(chunk) => print!("{}", chunk),
-                            Event::PreflightStart => println!("Starting preflight checks..."),
-                            Event::PreflightEnd => println!("Preflight checks completed."),
-                            Event::PreflightOk(name) => {
-                                println!("Preflight check '{}' passed.", name)
-                            }
-                            Event::ValidationStart => println!("Starting post-patch validation..."),
-                            Event::ValidationEnd => println!("Post-patch validation completed."),
-                            Event::ValidateOk(name) => println!("Validation '{}' passed.", name),
-                        }
-                    }
-                });
+                let (sender, receiver) = mpsc::channel(100);
+                let print_task = tokio::spawn(print_events(receiver));
 
                 let mut session = tx.load_session_cwd()?;
                 let user_prompt = if let Some(p) = prompt {
