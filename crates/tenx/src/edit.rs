@@ -10,38 +10,52 @@ fn get_editor() -> String {
     std::env::var("EDITOR").unwrap_or_else(|_| "vim".to_string())
 }
 
-/// Renders the initial text for the user to edit.
-fn render_initial_text(session: &libtenx::Session, step_offset: usize) -> String {
+/// Renders a step as a comment.
+fn render_step_commented(session: &libtenx::Session, step_offset: usize) -> String {
     let mut text = String::new();
+    let steps = session.steps();
+    let step = &steps[step_offset];
 
-    if let Some(steps) = session.steps().get(..=step_offset) {
-        // Add the current step's prompt uncommented
-        if let Some(current_step) = steps.last() {
-            text.push_str(&current_step.prompt.user_prompt);
-            text.push_str("\n\n");
-        }
-
-        // Add previous steps as comments
-        for (i, step) in steps[..steps.len().saturating_sub(1)]
-            .iter()
-            .rev()
-            .enumerate()
-        {
-            text.push_str(&format!("# Step {}\n", step_offset - i - 1));
-            text.push_str("# ====\n#\n");
-            text.push_str("# Prompt:\n# -------\n");
-            for line in step.prompt.user_prompt.lines() {
+    text.push_str(&format!("# Step {}\n", step_offset));
+    text.push_str("# ====\n#\n");
+    text.push_str("# Prompt:\n# -------\n");
+    for line in step.prompt.user_prompt.lines() {
+        text.push_str(&format!("# {}\n", line));
+    }
+    if let Some(patch) = &step.patch {
+        if let Some(comment) = &patch.comment {
+            text.push_str("#\n# Response:\n# ---------\n");
+            for line in comment.lines() {
                 text.push_str(&format!("# {}\n", line));
             }
-            if let Some(patch) = &step.patch {
-                if let Some(comment) = &patch.comment {
-                    text.push_str("#\n# Response:\n# ---------\n");
-                    for line in comment.lines() {
-                        text.push_str(&format!("# {}\n", line));
-                    }
-                }
-            }
-            text.push_str("\n\n");
+        }
+    }
+    text.push('\n');
+    text
+}
+
+/// Renders a step for editing.
+fn render_step_editable(session: &libtenx::Session, step_offset: usize) -> String {
+    let steps = session.steps();
+    steps[step_offset].prompt.user_prompt.clone() + "\n\n"
+}
+
+/// Renders the initial text for the user to edit.
+fn render_initial_text(session: &libtenx::Session) -> String {
+    let mut text = String::new();
+    let steps = session.steps();
+
+    if let Some(last_step) = steps.last() {
+        // Render the most recent prompt as editable
+        text.push_str(&last_step.prompt.user_prompt);
+        text.push_str("\n\n");
+    }
+
+    // Add previous steps as comments
+    for i in (0..steps.len().saturating_sub(1)).rev() {
+        text.push_str(&render_step_commented(session, i));
+        if i == 0 {
+            text.push('\n');
         }
     }
 
@@ -66,13 +80,8 @@ fn parse_edited_text(input: &str) -> PromptInput {
 
 /// Opens an editor for the user to input their prompt.
 pub fn edit_prompt(session: &Session) -> Result<Option<PromptInput>> {
-    edit_prompt_at_step(session, session.steps().len().saturating_sub(1))
-}
-
-/// Opens an editor for the user to input their prompt at a specific step.
-pub fn edit_prompt_at_step(session: &Session, step_offset: usize) -> Result<Option<PromptInput>> {
     let mut temp_file = NamedTempFile::new()?;
-    let initial_text = render_initial_text(session, step_offset);
+    let initial_text = render_initial_text(session);
     temp_file.write_all(initial_text.as_bytes())?;
     temp_file.flush()?;
     let initial_metadata = temp_file.as_file().metadata()?;
@@ -141,6 +150,34 @@ mod tests {
             comment: Some("First response\nalso with multiple lines".to_string()),
             cache: Default::default(),
         });
+
+        // Test editing first step (retry case)
+        let rendered_step_0 = render_initial_text(&session, 0);
+        assert_eq!(rendered_step_0, "First prompt\nwith multiple lines\n\n");
+
+        // Test adding new step (edit case)
+        let rendered_new_step = render_initial_text(&session, 1);
+        assert_eq!(
+            rendered_new_step,
+            indoc! {"
+            # Step 0
+            # ====
+            #
+            # Prompt:
+            # -------
+            # First prompt
+            # with multiple lines
+            #
+            # Response:
+            # ---------
+            # First response
+            # also with multiple lines
+
+
+        "}
+        );
+
+        // Add second step
         session
             .add_prompt(PromptInput {
                 user_prompt: "Second prompt\nstill multiple lines".to_string(),
@@ -152,15 +189,48 @@ mod tests {
             cache: Default::default(),
         });
 
-        let rendered_step_0 = render_initial_text(&session, 0);
-        assert_eq!(rendered_step_0, "First prompt\nwith multiple lines\n\n");
-
+        // Test editing second step
         let rendered_step_1 = render_initial_text(&session, 1);
         assert_eq!(
             rendered_step_1,
             indoc! {"
             Second prompt
             still multiple lines
+
+            # Step 0
+            # ====
+            #
+            # Prompt:
+            # -------
+            # First prompt
+            # with multiple lines
+            #
+            # Response:
+            # ---------
+            # First response
+            # also with multiple lines
+
+
+        "}
+        );
+
+        // Test adding new step after two existing steps
+        let rendered_new_step_2 = render_initial_text(&session, 2);
+        assert_eq!(
+            rendered_new_step_2,
+            indoc! {"
+            # Step 1
+            # ====
+            #
+            # Prompt:
+            # -------
+            # Second prompt
+            # still multiple lines
+            #
+            # Response:
+            # ---------
+            # Second response
+            # yet more lines
 
             # Step 0
             # ====

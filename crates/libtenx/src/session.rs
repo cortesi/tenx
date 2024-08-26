@@ -195,6 +195,16 @@ impl Session {
         Ok(())
     }
 
+    /// Sets the prompt for the last step in the session.
+    pub fn set_last_prompt(&mut self, prompt: PromptInput) -> Result<()> {
+        if let Some(last_step) = self.steps.last_mut() {
+            last_step.prompt = prompt;
+            Ok(())
+        } else {
+            Err(TenxError::Internal("No steps in the session".into()))
+        }
+    }
+
     /// Adds a new context to the session, ignoring duplicates.
     ///
     /// If a context with the same name and type already exists, it will not be added again.

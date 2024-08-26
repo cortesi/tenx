@@ -234,11 +234,13 @@ async fn main() -> Result<()> {
                     session.add_editable(file)?;
                 }
 
-                let user_prompt = match edit::edit_prompt(&session)? {
-                    Some(p) => p,
+                session.add_prompt(PromptInput {
+                    user_prompt: String::new(),
+                })?;
+                match edit::edit_prompt(&session)? {
+                    Some(p) => session.set_last_prompt(p)?,
                     None => return Ok(()),
                 };
-                session.add_prompt(user_prompt)?;
 
                 let (sender, receiver) = mpsc::channel(100);
                 let print_task = tokio::spawn(print_events(receiver));
@@ -284,11 +286,9 @@ async fn main() -> Result<()> {
                 tx.reset(&mut session, offset)?;
 
                 if *edit {
-                    let user_prompt = edit::edit_prompt_at_step(&session, offset)?;
-                    if let Some(prompt) = user_prompt {
-                        session.update_prompt_at(offset, prompt)?;
-                    } else {
-                        return Ok(());
+                    match edit::edit_prompt(&session)? {
+                        Some(prompt) => session.set_last_prompt(prompt)?,
+                        None => return Ok(()),
                     }
                 }
 
@@ -333,6 +333,9 @@ async fn main() -> Result<()> {
                 let print_task = tokio::spawn(print_events(receiver));
 
                 let mut session = tx.load_session_cwd()?;
+                session.add_prompt(PromptInput {
+                    user_prompt: String::new(),
+                })?;
                 let user_prompt = if let Some(p) = prompt {
                     PromptInput {
                         user_prompt: p.clone(),
@@ -349,7 +352,7 @@ async fn main() -> Result<()> {
                         None => return Ok(()),
                     }
                 };
-                session.add_prompt(user_prompt)?;
+                session.set_last_prompt(user_prompt)?;
                 for f in files.clone().unwrap_or_default() {
                     session.add_editable(f)?;
                 }
