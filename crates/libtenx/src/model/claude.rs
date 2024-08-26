@@ -141,11 +141,14 @@ impl Claude {
             messages: vec![
                 misanthropy::Message {
                     role: misanthropy::Role::User,
-                    content: vec![misanthropy::Content::text(format!(
-                        "{}\n{}",
-                        CONTEXT_LEADIN,
-                        session.dialect.render_context(session)?
-                    ))],
+                    content: vec![misanthropy::Content::Text(misanthropy::Text {
+                        text: format!(
+                            "{}\n{}",
+                            CONTEXT_LEADIN,
+                            session.dialect.render_context(session)?
+                        ),
+                        cache_control: Some(misanthropy::CacheControl::Ephemeral),
+                    })],
                 },
                 misanthropy::Message {
                     role: misanthropy::Role::Assistant,
@@ -168,7 +171,10 @@ impl Claude {
                     content: vec![misanthropy::Content::text("Got it")],
                 },
             ],
-            system: vec![misanthropy::Content::text(session.dialect.system())],
+            system: vec![misanthropy::Content::Text(misanthropy::Text {
+                text: session.dialect.system(),
+                cache_control: Some(misanthropy::CacheControl::Ephemeral),
+            })],
             temperature: None,
             stream: true,
             tools: vec![],
