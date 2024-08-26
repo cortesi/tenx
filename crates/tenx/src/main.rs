@@ -145,6 +145,12 @@ enum Commands {
         /// Edit the prompt before retrying
         #[clap(long)]
         edit: bool,
+        /// Add files as context
+        #[clap(long)]
+        ctx: Vec<PathBuf>,
+        /// Add ruskel documentation as context
+        #[clap(long)]
+        ruskel: Vec<String>,
     },
     /// Show the current session
     Show {
@@ -281,13 +287,26 @@ async fn main() -> Result<()> {
                 info!("context added");
                 Ok(())
             }
-            Commands::Retry { step_offset, edit } => {
+            Commands::Retry {
+                step_offset,
+                edit,
+                ctx,
+                ruskel,
+            } => {
                 let config = load_config(&cli)?;
                 let tx = Tenx::new(config);
                 let mut session = tx.load_session_cwd()?;
 
                 let offset = step_offset.unwrap_or(session.steps().len() - 1);
                 tx.reset(&mut session, offset)?;
+
+                for file in ctx {
+                    session.add_ctx_path(file)?;
+                }
+
+                for ruskel_doc in ruskel {
+                    session.add_ctx_ruskel(ruskel_doc.clone())?;
+                }
 
                 if *edit {
                     match edit::edit_prompt(&session)? {
