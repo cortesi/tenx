@@ -168,7 +168,7 @@ impl Claude {
                     content: vec![misanthropy::Content::text("Got it")],
                 },
             ],
-            system: Some(session.dialect.system()),
+            system: vec![misanthropy::Content::text(session.dialect.system())],
             temperature: None,
             stream: true,
             tools: vec![],
