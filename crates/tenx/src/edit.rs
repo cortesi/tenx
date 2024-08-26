@@ -97,6 +97,7 @@ mod tests {
     use super::*;
     use indoc::indoc;
     use libtenx::patch::Patch;
+    use pretty_assertions::assert_eq;
     use std::path::PathBuf;
 
     #[test]
@@ -163,12 +164,12 @@ mod tests {
 
             # Step 0
             # ====
-
+            #
             # Prompt:
             # -------
             # First prompt
             # with multiple lines
-
+            #
             # Response:
             # ---------
             # First response

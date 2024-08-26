@@ -14,6 +14,7 @@ clap = { version = "4.5.13", features = ["derive", "env"] }
 colored = "2.1.0"
 indoc = "2.0.5"
 libtenx = { workspace=true }
+pretty_assertions = "1.4.0"
 tempfile = "3.12.0"
 terminal_size = "0.3.0"
 textwrap = "0.16.1"

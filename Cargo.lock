@@ -3691,6 +3691,7 @@ dependencies = [
  "colored",
  "indoc",
  "libtenx",
+ "pretty_assertions",
  "tempfile",
  "terminal_size",
  "textwrap",
