@@ -82,8 +82,8 @@ impl Claude {
         if let Some(message) = &req.messages.last() {
             if message.role == Role::Assistant {
                 for content in &message.content {
-                    if let Content::Text { text } = content {
-                        return dialect.parse(text);
+                    if let Content::Text(text) = content {
+                        return dialect.parse(&text.text);
                     }
                 }
             }
@@ -141,35 +141,31 @@ impl Claude {
             messages: vec![
                 misanthropy::Message {
                     role: misanthropy::Role::User,
-                    content: vec![misanthropy::Content::Text {
-                        text: format!(
-                            "{}\n{}",
-                            CONTEXT_LEADIN,
-                            session.dialect.render_context(session)?
-                        ),
-                    }],
+                    content: vec![misanthropy::Content::text(format!(
+                        "{}\n{}",
+                        CONTEXT_LEADIN,
+                        session.dialect.render_context(session)?
+                    ))],
                 },
                 misanthropy::Message {
                     role: misanthropy::Role::Assistant,
-                    content: vec![misanthropy::Content::Text {
-                        text: "Got it.".to_string(),
-                    }],
+                    content: vec![misanthropy::Content::text("Got it")],
                 },
                 misanthropy::Message {
                     role: misanthropy::Role::User,
-                    content: vec![misanthropy::Content::Text {
-                        text: format!("{}\n{}", EDITABLE_LEADIN, {
+                    content: vec![misanthropy::Content::text(format!(
+                        "{}\n{}",
+                        EDITABLE_LEADIN,
+                        {
                             let (included, omitted) =
                                 self.filter_files(&session.editables()?, session, 0);
                             self.render_editables_with_omitted(session, included, omitted)?
-                        }),
-                    }],
+                        }
+                    ))],
                 },
                 misanthropy::Message {
                     role: misanthropy::Role::Assistant,
-                    content: vec![misanthropy::Content::Text {
-                        text: "Got it.".to_string(),
-                    }],
+                    content: vec![misanthropy::Content::text("Got it")],
                 },
             ],
             system: Some(session.dialect.system()),
@@ -182,33 +178,29 @@ impl Claude {
         for (i, s) in session.steps().iter().enumerate() {
             req.messages.push(misanthropy::Message {
                 role: misanthropy::Role::User,
-                content: vec![misanthropy::Content::Text {
-                    text: session.dialect.render_step_request(session, i)?,
-                }],
+                content: vec![misanthropy::Content::text(
+                    session.dialect.render_step_request(session, i)?,
+                )],
             });
             if let Some(patch) = &s.patch {
                 req.messages.push(misanthropy::Message {
                     role: misanthropy::Role::Assistant,
-                    content: vec![misanthropy::Content::Text {
-                        text: session.dialect.render_step_response(session, i)?,
-                    }],
+                    content: vec![misanthropy::Content::text(
+                        session.dialect.render_step_response(session, i)?,
+                    )],
                 });
                 let (included, omitted) = self.filter_files(&patch.changed_files(), session, i);
                 req.messages.push(misanthropy::Message {
                     role: misanthropy::Role::User,
-                    content: vec![misanthropy::Content::Text {
-                        text: format!(
-                            "{}\n{}",
-                            EDITABLE_UPDATE_LEADIN,
-                            self.render_editables_with_omitted(session, included, omitted)?
-                        ),
-                    }],
+                    content: vec![misanthropy::Content::text(format!(
+                        "{}\n{}",
+                        EDITABLE_UPDATE_LEADIN,
+                        self.render_editables_with_omitted(session, included, omitted)?
+                    ))],
                 });
                 req.messages.push(misanthropy::Message {
                     role: misanthropy::Role::Assistant,
-                    content: vec![misanthropy::Content::Text {
-                        text: "Got it.".to_string(),
-                    }],
+                    content: vec![misanthropy::Content::text("Got it.")],
                 });
             }
         }

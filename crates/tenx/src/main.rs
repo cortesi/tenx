@@ -360,6 +360,7 @@ async fn main() -> Result<()> {
                     return Err(anyhow::anyhow!("Session has no steps. Add a prompt first."));
                 }
 
+                session.add_prompt(PromptInput::default())?;
                 let user_prompt = if let Some(p) = prompt {
                     PromptInput {
                         user_prompt: p.clone(),
