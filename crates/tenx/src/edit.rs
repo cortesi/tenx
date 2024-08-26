@@ -152,27 +152,16 @@ mod tests {
         });
 
         // Test editing first step (retry case)
-        let rendered_step_0 = render_initial_text(&session, 0);
+        let rendered_step_0 = render_initial_text(&session);
         assert_eq!(rendered_step_0, "First prompt\nwith multiple lines\n\n");
 
         // Test adding new step (edit case)
-        let rendered_new_step = render_initial_text(&session, 1);
+        let rendered_new_step = render_initial_text(&session);
         assert_eq!(
             rendered_new_step,
             indoc! {"
-            # Step 0
-            # ====
-            #
-            # Prompt:
-            # -------
-            # First prompt
-            # with multiple lines
-            #
-            # Response:
-            # ---------
-            # First response
-            # also with multiple lines
-
+            First prompt
+            with multiple lines
 
         "}
         );
@@ -190,47 +179,12 @@ mod tests {
         });
 
         // Test editing second step
-        let rendered_step_1 = render_initial_text(&session, 1);
+        let rendered_step_1 = render_initial_text(&session);
         assert_eq!(
             rendered_step_1,
             indoc! {"
             Second prompt
             still multiple lines
-
-            # Step 0
-            # ====
-            #
-            # Prompt:
-            # -------
-            # First prompt
-            # with multiple lines
-            #
-            # Response:
-            # ---------
-            # First response
-            # also with multiple lines
-
-
-        "}
-        );
-
-        // Test adding new step after two existing steps
-        let rendered_new_step_2 = render_initial_text(&session, 2);
-        assert_eq!(
-            rendered_new_step_2,
-            indoc! {"
-            # Step 1
-            # ====
-            #
-            # Prompt:
-            # -------
-            # Second prompt
-            # still multiple lines
-            #
-            # Response:
-            # ---------
-            # Second response
-            # yet more lines
 
             # Step 0
             # ====
