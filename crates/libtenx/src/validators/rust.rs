@@ -42,11 +42,12 @@ fn run_cargo_command(name: &str, state: &Session, args: &[&str]) -> Result<()> {
     if output.status.success() {
         Ok(())
     } else {
+        let stdout = String::from_utf8_lossy(&output.stdout);
         let stderr = String::from_utf8_lossy(&output.stderr);
         Err(TenxError::Validation {
             name: name.to_string(),
             user: format!("Cargo {} failed", args[0]),
-            model: stderr.to_string(),
+            model: format!("stdout:\n{}\n\nstderr:\n{}", stdout, stderr),
         })
     }
 }
