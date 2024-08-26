@@ -34,12 +34,6 @@ fn render_step_commented(session: &libtenx::Session, step_offset: usize) -> Stri
     text
 }
 
-/// Renders a step for editing.
-fn render_step_editable(session: &libtenx::Session, step_offset: usize) -> String {
-    let steps = session.steps();
-    steps[step_offset].prompt.user_prompt.clone() + "\n\n"
-}
-
 /// Renders the initial text for the user to edit.
 fn render_initial_text(session: &libtenx::Session) -> String {
     let mut text = String::new();

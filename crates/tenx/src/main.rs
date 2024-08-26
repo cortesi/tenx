@@ -155,6 +155,10 @@ enum Commands {
         /// Output the rendered session
         #[clap(long)]
         render: bool,
+
+        /// Show full details
+        #[clap(long)]
+        full: bool,
     },
 }
 
@@ -333,9 +337,10 @@ async fn main() -> Result<()> {
                 let print_task = tokio::spawn(print_events(receiver));
 
                 let mut session = tx.load_session_cwd()?;
-                session.add_prompt(PromptInput {
-                    user_prompt: String::new(),
-                })?;
+                if session.steps().is_empty() {
+                    return Err(anyhow::anyhow!("Session has no steps. Add a prompt first."));
+                }
+
                 let user_prompt = if let Some(p) = prompt {
                     PromptInput {
                         user_prompt: p.clone(),
@@ -377,7 +382,7 @@ async fn main() -> Result<()> {
                 info!("editable files added");
                 Ok(())
             }
-            Commands::Show { raw, render } => {
+            Commands::Show { raw, render, full } => {
                 let config = load_config(&cli)?;
                 let tx = Tenx::new(config);
                 let session = tx.load_session_cwd()?;
@@ -390,7 +395,7 @@ async fn main() -> Result<()> {
                         println!("No model available in the session.");
                     }
                 } else {
-                    println!("{}", pretty::session(&session, false)?);
+                    println!("{}", pretty::session(&session, *full)?);
                 }
                 Ok(())
             }
