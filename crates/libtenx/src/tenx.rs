@@ -16,6 +16,7 @@ pub struct Config {
     pub anthropic_key: String,
     pub session_store_dir: Option<PathBuf>,
     pub retry_limit: usize,
+    pub no_preflight: bool,
 }
 
 impl Default for Config {
@@ -24,6 +25,7 @@ impl Default for Config {
             anthropic_key: String::new(),
             session_store_dir: None,
             retry_limit: 10,
+            no_preflight: false,
         }
     }
 }
@@ -44,6 +46,12 @@ impl Config {
     /// Sets the retry limit.
     pub fn with_retry_limit(mut self, limit: usize) -> Self {
         self.retry_limit = limit;
+        self
+    }
+
+    /// Sets the no_preflight flag.
+    pub fn with_no_preflight(mut self, no_preflight: bool) -> Self {
+        self.no_preflight = no_preflight;
         self
     }
 }
@@ -206,6 +214,9 @@ impl Tenx {
         session: &mut Session,
         sender: &Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
+        if self.config.no_preflight {
+            return Ok(());
+        }
         Self::send_event(sender, Event::PreflightStart)?;
         let preflight_validators = crate::validators::preflight(session)?;
         for validator in preflight_validators {

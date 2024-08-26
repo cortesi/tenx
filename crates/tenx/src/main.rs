@@ -73,6 +73,10 @@ struct Cli {
     #[clap(long, global = true)]
     retry_limit: Option<usize>,
 
+    /// Skip preflight checks
+    #[clap(long, global = true)]
+    no_preflight: bool,
+
     #[clap(subcommand)]
     command: Option<Commands>,
 }
@@ -178,6 +182,7 @@ fn load_config(cli: &Cli) -> Result<Config> {
     if let Some(retry_limit) = cli.retry_limit {
         config = config.with_retry_limit(retry_limit);
     }
+    config = config.with_no_preflight(cli.no_preflight);
     Ok(config)
 }
 
