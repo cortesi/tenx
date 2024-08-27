@@ -80,10 +80,10 @@ fn print_editables(session: &Session) -> Result<String> {
 }
 
 fn print_steps(session: &Session, full: bool, width: usize) -> Result<String> {
-    let mut output = String::new();
     if session.steps().is_empty() {
-        return Err(TenxError::Internal("Session has no steps".to_string()));
+        return Ok(String::new());
     }
+    let mut output = String::new();
     output.push_str(&format!("{}\n", "steps:".blue().bold()));
     for (i, step) in session.steps().iter().enumerate() {
         output.push_str(&format!("{}{}: ", INDENT, format!("{}", i).cyan().bold()));
