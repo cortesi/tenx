@@ -7,6 +7,15 @@ use textwrap::{wrap, Options};
 const DEFAULT_WIDTH: usize = 80;
 const INDENT: &str = "  ";
 
+fn format_usage(usage: &libtenx::model::Usage) -> String {
+    usage
+        .values()
+        .iter()
+        .map(|(k, v)| format!("{}:{}", k.blue().bold(), v))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 /// Pretty prints the Session information.
 pub fn session(session: &Session, full: bool) -> Result<String> {
     let width = terminal_size()
@@ -82,6 +91,14 @@ fn print_steps(session: &Session, full: bool, width: usize) -> Result<String> {
         output.push('\n');
         if let Some(patch) = &step.patch {
             output.push_str(&print_patch(session, patch, full, width));
+        }
+        if let Some(usage) = &step.usage {
+            output.push_str(&format!(
+                "{}{} {}\n",
+                INDENT.repeat(2),
+                "usage:".blue().bold(),
+                format_usage(usage)
+            ));
         }
         if let Some(err) = &step.err {
             output.push_str(&format!(
@@ -262,6 +279,7 @@ mod tests {
             },
             patch: None,
             err: None,
+            usage: None,
         };
         let result = render_step_editable(&step, false, 80);
         assert!(result.contains("Test prompt"));

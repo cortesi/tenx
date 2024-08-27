@@ -5,10 +5,20 @@ use tokio::sync::mpsc;
 use super::ModelProvider;
 use crate::{events::Event, patch::Patch, Config, Result, Session};
 
+use std::collections::HashMap;
+
 /// A dummy usage struct for testing purposes.
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct DummyUsage {
     pub dummy_counter: u32,
+}
+
+impl DummyUsage {
+    pub fn values(&self) -> HashMap<String, u64> {
+        let mut map = HashMap::new();
+        map.insert("dummy_counter".to_string(), self.dummy_counter as u64);
+        map
+    }
 }
 
 /// A dummy model for testing purposes.

@@ -1,10 +1,16 @@
-use serde::{Deserialize, Serialize};
-
 mod claude;
 mod dummy_model;
 
+use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
+use tokio::sync::mpsc;
+
 pub use claude::{Claude, ClaudeUsage};
 pub use dummy_model::{DummyModel, DummyUsage};
+
+use crate::{events::Event, patch::Patch, Config, Result, Session};
+
+use std::collections::HashMap;
 
 /// Represents usage statistics for different model types.
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -13,10 +19,15 @@ pub enum Usage {
     Dummy(DummyUsage),
 }
 
-use async_trait::async_trait;
-use tokio::sync::mpsc;
-
-use crate::{events::Event, patch::Patch, Config, Result, Session};
+impl Usage {
+    /// Returns a map of usage statistics.
+    pub fn values(&self) -> HashMap<String, u64> {
+        match self {
+            Usage::Claude(usage) => usage.values(),
+            Usage::Dummy(usage) => usage.values(),
+        }
+    }
+}
 
 /// Implemented by types that expose a prompt operation.
 #[async_trait]
