@@ -67,12 +67,15 @@ pub fn find_root(current_dir: &Path) -> PathBuf {
     current_dir.to_path_buf()
 }
 
+use crate::model::Usage;
+
 /// A single step in the session - basically a prompt and a patch.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Step {
     pub prompt: PromptInput,
     pub patch: Option<Patch>,
     pub err: Option<TenxError>,
+    pub usage: Option<Usage>,
 }
 
 /// A serializable session, which persists between invocations.
@@ -191,6 +194,7 @@ impl Session {
             prompt,
             patch: None,
             err: None,
+            usage: None,
         });
         Ok(())
     }
@@ -360,19 +364,23 @@ impl Session {
         Ok(())
     }
 
-    /// Prompts the current model with the session's state and returns the resulting patch.
+    /// Prompts the current model with the session's state and sets the resulting patch and usage.
     pub async fn prompt(
         &mut self,
         config: &Config,
         sender: Option<mpsc::Sender<Event>>,
-    ) -> Result<Patch> {
+    ) -> Result<()> {
         let mut model = self
             .model
             .take()
             .ok_or_else(|| TenxError::Internal("No model available".into()))?;
-        let patch = model.send(config, self, sender).await?;
+        let (patch, usage) = model.send(config, self, sender).await?;
         self.model = Some(model);
-        Ok(patch)
+        if let Some(last_step) = self.steps.last_mut() {
+            last_step.patch = Some(patch);
+            last_step.usage = Some(usage);
+        }
+        Ok(())
     }
 
     /// Applies the final patch in the session.

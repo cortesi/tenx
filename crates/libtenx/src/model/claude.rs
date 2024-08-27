@@ -35,6 +35,15 @@ use tokio::sync::mpsc;
 #[derive(Default, Debug, Serialize, Deserialize)]
 pub struct Claude {}
 
+/// Mirrors the Usage struct from misanthropy to track token usage statistics.
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct ClaudeUsage {
+    pub input_tokens: Option<u32>,
+    pub output_tokens: Option<u32>,
+    pub cache_creation_input_tokens: Option<u32>,
+    pub cache_read_input_tokens: Option<u32>,
+}
+
 impl From<serde_json::Error> for TenxError {
     fn from(error: serde_json::Error) -> Self {
         TenxError::Internal(error.to_string())
@@ -225,7 +234,7 @@ impl ModelProvider for Claude {
         config: &Config,
         session: &Session,
         sender: Option<mpsc::Sender<Event>>,
-    ) -> Result<patch::Patch> {
+    ) -> Result<(patch::Patch, super::Usage)> {
         if !session.pending_prompt() {
             return Err(TenxError::Internal("No pending prompt to process.".into()));
         }
@@ -234,7 +243,14 @@ impl ModelProvider for Claude {
             .stream_response(&config.anthropic_key, &req, sender)
             .await?;
         req.merge_response(&resp);
-        self.extract_changes(&session.dialect, &req)
+        let patch = self.extract_changes(&session.dialect, &req)?;
+        let usage = super::Usage::Claude(ClaudeUsage {
+            input_tokens: resp.usage.input_tokens,
+            output_tokens: resp.usage.output_tokens,
+            cache_creation_input_tokens: resp.usage.cache_creation_input_tokens,
+            cache_read_input_tokens: resp.usage.cache_read_input_tokens,
+        });
+        Ok((patch, usage))
     }
 
     fn render(&self, session: &Session) -> Result<String> {

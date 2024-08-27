@@ -5,6 +5,12 @@ use tokio::sync::mpsc;
 use super::ModelProvider;
 use crate::{events::Event, patch::Patch, Config, Result, Session};
 
+/// A dummy usage struct for testing purposes.
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct DummyUsage {
+    pub dummy_counter: u32,
+}
+
 /// A dummy model for testing purposes.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DummyModel {
@@ -39,8 +45,10 @@ impl ModelProvider for DummyModel {
         _config: &Config,
         _state: &Session,
         _sender: Option<mpsc::Sender<Event>>,
-    ) -> Result<Patch> {
-        self.change_set.clone()
+    ) -> Result<(Patch, super::Usage)> {
+        let patch = self.change_set.clone()?;
+        let usage = super::Usage::Dummy(DummyUsage { dummy_counter: 1 });
+        Ok((patch, usage))
     }
 
     fn render(&self, _session: &Session) -> Result<String> {

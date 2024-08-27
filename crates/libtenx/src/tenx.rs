@@ -168,14 +168,10 @@ impl Tenx {
         sender: Option<mpsc::Sender<Event>>,
         session_store: &SessionStore,
     ) -> Result<()> {
-        let patch = match session.prompt(&self.config, sender.clone()).await {
-            Ok(patch) => patch,
-            Err(e) => {
-                session.set_last_error(&e);
-                return Err(e);
-            }
-        };
-        session.set_last_patch(&patch);
+        if let Err(e) = session.prompt(&self.config, sender.clone()).await {
+            session.set_last_error(&e);
+            return Err(e);
+        }
         session_store.save(session)?;
         if let Err(e) = session.apply_last_patch() {
             session.set_last_error(&e);

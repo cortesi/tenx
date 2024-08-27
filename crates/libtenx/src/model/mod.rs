@@ -3,8 +3,15 @@ use serde::{Deserialize, Serialize};
 mod claude;
 mod dummy_model;
 
-pub use claude::Claude;
-pub use dummy_model::DummyModel;
+pub use claude::{Claude, ClaudeUsage};
+pub use dummy_model::{DummyModel, DummyUsage};
+
+/// Represents usage statistics for different model types.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum Usage {
+    Claude(ClaudeUsage),
+    Dummy(DummyUsage),
+}
 
 use async_trait::async_trait;
 use tokio::sync::mpsc;
@@ -23,7 +30,7 @@ pub trait ModelProvider {
         config: &Config,
         session: &Session,
         sender: Option<mpsc::Sender<Event>>,
-    ) -> Result<Patch>;
+    ) -> Result<(Patch, Usage)>;
 
     /// Render a session for display to the user.
     fn render(&self, session: &Session) -> Result<String>;
@@ -49,7 +56,7 @@ impl ModelProvider for Model {
         config: &Config,
         session: &Session,
         sender: Option<mpsc::Sender<Event>>,
-    ) -> Result<Patch> {
+    ) -> Result<(Patch, Usage)> {
         match self {
             Model::Claude(c) => c.send(config, session, sender).await,
             Model::Dummy(d) => d.send(config, session, sender).await,
