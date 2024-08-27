@@ -361,9 +361,6 @@ async fn main() -> Result<()> {
                 let print_task = tokio::spawn(print_events(receiver));
 
                 let mut session = tx.load_session_cwd()?;
-                if session.steps().is_empty() {
-                    return Err(anyhow::anyhow!("Session has no steps. Add a prompt first."));
-                }
 
                 session.add_prompt(PromptInput::default())?;
                 let user_prompt = if let Some(p) = prompt {

@@ -40,8 +40,8 @@ use std::collections::HashMap;
 /// Mirrors the Usage struct from misanthropy to track token usage statistics.
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct ClaudeUsage {
-    pub input_tokens: u32,
-    pub output_tokens: u32,
+    pub input_tokens: Option<u32>,
+    pub output_tokens: Option<u32>,
     pub cache_creation_input_tokens: Option<u32>,
     pub cache_read_input_tokens: Option<u32>,
 }
@@ -49,8 +49,12 @@ pub struct ClaudeUsage {
 impl ClaudeUsage {
     pub fn values(&self) -> HashMap<String, u64> {
         let mut map = HashMap::new();
-        map.insert("input_tokens".to_string(), self.input_tokens as u64);
-        map.insert("output_tokens".to_string(), self.output_tokens as u64);
+        if let Some(input_tokens) = self.input_tokens {
+            map.insert("input_tokens".to_string(), input_tokens as u64);
+        }
+        if let Some(output_tokens) = self.output_tokens {
+            map.insert("output_tokens".to_string(), output_tokens as u64);
+        }
         if let Some(cache_creation_input_tokens) = self.cache_creation_input_tokens {
             map.insert(
                 "cache_creation_input_tokens".to_string(),
