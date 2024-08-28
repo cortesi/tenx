@@ -2,9 +2,9 @@
 [![Docs](https://docs.rs/tenx/badge.svg)](https://docs.rs/tenx)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-# Tenx
+# Tenx 
 
-Tenx is an AI-powered coding assistant for expert developers. 
+An AI-powered coding assistant for expert developers. 
 
 ## Features
 
@@ -93,7 +93,3 @@ the dev process.
 
 Feel free to submit a Pull Request!
 
-
-## License
-
-This project is under the MIT License - see the [LICENSE](LICENSE) file for details.
