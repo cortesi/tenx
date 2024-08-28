@@ -150,9 +150,7 @@ impl Tenx {
                             "Retryable error (attempt {}/{}): {}",
                             retry_count, self.config.retry_limit, e
                         );
-                        session.add_prompt(Prompt {
-                            user_prompt: model_message.to_string(),
-                        })?;
+                        session.add_prompt(Prompt::Auto(model_message.to_string()))?;
                     } else {
                         warn!("Non-retryable error: {}", e);
                         return Err(e);
@@ -275,9 +273,7 @@ mod tests {
                 cache: Default::default(),
             })),
         );
-        session.add_prompt(Prompt {
-            user_prompt: "Test prompt".to_string(),
-        })?;
+        session.add_prompt(Prompt::User("Test prompt".to_string()))?;
         session.add_editable(test_file_path.clone())?;
 
         let session_store = SessionStore::open(Some(temp_dir.path().to_path_buf()))?;

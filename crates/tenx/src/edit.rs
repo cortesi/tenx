@@ -19,7 +19,7 @@ fn render_step_commented(session: &libtenx::Session, step_offset: usize) -> Stri
     text.push_str(&format!("# Step {}\n", step_offset));
     text.push_str("# ====\n#\n");
     text.push_str("# Prompt:\n# -------\n");
-    for line in step.prompt.user_prompt.lines() {
+    for line in step.prompt.text().lines() {
         text.push_str(&format!("# {}\n", line));
     }
     if let Some(patch) = &step.patch {
@@ -41,7 +41,7 @@ fn render_initial_text(session: &libtenx::Session) -> String {
 
     if let Some(last_step) = steps.last() {
         // Render the most recent prompt as editable
-        text.push_str(&last_step.prompt.user_prompt);
+        text.push_str(last_step.prompt.text());
         text.push_str("\n\n");
     }
 
@@ -67,9 +67,7 @@ fn parse_edited_text(input: &str) -> Prompt {
         }
     }
 
-    Prompt {
-        user_prompt: user_prompt.trim().to_string(),
-    }
+    Prompt::User(user_prompt.trim().to_string())
 }
 
 /// Opens an editor for the user to input their prompt.
@@ -124,7 +122,7 @@ mod tests {
             # First response
         "};
         let prompt = parse_edited_text(input);
-        assert_eq!(prompt.user_prompt, "New prompt here\nwith multiple lines");
+        assert_eq!(prompt.text(), "New prompt here\nwith multiple lines");
     }
 
     #[test]
@@ -135,9 +133,9 @@ mod tests {
             libtenx::model::Model::Dummy(libtenx::model::DummyModel::default()),
         );
         session
-            .add_prompt(Prompt {
-                user_prompt: "First prompt\nwith multiple lines".to_string(),
-            })
+            .add_prompt(Prompt::User(
+                "First prompt\nwith multiple lines".to_string(),
+            ))
             .unwrap();
         session.set_last_patch(&Patch {
             changes: vec![],
@@ -162,9 +160,9 @@ mod tests {
 
         // Add second step
         session
-            .add_prompt(Prompt {
-                user_prompt: "Second prompt\nstill multiple lines".to_string(),
-            })
+            .add_prompt(Prompt::User(
+                "Second prompt\nstill multiple lines".to_string(),
+            ))
             .unwrap();
         session.set_last_patch(&Patch {
             changes: vec![],

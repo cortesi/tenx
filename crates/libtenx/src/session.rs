@@ -520,9 +520,7 @@ mod tests {
                 .into_iter()
                 .collect(),
             };
-            session.add_prompt(Prompt {
-                user_prompt: format!("Prompt {}", i),
-            })?;
+            session.add_prompt(Prompt::User(format!("Prompt {}", i)))?;
             session.set_last_patch(&patch);
             session.apply_patch(&mut patch.clone())?;
         }

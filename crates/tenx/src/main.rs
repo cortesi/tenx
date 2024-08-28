@@ -249,9 +249,7 @@ async fn main() -> Result<()> {
                     session.add_editable(file)?;
                 }
 
-                session.add_prompt(Prompt {
-                    user_prompt: String::new(),
-                })?;
+                session.add_prompt(Prompt::User(String::new()))?;
                 match edit::edit_prompt(&session)? {
                     Some(p) => session.set_last_prompt(p)?,
                     None => return Ok(()),
@@ -364,15 +362,11 @@ async fn main() -> Result<()> {
 
                 session.add_prompt(Prompt::default())?;
                 let user_prompt = if let Some(p) = prompt {
-                    Prompt {
-                        user_prompt: p.clone(),
-                    }
+                    Prompt::User(p.clone())
                 } else if let Some(file_path) = prompt_file {
                     let prompt_content =
                         fs::read_to_string(file_path).context("Failed to read prompt file")?;
-                    Prompt {
-                        user_prompt: prompt_content,
-                    }
+                    Prompt::User(prompt_content)
                 } else {
                     match edit::edit_prompt(&session)? {
                         Some(p) => p,

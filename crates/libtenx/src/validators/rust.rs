@@ -112,9 +112,7 @@ mod tests {
             temp_dir.path().join("crate1/src/lib.rs"),
             temp_dir.path().join("crate2/src/lib.rs"),
         ];
-        let prompt = Prompt {
-            ..Default::default()
-        };
+        let prompt = Prompt::User(String::new());
 
         let mut session = Session::new(
             temp_dir.path().to_path_buf(),
@@ -142,9 +140,7 @@ mod tests {
             temp_dir.path().join("crate2/src/lib.rs"),
         ];
 
-        let prompt = Prompt {
-            ..Default::default()
-        };
+        let prompt = Prompt::User(String::new());
 
         let mut session = Session::new(
             temp_dir.path().to_path_buf(),
@@ -172,9 +168,7 @@ mod tests {
 
         let edit_paths = vec![temp_dir.path().join("crate1/src/lib.rs")];
 
-        let prompt = Prompt {
-            ..Default::default()
-        };
+        let prompt = Prompt::User(String::new());
 
         let mut session = Session::new(
             temp_dir.path().to_path_buf(),
@@ -200,9 +194,7 @@ mod tests {
     fn test_no_cargo_toml() -> Result<()> {
         let temp_dir = TempDir::new().unwrap();
 
-        let prompt = Prompt {
-            ..Default::default()
-        };
+        let prompt = Prompt::User(String::new());
 
         let mut session = Session::new(
             temp_dir.path().to_path_buf(),
@@ -254,9 +246,7 @@ mod tests {
             temp_dir2.path().to_path_buf(),
         ];
 
-        let prompt = Prompt {
-            ..Default::default()
-        };
+        let prompt = Prompt::User(String::new());
 
         let mut session = Session::new(
             temp_dir1.path().to_path_buf(),

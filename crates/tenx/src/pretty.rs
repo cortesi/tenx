@@ -122,7 +122,7 @@ fn print_steps(session: &Session, full: bool, width: usize) -> Result<String> {
 fn render_step_prompt(step: &libtenx::Step, width: usize) -> String {
     format!(
         "\n{}",
-        wrapped_block(&step.prompt.user_prompt, width, INDENT.len() * 2)
+        wrapped_block(step.prompt.text(), width, INDENT.len() * 2)
     )
 }
 
@@ -217,9 +217,7 @@ mod tests {
             libtenx::model::Model::Claude(Claude::default()),
         );
         session
-            .add_prompt(Prompt {
-                user_prompt: "Test prompt".to_string(),
-            })
+            .add_prompt(Prompt::User("Test prompt".to_string()))
             .unwrap();
         session.add_context(Context {
             ty: ContextType::File,
@@ -275,9 +273,7 @@ mod tests {
     #[test]
     fn test_render_step_editable() {
         let step = Step {
-            prompt: Prompt {
-                user_prompt: "Test prompt\nwith multiple\nlines".to_string(),
-            },
+            prompt: Prompt::User("Test prompt\nwith multiple\nlines".to_string()),
             patch: None,
             err: None,
             usage: None,
