@@ -1,5 +1,7 @@
 use colored::*;
-use libtenx::{dialect::DialectProvider, model::ModelProvider, Result, Session, TenxError};
+use libtenx::{
+    dialect::DialectProvider, model::ModelProvider, prompt::Prompt, Result, Session, TenxError,
+};
 use std::collections::HashSet;
 use terminal_size::{terminal_size, Width};
 use textwrap::{wrap, Options};
@@ -88,7 +90,7 @@ fn print_steps(session: &Session, full: bool, width: usize) -> Result<String> {
     output.push_str(&format!("{}\n", "steps:".blue().bold()));
     for (i, step) in session.steps().iter().enumerate() {
         output.push_str(&format!("{}{}: ", INDENT, format!("{}", i).cyan().bold()));
-        output.push_str(&render_step_prompt(step, width));
+        output.push_str(&render_step_prompt(step, width, full));
         output.push('\n');
         if let Some(patch) = &step.patch {
             output.push_str(&print_patch(session, patch, full, width));
@@ -119,11 +121,25 @@ fn print_steps(session: &Session, full: bool, width: usize) -> Result<String> {
     Ok(output)
 }
 
-fn render_step_prompt(step: &libtenx::Step, width: usize) -> String {
-    format!(
-        "\n{}",
-        wrapped_block(step.prompt.text(), width, INDENT.len() * 2)
-    )
+fn render_step_prompt(step: &libtenx::Step, width: usize, full: bool) -> String {
+    match &step.prompt {
+        Prompt::User(text) => format!("\n{}", wrapped_block(text, width, INDENT.len() * 2)),
+        Prompt::Auto(text) if full => format!("\n{}", wrapped_block(text, width, INDENT.len() * 2)),
+        Prompt::Auto(text) => {
+            let lines: Vec<&str> = text.lines().collect();
+            let first_line = lines.first().unwrap_or(&"");
+            let remaining_lines = lines.len().saturating_sub(1);
+            format!(
+                "\n{}\n{}",
+                wrapped_block(first_line, width, INDENT.len() * 2),
+                wrapped_block(
+                    &format!("... {} more lines", remaining_lines),
+                    width,
+                    INDENT.len() * 2
+                )
+            )
+        }
+    }
 }
 
 fn print_patch(
@@ -278,7 +294,7 @@ mod tests {
             err: None,
             usage: None,
         };
-        let full_result = render_step_prompt(&step, 80);
+        let full_result = render_step_prompt(&step, 80, true);
         assert!(full_result.contains("Test prompt"));
         assert!(full_result.contains("with multiple"));
         assert!(full_result.contains("lines"));
