@@ -2,7 +2,7 @@ use anyhow::{Context as AnyhowContext, Result};
 use std::{fs, io::Write, process::Command};
 use tempfile::NamedTempFile;
 
-use libtenx::prompt::PromptInput;
+use libtenx::prompt::Prompt;
 use libtenx::Session;
 
 /// Returns the user's preferred editor.
@@ -57,7 +57,7 @@ fn render_initial_text(session: &libtenx::Session) -> String {
 }
 
 /// Parses the edited text into a Prompt.
-fn parse_edited_text(input: &str) -> PromptInput {
+fn parse_edited_text(input: &str) -> Prompt {
     let mut user_prompt = String::new();
 
     for line in input.lines() {
@@ -67,13 +67,13 @@ fn parse_edited_text(input: &str) -> PromptInput {
         }
     }
 
-    PromptInput {
+    Prompt {
         user_prompt: user_prompt.trim().to_string(),
     }
 }
 
 /// Opens an editor for the user to input their prompt.
-pub fn edit_prompt(session: &Session) -> Result<Option<PromptInput>> {
+pub fn edit_prompt(session: &Session) -> Result<Option<Prompt>> {
     let mut temp_file = NamedTempFile::new()?;
     let initial_text = render_initial_text(session);
     temp_file.write_all(initial_text.as_bytes())?;
@@ -135,7 +135,7 @@ mod tests {
             libtenx::model::Model::Dummy(libtenx::model::DummyModel::default()),
         );
         session
-            .add_prompt(PromptInput {
+            .add_prompt(Prompt {
                 user_prompt: "First prompt\nwith multiple lines".to_string(),
             })
             .unwrap();
@@ -162,7 +162,7 @@ mod tests {
 
         // Add second step
         session
-            .add_prompt(PromptInput {
+            .add_prompt(Prompt {
                 user_prompt: "Second prompt\nstill multiple lines".to_string(),
             })
             .unwrap();

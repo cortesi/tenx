@@ -7,8 +7,8 @@ use tokio::sync::mpsc;
 use tracing::warn;
 
 use crate::{
-    events::Event, prompt::PromptInput, session_store::normalize_path, Result, Session,
-    SessionStore, TenxError,
+    events::Event, prompt::Prompt, session_store::normalize_path, Result, Session, SessionStore,
+    TenxError,
 };
 
 #[derive(Debug)]
@@ -150,7 +150,7 @@ impl Tenx {
                             "Retryable error (attempt {}/{}): {}",
                             retry_count, self.config.retry_limit, e
                         );
-                        session.add_prompt(PromptInput {
+                        session.add_prompt(Prompt {
                             user_prompt: model_message.to_string(),
                         })?;
                     } else {
@@ -275,7 +275,7 @@ mod tests {
                 cache: Default::default(),
             })),
         );
-        session.add_prompt(PromptInput {
+        session.add_prompt(Prompt {
             user_prompt: "Test prompt".to_string(),
         })?;
         session.add_editable(test_file_path.clone())?;

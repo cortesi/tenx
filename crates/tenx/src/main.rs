@@ -15,7 +15,7 @@ use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{fmt, EnvFilter};
 
 use libtenx::{
-    self, dialect::Dialect, model::Claude, model::Model, model::ModelProvider, prompt::PromptInput,
+    self, dialect::Dialect, model::Claude, model::Model, model::ModelProvider, prompt::Prompt,
     Config, Event, Session, Tenx,
 };
 
@@ -249,7 +249,7 @@ async fn main() -> Result<()> {
                     session.add_editable(file)?;
                 }
 
-                session.add_prompt(PromptInput {
+                session.add_prompt(Prompt {
                     user_prompt: String::new(),
                 })?;
                 match edit::edit_prompt(&session)? {
@@ -362,15 +362,15 @@ async fn main() -> Result<()> {
 
                 let mut session = tx.load_session_cwd()?;
 
-                session.add_prompt(PromptInput::default())?;
+                session.add_prompt(Prompt::default())?;
                 let user_prompt = if let Some(p) = prompt {
-                    PromptInput {
+                    Prompt {
                         user_prompt: p.clone(),
                     }
                 } else if let Some(file_path) = prompt_file {
                     let prompt_content =
                         fs::read_to_string(file_path).context("Failed to read prompt file")?;
-                    PromptInput {
+                    Prompt {
                         user_prompt: prompt_content,
                     }
                 } else {

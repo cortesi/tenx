@@ -100,9 +100,7 @@ impl RustWorkspace {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        dialect::Dialect, model::Model, prompt::PromptInput, testutils::create_dummy_project,
-    };
+    use crate::{dialect::Dialect, model::Model, prompt::Prompt, testutils::create_dummy_project};
     use tempfile::TempDir;
 
     #[test]
@@ -114,7 +112,7 @@ mod tests {
             temp_dir.path().join("crate1/src/lib.rs"),
             temp_dir.path().join("crate2/src/lib.rs"),
         ];
-        let prompt = PromptInput {
+        let prompt = Prompt {
             ..Default::default()
         };
 
@@ -144,7 +142,7 @@ mod tests {
             temp_dir.path().join("crate2/src/lib.rs"),
         ];
 
-        let prompt = PromptInput {
+        let prompt = Prompt {
             ..Default::default()
         };
 
@@ -174,7 +172,7 @@ mod tests {
 
         let edit_paths = vec![temp_dir.path().join("crate1/src/lib.rs")];
 
-        let prompt = PromptInput {
+        let prompt = Prompt {
             ..Default::default()
         };
 
@@ -202,7 +200,7 @@ mod tests {
     fn test_no_cargo_toml() -> Result<()> {
         let temp_dir = TempDir::new().unwrap();
 
-        let prompt = PromptInput {
+        let prompt = Prompt {
             ..Default::default()
         };
 
@@ -226,7 +224,7 @@ mod tests {
     fn test_no_paths_provided() -> Result<()> {
         let temp_dir = TempDir::new().unwrap();
 
-        let prompt = PromptInput::default();
+        let prompt = Prompt::default();
 
         let mut session = Session::new(
             temp_dir.path().to_path_buf(),
@@ -256,7 +254,7 @@ mod tests {
             temp_dir2.path().to_path_buf(),
         ];
 
-        let prompt = PromptInput {
+        let prompt = Prompt {
             ..Default::default()
         };
 

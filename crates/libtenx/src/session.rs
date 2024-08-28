@@ -12,7 +12,7 @@ use crate::{
     events::Event,
     model::{Model, ModelProvider},
     patch::{Change, Patch},
-    prompt::PromptInput,
+    prompt::Prompt,
     Config, Result, TenxError,
 };
 use tokio::sync::mpsc;
@@ -72,7 +72,7 @@ use crate::model::Usage;
 /// A single step in the session - basically a prompt and a patch.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Step {
-    pub prompt: PromptInput,
+    pub prompt: Prompt,
     pub patch: Option<Patch>,
     pub err: Option<TenxError>,
     pub usage: Option<Usage>,
@@ -95,7 +95,7 @@ pub struct Session {
 
 impl Session {
     /// Updates the prompt at a specific step.
-    pub fn update_prompt_at(&mut self, offset: usize, prompt: PromptInput) -> Result<()> {
+    pub fn update_prompt_at(&mut self, offset: usize, prompt: Prompt) -> Result<()> {
         if offset >= self.steps.len() {
             return Err(TenxError::Internal("Invalid step offset".into()));
         }
@@ -182,7 +182,7 @@ impl Session {
     /// Adds a new step to the session, and sets the step prompt.
     ///
     /// Returns an error if the last step doesn't have either a patch or an error.
-    pub fn add_prompt(&mut self, prompt: PromptInput) -> Result<()> {
+    pub fn add_prompt(&mut self, prompt: Prompt) -> Result<()> {
         if let Some(last_step) = self.steps.last() {
             if last_step.patch.is_none() && last_step.err.is_none() {
                 return Err(TenxError::Internal(
@@ -200,7 +200,7 @@ impl Session {
     }
 
     /// Sets the prompt for the last step in the session.
-    pub fn set_last_prompt(&mut self, prompt: PromptInput) -> Result<()> {
+    pub fn set_last_prompt(&mut self, prompt: Prompt) -> Result<()> {
         if let Some(last_step) = self.steps.last_mut() {
             last_step.prompt = prompt;
             Ok(())
@@ -520,7 +520,7 @@ mod tests {
                 .into_iter()
                 .collect(),
             };
-            session.add_prompt(PromptInput {
+            session.add_prompt(Prompt {
                 user_prompt: format!("Prompt {}", i),
             })?;
             session.set_last_patch(&patch);

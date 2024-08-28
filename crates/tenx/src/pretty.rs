@@ -88,7 +88,7 @@ fn print_steps(session: &Session, full: bool, width: usize) -> Result<String> {
     output.push_str(&format!("{}\n", "steps:".blue().bold()));
     for (i, step) in session.steps().iter().enumerate() {
         output.push_str(&format!("{}{}: ", INDENT, format!("{}", i).cyan().bold()));
-        output.push_str(&render_step_editable(step, full, width));
+        output.push_str(&render_step_prompt(step, width));
         output.push('\n');
         if let Some(patch) = &step.patch {
             output.push_str(&print_patch(session, patch, full, width));
@@ -119,13 +119,11 @@ fn print_steps(session: &Session, full: bool, width: usize) -> Result<String> {
     Ok(output)
 }
 
-fn render_step_editable(step: &libtenx::Step, full: bool, width: usize) -> String {
-    let prompt = if full {
-        &step.prompt.user_prompt
-    } else {
-        step.prompt.user_prompt.lines().next().unwrap_or("")
-    };
-    format!("\n{}", wrapped_block(prompt, width, INDENT.len() * 2))
+fn render_step_prompt(step: &libtenx::Step, width: usize) -> String {
+    format!(
+        "\n{}",
+        wrapped_block(&step.prompt.user_prompt, width, INDENT.len() * 2)
+    )
 }
 
 fn print_patch(
@@ -205,7 +203,7 @@ fn wrapped_block(text: &str, width: usize, indent: usize) -> String {
 mod tests {
     use super::*;
     use libtenx::{
-        dialect::Tags, model::Claude, patch::Patch, prompt::PromptInput, Context, ContextData,
+        dialect::Tags, model::Claude, patch::Patch, prompt::Prompt, Context, ContextData,
         ContextType, Step, TenxError,
     };
     use tempfile::TempDir;
@@ -219,7 +217,7 @@ mod tests {
             libtenx::model::Model::Claude(Claude::default()),
         );
         session
-            .add_prompt(PromptInput {
+            .add_prompt(Prompt {
                 user_prompt: "Test prompt".to_string(),
             })
             .unwrap();
@@ -245,8 +243,10 @@ mod tests {
     #[test]
     fn test_print_steps_with_patch() {
         let (_temp_dir, mut session) = create_test_session();
-        let mut patch = Patch::default();
-        patch.comment = Some("Test comment".to_string());
+        let patch = Patch {
+            comment: Some("Test comment".to_string()),
+            ..Default::default()
+        };
         session.set_last_patch(&patch);
         let result = print_steps(&session, false, 80);
         assert!(result.is_ok());
@@ -275,18 +275,14 @@ mod tests {
     #[test]
     fn test_render_step_editable() {
         let step = Step {
-            prompt: PromptInput {
+            prompt: Prompt {
                 user_prompt: "Test prompt\nwith multiple\nlines".to_string(),
             },
             patch: None,
             err: None,
             usage: None,
         };
-        let result = render_step_editable(&step, false, 80);
-        assert!(result.contains("Test prompt"));
-        assert!(!result.contains("with multiple"));
-
-        let full_result = render_step_editable(&step, true, 80);
+        let full_result = render_step_prompt(&step, 80);
         assert!(full_result.contains("Test prompt"));
         assert!(full_result.contains("with multiple"));
         assert!(full_result.contains("lines"));
