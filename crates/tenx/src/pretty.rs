@@ -8,10 +8,11 @@ const DEFAULT_WIDTH: usize = 80;
 const INDENT: &str = "  ";
 
 fn format_usage(usage: &libtenx::model::Usage) -> String {
-    usage
-        .values()
-        .iter()
-        .map(|(k, v)| format!("{}:{}", k.blue().bold(), v))
+    let values = usage.values();
+    let mut keys: Vec<_> = values.keys().collect();
+    keys.sort();
+    keys.iter()
+        .map(|k| format!("{}:{}", k.blue().bold(), values.get(*k).unwrap()))
         .collect::<Vec<_>>()
         .join(" ")
 }
