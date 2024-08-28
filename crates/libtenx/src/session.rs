@@ -25,7 +25,7 @@ pub enum ContextType {
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub enum ContextData {
-    /// Unresolved content that should be read from a file
+    /// Unresolved content that should be read from a file each time the session is rendered.
     Path(PathBuf),
     /// Resolved content that can be passed to the model.
     String(String),
