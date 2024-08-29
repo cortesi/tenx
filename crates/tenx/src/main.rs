@@ -7,6 +7,7 @@ use std::{
 use anyhow::{Context as AnyhowContext, Result};
 use clap::{CommandFactory, Parser, Subcommand};
 use colored::*;
+use serde_json::to_string_pretty;
 use tokio::sync::mpsc;
 use tracing::{info, Subscriber};
 use tracing_subscriber::fmt::format::{FmtSpan, Writer};
@@ -80,6 +81,8 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Print the current configuration
+    Conf,
     /// Add context to an existing session
     AddCtx {
         /// Specifies files to add as context
@@ -227,6 +230,11 @@ async fn main() -> Result<()> {
 
     match &cli.command {
         Some(cmd) => match cmd {
+            Commands::Conf => {
+                let config = load_config(&cli)?;
+                println!("{}", to_string_pretty(&config)?);
+                Ok(())
+            }
             Commands::Oneshot { files, ruskel, ctx } => {
                 let config = load_config(&cli)?;
                 let tx = Tenx::new(config);
