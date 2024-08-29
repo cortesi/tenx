@@ -1,20 +1,20 @@
 //! This module implements the Claude model provider for the tenx system.
-use tracing::warn;
+use std::{collections::HashSet, convert::From, path::PathBuf};
+
+use tracing::{trace, warn};
 
 use misanthropy::{Anthropic, Content, ContentBlockDelta, Role, StreamEvent};
 use serde::{Deserialize, Serialize};
 use serde_json;
+use tokio::sync::mpsc;
 
-use super::ModelProvider;
 use crate::{
     config::Config,
     dialect::{Dialect, DialectProvider},
     events::Event,
+    model::ModelProvider,
     patch, Result, Session, TenxError,
 };
-use std::collections::HashSet;
-use std::convert::From;
-use std::path::PathBuf;
 
 const DEFAULT_MODEL: &str = "claude-3-5-sonnet-20240620";
 const MAX_TOKENS: u32 = 8192;
@@ -24,8 +24,6 @@ const EDITABLE_LEADIN: &str =
 const EDITABLE_UPDATE_LEADIN: &str = "Here are the updated files.";
 const OMITTED_FILES_LEADIN: &str =
     "These files have been omitted since they were updated later in the conversation:";
-
-use tokio::sync::mpsc;
 
 /// A model that interacts with the Anthropic API. This general design of the model is to:
 ///
@@ -245,6 +243,11 @@ impl Claude {
                     role: misanthropy::Role::Assistant,
                     content: vec![misanthropy::Content::text("Got it.")],
                 });
+            } else if i != session.steps().len() - 1 {
+                req.messages.push(misanthropy::Message {
+                    role: misanthropy::Role::Assistant,
+                    content: vec![misanthropy::Content::text("omitted due to error")],
+                });
             }
         }
         Ok(req)
@@ -268,9 +271,11 @@ impl ModelProvider for Claude {
         }
         let dialect = config.dialect()?;
         let mut req = self.request(session, &dialect)?;
+        trace!("Sending request: {}", serde_json::to_string_pretty(&req)?);
         let resp = self
             .stream_response(&config.anthropic_key, &req, sender)
             .await?;
+        trace!("Got response: {}", serde_json::to_string_pretty(&resp)?);
         req.merge_response(&resp);
         let patch = self.extract_changes(&dialect, &req)?;
         let usage = super::Usage::Claude(ClaudeUsage {

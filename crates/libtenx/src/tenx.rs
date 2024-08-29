@@ -80,18 +80,21 @@ impl Tenx {
         session_store.save(session)?;
         if let Err(e) = self.run_preflight_validators(session, &sender) {
             session.set_last_error(&e);
+            session_store.save(session)?;
             return Err(e);
         }
 
         let mut retry_count = 0;
         loop {
-            match self
-                .execute_prompt_cycle(session, sender.clone(), session_store)
-                .await
-            {
-                Ok(()) => return Ok(()),
+            let result = self.execute_prompt_cycle(session, sender.clone()).await;
+            match result {
+                Ok(()) => {
+                    session_store.save(session)?;
+                    return Ok(());
+                }
                 Err(e) => {
                     session.set_last_error(&e);
+                    session_store.save(session)?;
                     if let Some(model_message) = e.should_retry() {
                         retry_count += 1;
                         if retry_count >= self.config.retry_limit {
@@ -103,6 +106,7 @@ impl Tenx {
                             retry_count, self.config.retry_limit, e
                         );
                         session.add_prompt(Prompt::Auto(model_message.to_string()))?;
+                        session_store.save(session)?;
                     } else {
                         warn!("Non-retryable error: {}", e);
                         return Err(e);
@@ -116,27 +120,11 @@ impl Tenx {
         &self,
         session: &mut Session,
         sender: Option<mpsc::Sender<Event>>,
-        session_store: &SessionStore,
     ) -> Result<()> {
-        if let Err(e) = session.prompt(&self.config, sender.clone()).await {
-            session.set_last_error(&e);
-            return Err(e);
-        }
-        session_store.save(session)?;
-        if let Err(e) = session.apply_last_patch() {
-            session.set_last_error(&e);
-            return Err(e);
-        }
-        session_store.save(session)?;
-        if let Err(e) = self.run_formatters(session, &sender) {
-            session.set_last_error(&e);
-            return Err(e);
-        }
-        session_store.save(session)?;
-        if let Err(e) = self.run_post_patch_validators(session, &sender) {
-            session.set_last_error(&e);
-            return Err(e);
-        }
+        session.prompt(&self.config, sender.clone()).await?;
+        session.apply_last_patch()?;
+        self.run_formatters(session, &sender)?;
+        self.run_post_patch_validators(session, &sender)?;
         Ok(())
     }
 
