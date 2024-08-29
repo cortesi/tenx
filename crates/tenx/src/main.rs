@@ -16,10 +16,11 @@ use tracing_subscriber::{fmt, EnvFilter};
 
 use libtenx::{
     self,
+    config::Config,
     model::Claude,
     model::{Model, ModelProvider},
     prompt::Prompt,
-    Config, Event, Session, Tenx,
+    Event, Session, Tenx,
 };
 
 mod edit;

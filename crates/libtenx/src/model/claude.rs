@@ -7,9 +7,10 @@ use serde_json;
 
 use super::ModelProvider;
 use crate::{
+    config::Config,
     dialect::{Dialect, DialectProvider},
     events::Event,
-    patch, Config, Result, Session, TenxError,
+    patch, Result, Session, TenxError,
 };
 use std::collections::HashSet;
 use std::convert::From;

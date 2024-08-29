@@ -8,7 +8,7 @@ use tokio::sync::mpsc;
 pub use claude::{Claude, ClaudeUsage};
 pub use dummy_model::{DummyModel, DummyUsage};
 
-use crate::{events::Event, patch::Patch, Config, Result, Session};
+use crate::{config::Config, events::Event, patch::Patch, Result, Session};
 
 use std::collections::HashMap;
 

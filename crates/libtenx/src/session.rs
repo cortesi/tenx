@@ -8,11 +8,12 @@ use pathdiff::diff_paths;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    config::Config,
     events::Event,
     model::ModelProvider,
     patch::{Change, Patch},
     prompt::Prompt,
-    Config, Result, TenxError,
+    Result, TenxError,
 };
 use tokio::sync::mpsc;
 

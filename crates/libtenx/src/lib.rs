@@ -1,15 +1,16 @@
 mod error;
 mod events;
-pub mod patch;
-pub mod prompt;
 mod session;
 mod session_store;
 mod tenx;
 mod testutils;
 mod validators;
 
+pub mod config;
 pub mod dialect;
 pub mod model;
+pub mod patch;
+pub mod prompt;
 
 pub use error::{Result, TenxError};
 pub use events::*;
