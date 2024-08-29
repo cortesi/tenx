@@ -14,14 +14,7 @@ use tracing_subscriber::fmt::time::FormatTime;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{fmt, EnvFilter};
 
-use libtenx::{
-    self,
-    config::Config,
-    model::Claude,
-    model::{Model, ModelProvider},
-    prompt::Prompt,
-    Event, Session, Tenx,
-};
+use libtenx::{self, config, model::ModelProvider, prompt::Prompt, Event, Session, Tenx};
 
 mod edit;
 mod pretty;
@@ -177,10 +170,10 @@ enum Commands {
 }
 
 /// Creates a Config from CLI arguments
-fn load_config(cli: &Cli) -> Result<Config> {
-    let mut config = Config::default()
+fn load_config(cli: &Cli) -> Result<config::Config> {
+    let mut config = config::Config::default()
         .with_anthropic_key(cli.anthropic_key.clone().unwrap_or_default())
-        .with_model(Model::Claude(Claude::default()));
+        .with_model(config::ConfigModel::Claude);
     if let Some(session_store_dir) = cli.session_store.clone() {
         config = config.with_session_store_dir(session_store_dir);
     }

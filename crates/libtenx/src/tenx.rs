@@ -199,24 +199,21 @@ mod tests {
     use std::fs;
     use std::path::PathBuf;
 
-    use crate::{
-        model::Model,
-        patch::{Change, Patch, WriteFile},
-    };
+    use crate::patch::{Change, Patch, WriteFile};
     use tempfile::tempdir;
 
     #[tokio::test]
     async fn test_tenx_process_prompt() -> Result<()> {
         let temp_dir = tempdir().unwrap();
         let config = Config::default()
-            .with_model(Model::Dummy(crate::model::DummyModel::from_patch(Patch {
+            .with_dummy_model(crate::model::DummyModel::from_patch(Patch {
                 changes: vec![Change::Write(WriteFile {
                     path: PathBuf::from("test.txt"),
                     content: "Updated content".to_string(),
                 })],
                 comment: Some("Test comment".to_string()),
                 cache: Default::default(),
-            })))
+            }))
             .with_session_store_dir(temp_dir.path())
             .with_retry_limit(1);
         let tenx = Tenx::new(config);

@@ -1,15 +1,36 @@
+use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
-use crate::{model, Result, TenxError};
+use crate::{dialect, model, Result};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub enum ConfigModel {
+    #[default]
+    Claude,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub enum ConfigDialect {
+    #[default]
+    Tags,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     pub anthropic_key: String,
     pub session_store_dir: Option<PathBuf>,
     pub retry_limit: usize,
     pub no_preflight: bool,
-    pub model: Option<model::Model>,
-    pub dialect: Option<crate::dialect::Dialect>,
+    pub model: ConfigModel,
+    pub dialect: ConfigDialect,
+
+    /// Set a dummy model for end-to-end testing. Over-rides the configured model.
+    #[serde(skip_serializing, skip_deserializing)]
+    dummy_model: Option<model::DummyModel>,
+
+    /// Set a dummy dialect for end-to-end testing. Over-rides the configured dialect.
+    #[serde(skip_serializing, skip_deserializing)]
+    dummy_dialect: Option<dialect::DummyDialect>,
 }
 
 impl Default for Config {
@@ -19,8 +40,10 @@ impl Default for Config {
             session_store_dir: None,
             retry_limit: 10,
             no_preflight: false,
-            model: None,
-            dialect: None,
+            model: ConfigModel::default(),
+            dialect: ConfigDialect::default(),
+            dummy_model: None,
+            dummy_dialect: None,
         }
     }
 }
@@ -33,14 +56,24 @@ impl Config {
     }
 
     /// Sets the configured model
-    pub fn with_model(mut self, model: model::Model) -> Self {
-        self.model = Some(model);
+    pub fn with_model(mut self, model: ConfigModel) -> Self {
+        self.model = model;
+        self
+    }
+
+    pub fn with_dummy_model(mut self, model: model::DummyModel) -> Self {
+        self.dummy_model = Some(model);
+        self
+    }
+
+    pub fn with_dummy_dialect(mut self, dialect: dialect::DummyDialect) -> Self {
+        self.dummy_dialect = Some(dialect);
         self
     }
 
     /// Sets the configured dialect
-    pub fn with_dialect(mut self, dialect: crate::dialect::Dialect) -> Self {
-        self.dialect = Some(dialect);
+    pub fn with_dialect(mut self, dialect: ConfigDialect) -> Self {
+        self.dialect = dialect;
         self
     }
 
@@ -64,15 +97,21 @@ impl Config {
 
     /// Returns the configured model.
     pub fn model(&self) -> Result<crate::model::Model> {
-        self.model
-            .clone()
-            .ok_or_else(|| TenxError::Internal("Model not configured".to_string()))
+        if let Some(dummy_model) = &self.dummy_model {
+            return Ok(model::Model::Dummy(dummy_model.clone()));
+        }
+        match self.model {
+            ConfigModel::Claude => Ok(model::Model::Claude(model::Claude {})),
+        }
     }
 
     /// Returns the configured dialect.
     pub fn dialect(&self) -> Result<crate::dialect::Dialect> {
-        self.dialect
-            .clone()
-            .ok_or_else(|| TenxError::Internal("Dialect not configured".to_string()))
+        if let Some(dummy_dialect) = &self.dummy_dialect {
+            return Ok(dialect::Dialect::Dummy(dummy_dialect.clone()));
+        }
+        match self.dialect {
+            ConfigDialect::Tags => Ok(dialect::Dialect::Tags(dialect::Tags {})),
+        }
     }
 }
