@@ -78,10 +78,11 @@ impl TenxError {
     }
 
     /// Returns the model response if the error is retryable, otherwise None.
-    pub fn should_retry(&self) -> Option<&str> {
+    pub fn should_retry(&self) -> Option<String> {
         match self {
-            TenxError::Validation { model, .. } => Some(model),
-            TenxError::Patch { model, .. } => Some(model),
+            TenxError::Validation { model, .. } => Some(model.to_string()),
+            TenxError::Patch { model, .. } => Some(model.to_string()),
+            TenxError::ResponseParse(e) => Some(e.to_string()),
             _ => None,
         }
     }

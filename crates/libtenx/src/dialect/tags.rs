@@ -67,7 +67,7 @@ impl DialectProvider for Tags {
         let mut rendered = String::new();
         rendered.push_str(&format!(
             "\n<prompt>\n{}\n</prompt>\n\n",
-            prompt.prompt.text().to_string()
+            prompt.prompt.text()
         ));
         Ok(rendered)
     }
