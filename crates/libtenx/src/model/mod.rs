@@ -47,7 +47,7 @@ pub trait ModelProvider {
     fn render(&self, session: &Session) -> Result<String>;
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub enum Model {
     Claude(Claude),
     Dummy(DummyModel),

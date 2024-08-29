@@ -15,7 +15,11 @@ use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{fmt, EnvFilter};
 
 use libtenx::{
-    self, dialect::Dialect, model::Claude, model::Model, model::ModelProvider, prompt::Prompt,
+    self,
+    dialect::Dialect,
+    model::Claude,
+    model::{Model, ModelProvider},
+    prompt::Prompt,
     Config, Event, Session, Tenx,
 };
 
@@ -174,8 +178,9 @@ enum Commands {
 
 /// Creates a Config from CLI arguments
 fn load_config(cli: &Cli) -> Result<Config> {
-    let mut config =
-        Config::default().with_anthropic_key(cli.anthropic_key.clone().unwrap_or_default());
+    let mut config = Config::default()
+        .with_anthropic_key(cli.anthropic_key.clone().unwrap_or_default())
+        .with_model(Model::Claude(Claude::default()));
     if let Some(session_store_dir) = cli.session_store.clone() {
         config = config.with_session_store_dir(session_store_dir);
     }
@@ -232,10 +237,8 @@ async fn main() -> Result<()> {
             Commands::Oneshot { files, ruskel, ctx } => {
                 let config = load_config(&cli)?;
                 let tx = Tenx::new(config);
-                let mut session = Session::from_cwd(
-                    Dialect::Tags(libtenx::dialect::Tags::default()),
-                    Model::Claude(Claude::default()),
-                )?;
+                let mut session =
+                    Session::from_cwd(Dialect::Tags(libtenx::dialect::Tags::default()))?;
 
                 for file in ctx {
                     session.add_ctx_path(file)?;
@@ -330,10 +333,8 @@ async fn main() -> Result<()> {
             Commands::New { files, ruskel } => {
                 let config = load_config(&cli)?;
                 let tx = Tenx::new(config);
-                let mut session = Session::from_cwd(
-                    Dialect::Tags(libtenx::dialect::Tags::default()),
-                    Model::Claude(Claude::default()),
-                )?;
+                let mut session =
+                    Session::from_cwd(Dialect::Tags(libtenx::dialect::Tags::default()))?;
 
                 for file in files {
                     session.add_ctx_path(file)?;
@@ -400,18 +401,15 @@ async fn main() -> Result<()> {
             }
             Commands::Show { raw, render, full } => {
                 let config = load_config(&cli)?;
-                let tx = Tenx::new(config);
+                let model = config.model()?;
+                let tx = Tenx::new(config.clone());
                 let session = tx.load_session_cwd()?;
                 if *raw {
                     println!("{:#?}", session);
                 } else if *render {
-                    if let Some(model) = &session.model {
-                        println!("{}", model.render(&session)?);
-                    } else {
-                        println!("No model available in the session.");
-                    }
+                    println!("{}", model.render(&session)?);
                 } else {
-                    println!("{}", pretty::session(&session, *full)?);
+                    println!("{}", pretty::session(&config, &session, *full)?);
                 }
                 Ok(())
             }

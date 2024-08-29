@@ -54,7 +54,7 @@ impl SessionStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{dialect, model};
+    use crate::dialect;
     use tempfile::TempDir;
 
     #[test]
@@ -75,7 +75,6 @@ mod tests {
         let state = Session::new(
             temp_dir.path().to_path_buf(),
             dialect::Dialect::Tags(dialect::Tags {}),
-            model::Model::Claude(model::Claude::default()),
         );
         state_store.save(&state).unwrap();
 

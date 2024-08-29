@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     dialect::Dialect,
     events::Event,
-    model::{Model, ModelProvider},
+    model::ModelProvider,
     patch::{Change, Patch},
     prompt::Prompt,
     Config, Result, TenxError,
@@ -86,8 +86,6 @@ pub struct Session {
     pub root: PathBuf,
     /// The dialect used in the session
     pub dialect: Dialect,
-    /// The model used in the session
-    pub model: Option<Model>,
     steps: Vec<Step>,
     context: Vec<Context>,
     editable: Vec<PathBuf>,
@@ -106,10 +104,9 @@ impl Session {
 
 impl Session {
     /// Creates a new Session with the specified root directory, dialect, and model.
-    pub fn new(root: PathBuf, dialect: Dialect, model: Model) -> Self {
+    pub fn new(root: PathBuf, dialect: Dialect) -> Self {
         Self {
             root: root.canonicalize().unwrap(),
-            model: Some(model),
             dialect,
             steps: vec![],
             context: vec![],
@@ -120,10 +117,10 @@ impl Session {
     /// Creates a new Session, discovering the root from the current working directory. At the
     /// moment, this means the enclosing git repository, if there is one, otherwise the current
     /// directory.
-    pub fn from_cwd(dialect: Dialect, model: Model) -> Result<Self> {
+    pub fn from_cwd(dialect: Dialect) -> Result<Self> {
         let cwd = env::current_dir().map_err(|e| TenxError::fio(e, "."))?;
         let root = find_root(&cwd);
-        Ok(Self::new(root, dialect, model))
+        Ok(Self::new(root, dialect))
     }
 
     pub fn steps(&self) -> &Vec<Step> {
@@ -371,12 +368,8 @@ impl Session {
         config: &Config,
         sender: Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
-        let mut model = self
-            .model
-            .take()
-            .ok_or_else(|| TenxError::Internal("No model available".into()))?;
+        let mut model = config.model()?;
         let (patch, usage) = model.send(config, self, sender).await?;
-        self.model = Some(model);
         if let Some(last_step) = self.steps.last_mut() {
             last_step.patch = Some(patch);
             last_step.usage = Some(usage);
@@ -412,7 +405,6 @@ mod tests {
         let mut session = Session::new(
             temp_dir.path().to_path_buf(),
             Dialect::Tags(crate::dialect::Tags {}),
-            Model::Dummy(crate::model::DummyModel::default()),
         );
 
         let context1 = Context {
@@ -442,11 +434,7 @@ mod tests {
         let sub_dir = root.join("subdir");
         fs::create_dir(&sub_dir).unwrap();
 
-        let session = Session::new(
-            root.clone(),
-            Dialect::Tags(crate::dialect::Tags {}),
-            Model::Dummy(crate::model::DummyModel::default()),
-        );
+        let session = Session::new(root.clone(), Dialect::Tags(crate::dialect::Tags {}));
 
         // Test 1: Current dir is the root directory
         {
@@ -496,11 +484,7 @@ mod tests {
         let root_dir = temp_dir.path().to_path_buf();
         let file_path = root_dir.join("test.txt");
 
-        let mut session = Session::new(
-            root_dir.clone(),
-            Dialect::Tags(crate::dialect::Tags {}),
-            Model::Dummy(crate::model::DummyModel::default()),
-        );
+        let mut session = Session::new(root_dir.clone(), Dialect::Tags(crate::dialect::Tags {}));
 
         // Create initial file
         fs::write(&file_path, "Initial content").unwrap();

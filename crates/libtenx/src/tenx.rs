@@ -7,16 +7,17 @@ use tokio::sync::mpsc;
 use tracing::warn;
 
 use crate::{
-    events::Event, prompt::Prompt, session_store::normalize_path, Result, Session, SessionStore,
-    TenxError,
+    events::Event, model, prompt::Prompt, session_store::normalize_path, Result, Session,
+    SessionStore, TenxError,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Config {
     pub anthropic_key: String,
     pub session_store_dir: Option<PathBuf>,
     pub retry_limit: usize,
     pub no_preflight: bool,
+    pub model: Option<model::Model>,
 }
 
 impl Default for Config {
@@ -26,6 +27,7 @@ impl Default for Config {
             session_store_dir: None,
             retry_limit: 10,
             no_preflight: false,
+            model: None,
         }
     }
 }
@@ -34,6 +36,12 @@ impl Config {
     /// Sets the Anthropic API key.
     pub fn with_anthropic_key(mut self, key: String) -> Self {
         self.anthropic_key = key;
+        self
+    }
+
+    /// Sets the configured model
+    pub fn with_model(mut self, model: model::Model) -> Self {
+        self.model = Some(model);
         self
     }
 
@@ -53,6 +61,13 @@ impl Config {
     pub fn with_no_preflight(mut self, no_preflight: bool) -> Self {
         self.no_preflight = no_preflight;
         self
+    }
+
+    /// Returns the configured model.
+    pub fn model(&self) -> Result<crate::model::Model> {
+        self.model
+            .clone()
+            .ok_or_else(|| TenxError::Internal("Model not configured".to_string()))
     }
 }
 
@@ -255,6 +270,14 @@ mod tests {
     async fn test_tenx_process_prompt() -> Result<()> {
         let temp_dir = tempdir().unwrap();
         let config = Config::default()
+            .with_model(Model::Dummy(crate::model::DummyModel::from_patch(Patch {
+                changes: vec![Change::Write(WriteFile {
+                    path: PathBuf::from("test.txt"),
+                    content: "Updated content".to_string(),
+                })],
+                comment: Some("Test comment".to_string()),
+                cache: Default::default(),
+            })))
             .with_session_store_dir(temp_dir.path())
             .with_retry_limit(1);
         let tenx = Tenx::new(config);
@@ -264,14 +287,6 @@ mod tests {
         let mut session = Session::new(
             temp_dir.path().to_path_buf(),
             Dialect::Dummy(DummyDialect::default()),
-            Model::Dummy(crate::model::DummyModel::from_patch(Patch {
-                changes: vec![Change::Write(WriteFile {
-                    path: PathBuf::from("test.txt"),
-                    content: "Updated content".to_string(),
-                })],
-                comment: Some("Test comment".to_string()),
-                cache: Default::default(),
-            })),
         );
         session.add_prompt(Prompt::User("Test prompt".to_string()))?;
         session.add_editable(test_file_path.clone())?;

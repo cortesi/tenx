@@ -130,7 +130,6 @@ mod tests {
         let mut session = Session::new(
             PathBuf::from("/"),
             libtenx::dialect::Dialect::Dummy(libtenx::dialect::DummyDialect::default()),
-            libtenx::model::Model::Dummy(libtenx::model::DummyModel::default()),
         );
         session
             .add_prompt(Prompt::User(

@@ -32,7 +32,7 @@ use tokio::sync::mpsc;
 /// - Emit both the non-editable context and the editable context as pre-primed messages in the
 ///   prompt.
 /// - Edit the conversation to keep the most up-to-date editable files frontmost.
-#[derive(Default, Debug, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone)]
 pub struct Claude {}
 
 use std::collections::HashMap;

@@ -22,7 +22,7 @@ impl DummyUsage {
 }
 
 /// A dummy model for testing purposes.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct DummyModel {
     change_set: Result<Patch>,
 }
