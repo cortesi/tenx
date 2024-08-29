@@ -176,6 +176,7 @@ impl DialectProvider for Tags {
                             replace.new
                         ));
                     }
+                    Change::Block(_) => {}
                 }
             }
             Ok(rendered)

@@ -169,6 +169,7 @@ fn print_patch(
         .map(|change| match change {
             libtenx::patch::Change::Write(w) => &w.path,
             libtenx::patch::Change::Replace(r) => &r.path,
+            libtenx::patch::Change::Block(b) => &b.path,
         })
         .collect();
     if !modified_files.is_empty() {
