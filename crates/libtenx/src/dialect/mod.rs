@@ -1,4 +1,3 @@
-use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 mod dummy_dialect;
@@ -36,7 +35,7 @@ pub trait DialectProvider {
     fn parse(&self, txt: &str) -> Result<Patch>;
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Dialect {
     Tags(Tags),
     Dummy(DummyDialect),

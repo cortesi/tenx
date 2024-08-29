@@ -44,7 +44,7 @@ pub trait ModelProvider {
     ) -> Result<(Patch, Usage)>;
 
     /// Render a session for display to the user.
-    fn render(&self, session: &Session) -> Result<String>;
+    fn render(&self, config: &Config, session: &Session) -> Result<String>;
 }
 
 #[derive(Debug, Clone)]
@@ -74,10 +74,10 @@ impl ModelProvider for Model {
         }
     }
 
-    fn render(&self, session: &Session) -> Result<String> {
+    fn render(&self, config: &Config, session: &Session) -> Result<String> {
         match self {
-            Model::Claude(c) => c.render(session),
-            Model::Dummy(d) => d.render(session),
+            Model::Claude(c) => c.render(config, session),
+            Model::Dummy(d) => d.render(config, session),
         }
     }
 }

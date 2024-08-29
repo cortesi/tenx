@@ -54,7 +54,6 @@ impl SessionStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dialect;
     use tempfile::TempDir;
 
     #[test]
@@ -72,16 +71,12 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let state_store = SessionStore::open(Some(temp_dir.path().into())).unwrap();
 
-        let state = Session::new(
-            temp_dir.path().to_path_buf(),
-            dialect::Dialect::Tags(dialect::Tags {}),
-        );
+        let state = Session::new(temp_dir.path().to_path_buf());
         state_store.save(&state).unwrap();
 
         let name = normalize_path(&state.root);
         let loaded_state = state_store.load(name)?;
         assert_eq!(loaded_state.root, state.root);
-        assert_eq!(loaded_state.dialect, state.dialect);
         Ok(())
     }
 }

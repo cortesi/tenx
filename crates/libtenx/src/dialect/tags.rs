@@ -3,8 +3,6 @@
 
 use std::{fs, path::PathBuf};
 
-use serde::{Deserialize, Serialize};
-
 use super::{xmlish, DialectProvider};
 use crate::{
     patch::{Change, Patch, Replace, WriteFile},
@@ -13,7 +11,7 @@ use crate::{
 
 const SYSTEM: &str = include_str!("./tags-system.txt");
 
-#[derive(Debug, Default, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct Tags {}
 
 impl DialectProvider for Tags {

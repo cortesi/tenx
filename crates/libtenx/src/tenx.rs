@@ -18,6 +18,7 @@ pub struct Config {
     pub retry_limit: usize,
     pub no_preflight: bool,
     pub model: Option<model::Model>,
+    pub dialect: Option<crate::dialect::Dialect>,
 }
 
 impl Default for Config {
@@ -28,6 +29,7 @@ impl Default for Config {
             retry_limit: 10,
             no_preflight: false,
             model: None,
+            dialect: None,
         }
     }
 }
@@ -42,6 +44,12 @@ impl Config {
     /// Sets the configured model
     pub fn with_model(mut self, model: model::Model) -> Self {
         self.model = Some(model);
+        self
+    }
+
+    /// Sets the configured dialect
+    pub fn with_dialect(mut self, dialect: crate::dialect::Dialect) -> Self {
+        self.dialect = Some(dialect);
         self
     }
 
@@ -68,6 +76,13 @@ impl Config {
         self.model
             .clone()
             .ok_or_else(|| TenxError::Internal("Model not configured".to_string()))
+    }
+
+    /// Returns the configured dialect.
+    pub fn dialect(&self) -> Result<crate::dialect::Dialect> {
+        self.dialect
+            .clone()
+            .ok_or_else(|| TenxError::Internal("Dialect not configured".to_string()))
     }
 }
 
@@ -259,7 +274,6 @@ impl Tenx {
 mod tests {
     use super::*;
     use crate::{
-        dialect::{Dialect, DummyDialect},
         model::Model,
         patch::{Change, Patch, WriteFile},
     };
@@ -284,10 +298,7 @@ mod tests {
         let test_file_path = temp_dir.path().join("test.txt");
         fs::write(&test_file_path, "Initial content").unwrap();
 
-        let mut session = Session::new(
-            temp_dir.path().to_path_buf(),
-            Dialect::Dummy(DummyDialect::default()),
-        );
+        let mut session = Session::new(temp_dir.path().to_path_buf());
         session.add_prompt(Prompt::User("Test prompt".to_string()))?;
         session.add_editable(test_file_path.clone())?;
 

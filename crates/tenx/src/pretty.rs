@@ -1,8 +1,5 @@
 use colored::*;
-use libtenx::{
-    dialect::DialectProvider, model::ModelProvider, prompt::Prompt, Config, Result, Session,
-    TenxError,
-};
+use libtenx::{prompt::Prompt, Result, Session, TenxError};
 use std::collections::HashSet;
 use terminal_size::{terminal_size, Width};
 use textwrap::{wrap, Options};
@@ -21,36 +18,24 @@ fn format_usage(usage: &libtenx::model::Usage) -> String {
 }
 
 /// Pretty prints the Session information.
-pub fn session(cnf: &Config, session: &Session, full: bool) -> Result<String> {
+pub fn session(session: &Session, full: bool) -> Result<String> {
     let width = terminal_size()
         .map(|(Width(w), _)| w as usize)
         .unwrap_or(DEFAULT_WIDTH);
     let mut output = String::new();
-    output.push_str(&print_session_info(cnf, session));
+    output.push_str(&print_session_info(session));
     output.push_str(&print_context(session));
     output.push_str(&print_editables(session)?);
     output.push_str(&print_steps(session, full, width)?);
     Ok(output)
 }
 
-fn print_session_info(cnf: &Config, session: &Session) -> String {
+fn print_session_info(session: &Session) -> String {
     let mut output = String::new();
     output.push_str(&format!(
         "{} {}\n",
         "root:".blue().bold(),
         session.root.display()
-    ));
-    output.push_str(&format!(
-        "{} {}\n",
-        "dialect:".blue().bold(),
-        session.dialect.name()
-    ));
-    output.push_str(&format!(
-        "{} {}\n",
-        "model:".blue().bold(),
-        cnf.model
-            .as_ref()
-            .map_or_else(|| "None".to_string(), |m| m.name().to_string())
     ));
     output
 }
@@ -220,18 +205,14 @@ fn wrapped_block(text: &str, width: usize, indent: usize) -> String {
 mod tests {
     use super::*;
     use libtenx::{
-        dialect::Tags, patch::Patch, prompt::Prompt, Context, ContextData, ContextType, Step,
-        TenxError,
+        patch::Patch, prompt::Prompt, Context, ContextData, ContextType, Step, TenxError,
     };
     use tempfile::TempDir;
 
     fn create_test_session() -> (TempDir, Session) {
         let temp_dir = TempDir::new().unwrap();
         let root_path = temp_dir.path().to_path_buf();
-        let mut session = Session::new(
-            root_path.clone(),
-            libtenx::dialect::Dialect::Tags(Tags::default()),
-        );
+        let mut session = Session::new(root_path.clone());
         session
             .add_prompt(Prompt::User("Test prompt".to_string()))
             .unwrap();

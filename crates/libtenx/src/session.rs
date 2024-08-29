@@ -8,7 +8,6 @@ use pathdiff::diff_paths;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    dialect::Dialect,
     events::Event,
     model::ModelProvider,
     patch::{Change, Patch},
@@ -84,8 +83,6 @@ pub struct Session {
     /// The session root directory. This is always an absolute path. Context and editable files are
     /// always relative to the root.
     pub root: PathBuf,
-    /// The dialect used in the session
-    pub dialect: Dialect,
     steps: Vec<Step>,
     context: Vec<Context>,
     editable: Vec<PathBuf>,
@@ -104,10 +101,9 @@ impl Session {
 
 impl Session {
     /// Creates a new Session with the specified root directory, dialect, and model.
-    pub fn new(root: PathBuf, dialect: Dialect) -> Self {
+    pub fn new(root: PathBuf) -> Self {
         Self {
             root: root.canonicalize().unwrap(),
-            dialect,
             steps: vec![],
             context: vec![],
             editable: vec![],
@@ -117,10 +113,10 @@ impl Session {
     /// Creates a new Session, discovering the root from the current working directory. At the
     /// moment, this means the enclosing git repository, if there is one, otherwise the current
     /// directory.
-    pub fn from_cwd(dialect: Dialect) -> Result<Self> {
+    pub fn from_cwd() -> Result<Self> {
         let cwd = env::current_dir().map_err(|e| TenxError::fio(e, "."))?;
         let root = find_root(&cwd);
-        Ok(Self::new(root, dialect))
+        Ok(Self::new(root))
     }
 
     pub fn steps(&self) -> &Vec<Step> {
@@ -402,10 +398,7 @@ mod tests {
     #[test]
     fn test_add_context_ignores_duplicates() {
         let temp_dir = tempdir().unwrap();
-        let mut session = Session::new(
-            temp_dir.path().to_path_buf(),
-            Dialect::Tags(crate::dialect::Tags {}),
-        );
+        let mut session = Session::new(temp_dir.path().to_path_buf());
 
         let context1 = Context {
             ty: ContextType::File,
@@ -434,7 +427,7 @@ mod tests {
         let sub_dir = root.join("subdir");
         fs::create_dir(&sub_dir).unwrap();
 
-        let session = Session::new(root.clone(), Dialect::Tags(crate::dialect::Tags {}));
+        let session = Session::new(root.clone());
 
         // Test 1: Current dir is the root directory
         {
@@ -484,7 +477,7 @@ mod tests {
         let root_dir = temp_dir.path().to_path_buf();
         let file_path = root_dir.join("test.txt");
 
-        let mut session = Session::new(root_dir.clone(), Dialect::Tags(crate::dialect::Tags {}));
+        let mut session = Session::new(root_dir.clone());
 
         // Create initial file
         fs::write(&file_path, "Initial content").unwrap();

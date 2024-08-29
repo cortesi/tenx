@@ -156,11 +156,11 @@ impl Claude {
     /// Returns a formatted string containing the rendered editables and omitted files.
     fn render_editables_with_omitted(
         &self,
-        session: &Session,
+        dialect: &Dialect,
         files: Vec<PathBuf>,
         omitted: Vec<PathBuf>,
     ) -> Result<String> {
-        let mut result = session.dialect.render_editables(files)?;
+        let mut result = dialect.render_editables(files)?;
         if !omitted.is_empty() {
             result.push_str(&format!("\n{}\n", OMITTED_FILES_LEADIN));
             for file in omitted {
@@ -170,7 +170,11 @@ impl Claude {
         Ok(result)
     }
 
-    fn request(&self, session: &Session) -> Result<misanthropy::MessagesRequest> {
+    fn request(
+        &self,
+        session: &Session,
+        dialect: &Dialect,
+    ) -> Result<misanthropy::MessagesRequest> {
         let mut req = misanthropy::MessagesRequest {
             model: DEFAULT_MODEL.to_string(),
             max_tokens: MAX_TOKENS,
@@ -178,11 +182,7 @@ impl Claude {
                 misanthropy::Message {
                     role: misanthropy::Role::User,
                     content: vec![misanthropy::Content::Text(misanthropy::Text {
-                        text: format!(
-                            "{}\n{}",
-                            CONTEXT_LEADIN,
-                            session.dialect.render_context(session)?
-                        ),
+                        text: format!("{}\n{}", CONTEXT_LEADIN, dialect.render_context(session)?),
                         cache_control: Some(misanthropy::CacheControl::Ephemeral),
                     })],
                 },
@@ -198,7 +198,7 @@ impl Claude {
                         {
                             let (included, omitted) =
                                 self.filter_files(&session.editables()?, session, 0);
-                            self.render_editables_with_omitted(session, included, omitted)?
+                            self.render_editables_with_omitted(dialect, included, omitted)?
                         }
                     ))],
                 },
@@ -208,7 +208,7 @@ impl Claude {
                 },
             ],
             system: vec![misanthropy::Content::Text(misanthropy::Text {
-                text: session.dialect.system(),
+                text: dialect.system(),
                 cache_control: Some(misanthropy::CacheControl::Ephemeral),
             })],
             temperature: None,
@@ -221,14 +221,14 @@ impl Claude {
             req.messages.push(misanthropy::Message {
                 role: misanthropy::Role::User,
                 content: vec![misanthropy::Content::text(
-                    session.dialect.render_step_request(session, i)?,
+                    dialect.render_step_request(session, i)?,
                 )],
             });
             if let Some(patch) = &s.patch {
                 req.messages.push(misanthropy::Message {
                     role: misanthropy::Role::Assistant,
                     content: vec![misanthropy::Content::text(
-                        session.dialect.render_step_response(session, i)?,
+                        dialect.render_step_response(session, i)?,
                     )],
                 });
                 let (included, omitted) = self.filter_files(&patch.changed_files(), session, i);
@@ -237,7 +237,7 @@ impl Claude {
                     content: vec![misanthropy::Content::text(format!(
                         "{}\n{}",
                         EDITABLE_UPDATE_LEADIN,
-                        self.render_editables_with_omitted(session, included, omitted)?
+                        self.render_editables_with_omitted(dialect, included, omitted)?
                     ))],
                 });
                 req.messages.push(misanthropy::Message {
@@ -265,12 +265,13 @@ impl ModelProvider for Claude {
         if !session.pending_prompt() {
             return Err(TenxError::Internal("No pending prompt to process.".into()));
         }
-        let mut req = self.request(session)?;
+        let dialect = config.dialect()?;
+        let mut req = self.request(session, &dialect)?;
         let resp = self
             .stream_response(&config.anthropic_key, &req, sender)
             .await?;
         req.merge_response(&resp);
-        let patch = self.extract_changes(&session.dialect, &req)?;
+        let patch = self.extract_changes(&dialect, &req)?;
         let usage = super::Usage::Claude(ClaudeUsage {
             input_tokens: resp.usage.input_tokens,
             output_tokens: resp.usage.output_tokens,
@@ -280,8 +281,9 @@ impl ModelProvider for Claude {
         Ok((patch, usage))
     }
 
-    fn render(&self, session: &Session) -> Result<String> {
-        let req = self.request(session)?;
+    fn render(&self, config: &Config, session: &Session) -> Result<String> {
+        let dialect = config.dialect()?;
+        let req = self.request(session, &dialect)?;
         let json = serde_json::to_string_pretty(&req)?;
         Ok(json)
     }

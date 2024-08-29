@@ -61,7 +61,7 @@ impl ModelProvider for DummyModel {
         Ok((patch, usage))
     }
 
-    fn render(&self, _session: &Session) -> Result<String> {
+    fn render(&self, _conf: &Config, _session: &Session) -> Result<String> {
         Ok("Dummy model render".to_string())
     }
 }

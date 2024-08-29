@@ -16,7 +16,6 @@ use tracing_subscriber::{fmt, EnvFilter};
 
 use libtenx::{
     self,
-    dialect::Dialect,
     model::Claude,
     model::{Model, ModelProvider},
     prompt::Prompt,
@@ -237,8 +236,7 @@ async fn main() -> Result<()> {
             Commands::Oneshot { files, ruskel, ctx } => {
                 let config = load_config(&cli)?;
                 let tx = Tenx::new(config);
-                let mut session =
-                    Session::from_cwd(Dialect::Tags(libtenx::dialect::Tags::default()))?;
+                let mut session = Session::from_cwd()?;
 
                 for file in ctx {
                     session.add_ctx_path(file)?;
@@ -333,8 +331,7 @@ async fn main() -> Result<()> {
             Commands::New { files, ruskel } => {
                 let config = load_config(&cli)?;
                 let tx = Tenx::new(config);
-                let mut session =
-                    Session::from_cwd(Dialect::Tags(libtenx::dialect::Tags::default()))?;
+                let mut session = Session::from_cwd()?;
 
                 for file in files {
                     session.add_ctx_path(file)?;
@@ -407,9 +404,9 @@ async fn main() -> Result<()> {
                 if *raw {
                     println!("{:#?}", session);
                 } else if *render {
-                    println!("{}", model.render(&session)?);
+                    println!("{}", model.render(&config, &session)?);
                 } else {
-                    println!("{}", pretty::session(&config, &session, *full)?);
+                    println!("{}", pretty::session(&session, *full)?);
                 }
                 Ok(())
             }

@@ -1,10 +1,8 @@
 use crate::{dialect::DialectProvider, patch::Patch, Result, Session};
 use std::path::PathBuf;
 
-use serde::{Deserialize, Serialize};
-
 /// A dummy dialect for testing purposes.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DummyDialect {
     parse_results: Vec<Result<Patch>>,
     current_index: usize,
