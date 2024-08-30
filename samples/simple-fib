@@ -8,7 +8,6 @@ cd $SCRIPT_DIR/..
 
 cargo run -- new
 cargo run -- edit \
-    --vvv \
     --prompt "Please complete the fibonacci function" \
     $SCRIPT_DIR/simple/src/*.rs 
 # git diff samples/simple

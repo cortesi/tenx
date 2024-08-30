@@ -56,6 +56,7 @@ fn create_subscriber(verbosity: u8, sender: mpsc::Sender<Event>) -> impl Subscri
         .with_env_filter(filter)
         .with_writer(make_writer)
         .with_span_events(FmtSpan::NONE)
+        .without_time()
         .finish()
 }
 
@@ -214,8 +215,7 @@ async fn print_events(mut receiver: mpsc::Receiver<Event>) {
     while let Some(event) = receiver.recv().await {
         match event {
             Event::Snippet(chunk) => {
-                print!("{}", chunk);
-                io::stdout().flush().unwrap();
+                println!("chunk: {:?}", chunk);
             }
             Event::PreflightStart => println!("{}", "Starting preflight checks...".blue()),
             Event::PreflightEnd => println!("{}", "Preflight checks completed.".blue()),
@@ -276,12 +276,23 @@ async fn main() -> anyhow::Result<()> {
     let verbosity = if cli.quiet { 0 } else { cli.verbose };
 
     let (sender, receiver) = mpsc::channel(100);
+    let (event_kill_tx, mut event_kill_rx) = mpsc::channel(1);
     let subscriber = create_subscriber(verbosity, sender.clone());
     subscriber.init();
     let event_task = if verbosity > 0 {
-        tokio::spawn(print_events(receiver))
+        tokio::spawn(async move {
+            tokio::select! {
+                _ = print_events(receiver) => {},
+                _ = event_kill_rx.recv() => {},
+            }
+        })
     } else {
-        tokio::spawn(progress_events(receiver))
+        tokio::spawn(async move {
+            tokio::select! {
+                _ = progress_events(receiver) => {},
+                _ = event_kill_rx.recv() => {},
+            }
+        })
     };
 
     let result = match &cli.command {
@@ -483,6 +494,10 @@ async fn main() -> anyhow::Result<()> {
 
     result?;
 
-    event_task.await?;
+    // Signal the event task to terminate
+    let _ = event_kill_tx.send(()).await;
+    // Wait for the event task to finish
+    let _ = tokio::time::timeout(std::time::Duration::from_millis(100), event_task).await;
+
     Ok(())
 }
