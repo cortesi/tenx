@@ -5,7 +5,7 @@ use std::{fs, path::PathBuf};
 
 use super::{xmlish, DialectProvider};
 use crate::{
-    patch::{Change, Patch, Replace, WriteFile},
+    patch::{Change, Patch, Replace, Smart, WriteFile},
     Result, Session, TenxError,
 };
 
@@ -100,6 +100,20 @@ impl DialectProvider for Tags {
         while let Some(line) = lines.peek() {
             if let Some(tag) = xmlish::parse_open(line) {
                 match tag.name.as_str() {
+                    "smart" => {
+                        let path = tag
+                            .attributes
+                            .get("path")
+                            .ok_or_else(|| {
+                                TenxError::ResponseParse("Missing path attribute".into())
+                            })?
+                            .clone();
+                        let (_, content) = xmlish::parse_block("smart", &mut lines)?;
+                        change_set.changes.push(Change::Smart(Smart {
+                            path: path.into(),
+                            text: content.join("\n"),
+                        }));
+                    }
                     "write_file" => {
                         let path = tag
                             .attributes
@@ -174,7 +188,13 @@ impl DialectProvider for Tags {
                             replace.new
                         ));
                     }
-                    Change::Smart(_) => {}
+                    Change::Smart(smart) => {
+                        rendered.push_str(&format!(
+                            "<smart path=\"{}\">\n{}\n</smart>\n\n",
+                            smart.path.display(),
+                            smart.text
+                        ));
+                    }
                 }
             }
             Ok(rendered)

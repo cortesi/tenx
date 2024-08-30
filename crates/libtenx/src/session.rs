@@ -310,7 +310,13 @@ impl Session {
                 Change::Write(write_file) => {
                     modified_cache.insert(write_file.path.clone(), write_file.content.clone());
                 }
-                Change::Smart(_) => {}
+                Change::Smart(smart) => {
+                    let current_content = modified_cache.get(&smart.path).ok_or_else(|| {
+                        TenxError::Internal("File not found in cache".to_string())
+                    })?;
+                    let new_content = smart.apply(current_content)?;
+                    modified_cache.insert(smart.path.clone(), new_content);
+                }
             }
         }
 

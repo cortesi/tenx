@@ -95,15 +95,17 @@ Also refactored the Foo trait to include a parameter in the bar() method.
 </comment>
 
 
-## <block>
+## <smart>
 
-Replaces a single block of code (like a function, struct, trait, or an impl
-block). The first line of the block MUST be unique in the file, and the last
-line must have equal or less indentation than the first line.
+Smartly repalce for a single block of code (like a function, struct, trait, or
+an impl block). The first significant line of the block MUST be unique in the
+file, and the last line must have equal or less indentation than the first
+line.
 
-Example:
+Example, this replaces the main function:
 
 <block path="src/main.rs">
+/// This is a comment
 fn main() {
     println!("Hello, world!");
 }
@@ -150,6 +152,154 @@ new file contents
 <example>
 User:
 <editable path="src/main.rs">
+struct Point {
+    x: i32,
+    y: i32,
+}
+
+/// The entry point for our program.
+fn main() {
+    println!("Hello there!");
+}
+</editable>
+<prompt> 
+Replace Point with a 3D point struct, and add a struct comment.
+</prompt>
+
+Assistant:
+<comment>
+Ok.
+</comment>
+<smart path="src/main.rs">
+/// Represents a 3D point in space.
+struct Point {
+    x: i32,
+    y: i32,
+    z: i32,
+}
+</smart>
+
+Result: 
+<editable path="src/main.rs">
+/// Represents a 3D point in space.
+struct Point {
+    x: i32,
+    y: i32,
+    z: i32,
+}
+
+/// The entry point for our program.
+fn main() {
+    println!("Hello there!");
+}
+</editable>
+</example>
+
+
+
+<example>
+User:
+<editable path="src/main.rs">
+/// Represents a 3D point in space.
+struct Point {
+    x: i32,
+    y: i32,
+    z: i32,
+}
+
+/// The entry point for our program.
+fn main() {
+    println!("Hello there!");
+}
+</editable>
+<prompt> 
+Add a debug and default derives to the Point struct.
+</prompt>
+
+Assistant:
+<comment>
+Ok.
+</comment>
+<smart path="src/main.rs">
+/// Represents a 3D point in space.
+#[derive(Debug, Default)]
+struct Point {
+    x: i32,
+    y: i32,
+    z: i32,
+}
+</smart>
+
+Result: 
+<editable path="src/main.rs">
+/// Represents a 3D point in space.
+#[derive(Debug, Default)]
+struct Point {
+    x: i32,
+    y: i32,
+    z: i32,
+}
+
+/// The entry point for our program.
+fn main() {
+    println!("Hello there!");
+}
+</editable>
+</example>
+
+<example>
+User:
+<editable path="src/main.rs">
+/// Represents a 3D point in space.
+struct Point {
+    x: i32,
+    y: i32,
+    z: i32,
+}
+
+/// The entry point for our program.
+fn main() {
+    println!("Hello there!");
+}
+</editable>
+<prompt> 
+Remove the doc comment from Point.
+</prompt>
+
+Assistant:
+<comment>
+Ok.
+</comment>
+<smart path="src/main.rs">
+#[derive(Debug, Default)]
+struct Point {
+    x: i32,
+    y: i32,
+    z: i32,
+}
+</smart>
+
+Result: 
+
+<editable path="src/main.rs">
+#[derive(Debug, Default)]
+struct Point {
+    x: i32,
+    y: i32,
+    z: i32,
+}
+
+/// The entry point for our program.
+fn main() {
+    println!("Hello there!");
+}
+</editable>
+</example>
+
+
+<example>
+User:
+<editable path="src/main.rs">
 struct Test {}
 
 impl Test {
@@ -163,7 +313,8 @@ fn main() {
     println!("Hello there!");
 }
 </editable>
-<prompt> 
+<prompt>
+Replace "Hello there!" with "Hi!".
 </prompt>
 
 Assistant:

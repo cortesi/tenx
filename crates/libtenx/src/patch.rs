@@ -95,9 +95,10 @@ impl Smart {
             if line.trim() == start_line {
                 if start_index.is_some() {
                     return Err(TenxError::Patch {
-                        user: "Multiple matches found for the block start".to_string(),
-                        model: "The first line of the block appears multiple times in the input"
-                            .to_string(),
+                        user: "Multiple matches found for the smart block start".to_string(),
+                        model:
+                            "The first line of the smart block appears multiple times in the input"
+                                .to_string(),
                     });
                 }
                 start_index = Some(i);
@@ -122,8 +123,8 @@ impl Smart {
         }
 
         let start_index = start_index.ok_or_else(|| TenxError::Patch {
-            user: "Could not find the block to replace".to_string(),
-            model: "The block does not appear in the input".to_string(),
+            user: "Could not find the smart block to replace".to_string(),
+            model: "The smart block does not appear in the input".to_string(),
         })?;
 
         let mut end_index = start_index;
