@@ -10,8 +10,7 @@ use colored::*;
 use serde_json::to_string_pretty;
 use tokio::sync::mpsc;
 use tracing::Subscriber;
-use tracing_subscriber::fmt::format::{FmtSpan, Writer};
-use tracing_subscriber::fmt::time::FormatTime;
+use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{fmt, EnvFilter};
 
@@ -20,16 +19,8 @@ use libtenx::{self, config, model::ModelProvider, prompt::Prompt, Event, LogLeve
 mod edit;
 mod pretty;
 
-struct NoTime;
-
-impl FormatTime for NoTime {
-    fn format_time(&self, _: &mut Writer<'_>) -> std::fmt::Result {
-        Ok(())
-    }
-}
-
-/// Creates a subscriber that writes to stdout without timestamps.
-fn create_subscriber(verbosity: u8) -> impl Subscriber {
+/// Creates a subscriber that sends events to an mpsc channel.
+fn create_subscriber(verbosity: u8, sender: mpsc::Sender<Event>) -> impl Subscriber {
     let filter = match verbosity {
         0 => EnvFilter::new("warn"),
         1 => EnvFilter::new("info"),
@@ -38,10 +29,32 @@ fn create_subscriber(verbosity: u8) -> impl Subscriber {
         _ => EnvFilter::new("warn"),
     };
 
+    struct Writer {
+        sender: mpsc::Sender<Event>,
+    }
+
+    impl std::io::Write for Writer {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            if let Ok(s) = std::str::from_utf8(buf) {
+                let _ = self
+                    .sender
+                    .try_send(Event::Log(LogLevel::Info, s.to_string()));
+            }
+            Ok(buf.len())
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    let make_writer = move || Writer {
+        sender: sender.clone(),
+    };
+
     fmt::Subscriber::builder()
         .with_env_filter(filter)
-        .with_timer(NoTime)
-        .with_writer(io::stdout)
+        .with_writer(make_writer)
         .with_span_events(FmtSpan::NONE)
         .finish()
 }
@@ -258,19 +271,25 @@ async fn progress_events(mut receiver: mpsc::Receiver<Event>) {
 }
 
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
-
     let verbosity = if cli.quiet { 0 } else { cli.verbose };
-    let subscriber = create_subscriber(verbosity);
-    subscriber.init();
 
-    match &cli.command {
+    let (sender, receiver) = mpsc::channel(100);
+    let subscriber = create_subscriber(verbosity, sender.clone());
+    subscriber.init();
+    let event_task = if verbosity > 0 {
+        tokio::spawn(print_events(receiver))
+    } else {
+        tokio::spawn(progress_events(receiver))
+    };
+
+    let result = match &cli.command {
         Some(cmd) => match cmd {
             Commands::Conf => {
                 let config = load_config(&cli)?;
                 println!("{}", to_string_pretty(&config)?);
-                Ok(())
+                Ok(()) as anyhow::Result<()>
             }
             Commands::Oneshot { files, ruskel, ctx } => {
                 let config = load_config(&cli)?;
@@ -295,16 +314,7 @@ async fn main() -> Result<()> {
                     None => return Ok(()),
                 };
 
-                let (sender, receiver) = mpsc::channel(100);
-                let event_task = if verbosity > 0 {
-                    tokio::spawn(print_events(receiver))
-                } else {
-                    tokio::spawn(progress_events(receiver))
-                };
-
-                tx.resume(&mut session, Some(sender)).await?;
-
-                event_task.await?;
+                tx.resume(&mut session, Some(sender.clone())).await?;
                 println!("\n");
                 println!("\n\n{}", "changes applied".green().bold());
                 Ok(())
@@ -362,12 +372,7 @@ async fn main() -> Result<()> {
                     }
                 }
 
-                let (sender, receiver) = mpsc::channel(100);
-                let print_task = tokio::spawn(print_events(receiver));
-
-                tx.resume(&mut session, Some(sender)).await?;
-
-                print_task.await?;
+                tx.resume(&mut session, Some(sender.clone())).await?;
                 println!("\n\n{}", "changes applied".green().bold());
                 Ok(())
             }
@@ -397,10 +402,6 @@ async fn main() -> Result<()> {
             } => {
                 let config = load_config(&cli)?;
                 let tx = Tenx::new(config);
-
-                let (sender, receiver) = mpsc::channel(100);
-                let print_task = tokio::spawn(print_events(receiver));
-
                 let mut session = tx.load_session_cwd()?;
 
                 session.add_prompt(Prompt::default())?;
@@ -431,7 +432,6 @@ async fn main() -> Result<()> {
 
                 tx.resume(&mut session, Some(sender)).await?;
 
-                print_task.await?;
                 println!("\n");
                 println!("\n\n{}", "changes applied".green().bold());
                 Ok(())
@@ -479,5 +479,10 @@ async fn main() -> Result<()> {
             // Print help and exit
             Ok(())
         }
-    }
+    };
+
+    result?;
+
+    event_task.await?;
+    Ok(())
 }
