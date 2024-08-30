@@ -310,7 +310,7 @@ impl Session {
                 Change::Write(write_file) => {
                     modified_cache.insert(write_file.path.clone(), write_file.content.clone());
                 }
-                Change::Block(_) => {}
+                Change::Smart(_) => {}
             }
         }
 

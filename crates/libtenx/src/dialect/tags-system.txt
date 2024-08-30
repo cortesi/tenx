@@ -94,6 +94,22 @@ Example:
 Also refactored the Foo trait to include a parameter in the bar() method.
 </comment>
 
+
+## <block>
+
+Replaces a single block of code (like a function, struct, trait, or an impl
+block). The first line of the block MUST be unique in the file, and the last
+line must have equal or less indentation than the first line.
+
+Example:
+
+<block path="src/main.rs">
+fn main() {
+    println!("Hello, world!");
+}
+</replace>
+
+
 ## <replace>
 
 Replace content in the file. Used for small changes. The <replace> tag operates
@@ -105,13 +121,13 @@ to provide.
 Example:
 
 <replace path="src/main.rs">
-    <old>
-        text to replace
-    </old>
-    <new>
-        the new text
-        to insert
-    </new>
+<old>
+text to replace
+</old>
+<new>
+the new text
+to insert
+</new>
 </replace>
 
 ## <write_file>
@@ -122,13 +138,49 @@ be used for changes to more than a third of a file.
 Example:
 
 <write_file path="src/main.rs">
-    new file contents
+new file contents
 </write_file>
 
 
 # Examples
 
 <examples>
+
+
+<example>
+User:
+<editable path="src/main.rs">
+struct Test {}
+
+impl Test {
+    fn new() -> Self {
+        Test
+    }
+}
+
+/// The entry point for our program.
+fn main() {
+    println!("Hello there!");
+}
+</editable>
+<prompt> 
+</prompt>
+
+Assistant:
+<comment>
+Ok.
+</comment>
+<replace path="src/main.rs">
+<old>
+println!("Hello there!");
+</old>
+<new>
+println!("Hi!");
+</new>
+</replace>
+</example>
+
+
 <example>
 User:
 <editable path="src/main.rs">

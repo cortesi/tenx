@@ -5,7 +5,7 @@ use std::{fs, path::PathBuf};
 
 use super::{xmlish, DialectProvider};
 use crate::{
-    patch::{Block, Change, Patch, Replace, WriteFile},
+    patch::{Change, Patch, Replace, WriteFile},
     Result, Session, TenxError,
 };
 
@@ -136,20 +136,6 @@ impl DialectProvider for Tags {
                         let (_, content) = xmlish::parse_block("comment", &mut lines)?;
                         change_set.comment = Some(content.join("\n"));
                     }
-                    "block" => {
-                        let path = tag
-                            .attributes
-                            .get("path")
-                            .ok_or_else(|| {
-                                TenxError::ResponseParse("Missing path attribute".into())
-                            })?
-                            .clone();
-                        let (_, content) = xmlish::parse_block("block", &mut lines)?;
-                        change_set.changes.push(Change::Block(Block {
-                            path: path.into(),
-                            block: content.join("\n"),
-                        }));
-                    }
                     _ => {
                         lines.next();
                     }
@@ -188,13 +174,7 @@ impl DialectProvider for Tags {
                             replace.new
                         ));
                     }
-                    Change::Block(block) => {
-                        rendered.push_str(&format!(
-                            "<block path=\"{}\">\n{}\n</block>\n\n",
-                            block.path.display(),
-                            block.block
-                        ));
-                    }
+                    Change::Smart(_) => {}
                 }
             }
             Ok(rendered)

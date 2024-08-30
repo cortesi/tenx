@@ -56,15 +56,20 @@ impl Replace {
     }
 }
 
+/// A smart replacement block. This operation has a set of heuristics for replacing a coherent
+/// block of code, without having to specify a file position or the old text (as in Replace). It
+/// doess this by detecting the position of the text to be replaced, ignoring common varieties of
+/// leading comments, and assuming that the end of the block has equal or lesser indentation as the
+/// start of the block.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct Block {
+pub struct Smart {
     pub path: PathBuf,
-    pub block: String,
+    pub text: String,
 }
 
-impl Block {
+impl Smart {
     pub fn apply(&self, input: &str) -> Result<String> {
-        let block_lines: Vec<&str> = self.block.lines().collect();
+        let block_lines: Vec<&str> = self.text.lines().collect();
         let input_lines: Vec<&str> = input.lines().collect();
 
         if block_lines.is_empty() {
@@ -128,7 +133,7 @@ impl Block {
 pub enum Change {
     Write(WriteFile),
     Replace(Replace),
-    Block(Block),
+    Smart(Smart),
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -146,7 +151,7 @@ impl Patch {
             .map(|change| match change {
                 Change::Write(write_file) => write_file.path.clone(),
                 Change::Replace(replace) => replace.path.clone(),
-                Change::Block(block) => block.path.clone(),
+                Change::Smart(block) => block.path.clone(),
             })
             .collect()
     }
@@ -156,7 +161,7 @@ impl Patch {
         match change {
             Change::Write(write_file) => format!("Write to {}", write_file.path.display()),
             Change::Replace(replace) => format!("Replace in {}", replace.path.display()),
-            Change::Block(block) => format!("Block in {}", block.path.display()),
+            Change::Smart(block) => format!("Smart in {}", block.path.display()),
         }
     }
 }
@@ -273,10 +278,10 @@ mod tests {
     }
 
     #[test]
-    fn test_block_apply() {
-        let block = Block {
+    fn test_smart_apply() {
+        let smart = Smart {
             path: "/path/to/file.txt".into(),
-            block: indoc! {"
+            text: indoc! {"
                     fn foo() {
                         println!('something else!');
                     }
@@ -302,16 +307,16 @@ mod tests {
             }
         "};
 
-        let result = block.apply(input).expect("Failed to apply block");
+        let result = smart.apply(input).expect("Failed to apply smart change");
         assert_eq!(result, expected_output.trim_end());
     }
 
     #[test]
-    fn test_block_apply_corner_cases() {
-        // Case 1: Block at the beginning of the file
-        let block1 = Block {
+    fn test_smart_apply_corner_cases() {
+        // Case 1: Smart at the beginning of the file
+        let smart1 = Smart {
             path: "/path/to/file.txt".into(),
-            block: indoc! {"
+            text: indoc! {"
                 fn first_function() {
                     // New implementation
                 }
@@ -339,15 +344,15 @@ mod tests {
             }
         "};
 
-        let result1 = block1
+        let result1 = smart1
             .apply(input1)
             .expect("Failed to apply block at the beginning");
         assert_eq!(result1, expected_output1.trim_end());
 
-        // Case 2: Block at the end of the file
-        let block2 = Block {
+        // Case 2: Smart at the end of the file
+        let block2 = Smart {
             path: "/path/to/file.txt".into(),
-            block: indoc! {"
+            text: indoc! {"
                 fn last_function() {
                     println!('New last function');
                 }
@@ -380,10 +385,10 @@ mod tests {
             .expect("Failed to apply block at the end");
         assert_eq!(result2, expected_output2.trim_end());
 
-        // Case 3: Block with different indentation
-        let block3 = Block {
+        // Case 3: Smart with different indentation
+        let smart3 = Smart {
             path: "/path/to/file.txt".into(),
-            block: indoc! {"
+            text: indoc! {"
                     fn indented_function() {
                         println!('New indented function');
                     }
@@ -419,7 +424,7 @@ mod tests {
             }
         "};
 
-        let result3 = block3
+        let result3 = smart3
             .apply(input3)
             .expect("Failed to apply block with different indentation");
         assert_eq!(result3, expected_output3.trim_end());
