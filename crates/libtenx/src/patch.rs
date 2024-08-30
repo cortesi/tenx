@@ -222,88 +222,85 @@ mod tests {
 
     #[test]
     fn test_replace_apply() {
-        let replace = Replace {
-            path: "/path/to/file.txt".into(),
-            old: indoc! {"
-                This is
-                old content
-                to be replaced
-            "}
-            .trim()
-            .to_string(),
-            new: indoc! {"
-                This is
-                new content
-                that replaces the old
-            "}
-            .trim()
-            .to_string(),
-        };
+        let test_cases = vec![
+            (
+                "Basic replace",
+                "/path/to/file.txt",
+                indoc! {"
+                    This is
+                    old content
+                    to be replaced
+                "},
+                indoc! {"
+                    This is
+                    new content
+                    that replaces the old
+                "},
+                indoc! {"
+                    Some initial text
+                    This is
+                    old content
+                    to be replaced
+                    Some final text
+                    This is
+                    old content
+                    to be replaced
+                    More text
+                "},
+                indoc! {"
+                    Some initial text
+                    This is
+                    new content
+                    that replaces the old
+                    Some final text
+                    This is
+                    old content
+                    to be replaced
+                    More text
+                "},
+            ),
+            (
+                "Whitespace insensitive replace",
+                "/path/to/file.txt",
+                indoc! {"
+                      This is
+                      old content  
+                    to be replaced
+                "},
+                indoc! {"
+                    This is
+                    new content
+                    that replaces the old
+                "},
+                indoc! {"
+                    Some initial text
+                     This is 
+                       old content
+                      to be replaced 
+                    Some final text
+                "},
+                indoc! {"
+                    Some initial text
+                    This is
+                    new content
+                    that replaces the old
+                    Some final text
+                "},
+            ),
+        ];
 
-        let input = indoc! {"
-            Some initial text
-            This is
-            old content
-            to be replaced
-            Some final text
-            This is
-            old content
-            to be replaced
-            More text
-        "};
-        let expected_output = indoc! {"
-            Some initial text
-            This is
-            new content
-            that replaces the old
-            Some final text
-            This is
-            old content
-            to be replaced
-            More text
-        "};
+        for (name, path, old, new, input, expected_output) in test_cases {
+            let replace = Replace {
+                path: path.into(),
+                old: old.trim().to_string(),
+                new: new.trim().to_string(),
+            };
 
-        let result = replace.apply(input).expect("Failed to apply replace");
-        assert_eq!(result, expected_output.trim_end());
-    }
-
-    #[test]
-    fn test_replace_apply_whitespace_insensitive() {
-        let replace = Replace {
-            path: "/path/to/file.txt".into(),
-            old: indoc! {"
-                  This is
-                  old content  
-                to be replaced
-            "}
-            .trim()
-            .to_string(),
-            new: indoc! {"
-                This is
-                new content
-                that replaces the old
-            "}
-            .trim()
-            .to_string(),
-        };
-
-        let input = indoc! {"
-            Some initial text
-             This is 
-               old content
-              to be replaced 
-            Some final text
-        "};
-        let expected_output = indoc! {"
-            Some initial text
-            This is
-            new content
-            that replaces the old
-            Some final text
-        "};
-
-        let result = replace.apply(input).expect("Failed to apply replace");
-        assert_eq!(result, expected_output.trim_end());
+            let result = replace
+                .apply(input)
+                .unwrap_or_else(|_| panic!("Failed to apply replace: {}", name));
+            assert_eq!(result, expected_output.trim_end(), "Test case: {}", name);
+        }
     }
 
     #[test]
