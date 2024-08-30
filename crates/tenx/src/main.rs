@@ -15,7 +15,7 @@ use tracing_subscriber::fmt::time::FormatTime;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{fmt, EnvFilter};
 
-use libtenx::{self, config, model::ModelProvider, prompt::Prompt, Event, Session, Tenx};
+use libtenx::{self, config, model::ModelProvider, prompt::Prompt, Event, LogLevel, Session, Tenx};
 
 mod edit;
 mod pretty;
@@ -217,6 +217,42 @@ async fn print_events(mut receiver: mpsc::Receiver<Event>) {
             Event::ValidationEnd => println!("{}", "Post-patch validation completed.".blue()),
             Event::CheckStart(name) => print!("\t{}...", name),
             Event::CheckOk(_) => println!(" done"),
+            Event::Log(level, message) => {
+                let colored_message = match level {
+                    LogLevel::Error => message.red(),
+                    LogLevel::Warn => message.yellow(),
+                    LogLevel::Info => message.green(),
+                    LogLevel::Debug => message.cyan(),
+                    LogLevel::Trace => message.magenta(),
+                };
+                println!("{}", colored_message);
+            }
+        }
+    }
+}
+
+/// Handles events with minimal progress output
+async fn progress_events(mut receiver: mpsc::Receiver<Event>) {
+    while let Some(event) = receiver.recv().await {
+        match event {
+            Event::Snippet(chunk) => {
+                print!("{}", chunk);
+                io::stdout().flush().unwrap();
+            }
+            Event::PreflightStart => println!("{}", "Starting preflight checks...".blue()),
+            Event::PreflightEnd => println!("{}", "Preflight checks completed.".blue()),
+            Event::FormattingStart => println!("{}", "Starting formatting...".blue()),
+            Event::FormattingEnd => println!("{}", "Formatting completed.".blue()),
+            Event::FormattingOk(name) => println!(
+                "\t{} {}",
+                format!("'{}' completed.", name).green(),
+                "✓".green()
+            ),
+            Event::ValidationStart => println!("{}", "Starting post-patch validation...".blue()),
+            Event::ValidationEnd => println!("{}", "Post-patch validation completed.".blue()),
+            Event::CheckStart(name) => print!("\t{}...", name),
+            Event::CheckOk(_) => println!(" done"),
+            Event::Log(_, _) => {} // Ignore Log events in progress_events
         }
     }
 }
@@ -260,11 +296,15 @@ async fn main() -> Result<()> {
                 };
 
                 let (sender, receiver) = mpsc::channel(100);
-                let print_task = tokio::spawn(print_events(receiver));
+                let event_task = if verbosity > 0 {
+                    tokio::spawn(print_events(receiver))
+                } else {
+                    tokio::spawn(progress_events(receiver))
+                };
 
                 tx.resume(&mut session, Some(sender)).await?;
 
-                print_task.await?;
+                event_task.await?;
                 println!("\n");
                 println!("\n\n{}", "changes applied".green().bold());
                 Ok(())
