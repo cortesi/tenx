@@ -112,6 +112,14 @@ enum Commands {
         /// Path to a file containing the prompt
         #[clap(long)]
         prompt_file: Option<PathBuf>,
+
+        /// Add ruskel documentation as context
+        #[clap(long)]
+        ruskel: Vec<String>,
+
+        /// Add files as context
+        #[clap(long)]
+        ctx: Vec<PathBuf>,
     },
     /// Create a new session
     New {
@@ -351,6 +359,8 @@ async fn main() -> Result<()> {
                 files,
                 prompt,
                 prompt_file,
+                ruskel,
+                ctx,
             } => {
                 let config = load_config(&cli)?;
                 let tx = Tenx::new(config);
@@ -376,6 +386,14 @@ async fn main() -> Result<()> {
                 session.set_last_prompt(user_prompt)?;
                 for f in files.clone().unwrap_or_default() {
                     session.add_editable(f)?;
+                }
+
+                for file in ctx {
+                    session.add_ctx_path(file)?;
+                }
+
+                for ruskel_doc in ruskel {
+                    session.add_ctx_ruskel(ruskel_doc.clone())?;
                 }
 
                 tx.resume(&mut session, Some(sender)).await?;

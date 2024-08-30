@@ -111,6 +111,8 @@ fn main() {
 }
 </replace>
 
+A smart block MUST BE COMPLETE. You cannot replace part of a block with a smart
+tag.
 
 ## <replace>
 
