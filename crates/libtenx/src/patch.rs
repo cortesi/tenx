@@ -1,6 +1,6 @@
 use crate::{Result, TenxError};
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
@@ -8,6 +8,16 @@ use serde::{Deserialize, Serialize};
 pub struct WriteFile {
     pub path: PathBuf,
     pub content: String,
+}
+
+fn smart_ignore_leaders(path: &Path) -> Vec<&'static str> {
+    match path.extension().and_then(|e| e.to_str()) {
+        Some("rs") => vec!["//", "///", "#["],
+        Some("go") => vec!["//"],
+        Some("py") => vec!["#"],
+        Some("c") | Some("h") => vec!["//", "/*"],
+        _ => vec!["//", "#", "/*", "#["],
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -79,6 +89,8 @@ impl Smart {
         let start_line = block_lines[0].trim();
         let mut start_index = None;
 
+        let ignore_leaders = smart_ignore_leaders(&self.path);
+
         for (i, line) in input_lines.iter().enumerate() {
             if line.trim() == start_line {
                 if start_index.is_some() {
@@ -92,9 +104,26 @@ impl Smart {
             }
         }
 
+        if start_index.is_none() {
+            let non_ignored_start = block_lines.iter().position(|line| {
+                !ignore_leaders
+                    .iter()
+                    .any(|leader| line.trim().starts_with(leader))
+            });
+            if let Some(non_ignored_index) = non_ignored_start {
+                let non_ignored_line = block_lines[non_ignored_index].trim();
+                for (i, line) in input_lines.iter().enumerate() {
+                    if line.trim() == non_ignored_line {
+                        start_index = Some(i.saturating_sub(non_ignored_index));
+                        break;
+                    }
+                }
+            }
+        }
+
         let start_index = start_index.ok_or_else(|| TenxError::Patch {
             user: "Could not find the block to replace".to_string(),
-            model: "The first line of the block does not appear in the input".to_string(),
+            model: "The block does not appear in the input".to_string(),
         })?;
 
         let mut end_index = start_index;
@@ -279,154 +308,202 @@ mod tests {
 
     #[test]
     fn test_smart_apply() {
-        let smart = Smart {
-            path: "/path/to/file.txt".into(),
-            text: indoc! {"
+        let test_cases = vec![
+            (
+                "Basic smart apply",
+                "/path/to/file.txt",
+                indoc! {"
                     fn foo() {
                         println!('something else!');
                     }
-            "}
-            .trim()
-            .to_string(),
-        };
-
-        let input = indoc! {"
-            fn foo() {
-                println!('hello');
-            }
-            fn bar () {
-                println!('hi there');
-            }
-        "};
-        let expected_output = indoc! {"
-            fn foo() {
-                println!('something else!');
-            }
-            fn bar () {
-                println!('hi there');
-            }
-        "};
-
-        let result = smart.apply(input).expect("Failed to apply smart change");
-        assert_eq!(result, expected_output.trim_end());
-    }
-
-    #[test]
-    fn test_smart_apply_corner_cases() {
-        // Case 1: Smart at the beginning of the file
-        let smart1 = Smart {
-            path: "/path/to/file.txt".into(),
-            text: indoc! {"
-                fn first_function() {
-                    // New implementation
-                }
-            "}
-            .trim()
-            .to_string(),
-        };
-
-        let input1 = indoc! {"
-            fn first_function() {
-                // Old implementation
-            }
-            
-            fn second_function() {
-                // Some code
-            }
-        "};
-        let expected_output1 = indoc! {"
-            fn first_function() {
-                // New implementation
-            }
-            
-            fn second_function() {
-                // Some code
-            }
-        "};
-
-        let result1 = smart1
-            .apply(input1)
-            .expect("Failed to apply block at the beginning");
-        assert_eq!(result1, expected_output1.trim_end());
-
-        // Case 2: Smart at the end of the file
-        let block2 = Smart {
-            path: "/path/to/file.txt".into(),
-            text: indoc! {"
-                fn last_function() {
-                    println!('New last function');
-                }
-            "}
-            .trim()
-            .to_string(),
-        };
-
-        let input2 = indoc! {"
-            fn first_function() {
-                // Some code
-            }
-            
-            fn last_function() {
-                // Old implementation
-            }
-        "};
-        let expected_output2 = indoc! {"
-            fn first_function() {
-                // Some code
-            }
-            
-            fn last_function() {
-                println!('New last function');
-            }
-        "};
-
-        let result2 = block2
-            .apply(input2)
-            .expect("Failed to apply block at the end");
-        assert_eq!(result2, expected_output2.trim_end());
-
-        // Case 3: Smart with different indentation
-        let smart3 = Smart {
-            path: "/path/to/file.txt".into(),
-            text: indoc! {"
-                    fn indented_function() {
-                        println!('New indented function');
+                "},
+                indoc! {"
+                    fn foo() {
+                        println!('hello');
                     }
-            "}
-            .trim()
-            .to_string(),
-        };
+                    fn bar () {
+                        println!('hi there');
+                    }
+                "},
+                indoc! {"
+                    fn foo() {
+                        println!('something else!');
+                    }
+                    fn bar () {
+                        println!('hi there');
+                    }
+                "},
+            ),
+            (
+                "Smart at the beginning of the file",
+                "/path/to/file.txt",
+                indoc! {"
+                    fn first_function() {
+                        // New implementation
+                    }
+                "},
+                indoc! {"
+                    fn first_function() {
+                        // Old implementation
+                    }
+                    
+                    fn second_function() {
+                        // Some code
+                    }
+                "},
+                indoc! {"
+                    fn first_function() {
+                        // New implementation
+                    }
+                    
+                    fn second_function() {
+                        // Some code
+                    }
+                "},
+            ),
+            (
+                "Smart at the end of the file",
+                "/path/to/file.txt",
+                indoc! {"
+                    fn last_function() {
+                        println!('New last function');
+                    }
+                "},
+                indoc! {"
+                    fn first_function() {
+                        // Some code
+                    }
+                    
+                    fn last_function() {
+                        // Old implementation
+                    }
+                "},
+                indoc! {"
+                    fn first_function() {
+                        // Some code
+                    }
+                    
+                    fn last_function() {
+                        println!('New last function');
+                    }
+                "},
+            ),
+            (
+                "Smart with different indentation",
+                "/path/to/file.txt",
+                indoc! {"
+                        fn indented_function() {
+                            println!('New indented function');
+                        }
+                "},
+                indoc! {"
+                    fn first_function() {
+                        // Some code
+                    }
+                    
+                        fn indented_function() {
+                            // Old implementation
+                        }
+                    
+                    fn last_function() {
+                        // Some code
+                    }
+                "},
+                indoc! {"
+                    fn first_function() {
+                        // Some code
+                    }
+                    
+                        fn indented_function() {
+                            println!('New indented function');
+                        }
+                    
+                    fn last_function() {
+                        // Some code
+                    }
+                "},
+            ),
+            (
+                "Smart with leading comments",
+                "/path/to/file.txt",
+                indoc! {"
+                    /// Updated comment
+                    fn foo() {
+                        println!(\"hello\")
+                    }
+                "},
+                indoc! {"
+                    // Some text
+                    /// This is a comment
+                    fn foo() {
+                    }
+                    fn bar() {
+                    }
+                "},
+                indoc! {"
+                    // Some text
+                    /// Updated comment
+                    fn foo() {
+                        println!(\"hello\")
+                    }
+                    fn bar() {
+                    }
+                "},
+            ),
+            (
+                "Smart with derive macros",
+                "/path/to/file.rs",
+                indoc! {"
+                    #[derive(Debug, Clone)]
+                    fn foo() {
+                        println!(\"hello from new foo\")
+                    }
+                "},
+                indoc! {"
+                    // Some other function
+                    fn bar() {
+                        // Some code
+                    }
 
-        let input3 = indoc! {"
-            fn first_function() {
-                // Some code
-            }
-            
-                fn indented_function() {
-                    // Old implementation
-                }
-            
-            fn last_function() {
-                // Some code
-            }
-        "};
-        let expected_output3 = indoc! {"
-            fn first_function() {
-                // Some code
-            }
-            
-                fn indented_function() {
-                    println!('New indented function');
-                }
-            
-            fn last_function() {
-                // Some code
-            }
-        "};
+                    #[derive(Debug)]
+                    fn foo() {
+                        // Old implementation
+                    }
 
-        let result3 = smart3
-            .apply(input3)
-            .expect("Failed to apply block with different indentation");
-        assert_eq!(result3, expected_output3.trim_end());
+                    // Another function
+                    fn baz() {
+                        // Some code
+                    }
+                "},
+                indoc! {"
+                    // Some other function
+                    fn bar() {
+                        // Some code
+                    }
+
+                    #[derive(Debug, Clone)]
+                    fn foo() {
+                        println!(\"hello from new foo\")
+                    }
+
+                    // Another function
+                    fn baz() {
+                        // Some code
+                    }
+                "},
+            ),
+        ];
+
+        for (name, path, text, input, expected_output) in test_cases {
+            let smart = Smart {
+                path: path.into(),
+                text: text.trim().to_string(),
+            };
+
+            let result = smart
+                .apply(input)
+                .unwrap_or_else(|_| panic!("Failed to apply smart change: {}", name));
+            assert_eq!(result, expected_output.trim_end(), "Test case: {}", name);
+        }
     }
 }
