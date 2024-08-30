@@ -9,7 +9,7 @@ use clap::{CommandFactory, Parser, Subcommand};
 use colored::*;
 use serde_json::to_string_pretty;
 use tokio::sync::mpsc;
-use tracing::{info, Subscriber};
+use tracing::Subscriber;
 use tracing_subscriber::fmt::format::{FmtSpan, Writer};
 use tracing_subscriber::fmt::time::FormatTime;
 use tracing_subscriber::util::SubscriberInitExt;
@@ -34,7 +34,8 @@ fn create_subscriber(verbosity: u8) -> impl Subscriber {
         0 => EnvFilter::new("warn"),
         1 => EnvFilter::new("info"),
         2 => EnvFilter::new("debug"),
-        _ => EnvFilter::new("trace"),
+        3 => EnvFilter::new("trace"),
+        _ => EnvFilter::new("warn"),
     };
 
     fmt::Subscriber::builder()
@@ -52,7 +53,7 @@ fn create_subscriber(verbosity: u8) -> impl Subscriber {
 #[clap(about = "AI-powered coding assistant", long_about = None)]
 struct Cli {
     /// Increase output verbosity
-    #[clap(short, long, action = clap::ArgAction::Count, global = true, default_value = "1")]
+    #[clap(short, long, action = clap::ArgAction::Count, global = true, default_value = "0")]
     verbose: u8,
 
     /// Decrease output verbosity
@@ -205,11 +206,6 @@ async fn print_events(mut receiver: mpsc::Receiver<Event>) {
             }
             Event::PreflightStart => println!("{}", "Starting preflight checks...".blue()),
             Event::PreflightEnd => println!("{}", "Preflight checks completed.".blue()),
-            Event::PreflightOk(name) => println!(
-                "\t{} {}",
-                format!("'{}' passed.", name).green(),
-                "✓".green()
-            ),
             Event::FormattingStart => println!("{}", "Starting formatting...".blue()),
             Event::FormattingEnd => println!("{}", "Formatting completed.".blue()),
             Event::FormattingOk(name) => println!(
@@ -219,11 +215,8 @@ async fn print_events(mut receiver: mpsc::Receiver<Event>) {
             ),
             Event::ValidationStart => println!("{}", "Starting post-patch validation...".blue()),
             Event::ValidationEnd => println!("{}", "Post-patch validation completed.".blue()),
-            Event::ValidateOk(name) => println!(
-                "\t{} {}",
-                format!("'{}' passed.", name).green(),
-                "✓".green()
-            ),
+            Event::CheckStart(name) => print!("\t{}...", name),
+            Event::CheckOk(_) => println!(" done"),
         }
     }
 }
@@ -273,7 +266,7 @@ async fn main() -> Result<()> {
 
                 print_task.await?;
                 println!("\n");
-                info!("\n\n{}", "changes applied".green().bold());
+                println!("\n\n{}", "changes applied".green().bold());
                 Ok(())
             }
             Commands::Reset { step_offset } => {
@@ -281,7 +274,7 @@ async fn main() -> Result<()> {
                 let tx = Tenx::new(config);
                 let mut session = tx.load_session_cwd()?;
                 tx.reset(&mut session, *step_offset)?;
-                info!("Session reset to step {}", step_offset);
+                println!("Session reset to step {}", step_offset);
                 Ok(())
             }
             Commands::AddCtx { files, ruskel } => {
@@ -298,7 +291,7 @@ async fn main() -> Result<()> {
                 }
 
                 tx.save_session(&session)?;
-                info!("context added");
+                println!("context added");
                 Ok(())
             }
             Commands::Retry {
@@ -335,7 +328,7 @@ async fn main() -> Result<()> {
                 tx.resume(&mut session, Some(sender)).await?;
 
                 print_task.await?;
-                info!("\n\n{}", "changes applied".green().bold());
+                println!("\n\n{}", "changes applied".green().bold());
                 Ok(())
             }
             Commands::New { files, ruskel } => {
@@ -352,7 +345,7 @@ async fn main() -> Result<()> {
                 }
 
                 tx.save_session(&session)?;
-                info!("new session: {}", session.root.display());
+                println!("new session: {}", session.root.display());
                 Ok(())
             }
             Commands::Edit {
@@ -400,7 +393,7 @@ async fn main() -> Result<()> {
 
                 print_task.await?;
                 println!("\n");
-                info!("\n\n{}", "changes applied".green().bold());
+                println!("\n\n{}", "changes applied".green().bold());
                 Ok(())
             }
             Commands::AddEdit { files } => {
@@ -413,7 +406,7 @@ async fn main() -> Result<()> {
                 }
 
                 tx.save_session(&session)?;
-                info!("editable files added");
+                println!("editable files added");
                 Ok(())
             }
             Commands::Show { raw, render, full } => {

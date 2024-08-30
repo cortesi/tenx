@@ -154,12 +154,14 @@ impl Tenx {
         Self::send_event(sender, Event::PreflightStart)?;
         let preflight_validators = crate::validators::preflight(session)?;
         for validator in preflight_validators {
+            Self::send_event(sender, Event::CheckStart(validator.name().to_string()))?;
             if let Err(e) = validator.validate(session) {
                 if let TenxError::Validation { name, user, model } = e {
                     return Err(TenxError::Preflight { name, user, model });
                 }
                 return Err(e);
             }
+            Self::send_event(sender, Event::CheckOk(validator.name().to_string()))?;
         }
         Self::send_event(sender, Event::PreflightEnd)?;
         Ok(())
@@ -173,7 +175,9 @@ impl Tenx {
         Self::send_event(sender, Event::ValidationStart)?;
         let post_patch_validators = crate::validators::post_patch(session)?;
         for validator in post_patch_validators {
+            Self::send_event(sender, Event::CheckStart(validator.name().to_string()))?;
             validator.validate(session)?;
+            Self::send_event(sender, Event::CheckOk(validator.name().to_string()))?;
         }
         Self::send_event(sender, Event::ValidationEnd)?;
         Ok(())

@@ -8,8 +8,6 @@ pub enum Event {
     PreflightStart,
     /// The preflight check suite has ended
     PreflightEnd,
-    /// A preflight check has passed
-    PreflightOk(String),
     /// The formatting suite has started
     FormattingStart,
     /// The formatting suite has ended
@@ -20,6 +18,6 @@ pub enum Event {
     ValidationStart,
     /// The validation suite has ended
     ValidationEnd,
-    /// A validation check has passed
-    ValidateOk(String),
+    CheckStart(String),
+    CheckOk(String),
 }
