@@ -90,6 +90,14 @@ struct Cli {
     #[clap(long, global = true)]
     no_preflight: bool,
 
+    /// Force colored output
+    #[clap(long, global = true, conflicts_with = "no_color")]
+    color: bool,
+
+    /// Disable colored output
+    #[clap(long, global = true)]
+    no_color: bool,
+
     #[clap(subcommand)]
     command: Option<Commands>,
 }
@@ -267,6 +275,12 @@ async fn progress_events(mut receiver: mpsc::Receiver<Event>) {
 async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     let verbosity = if cli.quiet { 0 } else { cli.verbose };
+
+    if cli.color {
+        colored::control::set_override(true);
+    } else if cli.no_color {
+        colored::control::set_override(false);
+    }
 
     let (sender, receiver) = mpsc::channel(100);
     let (event_kill_tx, mut event_kill_rx) = mpsc::channel(1);
