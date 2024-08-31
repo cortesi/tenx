@@ -2,13 +2,12 @@
 set -e
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+RUN="cargo run -- --session-store $SCRIPT_DIR/.session_store"
 
-echo $SCRIPT_DIR
 cd $SCRIPT_DIR/..
-
-cargo run -- new
-cargo run -- edit \
+$RUN new
+$RUN edit \
     --prompt "Please complete the fibonacci function" \
     $SCRIPT_DIR/simple/src/*.rs 
-# git diff samples/simple
+git diff samples/simple
 git checkout samples/simple

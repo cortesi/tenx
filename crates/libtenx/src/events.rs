@@ -32,3 +32,34 @@ pub enum Event {
     /// A log message with a specified log level
     Log(LogLevel, String),
 }
+
+impl Event {
+    /// Returns the camelcase name of the event variant
+    pub fn name(&self) -> &'static str {
+        match self {
+            Event::Snippet(_) => "snippet",
+            Event::PreflightStart => "preflight_start",
+            Event::PreflightEnd => "preflight_end",
+            Event::FormattingStart => "formatting_start",
+            Event::FormattingEnd => "formatting_end",
+            Event::FormattingOk(_) => "formatting_ok",
+            Event::ValidationStart => "validation_start",
+            Event::ValidationEnd => "validation_end",
+            Event::CheckStart(_) => "check_start",
+            Event::CheckOk(_) => "check_ok",
+            Event::Log(_, _) => "log",
+        }
+    }
+
+    /// Returns the enclosed string if any, otherwise an empty string
+    pub fn display(&self) -> String {
+        match self {
+            Event::Snippet(s)
+            | Event::FormattingOk(s)
+            | Event::CheckStart(s)
+            | Event::CheckOk(s) => s.clone(),
+            Event::Log(_, s) => s.clone(),
+            _ => String::new(),
+        }
+    }
+}

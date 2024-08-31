@@ -9,7 +9,7 @@ pub struct CargoTester;
 
 impl Validator for CargoChecker {
     fn name(&self) -> &'static str {
-        "CargoChecker"
+        "cargo check"
     }
 
     fn validate(&self, state: &Session) -> Result<()> {
@@ -19,7 +19,7 @@ impl Validator for CargoChecker {
 
 impl Validator for CargoTester {
     fn name(&self) -> &'static str {
-        "CargoTester"
+        "cargo test"
     }
 
     fn validate(&self, state: &Session) -> Result<()> {

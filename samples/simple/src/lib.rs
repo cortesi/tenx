@@ -14,8 +14,9 @@ impl Example {
     }
 }
 
-pub fn fibonacci(_n: u64) -> u64 {
-    unimplemented!()
+pub fn fibonacci(n: u64) -> u64 {
+    println!("Calculating fibonacci({})", n);
+    0
 }
 
 pub fn add(left: u64, right: u64) -> u64 {

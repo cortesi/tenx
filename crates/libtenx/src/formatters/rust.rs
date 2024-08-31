@@ -7,7 +7,7 @@ pub struct CargoFormatter;
 
 impl Formatter for CargoFormatter {
     fn name(&self) -> &'static str {
-        "CargoFormatter"
+        "cargo fmt"
     }
 
     fn format(&self, state: &Session) -> Result<()> {

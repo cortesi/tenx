@@ -214,31 +214,24 @@ fn load_config(cli: &Cli) -> Result<config::Config> {
 async fn print_events(mut receiver: mpsc::Receiver<Event>) {
     while let Some(event) = receiver.recv().await {
         match event {
-            Event::Snippet(chunk) => {
-                println!("chunk: {:?}", chunk);
-            }
-            Event::PreflightStart => println!("{}", "Starting preflight checks...".blue()),
-            Event::PreflightEnd => println!("{}", "Preflight checks completed.".blue()),
-            Event::FormattingStart => println!("{}", "Starting formatting...".blue()),
-            Event::FormattingEnd => println!("{}", "Formatting completed.".blue()),
-            Event::FormattingOk(name) => println!(
-                "\t{} {}",
-                format!("'{}' completed.", name).green(),
-                "✓".green()
-            ),
-            Event::ValidationStart => println!("{}", "Starting post-patch validation...".blue()),
-            Event::ValidationEnd => println!("{}", "Post-patch validation completed.".blue()),
-            Event::CheckStart(name) => print!("\t{}...", name),
-            Event::CheckOk(_) => println!(" done"),
             Event::Log(level, message) => {
-                let colored_message = match level {
-                    LogLevel::Error => message.red(),
-                    LogLevel::Warn => message.yellow(),
-                    LogLevel::Info => message.green(),
-                    LogLevel::Debug => message.cyan(),
-                    LogLevel::Trace => message.magenta(),
+                let severity = match level {
+                    LogLevel::Error => "error".red(),
+                    LogLevel::Warn => "warn".yellow(),
+                    LogLevel::Info => "info".green(),
+                    LogLevel::Debug => "debug".cyan(),
+                    LogLevel::Trace => "trace".magenta(),
                 };
-                println!("{}", colored_message);
+                println!("{}: {}", severity, message);
+            }
+            _ => {
+                let name = event.name().to_string();
+                let display = event.display();
+                if display.is_empty() {
+                    println!("{}", name.blue());
+                } else {
+                    println!("{}: {}", name.blue(), display);
+                }
             }
         }
     }
@@ -326,8 +319,7 @@ async fn main() -> anyhow::Result<()> {
                 };
 
                 tx.resume(&mut session, Some(sender.clone())).await?;
-                println!("\n");
-                println!("\n\n{}", "changes applied".green().bold());
+                println!("{}", "changes applied".green().bold());
                 Ok(())
             }
             Commands::Reset { step_offset } => {
