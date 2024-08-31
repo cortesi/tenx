@@ -1,6 +1,5 @@
 use colored::*;
 use libtenx::{prompt::Prompt, Result, Session, TenxError};
-use std::collections::HashSet;
 use terminal_size::{terminal_size, Width};
 use textwrap::{wrap, Options};
 
@@ -12,9 +11,9 @@ fn format_usage(usage: &libtenx::model::Usage) -> String {
     let mut keys: Vec<_> = values.keys().collect();
     keys.sort();
     keys.iter()
-        .map(|k| format!("{}:{}", k.blue().bold(), values.get(*k).unwrap()))
+        .map(|k| format!("{}: {}", k.blue().bold(), values.get(*k).unwrap()))
         .collect::<Vec<_>>()
-        .join(" ")
+        .join("\n")
 }
 
 /// Pretty prints the Session information.
@@ -74,19 +73,13 @@ fn print_steps(session: &Session, full: bool, width: usize) -> Result<String> {
     let mut output = String::new();
     output.push_str(&format!("{}\n", "steps:".blue().bold()));
     for (i, step) in session.steps().iter().enumerate() {
-        output.push_str(&format!("{}{}: ", INDENT, format!("{}", i).cyan().bold()));
+        output.push_str(&format!("\n{}\n", "=".repeat(width)));
+        output.push_str(&format!("{}\n", format!("Step {}", i).cyan().bold()));
+        output.push_str(&format!("{}\n", "=".repeat(width)));
         output.push_str(&render_step_prompt(step, width, full));
         output.push('\n');
         if let Some(patch) = &step.patch {
             output.push_str(&print_patch(session, patch, full, width));
-        }
-        if let Some(usage) = &step.usage {
-            output.push_str(&format!(
-                "{}{} {}\n",
-                INDENT.repeat(2),
-                "usage:".blue().bold(),
-                format_usage(usage)
-            ));
         }
         if let Some(err) = &step.err {
             output.push_str(&format!(
@@ -102,25 +95,41 @@ fn print_steps(session: &Session, full: bool, width: usize) -> Result<String> {
             output.push_str(&wrapped_block(&error_text, width, INDENT.len() * 3));
             output.push('\n');
         }
+        if let Some(usage) = &step.usage {
+            output.push_str(&format!("{}{}\n", INDENT.repeat(2), "usage:".blue().bold()));
+            for line in format_usage(usage).lines() {
+                output.push_str(&format!("{}{}\n", INDENT.repeat(3), line));
+            }
+        }
     }
     Ok(output)
 }
 
 fn render_step_prompt(step: &libtenx::Step, width: usize, full: bool) -> String {
+    let prompt_header = format!("{}{}\n", INDENT.repeat(2), "prompt:".blue().bold());
     match &step.prompt {
-        Prompt::User(text) => format!("\n{}", wrapped_block(text, width, INDENT.len() * 2)),
-        Prompt::Auto(text) if full => format!("\n{}", wrapped_block(text, width, INDENT.len() * 2)),
+        Prompt::User(text) => format!(
+            "{}{}",
+            prompt_header,
+            wrapped_block(text, width, INDENT.len() * 3)
+        ),
+        Prompt::Auto(text) if full => format!(
+            "{}{}",
+            prompt_header,
+            wrapped_block(text, width, INDENT.len() * 3)
+        ),
         Prompt::Auto(text) => {
             let lines: Vec<&str> = text.lines().collect();
             let first_line = lines.first().unwrap_or(&"");
             let remaining_lines = lines.len().saturating_sub(1);
             format!(
-                "\n{}\n{}",
-                wrapped_block(first_line, width, INDENT.len() * 2),
+                "{}{}\n{}",
+                prompt_header,
+                wrapped_block(first_line, width, INDENT.len() * 3),
                 wrapped_block(
                     &format!("... {} more lines", remaining_lines),
                     width,
-                    INDENT.len() * 2
+                    INDENT.len() * 3
                 )
             )
         }
@@ -148,27 +157,59 @@ fn print_patch(
         output.push_str(&wrapped_block(&comment_text, width, INDENT.len() * 3));
         output.push('\n');
     }
-    let modified_files: HashSet<_> = patch
-        .changes
-        .iter()
-        .map(|change| match change {
-            libtenx::patch::Change::Write(w) => &w.path,
-            libtenx::patch::Change::Replace(r) => &r.path,
-            libtenx::patch::Change::Smart(b) => &b.path,
-        })
-        .collect();
-    if !modified_files.is_empty() {
-        output.push_str(&format!(
-            "{}{}\n",
-            INDENT.repeat(2),
-            "modified:".blue().bold()
-        ));
-        for file in modified_files {
-            output.push_str(&format!(
-                "{}- {}\n",
-                INDENT.repeat(3),
-                session.relpath(file).display()
-            ));
+    output.push_str(&format!(
+        "{}{}\n",
+        INDENT.repeat(2),
+        "modified:".blue().bold()
+    ));
+    for change in &patch.changes {
+        match change {
+            libtenx::patch::Change::Write(w) => {
+                let file_path = session
+                    .relpath(&w.path)
+                    .display()
+                    .to_string()
+                    .green()
+                    .bold();
+                output.push_str(&format!("{}- {} (write)\n", INDENT.repeat(3), file_path));
+                if full {
+                    output.push_str(&wrapped_block(&w.content, width, INDENT.len() * 4));
+                    output.push('\n');
+                }
+            }
+            libtenx::patch::Change::Replace(r) => {
+                let file_path = session
+                    .relpath(&r.path)
+                    .display()
+                    .to_string()
+                    .green()
+                    .bold();
+                output.push_str(&format!("{}- {} (replace)\n", INDENT.repeat(3), file_path));
+                if full {
+                    output.push_str(&format!("{}{}\n", INDENT.repeat(4), "old:".yellow().bold()));
+                    output.push_str(&wrapped_block(&r.old, width, INDENT.len() * 5));
+                    output.push_str(&format!(
+                        "\n{}{}\n",
+                        INDENT.repeat(4),
+                        "new:".green().bold()
+                    ));
+                    output.push_str(&wrapped_block(&r.new, width, INDENT.len() * 5));
+                    output.push('\n');
+                }
+            }
+            libtenx::patch::Change::Smart(s) => {
+                let file_path = session
+                    .relpath(&s.path)
+                    .display()
+                    .to_string()
+                    .green()
+                    .bold();
+                output.push_str(&format!("{}- {} (smart)\n", INDENT.repeat(3), file_path));
+                if full {
+                    output.push_str(&wrapped_block(&s.text, width, INDENT.len() * 4));
+                    output.push('\n');
+                }
+            }
         }
     }
     output
@@ -179,14 +220,23 @@ pub fn full_error(error: &TenxError) -> String {
     match error {
         TenxError::Validation { name, user, model } => {
             format!(
-                "Validation Error: {}\nUser Message: {}\nModel Message: {}",
-                name, user, model
+                "{}: {}\n{}: {}\n{}: {}",
+                "Validation Error".red().bold(),
+                name,
+                "User Message".yellow().bold(),
+                user,
+                "Model Message".yellow().bold(),
+                model
             )
         }
         TenxError::Patch { user, model } => {
             format!(
-                "Patch Error\nUser Message: {}\nModel Message: {}",
-                user, model
+                "{}\n{}: {}\n{}: {}",
+                "Patch Error".red().bold(),
+                "User Message".yellow().bold(),
+                user,
+                "Model Message".yellow().bold(),
+                model
             )
         }
         _ => format!("{:?}", error),
@@ -231,7 +281,7 @@ mod tests {
         assert!(result.is_ok());
         let output = result.unwrap();
         assert!(output.contains("steps:"));
-        assert!(output.contains("0:"));
+        assert!(output.contains("Step 0"));
         assert!(output.contains("Test prompt"));
     }
 
@@ -247,7 +297,7 @@ mod tests {
         assert!(result.is_ok());
         let output = result.unwrap();
         assert!(output.contains("steps:"));
-        assert!(output.contains("0:"));
+        assert!(output.contains("Step 0"));
         assert!(output.contains("Test prompt"));
         assert!(output.contains("comment:"));
         assert!(output.contains("Test comment"));
@@ -261,7 +311,7 @@ mod tests {
         assert!(result.is_ok());
         let output = result.unwrap();
         assert!(output.contains("steps:"));
-        assert!(output.contains("0:"));
+        assert!(output.contains("Step 0"));
         assert!(output.contains("Test prompt"));
         assert!(output.contains("error:"));
         assert!(output.contains("Test error"));
