@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::env;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use toml;
 
 use crate::{dialect, model, Result, TenxError};
@@ -98,6 +98,32 @@ impl Config {
             .map_err(|e| TenxError::Internal(format!("Failed to parse TOML: {}", e)))
     }
 
+    /// Merge another Config into this one, only overriding non-default values.
+    pub fn merge(&mut self, other: &Config) {
+        let dflt = Config::default();
+        if other.anthropic_key.is_some() {
+            self.anthropic_key = other.anthropic_key.clone();
+        }
+        if other.session_store_dir.is_some() {
+            self.session_store_dir = other.session_store_dir.clone();
+        }
+        if other.retry_limit != dflt.retry_limit {
+            self.retry_limit = other.retry_limit;
+        }
+        if other.no_preflight != dflt.no_preflight {
+            self.no_preflight = other.no_preflight;
+        }
+        if other.default_model != dflt.default_model {
+            self.default_model = other.default_model.clone();
+        }
+        if other.default_dialect != dflt.default_dialect {
+            self.default_dialect = other.default_dialect.clone();
+        }
+        if other.tags != dflt.tags {
+            self.tags = other.tags.clone();
+        }
+    }
+
     /// Serialize the Config into a TOML string.
     pub fn to_toml(&self) -> Result<String> {
         toml::to_string_pretty(self)
@@ -134,9 +160,11 @@ impl Config {
         self
     }
 
-    /// Sets the state directory.
-    pub fn with_session_store_dir<P: AsRef<Path>>(mut self, dir: P) -> Self {
-        self.session_store_dir = Some(dir.as_ref().to_path_buf());
+    /// Sets the state directory if Some, otherwise leaves it unchanged.
+    pub fn with_session_store_dir(mut self, dir: Option<PathBuf>) -> Self {
+        if let Some(dir) = dir {
+            self.session_store_dir = Some(dir);
+        }
         self
     }
 
@@ -197,7 +225,7 @@ mod tests {
     fn test_toml_serialization() {
         let config = Config::default()
             .with_anthropic_key(Some("test_key".to_string()))
-            .with_session_store_dir("/tmp/test")
+            .with_session_store_dir(Some(PathBuf::from("/tmp/test")))
             .with_retry_limit(5)
             .with_no_preflight(true)
             .with_tags_smart(false)
@@ -236,5 +264,63 @@ mod tests {
         assert!(!table.contains_key("default_model"));
         assert!(!table.contains_key("default_dialect"));
         assert!(!table.contains_key("tags"));
+    }
+
+    #[test]
+    fn test_config_merge() {
+        let mut base_config = Config::default()
+            .with_anthropic_key(Some("base_key".to_string()))
+            .with_retry_limit(5);
+
+        let other_config = Config::default()
+            .with_anthropic_key(Some("other_key".to_string()))
+            .with_session_store_dir(Some(PathBuf::from("/tmp/other")))
+            .with_no_preflight(true);
+
+        base_config.merge(&other_config);
+
+        assert_eq!(base_config.anthropic_key, Some("other_key".to_string()));
+        assert_eq!(
+            base_config.session_store_dir,
+            Some(PathBuf::from("/tmp/other"))
+        );
+        assert_eq!(base_config.retry_limit, 5);
+        assert!(base_config.no_preflight);
+        assert_eq!(base_config.default_model, ConfigModel::Claude);
+        assert_eq!(base_config.default_dialect, ConfigDialect::Tags);
+        assert!(base_config.tags.smart);
+    }
+
+    #[test]
+    fn test_with_session_store_dir_option() {
+        let config = Config::default();
+
+        let config_with_dir = config
+            .clone()
+            .with_session_store_dir(Some(PathBuf::from("/tmp/test")));
+        assert_eq!(
+            config_with_dir.session_store_dir,
+            Some(PathBuf::from("/tmp/test"))
+        );
+
+        let config_without_change = config.clone().with_session_store_dir(None);
+
+        assert_eq!(config_without_change.session_store_dir, None);
+
+        let config_with_existing =
+            Config::default().with_session_store_dir(Some(PathBuf::from("/tmp/existing")));
+        let config_override = config_with_existing
+            .clone()
+            .with_session_store_dir(Some(PathBuf::from("/tmp/new")));
+        assert_eq!(
+            config_override.session_store_dir,
+            Some(PathBuf::from("/tmp/new"))
+        );
+
+        let config_keep_existing = config_with_existing.clone().with_session_store_dir(None);
+        assert_eq!(
+            config_keep_existing.session_store_dir,
+            Some(PathBuf::from("/tmp/existing"))
+        );
     }
 }

@@ -206,7 +206,7 @@ mod tests {
                 comment: Some("Test comment".to_string()),
                 cache: Default::default(),
             }))
-            .with_session_store_dir(temp_dir.path())
+            .with_session_store_dir(Some(temp_dir.path().into()))
             .with_retry_limit(1);
         let tenx = Tenx::new(config);
         let test_file_path = temp_dir.path().join("test.txt");

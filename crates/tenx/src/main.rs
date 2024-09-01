@@ -224,11 +224,9 @@ enum Commands {
 fn load_config(cli: &Cli) -> Result<config::Config> {
     let mut config = config::Config::default()
         .load_env()
+        .with_session_store_dir(cli.session_store.clone())
         .with_anthropic_key(cli.anthropic_key.clone())
         .with_default_model(config::ConfigModel::Claude);
-    if let Some(session_store_dir) = cli.session_store.clone() {
-        config = config.with_session_store_dir(session_store_dir);
-    }
     if let Some(retry_limit) = cli.retry_limit {
         config = config.with_retry_limit(retry_limit);
     }
