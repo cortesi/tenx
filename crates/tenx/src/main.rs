@@ -298,9 +298,15 @@ async fn print_events(mut receiver: mpsc::Receiver<Event>) {
 
 /// Handles events with minimal progress output
 async fn progress_events(mut receiver: mpsc::Receiver<Event>) {
+    let mut last_was_snippet = false;
     while let Some(event) = receiver.recv().await {
+        if last_was_snippet && !matches!(event, Event::Snippet(_)) {
+            println!();
+        }
         match event {
-            Event::Snippet(chunk) => {
+            Event::PromptStart => println!("{}", "Prompting model...".blue()),
+            Event::ApplyPatch => println!("{}", "Applying patch...".blue()),
+            Event::Snippet(ref chunk) => {
                 print!("{}", chunk);
                 io::stdout().flush().unwrap();
             }
@@ -308,17 +314,18 @@ async fn progress_events(mut receiver: mpsc::Receiver<Event>) {
             Event::PreflightEnd => println!("{}", "Preflight checks completed.".blue()),
             Event::FormattingStart => println!("{}", "Starting formatting...".blue()),
             Event::FormattingEnd => println!("{}", "Formatting completed.".blue()),
-            Event::FormattingOk(name) => println!(
+            Event::FormattingOk(ref name) => println!(
                 "\t{} {}",
                 format!("'{}' completed.", name).green(),
                 "✓".green()
             ),
             Event::ValidationStart => println!("{}", "Starting post-patch validation...".blue()),
             Event::ValidationEnd => println!("{}", "Post-patch validation completed.".blue()),
-            Event::CheckStart(name) => print!("\t{}...", name),
+            Event::CheckStart(ref name) => print!("\t{}...", name),
             Event::CheckOk(_) => println!(" done"),
             Event::Log(_, _) => {} // Ignore Log events in progress_events
         }
+        last_was_snippet = matches!(event, Event::Snippet(_));
     }
 }
 

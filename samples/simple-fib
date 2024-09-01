@@ -2,7 +2,7 @@
 set -e
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-RUN="cargo run -- --session-store $SCRIPT_DIR/.session_store"
+RUN="cargo run -- --session-store-dir $SCRIPT_DIR/.session_store"
 
 cd $SCRIPT_DIR/..
 $RUN new

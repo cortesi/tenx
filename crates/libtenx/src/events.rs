@@ -27,10 +27,16 @@ pub enum Event {
     ValidationStart,
     /// The validation suite has ended
     ValidationEnd,
+    /// A a preflight or post-patch check has started
     CheckStart(String),
+    /// A a preflight or post-patch check has passed
     CheckOk(String),
     /// A log message with a specified log level
     Log(LogLevel, String),
+    /// A model prompt has started
+    PromptStart,
+    /// Patch application has started
+    ApplyPatch,
 }
 
 impl Event {
@@ -48,6 +54,8 @@ impl Event {
             Event::CheckStart(_) => "check_start",
             Event::CheckOk(_) => "check_ok",
             Event::Log(_, _) => "log",
+            Event::PromptStart => "prompt_start",
+            Event::ApplyPatch => "apply_patch",
         }
     }
 

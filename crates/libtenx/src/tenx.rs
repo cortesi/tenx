@@ -121,7 +121,9 @@ impl Tenx {
         session: &mut Session,
         sender: Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
+        Self::send_event(&sender, Event::PromptStart)?;
         session.prompt(&self.config, sender.clone()).await?;
+        Self::send_event(&sender, Event::ApplyPatch)?;
         session.apply_last_patch()?;
         self.run_formatters(session, &sender)?;
         self.run_post_patch_validators(session, &sender)?;
