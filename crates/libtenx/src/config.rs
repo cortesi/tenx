@@ -76,15 +76,20 @@ impl Default for Tags {
     }
 }
 
+// Note that we can't use Optional values in the config. TOML includes no way to render
+// optional values, so our strategy of rendering the full config with a default config for
+// documentation falls by the wayside.
+
 #[derive(Debug, Clone, Deserialize)]
+/// Configuration for the Tenx application.
 pub struct Config {
     /// The Anthropic API key.
     #[serde(default)]
-    pub anthropic_key: Option<String>,
+    pub anthropic_key: String,
 
     /// The directory to store session state.
     #[serde(default)]
-    pub session_store_dir: Option<PathBuf>,
+    pub session_store_dir: PathBuf,
 
     /// The number of times to retry a request.
     #[serde(default = "default_retry_limit")]
@@ -140,8 +145,8 @@ impl Serialize for Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            anthropic_key: None,
-            session_store_dir: None,
+            anthropic_key: String::new(),
+            session_store_dir: home_config_dir().join("state"),
             retry_limit: DEFAULT_RETRY_LIMIT,
             no_preflight: false,
             default_model: ConfigModel::default(),
@@ -170,10 +175,10 @@ impl Config {
     /// Merge another Config into this one, only overriding non-default values.
     pub fn merge(&mut self, other: &Config) {
         let dflt = Config::default();
-        if other.anthropic_key.is_some() {
+        if other.anthropic_key != dflt.anthropic_key {
             self.anthropic_key = other.anthropic_key.clone();
         }
-        if other.session_store_dir.is_some() {
+        if other.session_store_dir != dflt.session_store_dir {
             self.session_store_dir = other.session_store_dir.clone();
         }
         if other.retry_limit != dflt.retry_limit {
@@ -202,7 +207,7 @@ impl Config {
     /// Sets the Anthropic API key. If None, the existing value is unchanged.
     pub fn with_anthropic_key(mut self, key: Option<String>) -> Self {
         if let Some(key) = key {
-            self.anthropic_key = Some(key);
+            self.anthropic_key = key;
         }
         self
     }
@@ -232,7 +237,7 @@ impl Config {
     /// Sets the state directory if Some, otherwise leaves it unchanged.
     pub fn with_session_store_dir(mut self, dir: Option<PathBuf>) -> Self {
         if let Some(dir) = dir {
-            self.session_store_dir = Some(dir);
+            self.session_store_dir = dir;
         }
         self
     }
@@ -258,7 +263,7 @@ impl Config {
     /// Loads the Anthropic API key from the ANTHROPIC_API_KEY environment variable, if it exists.
     pub fn load_env(mut self) -> Self {
         if let Ok(key) = env::var("ANTHROPIC_API_KEY") {
-            self.anthropic_key = Some(key);
+            self.anthropic_key = key;
         }
         self
     }
@@ -348,11 +353,8 @@ mod tests {
 
         base_config.merge(&other_config);
 
-        assert_eq!(base_config.anthropic_key, Some("other_key".to_string()));
-        assert_eq!(
-            base_config.session_store_dir,
-            Some(PathBuf::from("/tmp/other"))
-        );
+        assert_eq!(base_config.anthropic_key, "other_key".to_string());
+        assert_eq!(base_config.session_store_dir, PathBuf::from("/tmp/other"));
         assert_eq!(base_config.retry_limit, 5);
         assert!(base_config.no_preflight);
         assert_eq!(base_config.default_model, ConfigModel::Claude);
@@ -369,27 +371,27 @@ mod tests {
             .with_session_store_dir(Some(PathBuf::from("/tmp/test")));
         assert_eq!(
             config_with_dir.session_store_dir,
-            Some(PathBuf::from("/tmp/test"))
+            PathBuf::from("/tmp/test")
         );
 
         let config_without_change = config.clone().with_session_store_dir(None);
 
-        assert_eq!(config_without_change.session_store_dir, None);
+        assert_eq!(
+            config_without_change.session_store_dir,
+            home_config_dir().join("state")
+        );
 
         let config_with_existing =
             Config::default().with_session_store_dir(Some(PathBuf::from("/tmp/existing")));
         let config_override = config_with_existing
             .clone()
             .with_session_store_dir(Some(PathBuf::from("/tmp/new")));
-        assert_eq!(
-            config_override.session_store_dir,
-            Some(PathBuf::from("/tmp/new"))
-        );
+        assert_eq!(config_override.session_store_dir, PathBuf::from("/tmp/new"));
 
         let config_keep_existing = config_with_existing.clone().with_session_store_dir(None);
         assert_eq!(
             config_keep_existing.session_store_dir,
-            Some(PathBuf::from("/tmp/existing"))
+            PathBuf::from("/tmp/existing")
         );
     }
 
@@ -399,11 +401,11 @@ mod tests {
         let config = Config::from_toml(toml_str).unwrap();
 
         assert_eq!(config.retry_limit, 42);
-        assert_eq!(config.anthropic_key, None);
-        assert_eq!(config.session_store_dir, None);
-        assert_eq!(config.no_preflight, false);
+        assert_eq!(config.anthropic_key, "");
+        assert_eq!(config.session_store_dir, PathBuf::new());
+        assert!(!config.no_preflight);
         assert_eq!(config.default_model, ConfigModel::Claude);
         assert_eq!(config.default_dialect, ConfigDialect::Tags);
-        assert_eq!(config.tags.smart, false);
+        assert!(!config.tags.smart);
     }
 }

@@ -266,9 +266,11 @@ impl ModelProvider for Claude {
         session: &Session,
         sender: Option<mpsc::Sender<Event>>,
     ) -> Result<(patch::Patch, super::Usage)> {
-        let key = config.anthropic_key.as_ref().ok_or_else(|| {
-            TenxError::Internal("No Anthropic key configured for Claude model.".into())
-        })?;
+        if config.anthropic_key.is_empty() {
+            return Err(TenxError::Internal(
+                "No Anthropic key configured for Claude model.".into(),
+            ));
+        }
 
         if !session.pending_prompt() {
             return Err(TenxError::Internal("No pending prompt to process.".into()));
@@ -276,7 +278,9 @@ impl ModelProvider for Claude {
         let dialect = config.dialect()?;
         let mut req = self.request(session, &dialect)?;
         trace!("Sending request: {}", serde_json::to_string_pretty(&req)?);
-        let resp = self.stream_response(key, &req, sender).await?;
+        let resp = self
+            .stream_response(&config.anthropic_key, &req, sender)
+            .await?;
         trace!("Got response: {}", serde_json::to_string_pretty(&resp)?);
         req.merge_response(&resp);
         let patch = self.extract_changes(&dialect, &req)?;
