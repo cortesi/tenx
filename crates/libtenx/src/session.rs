@@ -8,12 +8,7 @@ use pathdiff::diff_paths;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    config,
-    events::Event,
-    model::ModelProvider,
-    patch::{Change, Patch},
-    prompt::Prompt,
-    Result, TenxError,
+    config, events::Event, model::ModelProvider, patch::Patch, prompt::Prompt, Result, TenxError,
 };
 use tokio::sync::mpsc;
 
@@ -268,7 +263,7 @@ impl Session {
     }
 
     /// Apply a patch, entering the modified files into the patch cache. It is the caller's
-    /// responsibility to save the patch back the the sesison if needed.
+    /// responsibility to save the patch back to the session if needed.
     pub fn apply_patch(&mut self, patch: &mut Patch) -> Result<()> {
         // First, enter all the modified files into the patch cache
         for path in patch.changed_files() {
@@ -283,28 +278,8 @@ impl Session {
         // Next, make a clone copy of the cache
         let mut modified_cache = patch.cache.clone();
 
-        // Now all modifications are applied to the cloned cache one after the other
-        for change in &patch.changes {
-            match change {
-                Change::Replace(replace) => {
-                    let current_content = modified_cache.get(&replace.path).ok_or_else(|| {
-                        TenxError::Internal("File not found in cache".to_string())
-                    })?;
-                    let new_content = replace.apply(current_content)?;
-                    modified_cache.insert(replace.path.clone(), new_content);
-                }
-                Change::Write(write_file) => {
-                    modified_cache.insert(write_file.path.clone(), write_file.content.clone());
-                }
-                Change::Smart(smart) => {
-                    let current_content = modified_cache.get(&smart.path).ok_or_else(|| {
-                        TenxError::Internal("File not found in cache".to_string())
-                    })?;
-                    let new_content = smart.apply(current_content)?;
-                    modified_cache.insert(smart.path.clone(), new_content);
-                }
-            }
-        }
+        // Apply all modifications to the cloned cache
+        patch.apply(&mut modified_cache)?;
 
         // Finally, write all files to disk
         for (path, content) in modified_cache {
