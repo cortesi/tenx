@@ -14,7 +14,10 @@ use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{fmt, EnvFilter};
 
-use libtenx::{self, config, model::ModelProvider, prompt::Prompt, Event, LogLevel, Session, Tenx};
+use libtenx::{
+    self, config, dialect::DialectProvider, model::ModelProvider, prompt::Prompt, Event, LogLevel,
+    Session, Tenx,
+};
 
 mod edit;
 mod pretty;
@@ -106,6 +109,12 @@ struct Cli {
 enum Commands {
     /// Print the current configuration
     Conf,
+    /// Print the current dialect and its settings
+    Dialect {
+        /// Print the complete system prompt
+        #[clap(long)]
+        system: bool,
+    },
     /// Add context to an existing session
     AddCtx {
         /// Specifies files to add as context
@@ -308,6 +317,17 @@ async fn main() -> anyhow::Result<()> {
                 let config = load_config(&cli)?;
                 println!("{}", to_string_pretty(&config)?);
                 Ok(()) as anyhow::Result<()>
+            }
+            Commands::Dialect { system } => {
+                let config = load_config(&cli)?;
+                let dialect = config.dialect()?;
+                println!("Current dialect: {}", dialect.name());
+                if *system {
+                    println!("\nSystem prompt:\n{}", dialect.system());
+                } else {
+                    println!("\nSettings:\n{:#?}", config.tags);
+                }
+                Ok(())
             }
             Commands::Oneshot { files, ruskel, ctx } => {
                 let config = load_config(&cli)?;
