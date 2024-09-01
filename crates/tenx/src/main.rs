@@ -119,6 +119,9 @@ enum Commands {
         /// Output full configuration
         #[clap(long)]
         full: bool,
+        /// Output default configuration
+        #[clap(long)]
+        defaults: bool,
     },
     /// Print the current dialect and its settings
     Dialect {
@@ -326,8 +329,16 @@ async fn main() -> anyhow::Result<()> {
 
     let result = match &cli.command {
         Some(cmd) => match cmd {
-            Commands::Conf { json, full } => {
-                let mut config = load_config(&cli)?;
+            Commands::Conf {
+                json,
+                full,
+                defaults,
+            } => {
+                let mut config = if *defaults {
+                    config::Config::default()
+                } else {
+                    load_config(&cli)?
+                };
                 if *full {
                     config = config.with_full(true);
                 }
