@@ -3,7 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{Result, Session, TenxError};
+use crate::{config, Result, Session, TenxError};
 
 /// Normalizes a path for use as a filename by replacing problematic characters.
 pub fn normalize_path(path: &Path) -> String {
@@ -21,13 +21,7 @@ impl SessionStore {
     /// Creates a new StateStore with the specified base directory.
     /// Creates a new StateStore with the specified base directory.
     pub fn open(base_dir: Option<PathBuf>) -> Result<Self> {
-        let base_dir = base_dir.unwrap_or_else(|| {
-            dirs::home_dir()
-                .expect("Failed to get home directory")
-                .join(".config")
-                .join("tenx")
-                .join("state")
-        });
+        let base_dir = base_dir.unwrap_or_else(|| config::home_config_dir().join("state"));
         fs::create_dir_all(&base_dir).map_err(|e| TenxError::fio(e, &base_dir))?;
         Ok(Self { base_dir })
     }

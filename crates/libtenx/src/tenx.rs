@@ -38,7 +38,7 @@ impl Tenx {
 
     /// Loads a session from the store based on the given path.
     pub fn load_session<P: AsRef<Path>>(&self, path: P) -> Result<Session> {
-        let root = crate::session::find_root(path.as_ref());
+        let root = crate::config::find_project_root(path.as_ref());
         let session_store = SessionStore::open(self.config.session_store_dir.clone())?;
         let name = normalize_path(&root);
         session_store.load(name)
@@ -47,7 +47,7 @@ impl Tenx {
     /// Loads a session from the store based on the current working directory.
     pub fn load_session_cwd(&self) -> Result<Session> {
         let current_dir = env::current_dir().map_err(|e| TenxError::fio(e, "."))?;
-        let root = crate::session::find_root(&current_dir);
+        let root = crate::config::find_project_root(&current_dir);
         self.load_session(root)
     }
 

@@ -8,7 +8,7 @@ use pathdiff::diff_paths;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    config::Config,
+    config,
     events::Event,
     model::ModelProvider,
     patch::{Change, Patch},
@@ -51,20 +51,6 @@ impl Context {
                 .map_err(|e| TenxError::fio(e, path.clone()))?),
         }
     }
-}
-
-/// Finds the root directory based on the current working directory or git repo root.
-pub fn find_root(current_dir: &Path) -> PathBuf {
-    let mut dir = current_dir.to_path_buf();
-    loop {
-        if dir.join(".git").is_dir() {
-            return dir;
-        }
-        if !dir.pop() {
-            break;
-        }
-    }
-    current_dir.to_path_buf()
 }
 
 use crate::model::Usage;
@@ -116,7 +102,7 @@ impl Session {
     /// directory.
     pub fn from_cwd() -> Result<Self> {
         let cwd = env::current_dir().map_err(|e| TenxError::fio(e, "."))?;
-        let root = find_root(&cwd);
+        let root = config::find_project_root(&cwd);
         Ok(Self::new(root))
     }
 
@@ -368,7 +354,7 @@ impl Session {
     /// Prompts the current model with the session's state and sets the resulting patch and usage.
     pub async fn prompt(
         &mut self,
-        config: &Config,
+        config: &config::Config,
         sender: Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
         let mut model = config.model()?;

@@ -83,7 +83,7 @@ struct Cli {
 
     /// Session storage directory (~/.config/tenx/state by default)
     #[clap(long, global = true)]
-    session_store: Option<PathBuf>,
+    session_store_dir: Option<PathBuf>,
 
     /// Number of times to retry a prompt before failing
     #[clap(long, global = true)]
@@ -230,7 +230,7 @@ enum Commands {
 fn load_config(cli: &Cli) -> Result<config::Config> {
     let mut config = config::Config::default()
         .load_env()
-        .with_session_store_dir(cli.session_store.clone())
+        .with_session_store_dir(cli.session_store_dir.clone())
         .with_anthropic_key(cli.anthropic_key.clone())
         .with_default_model(config::ConfigModel::Claude);
     if let Some(retry_limit) = cli.retry_limit {

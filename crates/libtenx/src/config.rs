@@ -1,9 +1,12 @@
+use std::{
+    env,
+    path::{Path, PathBuf},
+};
+
 use serde::{
     ser::{SerializeStruct, Serializer},
     Deserialize, Serialize,
 };
-use std::env;
-use std::path::PathBuf;
 use toml;
 
 use crate::{dialect, model, Result, TenxError};
@@ -16,7 +19,32 @@ macro_rules! serialize_if_different {
     };
 }
 
+pub const HOME_CONFIG_FILE: &str = "tenx.toml";
+pub const LOCAL_CONFIG_FILE: &str = ".tenx.toml";
+
 const DEFAULT_RETRY_LIMIT: usize = 16;
+
+/// Returns the path to the configuration directory.
+pub fn home_config_dir() -> PathBuf {
+    dirs::home_dir()
+        .expect("Failed to get home directory")
+        .join(".config")
+        .join("tenx")
+}
+
+/// Finds the root directory based on a specified working directory or git repo root.
+pub fn find_project_root(current_dir: &Path) -> PathBuf {
+    let mut dir = current_dir.to_path_buf();
+    loop {
+        if dir.join(".git").is_dir() {
+            return dir;
+        }
+        if !dir.pop() {
+            break;
+        }
+    }
+    current_dir.to_path_buf()
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 #[serde(rename_all = "snake_case")]
