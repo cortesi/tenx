@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::env;
 use std::path::{Path, PathBuf};
 use toml;
 
@@ -111,13 +112,15 @@ impl Config {
 
     /// Serialize the Config into a TOML string.
     pub fn to_toml(&self) -> Result<String> {
-        toml::to_string(self)
+        toml::to_string_pretty(self)
             .map_err(|e| TenxError::Internal(format!("Failed to serialize to TOML: {}", e)))
     }
 
-    /// Sets the Anthropic API key.
-    pub fn with_anthropic_key(mut self, key: String) -> Self {
-        self.anthropic_key = Some(key);
+    /// Sets the Anthropic API key. If None, the existing value is unchanged.
+    pub fn with_anthropic_key(mut self, key: Option<String>) -> Self {
+        if let Some(key) = key {
+            self.anthropic_key = Some(key);
+        }
         self
     }
 
@@ -167,6 +170,14 @@ impl Config {
         self
     }
 
+    /// Loads the Anthropic API key from the ANTHROPIC_API_KEY environment variable, if it exists.
+    pub fn load_env(mut self) -> Self {
+        if let Ok(key) = env::var("ANTHROPIC_API_KEY") {
+            self.anthropic_key = Some(key);
+        }
+        self
+    }
+
     /// Returns the configured model.
     pub fn model(&self) -> Result<crate::model::Model> {
         if let Some(dummy_model) = &self.dummy_model {
@@ -197,7 +208,7 @@ mod tests {
     #[test]
     fn test_toml_serialization() {
         let config = Config::default()
-            .with_anthropic_key("test_key".to_string())
+            .with_anthropic_key(Some("test_key".to_string()))
             .with_session_store_dir("/tmp/test")
             .with_retry_limit(5)
             .with_no_preflight(true)
