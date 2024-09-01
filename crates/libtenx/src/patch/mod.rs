@@ -5,7 +5,7 @@ mod write;
 
 pub use replace::*;
 pub use smart::*;
-// pub use udiff::*;
+pub use udiff::*;
 pub use write::*;
 
 use std::collections::HashMap;
@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::Result;
 
+/// A change to be applied to a file.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum Change {
     Write(write::WriteFile),
