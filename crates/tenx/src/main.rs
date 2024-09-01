@@ -220,7 +220,7 @@ enum Commands {
 fn load_config(cli: &Cli) -> Result<config::Config> {
     let mut config = config::Config::default()
         .with_anthropic_key(cli.anthropic_key.clone().unwrap_or_default())
-        .with_model(config::ConfigModel::Claude);
+        .with_default_model(config::ConfigModel::Claude);
     if let Some(session_store_dir) = cli.session_store.clone() {
         config = config.with_session_store_dir(session_store_dir);
     }
