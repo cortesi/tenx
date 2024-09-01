@@ -10,9 +10,12 @@ use crate::{
 };
 
 const SYSTEM: &str = include_str!("./tags-system.txt");
+const SMART: &str = include_str!("./tags-smart.txt");
 
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
-pub struct Tags {}
+pub struct Tags {
+    pub smart: bool,
+}
 
 impl DialectProvider for Tags {
     fn name(&self) -> &'static str {
@@ -20,7 +23,11 @@ impl DialectProvider for Tags {
     }
 
     fn system(&self) -> String {
-        SYSTEM.to_string()
+        let mut out = SYSTEM.to_string();
+        if self.smart {
+            out.push_str(SMART);
+        }
+        out
     }
 
     fn render_context(&self, s: &Session) -> Result<String> {
@@ -211,7 +218,7 @@ mod tests {
 
     #[test]
     fn test_parse_response_basic() {
-        let d = Tags {};
+        let d = Tags { smart: true };
 
         let input = r#"
             <comment>
@@ -259,5 +266,17 @@ mod tests {
             }
             _ => panic!("Expected Replace for /path/to/file.txt"),
         }
+    }
+
+    #[test]
+    fn test_render_system() {
+        let tags_with_smart = Tags { smart: true };
+        let tags_without_smart = Tags { smart: false };
+
+        // Test with smart enabled
+        let _system_with_smart = tags_with_smart.system();
+
+        // Test without smart
+        let _system_without_smart = tags_without_smart.system();
     }
 }

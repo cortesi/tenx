@@ -16,13 +16,25 @@ pub enum ConfigDialect {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Tags {
+    pub smart: bool,
+}
+
+impl Default for Tags {
+    fn default() -> Self {
+        Self { smart: true }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     pub anthropic_key: String,
     pub session_store_dir: Option<PathBuf>,
     pub retry_limit: usize,
     pub no_preflight: bool,
-    pub model: ConfigModel,
-    pub dialect: ConfigDialect,
+    pub default_model: ConfigModel,
+    pub default_dialect: ConfigDialect,
+    pub tags: Tags,
 
     /// Set a dummy model for end-to-end testing. Over-rides the configured model.
     #[serde(skip_serializing, skip_deserializing)]
@@ -40,10 +52,11 @@ impl Default for Config {
             session_store_dir: None,
             retry_limit: 10,
             no_preflight: false,
-            model: ConfigModel::default(),
-            dialect: ConfigDialect::default(),
+            default_model: ConfigModel::default(),
+            default_dialect: ConfigDialect::default(),
             dummy_model: None,
             dummy_dialect: None,
+            tags: Tags::default(),
         }
     }
 }
@@ -57,7 +70,7 @@ impl Config {
 
     /// Sets the configured model
     pub fn with_model(mut self, model: ConfigModel) -> Self {
-        self.model = model;
+        self.default_model = model;
         self
     }
 
@@ -73,7 +86,7 @@ impl Config {
 
     /// Sets the configured dialect
     pub fn with_dialect(mut self, dialect: ConfigDialect) -> Self {
-        self.dialect = dialect;
+        self.default_dialect = dialect;
         self
     }
 
@@ -100,7 +113,7 @@ impl Config {
         if let Some(dummy_model) = &self.dummy_model {
             return Ok(model::Model::Dummy(dummy_model.clone()));
         }
-        match self.model {
+        match self.default_model {
             ConfigModel::Claude => Ok(model::Model::Claude(model::Claude {})),
         }
     }
@@ -110,8 +123,10 @@ impl Config {
         if let Some(dummy_dialect) = &self.dummy_dialect {
             return Ok(dialect::Dialect::Dummy(dummy_dialect.clone()));
         }
-        match self.dialect {
-            ConfigDialect::Tags => Ok(dialect::Dialect::Tags(dialect::Tags {})),
+        match self.default_dialect {
+            ConfigDialect::Tags => Ok(dialect::Dialect::Tags(dialect::Tags {
+                smart: self.tags.smart,
+            })),
         }
     }
 }
