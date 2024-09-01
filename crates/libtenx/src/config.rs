@@ -22,9 +22,10 @@ pub struct Tags {
     pub smart: bool,
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for Tags {
     fn default() -> Self {
-        Self { smart: true }
+        Self { smart: false }
     }
 }
 
@@ -55,7 +56,7 @@ pub struct Config {
     pub default_dialect: ConfigDialect,
 
     /// The tags dialect configuration.
-    #[serde(skip_serializing_if = "default")]
+    #[serde(default, skip_serializing_if = "default")]
     pub tags: Tags,
 
     /// Set a dummy model for end-to-end testing. Over-rides the configured model.
@@ -288,7 +289,7 @@ mod tests {
         assert!(base_config.no_preflight);
         assert_eq!(base_config.default_model, ConfigModel::Claude);
         assert_eq!(base_config.default_dialect, ConfigDialect::Tags);
-        assert!(base_config.tags.smart);
+        assert!(!base_config.tags.smart);
     }
 
     #[test]
