@@ -15,6 +15,18 @@ const SMART: &str = include_str!("./tags-smart.txt");
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct Tags {
     pub smart: bool,
+    pub replace: bool,
+    pub udiff: bool,
+}
+
+impl Tags {
+    pub fn new(smart: bool, replace: bool, udiff: bool) -> Self {
+        Self {
+            smart,
+            replace,
+            udiff,
+        }
+    }
 }
 
 impl DialectProvider for Tags {
@@ -230,7 +242,11 @@ mod tests {
 
     #[test]
     fn test_parse_response_basic() {
-        let d = Tags { smart: true };
+        let d = Tags {
+            smart: true,
+            replace: true,
+            udiff: false,
+        };
 
         let input = r#"
             <comment>
@@ -282,8 +298,16 @@ mod tests {
 
     #[test]
     fn test_render_system() {
-        let tags_with_smart = Tags { smart: true };
-        let tags_without_smart = Tags { smart: false };
+        let tags_with_smart = Tags {
+            smart: true,
+            replace: true,
+            udiff: false,
+        };
+        let tags_without_smart = Tags {
+            smart: false,
+            replace: true,
+            udiff: false,
+        };
 
         // Test with smart enabled
         let _system_with_smart = tags_with_smart.system();

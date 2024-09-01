@@ -105,6 +105,14 @@ struct Cli {
     #[clap(long, global = true)]
     tags_smart: Option<bool>,
 
+    /// Enable or disable replace mode for the Tags dialect
+    #[clap(long, global = true)]
+    tags_replace: Option<bool>,
+
+    /// Enable or disable udiff mode for the Tags dialect
+    #[clap(long, global = true)]
+    tags_udiff: Option<bool>,
+
     #[clap(subcommand)]
     command: Option<Commands>,
 }
@@ -257,14 +265,11 @@ fn load_config(cli: &Cli) -> Result<config::Config> {
         .with_session_store_dir(cli.session_store_dir.clone())
         .with_anthropic_key(cli.anthropic_key.clone())
         .with_default_model(config::ConfigModel::Claude)
-        .with_no_preflight(cli.no_preflight);
-
-    if let Some(retry_limit) = cli.retry_limit {
-        config = config.with_retry_limit(retry_limit);
-    }
-    if let Some(tags_smart) = cli.tags_smart {
-        config = config.with_tags_smart(tags_smart);
-    }
+        .with_no_preflight(cli.no_preflight)
+        .with_retry_limit(cli.retry_limit)
+        .with_tags_smart(cli.tags_smart)
+        .with_tags_replace(cli.tags_replace)
+        .with_tags_udiff(cli.tags_udiff);
 
     Ok(config)
 }

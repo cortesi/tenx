@@ -67,12 +67,17 @@ pub enum ConfigDialect {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Tags {
     pub smart: bool,
+    pub replace: bool,
+    pub udiff: bool,
 }
 
-#[allow(clippy::derivable_impls)]
 impl Default for Tags {
     fn default() -> Self {
-        Self { smart: false }
+        Self {
+            smart: false,
+            replace: true,
+            udiff: false,
+        }
     }
 }
 
@@ -242,9 +247,11 @@ impl Config {
         self
     }
 
-    /// Sets the retry limit.
-    pub fn with_retry_limit(mut self, limit: usize) -> Self {
-        self.retry_limit = limit;
+    /// Sets the retry limit if Some, otherwise leaves it unchanged.
+    pub fn with_retry_limit(mut self, limit: Option<usize>) -> Self {
+        if let Some(l) = limit {
+            self.retry_limit = l;
+        }
         self
     }
 
@@ -255,8 +262,26 @@ impl Config {
     }
 
     /// Sets the smart flag for the Tags dialect.
-    pub fn with_tags_smart(mut self, smart: bool) -> Self {
-        self.tags.smart = smart;
+    pub fn with_tags_smart(mut self, smart: Option<bool>) -> Self {
+        if let Some(s) = smart {
+            self.tags.smart = s;
+        }
+        self
+    }
+
+    /// Sets the replace flag for the Tags dialect.
+    pub fn with_tags_replace(mut self, replace: Option<bool>) -> Self {
+        if let Some(r) = replace {
+            self.tags.replace = r;
+        }
+        self
+    }
+
+    /// Sets the udiff flag for the Tags dialect.
+    pub fn with_tags_udiff(mut self, udiff: Option<bool>) -> Self {
+        if let Some(u) = udiff {
+            self.tags.udiff = u;
+        }
         self
     }
 
@@ -284,9 +309,11 @@ impl Config {
             return Ok(dialect::Dialect::Dummy(dummy_dialect.clone()));
         }
         match self.default_dialect {
-            ConfigDialect::Tags => Ok(dialect::Dialect::Tags(dialect::Tags {
-                smart: self.tags.smart,
-            })),
+            ConfigDialect::Tags => Ok(dialect::Dialect::Tags(dialect::Tags::new(
+                self.tags.smart,
+                self.tags.replace,
+                self.tags.udiff,
+            ))),
         }
     }
 }
@@ -300,9 +327,9 @@ mod tests {
         let config = Config::default()
             .with_anthropic_key(Some("test_key".to_string()))
             .with_session_store_dir(Some(PathBuf::from("/tmp/test")))
-            .with_retry_limit(5)
+            .with_retry_limit(Some(5))
             .with_no_preflight(true)
-            .with_tags_smart(false)
+            .with_tags_smart(Some(false))
             .with_default_model(ConfigModel::Claude)
             .with_default_dialect(ConfigDialect::Tags);
 
@@ -344,7 +371,7 @@ mod tests {
     fn test_config_merge() {
         let mut base_config = Config::default()
             .with_anthropic_key(Some("base_key".to_string()))
-            .with_retry_limit(5);
+            .with_retry_limit(Some(5));
 
         let other_config = Config::default()
             .with_anthropic_key(Some("other_key".to_string()))

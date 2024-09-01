@@ -209,7 +209,7 @@ mod tests {
                 cache: Default::default(),
             }))
             .with_session_store_dir(Some(temp_dir.path().into()))
-            .with_retry_limit(1);
+            .with_retry_limit(Some(1));
         let tenx = Tenx::new(config);
         let test_file_path = temp_dir.path().join("test.txt");
         fs::write(&test_file_path, "Initial content").unwrap();
