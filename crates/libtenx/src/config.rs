@@ -19,12 +19,14 @@ macro_rules! serialize_if_different {
 const DEFAULT_RETRY_LIMIT: usize = 16;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+#[serde(rename_all = "snake_case")]
 pub enum ConfigModel {
     #[default]
     Claude,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+#[serde(rename_all = "snake_case")]
 pub enum ConfigDialect {
     #[default]
     Tags,
