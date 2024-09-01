@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
@@ -104,6 +105,16 @@ impl Smart {
         }
 
         Ok(result)
+    }
+
+    /// Applies the smart replacement operation to the given file content in the cache.
+    pub fn apply_to_cache(&self, cache: &mut HashMap<PathBuf, String>) -> Result<()> {
+        let current_content = cache
+            .get(&self.path)
+            .ok_or_else(|| TenxError::Internal("File not found in cache".to_string()))?;
+        let new_content = self.apply(current_content)?;
+        cache.insert(self.path.clone(), new_content);
+        Ok(())
     }
 }
 

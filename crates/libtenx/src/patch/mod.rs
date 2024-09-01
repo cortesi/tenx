@@ -13,7 +13,7 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-use crate::error::{Result, TenxError};
+use crate::error::Result;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum Change {
@@ -55,23 +55,9 @@ impl Patch {
     pub fn apply(&self, cache: &mut HashMap<PathBuf, String>) -> Result<()> {
         for change in &self.changes {
             match change {
-                Change::Replace(replace) => {
-                    let current_content = cache.get(&replace.path).ok_or_else(|| {
-                        TenxError::Internal("File not found in cache".to_string())
-                    })?;
-                    let new_content = replace.apply(current_content)?;
-                    cache.insert(replace.path.clone(), new_content);
-                }
-                Change::Write(write_file) => {
-                    cache.insert(write_file.path.clone(), write_file.content.clone());
-                }
-                Change::Smart(smart) => {
-                    let current_content = cache.get(&smart.path).ok_or_else(|| {
-                        TenxError::Internal("File not found in cache".to_string())
-                    })?;
-                    let new_content = smart.apply(current_content)?;
-                    cache.insert(smart.path.clone(), new_content);
-                }
+                Change::Replace(replace) => replace.apply_to_cache(cache)?,
+                Change::Write(write_file) => write_file.apply_to_cache(cache)?,
+                Change::Smart(smart) => smart.apply_to_cache(cache)?,
             }
         }
         Ok(())
