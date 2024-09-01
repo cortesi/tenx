@@ -1,14 +1,8 @@
-use crate::{Result, TenxError};
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct WriteFile {
-    pub path: PathBuf,
-    pub content: String,
-}
+use crate::error::{Result, TenxError};
 
 fn smart_ignore_leaders(path: &Path) -> Vec<&'static str> {
     match path.extension().and_then(|e| e.to_str()) {
@@ -17,52 +11,6 @@ fn smart_ignore_leaders(path: &Path) -> Vec<&'static str> {
         Some("py") => vec!["#"],
         Some("c") | Some("h") => vec!["//", "/*"],
         _ => vec!["//", "#", "/*", "#["],
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct Replace {
-    pub path: PathBuf,
-    pub old: String,
-    pub new: String,
-}
-
-impl Replace {
-    /// Applies the replacement operation to the given input string.
-    ///
-    /// Replaces only the first occurrence of the old content with the new content.
-    /// Returns the modified string if the replacement was successful, or an error if no changes were made.
-    pub fn apply(&self, input: &str) -> Result<String> {
-        let old_lines: Vec<&str> = self.old.lines().map(str::trim).collect();
-        let new_lines: Vec<&str> = self.new.lines().collect();
-        let input_lines: Vec<&str> = input.lines().collect();
-
-        let mut result = Vec::new();
-        let mut i = 0;
-
-        while i < input_lines.len() {
-            if input_lines[i..]
-                .iter()
-                .map(|s| s.trim())
-                .collect::<Vec<_>>()
-                .starts_with(&old_lines)
-            {
-                result.extend(new_lines.iter().cloned());
-                result.extend(input_lines[i + old_lines.len()..].iter().cloned());
-                return Ok(result.join("\n"));
-            } else {
-                result.push(input_lines[i]);
-                i += 1;
-            }
-        }
-
-        Err(TenxError::Patch {
-            user: "Could not find the text to replace".to_string(),
-            model: format!(
-                "Invalid replace specification - could not find the following text in the source file:\n{}",
-                self.old
-            )
-        })
     }
 }
 
@@ -159,150 +107,11 @@ impl Smart {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub enum Change {
-    Write(WriteFile),
-    Replace(Replace),
-    Smart(Smart),
-}
-
-#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct Patch {
-    pub changes: Vec<Change>,
-    pub comment: Option<String>,
-    pub cache: HashMap<PathBuf, String>,
-}
-
-impl Patch {
-    /// Returns a vector of PathBufs for all files changed in the patch.
-    pub fn changed_files(&self) -> Vec<PathBuf> {
-        self.changes
-            .iter()
-            .map(|change| match change {
-                Change::Write(write_file) => write_file.path.clone(),
-                Change::Replace(replace) => replace.path.clone(),
-                Change::Smart(block) => block.path.clone(),
-            })
-            .collect()
-    }
-
-    /// Returns a string representation of the change for display purposes.
-    pub fn change_description(change: &Change) -> String {
-        match change {
-            Change::Write(write_file) => format!("Write to {}", write_file.path.display()),
-            Change::Replace(replace) => format!("Replace in {}", replace.path.display()),
-            Change::Smart(block) => format!("Smart in {}", block.path.display()),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use indoc::indoc;
     use pretty_assertions::assert_eq;
-
-    #[test]
-    fn test_changed_files() {
-        let mut patch = Patch::default();
-        patch.changes.push(Change::Write(WriteFile {
-            path: PathBuf::from("file1.txt"),
-            content: "content".to_string(),
-        }));
-        patch.changes.push(Change::Replace(Replace {
-            path: PathBuf::from("file2.txt"),
-            old: "old".to_string(),
-            new: "new".to_string(),
-        }));
-
-        let changed_files = patch.changed_files();
-        assert_eq!(changed_files.len(), 2);
-        assert!(changed_files.contains(&PathBuf::from("file1.txt")));
-        assert!(changed_files.contains(&PathBuf::from("file2.txt")));
-    }
-
-    #[test]
-    fn test_replace_apply() {
-        let test_cases = vec![
-            (
-                "Basic replace",
-                "/path/to/file.txt",
-                indoc! {"
-                    This is
-                    old content
-                    to be replaced
-                "},
-                indoc! {"
-                    This is
-                    new content
-                    that replaces the old
-                "},
-                indoc! {"
-                    Some initial text
-                    This is
-                    old content
-                    to be replaced
-                    Some final text
-                    This is
-                    old content
-                    to be replaced
-                    More text
-                "},
-                indoc! {"
-                    Some initial text
-                    This is
-                    new content
-                    that replaces the old
-                    Some final text
-                    This is
-                    old content
-                    to be replaced
-                    More text
-                "},
-            ),
-            (
-                "Whitespace insensitive replace",
-                "/path/to/file.txt",
-                indoc! {"
-                      This is
-                      old content  
-                    to be replaced
-                "},
-                indoc! {"
-                    This is
-                    new content
-                    that replaces the old
-                "},
-                indoc! {"
-                    Some initial text
-                     This is 
-                       old content
-                      to be replaced 
-                    Some final text
-                "},
-                indoc! {"
-                    Some initial text
-                    This is
-                    new content
-                    that replaces the old
-                    Some final text
-                "},
-            ),
-        ];
-
-        for (name, path, old, new, input, expected_output) in test_cases {
-            let replace = Replace {
-                path: path.into(),
-                old: old.trim().to_string(),
-                new: new.trim().to_string(),
-            };
-
-            let result = replace
-                .apply(input)
-                .unwrap_or_else(|_| panic!("Failed to apply replace: {}", name));
-            assert_eq!(result, expected_output.trim_end(), "Test case: {}", name);
-        }
-    }
 
     #[test]
     fn test_smart_apply() {

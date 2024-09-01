@@ -12,6 +12,7 @@ use crate::{
 const SYSTEM: &str = include_str!("./tags-system.txt");
 const SMART: &str = include_str!("./tags-smart.txt");
 const REPLACE: &str = include_str!("./tags-replace.txt");
+const UDIFF: &str = include_str!("./tags-udiff.txt");
 
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct Tags {
@@ -42,6 +43,9 @@ impl DialectProvider for Tags {
         }
         if self.replace {
             out.push_str(REPLACE);
+        }
+        if self.udiff {
+            out.push_str(UDIFF);
         }
         out
     }
