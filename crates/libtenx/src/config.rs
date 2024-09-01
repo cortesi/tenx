@@ -1,9 +1,22 @@
-use serde::{Deserialize, Serialize};
+use serde::{
+    ser::{SerializeStruct, Serializer},
+    Deserialize, Serialize,
+};
 use std::env;
 use std::path::PathBuf;
 use toml;
 
 use crate::{dialect, model, Result, TenxError};
+
+macro_rules! serialize_if_different {
+    ($state:expr, $self:expr, $default:expr, $field:ident) => {
+        if $self.full || $self.$field != $default.$field {
+            $state.serialize_field(stringify!($field), &$self.$field)?;
+        }
+    };
+}
+
+const DEFAULT_RETRY_LIMIT: usize = 16;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub enum ConfigModel {
@@ -29,51 +42,61 @@ impl Default for Tags {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Config {
     /// The Anthropic API key.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub anthropic_key: Option<String>,
 
     /// The directory to store session state.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub session_store_dir: Option<PathBuf>,
 
     /// The number of times to retry a request.
-    #[serde(skip_serializing_if = "is_default_retry_limit")]
     pub retry_limit: usize,
 
     /// Skip the preflight check.
-    #[serde(skip_serializing_if = "default")]
     pub no_preflight: bool,
 
     /// The default model.
-    #[serde(default, skip_serializing_if = "default")]
+    #[serde(default)]
     pub default_model: ConfigModel,
 
     /// The default dialect.
-    #[serde(default, skip_serializing_if = "default")]
+    #[serde(default)]
     pub default_dialect: ConfigDialect,
 
     /// The tags dialect configuration.
-    #[serde(default, skip_serializing_if = "default")]
+    #[serde(default)]
     pub tags: Tags,
 
     /// Set a dummy model for end-to-end testing. Over-rides the configured model.
-    #[serde(skip_serializing, skip_deserializing)]
+    #[serde(skip)]
     dummy_model: Option<model::DummyModel>,
 
     /// Set a dummy dialect for end-to-end testing. Over-rides the configured dialect.
-    #[serde(skip_serializing, skip_deserializing)]
+    #[serde(skip)]
     dummy_dialect: Option<dialect::DummyDialect>,
+
+    /// When true, serializes all fields regardless of default values.
+    #[serde(skip)]
+    full: bool,
 }
 
-fn default<T: Default + PartialEq>(t: &T) -> bool {
-    *t == Default::default()
-}
-
-fn is_default_retry_limit(value: &usize) -> bool {
-    *value == Config::default().retry_limit
+impl Serialize for Config {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let default = Config::default();
+        let mut state = serializer.serialize_struct("Config", 7)?;
+        serialize_if_different!(state, self, default, anthropic_key);
+        serialize_if_different!(state, self, default, session_store_dir);
+        serialize_if_different!(state, self, default, retry_limit);
+        serialize_if_different!(state, self, default, no_preflight);
+        serialize_if_different!(state, self, default, default_model);
+        serialize_if_different!(state, self, default, default_dialect);
+        serialize_if_different!(state, self, default, tags);
+        state.end()
+    }
 }
 
 impl Default for Config {
@@ -81,18 +104,25 @@ impl Default for Config {
         Self {
             anthropic_key: None,
             session_store_dir: None,
-            retry_limit: 10,
+            retry_limit: DEFAULT_RETRY_LIMIT,
             no_preflight: false,
             default_model: ConfigModel::default(),
             default_dialect: ConfigDialect::default(),
             dummy_model: None,
             dummy_dialect: None,
             tags: Tags::default(),
+            full: false,
         }
     }
 }
 
 impl Config {
+    /// Sets the full serialization flag.
+    pub fn with_full(mut self, full: bool) -> Self {
+        self.full = full;
+        self
+    }
+
     /// Deserialize a TOML string into a Config.
     pub fn from_toml(toml_str: &str) -> Result<Self> {
         toml::from_str(toml_str)
