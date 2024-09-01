@@ -365,7 +365,7 @@ async fn main() -> anyhow::Result<()> {
                 } else {
                     load_config(&cli)?
                 };
-                if *full {
+                if *full || *defaults {
                     config = config.with_full(true);
                 }
                 if *json {
