@@ -31,7 +31,7 @@ impl Tenx {
 
     /// Saves a session to the store.
     pub fn save_session(&self, session: &Session) -> Result<()> {
-        let session_store = SessionStore::open(self.config.session_store_dir.clone())?;
+        let session_store = SessionStore::open(self.config.session_store_dir())?;
         session_store.save(session)?;
         Ok(())
     }
@@ -39,7 +39,7 @@ impl Tenx {
     /// Loads a session from the store based on the given path.
     pub fn load_session<P: AsRef<Path>>(&self, path: P) -> Result<Session> {
         let root = crate::config::find_project_root(path.as_ref());
-        let session_store = SessionStore::open(self.config.session_store_dir.clone())?;
+        let session_store = SessionStore::open(self.config.session_store_dir())?;
         let name = normalize_path(&root);
         session_store.load(name)
     }
@@ -58,7 +58,7 @@ impl Tenx {
         session: &mut Session,
         sender: Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
-        let session_store = SessionStore::open(self.config.session_store_dir.clone())?;
+        let session_store = SessionStore::open(self.config.session_store_dir())?;
         session.rollback_last()?;
         self.process_prompt(session, sender, &session_store).await
     }

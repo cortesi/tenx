@@ -151,7 +151,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             anthropic_key: String::new(),
-            session_store_dir: home_config_dir().join("state"),
+            session_store_dir: PathBuf::new(),
             retry_limit: DEFAULT_RETRY_LIMIT,
             no_preflight: false,
             default_model: ConfigModel::default(),
@@ -165,6 +165,14 @@ impl Default for Config {
 }
 
 impl Config {
+    pub fn session_store_dir(&self) -> PathBuf {
+        if self.session_store_dir.as_os_str().is_empty() {
+            home_config_dir().join("state")
+        } else {
+            self.session_store_dir.clone()
+        }
+    }
+
     /// Sets the full serialization flag.
     pub fn with_full(mut self, full: bool) -> Self {
         self.full = full;
@@ -404,9 +412,10 @@ mod tests {
         let config_without_change = config.clone().with_session_store_dir(None);
 
         assert_eq!(
-            config_without_change.session_store_dir,
+            config_without_change.session_store_dir(),
             home_config_dir().join("state")
         );
+        assert_eq!(config_without_change.session_store_dir, PathBuf::new());
 
         let config_with_existing =
             Config::default().with_session_store_dir(Some(PathBuf::from("/tmp/existing")));
