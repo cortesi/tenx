@@ -116,6 +116,9 @@ enum Commands {
         /// Output as JSON instead of TOML
         #[clap(long)]
         json: bool,
+        /// Output full configuration
+        #[clap(long)]
+        full: bool,
     },
     /// Print the current dialect and its settings
     Dialect {
@@ -323,8 +326,11 @@ async fn main() -> anyhow::Result<()> {
 
     let result = match &cli.command {
         Some(cmd) => match cmd {
-            Commands::Conf { json } => {
-                let config = load_config(&cli)?;
+            Commands::Conf { json, full } => {
+                let mut config = load_config(&cli)?;
+                if *full {
+                    config = config.with_full(true);
+                }
                 if *json {
                     println!("{}", to_string_pretty(&config)?);
                 } else {
