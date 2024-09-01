@@ -111,8 +111,12 @@ impl DialectProvider for Tags {
                         let path = tag
                             .attributes
                             .get("path")
-                            .ok_or_else(|| {
-                                TenxError::ResponseParse("Missing path attribute".into())
+                            .ok_or_else(|| TenxError::ResponseParse {
+                                user: "Failed to parse model response".into(),
+                                model: format!(
+                                    "Missing path attribute in smart tag. Line: '{}'",
+                                    line
+                                ),
                             })?
                             .clone();
                         let (_, content) = xmlish::parse_block("smart", &mut lines)?;
@@ -125,8 +129,12 @@ impl DialectProvider for Tags {
                         let path = tag
                             .attributes
                             .get("path")
-                            .ok_or_else(|| {
-                                TenxError::ResponseParse("Missing path attribute".into())
+                            .ok_or_else(|| TenxError::ResponseParse {
+                                user: "Failed to parse model response".into(),
+                                model: format!(
+                                    "Missing path attribute in write_file tag. Line: '{}'",
+                                    line
+                                ),
                             })?
                             .clone();
                         let (_, content) = xmlish::parse_block("write_file", &mut lines)?;
@@ -139,8 +147,12 @@ impl DialectProvider for Tags {
                         let path = tag
                             .attributes
                             .get("path")
-                            .ok_or_else(|| {
-                                TenxError::ResponseParse("Missing path attribute".into())
+                            .ok_or_else(|| TenxError::ResponseParse {
+                                user: "Failed to parse model response".into(),
+                                model: format!(
+                                    "Missing path attribute in replace tag. Line: '{}'",
+                                    line
+                                ),
                             })?
                             .clone();
                         let (_, replace_content) = xmlish::parse_block("replace", &mut lines)?;

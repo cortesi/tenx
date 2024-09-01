@@ -54,17 +54,26 @@ pub fn parse_block<I>(tag_name: &str, lines: &mut I) -> Result<(Tag, Vec<String>
 where
     I: Iterator<Item = String>,
 {
-    let opening_line = lines
-        .next()
-        .ok_or_else(|| TenxError::ResponseParse("Expected opening tag".into()))?;
-    let tag = parse_open(&opening_line)
-        .ok_or_else(|| TenxError::ResponseParse("Invalid opening tag".into()))?;
+    let opening_line = lines.next().ok_or_else(|| TenxError::ResponseParse {
+        user: "Failed to parse model response".into(),
+        model: "Expected opening tag in XML-like structure. No lines found.".into(),
+    })?;
+    let tag = parse_open(&opening_line).ok_or_else(|| TenxError::ResponseParse {
+        user: "Failed to parse model response".into(),
+        model: format!(
+            "Invalid opening tag in XML-like structure. Line: '{}'",
+            opening_line
+        ),
+    })?;
 
     if tag.name != tag_name {
-        return Err(TenxError::ResponseParse(format!(
-            "Expected tag {}, found {}",
-            tag_name, tag.name
-        )));
+        return Err(TenxError::ResponseParse {
+            user: "Failed to parse model response".into(),
+            model: format!(
+                "Expected tag {}, found {} in XML-like structure. Line: '{}'",
+                tag_name, tag.name, opening_line
+            ),
+        });
     }
 
     let mut contents = Vec::new();
@@ -74,6 +83,7 @@ where
         }
     }
 
+    let mut last_line = String::new();
     for line in lines {
         if is_close(&line, tag_name) {
             if let Some(last_content) = line.split('<').next() {
@@ -83,13 +93,17 @@ where
             }
             return Ok((tag, contents));
         }
-        contents.push(line);
+        contents.push(line.clone());
+        last_line = line;
     }
 
-    Err(TenxError::ResponseParse(format!(
-        "Closing tag not found for {}",
-        tag_name
-    )))
+    Err(TenxError::ResponseParse {
+        user: "Failed to parse model response".into(),
+        model: format!(
+            "Closing tag not found for {} in XML-like structure. Last line processed: '{}'",
+            tag_name, last_line
+        ),
+    })
 }
 
 #[cfg(test)]

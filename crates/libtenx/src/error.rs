@@ -22,8 +22,13 @@ pub enum TenxError {
     #[error("Model error: {0}")]
     Model(String),
 
-    #[error("Error parsing response from model: {0}")]
-    ResponseParse(String),
+    #[error("Error parsing response from model: {user}")]
+    ResponseParse {
+        /// A friendly error message for the user
+        user: String,
+        /// Detailed error information for the model
+        model: String,
+    },
 
     #[error("Error applying change: {0}")]
     Change(String),
@@ -82,7 +87,7 @@ impl TenxError {
         match self {
             TenxError::Validation { model, .. } => Some(model.to_string()),
             TenxError::Patch { model, .. } => Some(model.to_string()),
-            TenxError::ResponseParse(e) => Some(e.to_string()),
+            TenxError::ResponseParse { model, .. } => Some(model.to_string()),
             _ => None,
         }
     }
