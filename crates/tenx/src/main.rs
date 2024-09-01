@@ -7,7 +7,6 @@ use std::{
 use anyhow::{Context as AnyhowContext, Result};
 use clap::{CommandFactory, Parser, Subcommand};
 use colored::*;
-use serde_json::to_string_pretty;
 use tokio::sync::mpsc;
 use tracing::Subscriber;
 use tracing_subscriber::fmt::format::FmtSpan;
@@ -323,7 +322,7 @@ async fn main() -> anyhow::Result<()> {
         Some(cmd) => match cmd {
             Commands::Conf => {
                 let config = load_config(&cli)?;
-                println!("{}", to_string_pretty(&config)?);
+                println!("{}", config.to_toml()?);
                 Ok(()) as anyhow::Result<()>
             }
             Commands::Dialect { system } => {
