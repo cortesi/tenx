@@ -71,7 +71,6 @@ fn print_steps(session: &Session, full: bool, width: usize) -> Result<String> {
         return Ok(String::new());
     }
     let mut output = String::new();
-    output.push_str(&format!("{}\n", "steps:".blue().bold()));
     for (i, step) in session.steps().iter().enumerate() {
         output.push_str(&format!("\n{}\n", "=".repeat(width)));
         output.push_str(&format!("{}\n", format!("Step {}", i).cyan().bold()));
@@ -280,7 +279,6 @@ mod tests {
         let result = print_steps(&session, false, 80);
         assert!(result.is_ok());
         let output = result.unwrap();
-        assert!(output.contains("steps:"));
         assert!(output.contains("Step 0"));
         assert!(output.contains("Test prompt"));
     }
@@ -296,7 +294,6 @@ mod tests {
         let result = print_steps(&session, false, 80);
         assert!(result.is_ok());
         let output = result.unwrap();
-        assert!(output.contains("steps:"));
         assert!(output.contains("Step 0"));
         assert!(output.contains("Test prompt"));
         assert!(output.contains("comment:"));
@@ -310,7 +307,6 @@ mod tests {
         let result = print_steps(&session, false, 80);
         assert!(result.is_ok());
         let output = result.unwrap();
-        assert!(output.contains("steps:"));
         assert!(output.contains("Step 0"));
         assert!(output.contains("Test prompt"));
         assert!(output.contains("error:"));
