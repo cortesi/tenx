@@ -11,6 +11,7 @@ use crate::{
 
 const SYSTEM: &str = include_str!("./tags-system.txt");
 const SMART: &str = include_str!("./tags-smart.txt");
+const REPLACE: &str = include_str!("./tags-replace.txt");
 
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct Tags {
@@ -38,6 +39,9 @@ impl DialectProvider for Tags {
         let mut out = SYSTEM.to_string();
         if self.smart {
             out.push_str(SMART);
+        }
+        if self.replace {
+            out.push_str(REPLACE);
         }
         out
     }
