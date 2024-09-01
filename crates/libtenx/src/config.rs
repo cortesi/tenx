@@ -24,6 +24,10 @@ pub const LOCAL_CONFIG_FILE: &str = ".tenx.toml";
 
 const DEFAULT_RETRY_LIMIT: usize = 16;
 
+fn default_retry_limit() -> usize {
+    DEFAULT_RETRY_LIMIT
+}
+
 /// Returns the path to the configuration directory.
 pub fn home_config_dir() -> PathBuf {
     dirs::home_dir()
@@ -83,7 +87,7 @@ pub struct Config {
     pub session_store_dir: Option<PathBuf>,
 
     /// The number of times to retry a request.
-    #[serde(default)]
+    #[serde(default = "default_retry_limit")]
     pub retry_limit: usize,
 
     /// Skip the preflight check.
@@ -387,5 +391,19 @@ mod tests {
             config_keep_existing.session_store_dir,
             Some(PathBuf::from("/tmp/existing"))
         );
+    }
+
+    #[test]
+    fn test_single_value_deserialization() {
+        let toml_str = "retry_limit = 42";
+        let config = Config::from_toml(toml_str).unwrap();
+
+        assert_eq!(config.retry_limit, 42);
+        assert_eq!(config.anthropic_key, None);
+        assert_eq!(config.session_store_dir, None);
+        assert_eq!(config.no_preflight, false);
+        assert_eq!(config.default_model, ConfigModel::Claude);
+        assert_eq!(config.default_dialect, ConfigDialect::Tags);
+        assert_eq!(config.tags.smart, false);
     }
 }
