@@ -17,7 +17,7 @@ pub enum ConfigDialect {
     Tags,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Tags {
     pub smart: bool,
 }
@@ -39,23 +39,23 @@ pub struct Config {
     pub session_store_dir: Option<PathBuf>,
 
     /// The number of times to retry a request.
-    #[serde(skip_serializing_if = "is_default_usize")]
+    #[serde(skip_serializing_if = "is_default_retry_limit")]
     pub retry_limit: usize,
 
     /// Skip the preflight check.
-    #[serde(skip_serializing_if = "is_default_bool")]
+    #[serde(skip_serializing_if = "default")]
     pub no_preflight: bool,
 
     /// The default model.
-    #[serde(default, skip_serializing_if = "is_default_config_model")]
+    #[serde(default, skip_serializing_if = "default")]
     pub default_model: ConfigModel,
 
     /// The default dialect.
-    #[serde(default, skip_serializing_if = "is_default_config_dialect")]
+    #[serde(default, skip_serializing_if = "default")]
     pub default_dialect: ConfigDialect,
 
     /// The tags dialect configuration.
-    #[serde(skip_serializing_if = "is_default_tags")]
+    #[serde(skip_serializing_if = "default")]
     pub tags: Tags,
 
     /// Set a dummy model for end-to-end testing. Over-rides the configured model.
@@ -67,24 +67,12 @@ pub struct Config {
     dummy_dialect: Option<dialect::DummyDialect>,
 }
 
-fn is_default_usize(value: &usize) -> bool {
+fn default<T: Default + PartialEq>(t: &T) -> bool {
+    *t == Default::default()
+}
+
+fn is_default_retry_limit(value: &usize) -> bool {
     *value == Config::default().retry_limit
-}
-
-fn is_default_bool(value: &bool) -> bool {
-    *value == Config::default().no_preflight
-}
-
-fn is_default_config_model(value: &ConfigModel) -> bool {
-    value == &ConfigModel::default()
-}
-
-fn is_default_config_dialect(value: &ConfigDialect) -> bool {
-    value == &ConfigDialect::default()
-}
-
-fn is_default_tags(value: &Tags) -> bool {
-    value.smart == Tags::default().smart
 }
 
 impl Default for Config {

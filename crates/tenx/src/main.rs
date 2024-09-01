@@ -7,6 +7,7 @@ use std::{
 use anyhow::{Context as AnyhowContext, Result};
 use clap::{CommandFactory, Parser, Subcommand};
 use colored::*;
+use serde_json::to_string_pretty;
 use tokio::sync::mpsc;
 use tracing::Subscriber;
 use tracing_subscriber::fmt::format::FmtSpan;
@@ -111,7 +112,11 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// Print the current configuration
-    Conf,
+    Conf {
+        /// Output as JSON instead of TOML
+        #[clap(long)]
+        json: bool,
+    },
     /// Print the current dialect and its settings
     Dialect {
         /// Print the complete system prompt
@@ -320,9 +325,13 @@ async fn main() -> anyhow::Result<()> {
 
     let result = match &cli.command {
         Some(cmd) => match cmd {
-            Commands::Conf => {
+            Commands::Conf { json } => {
                 let config = load_config(&cli)?;
-                println!("{}", config.to_toml()?);
+                if *json {
+                    println!("{}", to_string_pretty(&config)?);
+                } else {
+                    println!("{}", config.to_toml()?);
+                }
                 Ok(()) as anyhow::Result<()>
             }
             Commands::Dialect { system } => {
