@@ -21,6 +21,7 @@ pub enum Change {
     Write(write::WriteFile),
     Replace(replace::Replace),
     Smart(smart::Smart),
+    UDiff(udiff::UDiff),
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -33,14 +34,16 @@ pub struct Patch {
 impl Patch {
     /// Returns a vector of PathBufs for all files changed in the patch.
     pub fn changed_files(&self) -> Vec<PathBuf> {
-        self.changes
-            .iter()
-            .map(|change| match change {
-                Change::Write(write_file) => write_file.path.clone(),
-                Change::Replace(replace) => replace.path.clone(),
-                Change::Smart(block) => block.path.clone(),
-            })
-            .collect()
+        let mut paths = vec![];
+        for change in &self.changes {
+            match change {
+                Change::Write(write_file) => paths.push(write_file.path.clone()),
+                Change::Replace(replace) => paths.push(replace.path.clone()),
+                Change::Smart(block) => paths.push(block.path.clone()),
+                Change::UDiff(udiff) => paths.extend(udiff.modified_files.iter().map(|f| f.into())),
+            }
+        }
+        paths
     }
 
     /// Returns a string representation of the change for display purposes.
@@ -49,6 +52,7 @@ impl Patch {
             Change::Write(write_file) => format!("Write to {}", write_file.path.display()),
             Change::Replace(replace) => format!("Replace in {}", replace.path.display()),
             Change::Smart(block) => format!("Smart in {}", block.path.display()),
+            Change::UDiff(udiff) => format!("UDiff for {} files", udiff.modified_files.len()),
         }
     }
 
@@ -59,6 +63,7 @@ impl Patch {
                 Change::Replace(replace) => replace.apply_to_cache(cache)?,
                 Change::Write(write_file) => write_file.apply_to_cache(cache)?,
                 Change::Smart(smart) => smart.apply_to_cache(cache)?,
+                Change::UDiff(udiff) => udiff.apply_to_cache(cache)?,
             }
         }
         Ok(())

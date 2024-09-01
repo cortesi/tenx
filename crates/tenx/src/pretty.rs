@@ -176,6 +176,13 @@ fn print_patch(
                     output.push('\n');
                 }
             }
+            libtenx::patch::Change::UDiff(w) => {
+                output.push_str(&format!("{} udiff \n", INDENT.repeat(3)));
+                if full {
+                    output.push_str(&wrapped_block(&w.patch, width, INDENT.len() * 4));
+                    output.push('\n');
+                }
+            }
             libtenx::patch::Change::Replace(r) => {
                 let file_path = session
                     .relpath(&r.path)

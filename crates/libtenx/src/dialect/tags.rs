@@ -5,7 +5,7 @@ use std::{fs, path::PathBuf};
 
 use super::{xmlish, DialectProvider};
 use crate::{
-    patch::{Change, Patch, Replace, Smart, WriteFile},
+    patch::{Change, Patch, Replace, Smart, UDiff, WriteFile},
     Result, Session, TenxError,
 };
 
@@ -185,6 +185,12 @@ impl DialectProvider for Tags {
                             new: new.join("\n"),
                         }));
                     }
+                    "udiff" => {
+                        let (_, content) = xmlish::parse_block("write_file", &mut lines)?;
+                        change_set
+                            .changes
+                            .push(Change::UDiff(UDiff::new(content.join("\n"))?));
+                    }
                     "comment" => {
                         let (_, content) = xmlish::parse_block("comment", &mut lines)?;
                         change_set.comment = Some(content.join("\n"));
@@ -233,6 +239,9 @@ impl DialectProvider for Tags {
                             smart.path.display(),
                             smart.text
                         ));
+                    }
+                    Change::UDiff(udiff) => {
+                        rendered.push_str(&format!("<udiff>\n{}\n</udiff>\n\n", udiff.patch));
                     }
                 }
             }
