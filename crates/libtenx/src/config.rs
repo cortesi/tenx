@@ -29,17 +29,31 @@ impl Default for Tags {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
-    pub anthropic_key: String,
+    /// The Anthropic API key.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub anthropic_key: Option<String>,
+
+    /// The directory to store session state.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub session_store_dir: Option<PathBuf>,
+
+    /// The number of times to retry a request.
     #[serde(skip_serializing_if = "is_default_usize")]
     pub retry_limit: usize,
+
+    /// Skip the preflight check.
     #[serde(skip_serializing_if = "is_default_bool")]
     pub no_preflight: bool,
+
+    /// The default model.
     #[serde(default, skip_serializing_if = "is_default_config_model")]
     pub default_model: ConfigModel,
+
+    /// The default dialect.
     #[serde(default, skip_serializing_if = "is_default_config_dialect")]
     pub default_dialect: ConfigDialect,
+
+    /// The tags dialect configuration.
     #[serde(skip_serializing_if = "is_default_tags")]
     pub tags: Tags,
 
@@ -75,7 +89,7 @@ fn is_default_tags(value: &Tags) -> bool {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            anthropic_key: String::new(),
+            anthropic_key: None,
             session_store_dir: None,
             retry_limit: 10,
             no_preflight: false,
@@ -84,15 +98,6 @@ impl Default for Config {
             dummy_model: None,
             dummy_dialect: None,
             tags: Tags::default(),
-        }
-    }
-}
-
-impl Config {
-    pub fn new(anthropic_key: String) -> Self {
-        Self {
-            anthropic_key,
-            ..Default::default()
         }
     }
 }
@@ -112,7 +117,7 @@ impl Config {
 
     /// Sets the Anthropic API key.
     pub fn with_anthropic_key(mut self, key: String) -> Self {
-        self.anthropic_key = key;
+        self.anthropic_key = Some(key);
         self
     }
 
@@ -191,7 +196,8 @@ mod tests {
 
     #[test]
     fn test_toml_serialization() {
-        let config = Config::new("test_key".to_string())
+        let config = Config::default()
+            .with_anthropic_key("test_key".to_string())
             .with_session_store_dir("/tmp/test")
             .with_retry_limit(5)
             .with_no_preflight(true)
@@ -217,14 +223,14 @@ mod tests {
         assert_eq!(config.tags.smart, deserialized_config.tags.smart);
 
         // Test default value serialization
-        let default_config = Config::new("default_key".to_string());
+        let default_config = Config::default();
         let default_toml_str = default_config.to_toml().unwrap();
         println!("Default Config TOML:\n{}", default_toml_str);
 
         let parsed_toml: toml::Value = toml::from_str(&default_toml_str).unwrap();
         let table = parsed_toml.as_table().unwrap();
 
-        assert!(table.contains_key("anthropic_key"));
+        assert!(!table.contains_key("anthropic_key"));
         assert!(!table.contains_key("session_store_dir"));
         assert!(!table.contains_key("retry_limit"));
         assert!(!table.contains_key("no_preflight"));
