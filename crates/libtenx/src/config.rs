@@ -108,6 +108,12 @@ impl Config {
         self
     }
 
+    /// Sets the smart flag for the Tags dialect.
+    pub fn with_tags_smart(mut self, smart: bool) -> Self {
+        self.tags.smart = smart;
+        self
+    }
+
     /// Returns the configured model.
     pub fn model(&self) -> Result<crate::model::Model> {
         if let Some(dummy_model) = &self.dummy_model {

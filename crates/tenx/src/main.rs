@@ -101,6 +101,10 @@ struct Cli {
     #[clap(long, global = true)]
     no_color: bool,
 
+    /// Enable or disable smart mode for the Tags dialect
+    #[clap(long, global = true)]
+    tags_smart: Option<bool>,
+
     #[clap(subcommand)]
     command: Option<Commands>,
 }
@@ -224,6 +228,9 @@ fn load_config(cli: &Cli) -> Result<config::Config> {
         config = config.with_retry_limit(retry_limit);
     }
     config = config.with_no_preflight(cli.no_preflight);
+    if let Some(tags_smart) = cli.tags_smart {
+        config = config.with_tags_smart(tags_smart);
+    }
     Ok(config)
 }
 
