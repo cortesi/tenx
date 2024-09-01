@@ -7,6 +7,8 @@ RUN="cargo run -- --session-store-dir $SCRIPT_DIR/.session_store"
 cd $SCRIPT_DIR/..
 $RUN new
 $RUN edit \
+    --tags-udiff=true \
+    --tags-replace=false \
     --prompt "Please complete the fibonacci function" \
     $SCRIPT_DIR/simple/src/*.rs 
 git diff samples/simple

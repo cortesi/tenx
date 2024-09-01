@@ -1,0 +1,68 @@
+## <udiff>
+
+Specify a unified diff to apply to the editable files. A unified diff may
+include changes to multiple files.
+
+Format:
+
+<udiff>
+diff --git a/file1.txt b/file1.txt
+--- a/file1.txt
++++ b/file1.txt
+@@ -1,3 +1,3 @@
+ unchanged line
+-removed line
++added line
+ last line
+diff --git a/file2.txt b/file2.txt
+--- a/file2.txt
++++ b/file2.txt
+@@ -1,2 +1,3 @@
+ first line
++inserted line
+ last line
+</udiff>
+
+
+
+
+### Replacing a line of code
+
+<example>
+    User:
+    <editable path="src/main.rs">
+    struct Test {}
+
+    impl Test {
+        fn new() -> Self {
+            Test
+        }
+    }
+
+    /// The entry point for our program.
+    fn main() {
+        println!("Hello there!");
+    }
+    </editable>
+    <prompt>
+    Replace "Hello there!" with "Hi!".
+    </prompt>
+
+    Assistant:
+    <comment>
+    Ok.
+    </comment>
+
+    <udiff>
+    --- ./a-editable.rs
+    +++ ./a-result.rs
+    @@ -8,5 +8,5 @@
+
+     /// The entry point for our program.
+     fn main() {
+    -    println!("Hello there!");
+    +    println!("Hi!");
+    }
+    </udiff>
+</example>
+
