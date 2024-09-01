@@ -226,20 +226,46 @@ enum Commands {
     },
 }
 
-/// Creates a Config from CLI arguments
+/// Creates a Config from disk and CLI arguments
 fn load_config(cli: &Cli) -> Result<config::Config> {
-    let mut config = config::Config::default()
+    let mut config = config::Config::default();
+
+    // Load from home config file
+    let home_config_path = config::home_config_dir().join(config::HOME_CONFIG_FILE);
+    if home_config_path.exists() {
+        let home_config_str =
+            fs::read_to_string(&home_config_path).context("Failed to read home config file")?;
+        let home_config = config::Config::from_toml(&home_config_str)
+            .context("Failed to parse home config file")?;
+        config.merge(&home_config);
+    }
+
+    // Load from local config file
+    let project_root = config::find_project_root(&std::env::current_dir()?);
+    let local_config_path = project_root.join(config::LOCAL_CONFIG_FILE);
+    if local_config_path.exists() {
+        let local_config_str =
+            fs::read_to_string(&local_config_path).context("Failed to read local config file")?;
+        let local_config = config::Config::from_toml(&local_config_str)
+            .context("Failed to parse local config file")?;
+        config.merge(&local_config);
+    }
+
+    // Apply CLI arguments
+    config = config
         .load_env()
         .with_session_store_dir(cli.session_store_dir.clone())
         .with_anthropic_key(cli.anthropic_key.clone())
-        .with_default_model(config::ConfigModel::Claude);
+        .with_default_model(config::ConfigModel::Claude)
+        .with_no_preflight(cli.no_preflight);
+
     if let Some(retry_limit) = cli.retry_limit {
         config = config.with_retry_limit(retry_limit);
     }
-    config = config.with_no_preflight(cli.no_preflight);
     if let Some(tags_smart) = cli.tags_smart {
         config = config.with_tags_smart(tags_smart);
     }
+
     Ok(config)
 }
 

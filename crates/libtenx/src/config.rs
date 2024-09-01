@@ -75,15 +75,19 @@ impl Default for Tags {
 #[derive(Debug, Clone, Deserialize)]
 pub struct Config {
     /// The Anthropic API key.
+    #[serde(default)]
     pub anthropic_key: Option<String>,
 
     /// The directory to store session state.
+    #[serde(default)]
     pub session_store_dir: Option<PathBuf>,
 
     /// The number of times to retry a request.
+    #[serde(default)]
     pub retry_limit: usize,
 
     /// Skip the preflight check.
+    #[serde(default)]
     pub no_preflight: bool,
 
     /// The default model.
