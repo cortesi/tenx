@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use std::fs;
+use fs_err as fs;
 use std::path::Path;
 
 pub fn create_dummy_project(temp_dir: &Path) -> std::io::Result<()> {

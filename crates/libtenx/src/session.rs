@@ -1,8 +1,9 @@
 use std::{
-    env, fs,
+    env,
     path::{Path, PathBuf},
 };
 
+use fs_err as fs;
 use libruskel::Ruskel;
 use pathdiff::diff_paths;
 use serde::{Deserialize, Serialize};
@@ -42,8 +43,7 @@ impl Context {
     pub fn body(&self, session: &Session) -> Result<String> {
         match &self.data {
             ContextData::String(content) => Ok(content.clone()),
-            ContextData::Path(path) => Ok(std::fs::read_to_string(session.abspath(path)?)
-                .map_err(|e| TenxError::fio(e, path.clone()))?),
+            ContextData::Path(path) => Ok(fs::read_to_string(session.abspath(path)?)?),
         }
     }
 }
@@ -96,7 +96,8 @@ impl Session {
     /// moment, this means the enclosing git repository, if there is one, otherwise the current
     /// directory.
     pub fn from_cwd() -> Result<Self> {
-        let cwd = env::current_dir().map_err(|e| TenxError::fio(e, "."))?;
+        let cwd = env::current_dir()
+            .map_err(|e| TenxError::Internal(format!("Could not access cwd: {}", e)))?;
         let root = config::find_project_root(&cwd);
         Ok(Self::new(root))
     }
@@ -124,7 +125,7 @@ impl Session {
         self.root
             .join(path)
             .canonicalize()
-            .map_err(|e| TenxError::fio(e, path))
+            .map_err(|e| TenxError::Internal(format!("Could not canonicalize: {}", e)))
     }
 
     /// Returns the absolute paths of the editables for this session.
@@ -206,7 +207,8 @@ impl Session {
     fn normalize_path<P: AsRef<Path>>(&self, path: P) -> Result<PathBuf> {
         self.normalize_path_with_cwd(
             path,
-            env::current_dir().map_err(|e| TenxError::fio(e, "."))?,
+            env::current_dir()
+                .map_err(|e| TenxError::Internal(format!("Could not get cwd: {}", e)))?,
         )
     }
 
@@ -221,7 +223,7 @@ impl Session {
             let absolute_path = current_dir
                 .join(path)
                 .canonicalize()
-                .map_err(|e| TenxError::fio(e, path))?;
+                .map_err(|e| TenxError::Internal(format!("Could not canonicalize: {}", e)))?;
 
             Ok(absolute_path
                 .strip_prefix(&self.root)
@@ -274,8 +276,7 @@ impl Session {
         for path in patch.changed_files() {
             let abs_path = self.abspath(&path)?;
             if let std::collections::hash_map::Entry::Vacant(e) = patch.cache.entry(path) {
-                let content = fs::read_to_string(&abs_path)
-                    .map_err(|e| TenxError::fio(e, abs_path.clone()))?;
+                let content = fs::read_to_string(&abs_path)?;
                 e.insert(content);
             }
         }
@@ -289,7 +290,7 @@ impl Session {
         // Finally, write all files to disk
         for (path, content) in modified_cache {
             let abs_path = self.abspath(&path)?;
-            fs::write(&abs_path, content).map_err(|e| TenxError::fio(e, abs_path.clone()))?;
+            fs::write(&abs_path, content)?;
         }
 
         Ok(())
@@ -298,7 +299,7 @@ impl Session {
     /// Rolls back the changes made by a patch, using the cached file contents.
     pub fn rollback(&self, patch: &Patch) -> Result<()> {
         for (path, content) in &patch.cache {
-            fs::write(self.abspath(path)?, content).map_err(|e| TenxError::fio(e, path.clone()))?;
+            fs::write(self.abspath(path)?, content)?;
         }
         Ok(())
     }

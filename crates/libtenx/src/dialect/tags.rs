@@ -1,13 +1,14 @@
 //! Defines an interaction style where files are sent to the model in XML-like tags, and model
 //! responses are parsed from similar tags.
 
-use std::{fs, path::PathBuf};
+use std::path::PathBuf;
 
 use super::{xmlish, DialectProvider};
 use crate::{
     patch::{Change, Patch, Replace, Smart, UDiff, WriteFile},
     Result, Session, TenxError,
 };
+use fs_err as fs;
 
 const SYSTEM: &str = include_str!("./tags-system.txt");
 const SMART: &str = include_str!("./tags-smart.txt");
@@ -72,8 +73,7 @@ impl DialectProvider for Tags {
     fn render_editables(&self, paths: Vec<PathBuf>) -> Result<String> {
         let mut rendered = String::new();
         for path in paths {
-            let contents =
-                fs::read_to_string(&path).map_err(|e| TenxError::fio(e, path.clone()))?;
+            let contents = fs::read_to_string(&path)?;
 
             rendered.push_str(&format!(
                 "<editable path=\"{}\">\n{}</editable>\n\n",

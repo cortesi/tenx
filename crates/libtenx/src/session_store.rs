@@ -1,7 +1,6 @@
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
+
+use fs_err as fs;
 
 use crate::{Result, Session, TenxError};
 
@@ -21,7 +20,7 @@ impl SessionStore {
     /// Creates a new StateStore with the specified base directory.
     /// Creates a new StateStore with the specified base directory.
     pub fn open(base_dir: PathBuf) -> Result<Self> {
-        fs::create_dir_all(&base_dir).map_err(|e| TenxError::fio(e, &base_dir))?;
+        fs::create_dir_all(&base_dir)?;
         Ok(Self { base_dir })
     }
 
@@ -31,15 +30,14 @@ impl SessionStore {
         let file_path = self.base_dir.join(file_name);
         let serialized = serde_json::to_string(state)
             .map_err(|e| TenxError::SessionStore(format!("serialization failed: {}", e)))?;
-        fs::write(&file_path, serialized).map_err(|e| TenxError::fio(e, &file_path))?;
+        fs::write(&file_path, serialized)?;
         Ok(())
     }
 
     /// Loads a State from a file based on the given name.
     pub fn load<S: AsRef<str>>(&self, name: S) -> Result<Session> {
         let file_path = self.base_dir.join(name.as_ref());
-        let serialized =
-            fs::read_to_string(&file_path).map_err(|e| TenxError::fio(e, &file_path))?;
+        let serialized = fs::read_to_string(&file_path)?;
         serde_json::from_str(&serialized).map_err(|e| TenxError::Internal(format!("{}", e)))
     }
 }

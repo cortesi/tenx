@@ -46,7 +46,8 @@ impl Tenx {
 
     /// Loads a session from the store based on the current working directory.
     pub fn load_session_cwd(&self) -> Result<Session> {
-        let current_dir = env::current_dir().map_err(|e| TenxError::fio(e, "."))?;
+        let current_dir = env::current_dir()
+            .map_err(|e| TenxError::Internal(format!("Could not get cwd: {}", e)))?;
         let root = crate::config::find_project_root(&current_dir);
         self.load_session(root)
     }
@@ -192,7 +193,7 @@ impl Tenx {
 mod tests {
     use super::*;
 
-    use std::fs;
+    use fs_err as fs;
     use std::path::PathBuf;
 
     use crate::patch::{Change, Patch, WriteFile};

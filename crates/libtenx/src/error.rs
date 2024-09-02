@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 use thiserror::Error;
 
 pub type Result<T> = std::result::Result<T, TenxError>;
@@ -9,9 +8,8 @@ pub enum TenxError {
     #[error("Failed to render query: {0}")]
     Render(String),
 
-    // We want error to be serializable, so can't include the source untransformed
-    #[error("File IO error: {path}: {src}")]
-    FileIo { src: String, path: PathBuf },
+    #[error("Io error: {0}")]
+    Io(String),
 
     #[error("No paths provided")]
     NoPathsProvided,
@@ -74,14 +72,6 @@ pub enum TenxError {
 }
 
 impl TenxError {
-    /// Constructs a FileIo error from an IO error and a path-like argument.
-    pub fn fio<P: AsRef<std::path::Path>>(err: std::io::Error, path: P) -> Self {
-        TenxError::FileIo {
-            src: err.to_string(),
-            path: path.as_ref().to_path_buf(),
-        }
-    }
-
     /// Returns the model response if the error is retryable, otherwise None.
     pub fn should_retry(&self) -> Option<String> {
         match self {
@@ -90,6 +80,12 @@ impl TenxError {
             TenxError::ResponseParse { model, .. } => Some(model.to_string()),
             _ => None,
         }
+    }
+}
+
+impl From<std::io::Error> for TenxError {
+    fn from(error: std::io::Error) -> Self {
+        TenxError::Io(error.to_string())
     }
 }
 
