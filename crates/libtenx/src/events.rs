@@ -43,6 +43,8 @@ pub enum Event {
     Retry(String),
     /// A fatal error has occurred
     Fatal(String),
+    /// The session has finished successfully
+    Finish,
 }
 
 impl Event {
@@ -65,6 +67,7 @@ impl Event {
             Event::Retry(_) => "retry",
             Event::Fatal(_) => "fatal",
             Event::PromptDone => "prompt_done",
+            Event::Finish => "finish",
         }
     }
 
@@ -86,7 +89,7 @@ impl Event {
             Event::PreflightStart => Some("Starting preflight checks...".to_string()),
             Event::FormattingStart => Some("Starting formatting...".to_string()),
             Event::ValidationStart => Some("Starting post-patch validation...".to_string()),
-            Event::CheckStart(name) => Some(format!("Checking {}...", name)),
+            Event::CheckStart(name) => Some(format!("Running check {}...", name)),
             Event::PromptStart => Some("Prompting model...".to_string()),
             Event::ApplyPatch => Some("Applying patch...".to_string()),
             _ => None,

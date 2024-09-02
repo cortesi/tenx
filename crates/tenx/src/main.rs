@@ -302,18 +302,9 @@ async fn print_events(mut receiver: mpsc::Receiver<Event>) {
     }
 }
 
-/// Helper macro to unwrap the spinner reference
-macro_rules! with_spinner {
-    ($spinner:expr, $($action:tt)*) => {
-        if let Some(ref s) = $spinner {
-            s.$($action)*
-        }
-    };
-}
-
 /// Handles events with improved progress output using indicatif
 async fn progress_events(mut receiver: mpsc::Receiver<Event>) {
-    let spinner_style = ProgressStyle::with_template("{spinner:.blue} {msg}")
+    let spinner_style = ProgressStyle::with_template("{spinner:.blue.bold} {msg}")
         .unwrap()
         .tick_strings(&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]);
 
@@ -344,21 +335,20 @@ async fn progress_events(mut receiver: mpsc::Receiver<Event>) {
                 io::stdout().flush().unwrap();
             }
             Event::PromptDone => {
-                manage_spinner(&mut current_spinner, |s| s.finish_and_clear());
-                println!("\n");
+                println!("\n\n");
             }
             Event::PreflightEnd | Event::FormattingEnd | Event::ValidationEnd => {
-                manage_spinner(&mut current_spinner, |s| {
-                    s.finish_with_message(format!("{} {}", event.name().green(), "✓".green()))
-                });
+                manage_spinner(&mut current_spinner, |s| s.finish_and_clear());
             }
-            Event::FormattingOk(ref name) => {
-                manage_spinner(&mut current_spinner, |s| {
-                    s.finish_with_message(format!("'{}' completed. {}", name.green(), "✓".green()))
-                });
+            Event::FormattingOk(_) => {
+                manage_spinner(&mut current_spinner, |s| s.finish_and_clear());
             }
             Event::CheckOk(_) => {
                 manage_spinner(&mut current_spinner, |s| s.finish());
+            }
+            Event::Finish => {
+                manage_spinner(&mut current_spinner, |s| s.finish_and_clear());
+                println!("{}", "Done.".green().bold());
             }
             Event::Log(_, _) => {} // Ignore Log events in progress_events
             _ => {
@@ -383,6 +373,7 @@ async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     let verbosity = if cli.quiet { 0 } else { cli.verbose };
     let config = load_config(&cli)?;
+    let tx = Tenx::new(config.clone());
 
     if cli.color {
         colored::control::set_override(true);
@@ -443,7 +434,6 @@ async fn main() -> anyhow::Result<()> {
                 Ok(())
             }
             Commands::Oneshot { files, ruskel, ctx } => {
-                let tx = Tenx::new(config.clone());
                 let mut session = Session::from_cwd()?;
 
                 for file in ctx {
@@ -465,18 +455,15 @@ async fn main() -> anyhow::Result<()> {
                 };
 
                 tx.resume(&mut session, Some(sender.clone())).await?;
-                println!("{}", "changes applied".green().bold());
                 Ok(())
             }
             Commands::Reset { step_offset } => {
-                let tx = Tenx::new(config.clone());
                 let mut session = tx.load_session_cwd()?;
                 tx.reset(&mut session, *step_offset)?;
                 println!("Session reset to step {}", step_offset);
                 Ok(())
             }
             Commands::AddCtx { files, ruskel } => {
-                let tx = Tenx::new(config.clone());
                 let mut session = tx.load_session_cwd()?;
 
                 for file in files {
@@ -497,7 +484,6 @@ async fn main() -> anyhow::Result<()> {
                 ctx,
                 ruskel,
             } => {
-                let tx = Tenx::new(config.clone());
                 let mut session = tx.load_session_cwd()?;
 
                 let offset = step_offset.unwrap_or(session.steps().len() - 1);
@@ -519,11 +505,9 @@ async fn main() -> anyhow::Result<()> {
                 }
 
                 tx.resume(&mut session, Some(sender.clone())).await?;
-                println!("\n\n{}", "changes applied".green().bold());
                 Ok(())
             }
             Commands::New { files, ruskel } => {
-                let tx = Tenx::new(config.clone());
                 let mut session = Session::from_cwd()?;
 
                 for file in files {
@@ -545,7 +529,6 @@ async fn main() -> anyhow::Result<()> {
                 ruskel,
                 ctx,
             } => {
-                let tx = Tenx::new(config.clone());
                 let mut session = tx.load_session_cwd()?;
 
                 session.add_prompt(Prompt::default())?;
@@ -575,13 +558,9 @@ async fn main() -> anyhow::Result<()> {
                 }
 
                 tx.resume(&mut session, Some(sender)).await?;
-
-                println!("\n");
-                println!("\n\n{}", "changes applied".green().bold());
                 Ok(())
             }
             Commands::AddEdit { files } => {
-                let tx = Tenx::new(config.clone());
                 let mut session = tx.load_session_cwd()?;
 
                 for file in files {
@@ -594,7 +573,6 @@ async fn main() -> anyhow::Result<()> {
             }
             Commands::Show { raw, render, full } => {
                 let model = config.model()?;
-                let tx = Tenx::new(config.clone());
                 let session = tx.load_session_cwd()?;
                 if *raw {
                     println!("{:#?}", session);

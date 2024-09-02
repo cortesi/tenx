@@ -29,7 +29,7 @@ pub trait DialectProvider {
     fn render_step_response(&self, session: &Session, offset: usize) -> Result<String>;
 
     /// Render the editable context section
-    fn render_editables(&self, paths: Vec<PathBuf>) -> Result<String>;
+    fn render_editables(&self, session: &Session, paths: Vec<PathBuf>) -> Result<String>;
 
     /// Parse a model's response into concrete operations
     fn parse(&self, txt: &str) -> Result<Patch>;
@@ -63,10 +63,10 @@ impl DialectProvider for Dialect {
         }
     }
 
-    fn render_editables(&self, paths: Vec<PathBuf>) -> Result<String> {
+    fn render_editables(&self, session: &Session, paths: Vec<PathBuf>) -> Result<String> {
         match self {
-            Dialect::Tags(t) => t.render_editables(paths),
-            Dialect::Dummy(d) => d.render_editables(paths),
+            Dialect::Tags(t) => t.render_editables(session, paths),
+            Dialect::Dummy(d) => d.render_editables(session, paths),
         }
     }
 

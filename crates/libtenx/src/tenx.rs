@@ -89,10 +89,11 @@ impl Tenx {
         loop {
             Self::send_event(&sender, Event::PromptStart)?;
             let result = self.execute_prompt_cycle(session, sender.clone()).await;
+            Self::send_event(&sender, Event::PromptDone)?;
             match result {
                 Ok(()) => {
-                    Self::send_event(&sender, Event::PromptDone)?;
                     session_store.save(session)?;
+                    Self::send_event(&sender, Event::Finish)?;
                     return Ok(());
                 }
                 Err(e) => {

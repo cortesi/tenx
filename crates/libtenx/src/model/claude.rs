@@ -155,11 +155,12 @@ impl Claude {
     /// Returns a formatted string containing the rendered editables and omitted files.
     fn render_editables_with_omitted(
         &self,
+        session: &Session,
         dialect: &Dialect,
         files: Vec<PathBuf>,
         omitted: Vec<PathBuf>,
     ) -> Result<String> {
-        let mut result = dialect.render_editables(files)?;
+        let mut result = dialect.render_editables(session, files)?;
         if !omitted.is_empty() {
             result.push_str(&format!("\n{}\n", OMITTED_FILES_LEADIN));
             for file in omitted {
@@ -197,7 +198,7 @@ impl Claude {
                         {
                             let (included, omitted) =
                                 self.filter_files(session.editable(), session, 0);
-                            self.render_editables_with_omitted(dialect, included, omitted)?
+                            self.render_editables_with_omitted(session, dialect, included, omitted)?
                         }
                     ))],
                 },
@@ -236,7 +237,7 @@ impl Claude {
                     content: vec![misanthropy::Content::text(format!(
                         "{}\n{}",
                         EDITABLE_UPDATE_LEADIN,
-                        self.render_editables_with_omitted(dialect, included, omitted)?
+                        self.render_editables_with_omitted(session, dialect, included, omitted)?
                     ))],
                 });
                 req.messages.push(misanthropy::Message {

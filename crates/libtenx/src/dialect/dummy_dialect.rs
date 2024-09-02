@@ -40,7 +40,7 @@ impl DialectProvider for DummyDialect {
         Ok(String::new())
     }
 
-    fn render_editables(&self, _paths: Vec<PathBuf>) -> Result<String> {
+    fn render_editables(&self, _session: &Session, _paths: Vec<PathBuf>) -> Result<String> {
         Ok(String::new())
     }
 

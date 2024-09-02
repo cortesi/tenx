@@ -70,11 +70,10 @@ impl DialectProvider for Tags {
         Ok(rendered)
     }
 
-    fn render_editables(&self, paths: Vec<PathBuf>) -> Result<String> {
+    fn render_editables(&self, session: &Session, paths: Vec<PathBuf>) -> Result<String> {
         let mut rendered = String::new();
         for path in paths {
-            let contents = fs::read_to_string(&path)?;
-
+            let contents = fs::read_to_string(session.abspath(&path)?)?;
             rendered.push_str(&format!(
                 "<editable path=\"{}\">\n{}</editable>\n\n",
                 path.display(),
