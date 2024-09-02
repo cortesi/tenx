@@ -196,7 +196,7 @@ impl Claude {
                         EDITABLE_LEADIN,
                         {
                             let (included, omitted) =
-                                self.filter_files(&session.editables()?, session, 0);
+                                self.filter_files(&session.rel_editables()?, session, 0);
                             self.render_editables_with_omitted(dialect, included, omitted)?
                         }
                     ))],

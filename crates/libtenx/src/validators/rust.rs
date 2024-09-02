@@ -59,7 +59,7 @@ pub struct RustWorkspace {
 
 impl RustWorkspace {
     pub fn discover(session: &Session) -> Result<Self> {
-        let common_ancestor = Self::find_common_ancestor(&session.editables()?)?;
+        let common_ancestor = Self::find_common_ancestor(&session.abs_editables()?)?;
         let root_path = Self::find_workspace_root(&common_ancestor)?;
 
         Ok(RustWorkspace { root_path })

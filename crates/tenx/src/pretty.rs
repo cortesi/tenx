@@ -52,7 +52,7 @@ fn print_context(session: &Session) -> String {
 
 fn print_editables(session: &Session) -> Result<String> {
     let mut output = String::new();
-    let editables = session.editables()?;
+    let editables = session.abs_editables()?;
     if !editables.is_empty() {
         output.push_str(&format!("{}\n", "edit:".blue().bold()));
         for path in editables {

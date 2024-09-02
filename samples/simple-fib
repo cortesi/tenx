@@ -10,6 +10,7 @@ $RUN edit \
     --tags-udiff=true \
     --tags-replace=false \
     --prompt "Please complete the fibonacci function" \
-    $SCRIPT_DIR/simple/src/*.rs 
+    ./samples/simple/src/*.rs 
+$RUN show --full
 git diff samples/simple
 git checkout samples/simple

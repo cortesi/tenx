@@ -11,7 +11,7 @@ pub trait Formatter {
 pub fn formatters(state: &Session) -> Result<Vec<Box<dyn Formatter>>> {
     let mut formatters: Vec<Box<dyn Formatter>> = vec![];
     if state
-        .editables()?
+        .abs_editables()?
         .iter()
         .any(|path| path.extension().map_or(false, |ext| ext == "rs"))
     {

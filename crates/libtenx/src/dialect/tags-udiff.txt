@@ -3,6 +3,9 @@
 Specify a unified diff to apply to the editable files. A unified diff may
 include changes to multiple files.
 
+The paths used in the unified diff must exactly match the paths of the editable
+files.
+
 Format:
 
 <udiff>
@@ -54,8 +57,9 @@ diff --git a/file2.txt b/file2.txt
     </comment>
 
     <udiff>
-    --- ./a-editable.rs
-    +++ ./a-result.rs
+    diff --git a/src/main.rs b/src/main.rs
+    --- a/src/main.rs
+    +++ b/src/main.rs
     @@ -8,5 +8,5 @@
 
      /// The entry point for our program.

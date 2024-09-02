@@ -15,7 +15,7 @@ pub trait Validator {
 pub fn preflight(state: &Session) -> Result<Vec<Box<dyn Validator>>> {
     let mut validators: Vec<Box<dyn Validator>> = vec![];
     if state
-        .editables()?
+        .abs_editables()?
         .iter()
         .any(|path| path.extension().map_or(false, |ext| ext == "rs"))
     {

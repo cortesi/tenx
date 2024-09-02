@@ -122,8 +122,13 @@ impl Session {
             .map_err(|e| TenxError::fio(e, path))
     }
 
+    /// Returns the relative paths of the editables for this session.
+    pub fn rel_editables(&self) -> Result<Vec<PathBuf>> {
+        Ok(self.editable.clone())
+    }
+
     /// Returns the absolute paths of the editables for this session.
-    pub fn editables(&self) -> Result<Vec<PathBuf>> {
+    pub fn abs_editables(&self) -> Result<Vec<PathBuf>> {
         self.editable
             .clone()
             .iter()

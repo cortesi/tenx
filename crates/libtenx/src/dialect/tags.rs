@@ -186,7 +186,7 @@ impl DialectProvider for Tags {
                         }));
                     }
                     "udiff" => {
-                        let (_, content) = xmlish::parse_block("write_file", &mut lines)?;
+                        let (_, content) = xmlish::parse_block("udiff", &mut lines)?;
                         change_set
                             .changes
                             .push(Change::UDiff(UDiff::new(content.join("\n"))?));

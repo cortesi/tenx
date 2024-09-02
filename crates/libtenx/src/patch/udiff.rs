@@ -184,7 +184,7 @@ mod tests {
         let valid_diff = indoc! {"
             --- a/file.txt
             +++ b/file.txt
-            @@ -1,3 +1,3 @@
+            @@ 1,3 +1,3 @@
              unchanged line
             -removed line
             +added line
