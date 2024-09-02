@@ -308,6 +308,10 @@ async fn progress_events(mut receiver: mpsc::Receiver<Event>) {
         .unwrap()
         .tick_strings(&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]);
 
+    let validator_spinner_style = ProgressStyle::with_template("{spinner:.blue.bold} {msg}")
+        .unwrap()
+        .tick_strings(&["▹▹▹▹▹", "▸▹▹▹▹", "▹▸▹▹▹", "▹▹▸▹▹", "▹▹▹▸▹", "▹▹▹▹▸"]);
+
     let mut current_spinner: Option<ProgressBar> = None;
 
     fn manage_spinner<F>(spinner: &mut Option<ProgressBar>, f: F)
@@ -343,12 +347,22 @@ async fn progress_events(mut receiver: mpsc::Receiver<Event>) {
             Event::FormattingOk(_) => {
                 manage_spinner(&mut current_spinner, |s| s.finish_and_clear());
             }
-            Event::CheckOk(_) => {
+            Event::ValidatorOk(_) => {
                 manage_spinner(&mut current_spinner, |s| s.finish());
             }
             Event::Finish => {
                 manage_spinner(&mut current_spinner, |s| s.finish_and_clear());
                 println!("{}", "Done.".green().bold());
+            }
+            Event::ValidatorStart(msg) => {
+                if let Some(spinner) = current_spinner.as_ref() {
+                    spinner.finish();
+                }
+                let new_spinner =
+                    ProgressBar::new_spinner().with_style(validator_spinner_style.clone());
+                new_spinner.enable_steady_tick(std::time::Duration::from_millis(100));
+                new_spinner.set_message(format!("  Checking: {}", msg));
+                current_spinner = Some(new_spinner);
             }
             Event::Log(_, _) => {} // Ignore Log events in progress_events
             _ => {

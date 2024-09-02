@@ -28,9 +28,9 @@ pub enum Event {
     /// The validation suite has ended
     ValidationEnd,
     /// A a preflight or post-patch check has started
-    CheckStart(String),
+    ValidatorStart(String),
     /// A a preflight or post-patch check has passed
-    CheckOk(String),
+    ValidatorOk(String),
     /// A log message with a specified log level
     Log(LogLevel, String),
     /// A model prompt has started
@@ -59,8 +59,8 @@ impl Event {
             Event::FormattingOk(_) => "formatting_ok",
             Event::ValidationStart => "validation_start",
             Event::ValidationEnd => "validation_end",
-            Event::CheckStart(_) => "check_start",
-            Event::CheckOk(_) => "check_ok",
+            Event::ValidatorStart(_) => "check_start",
+            Event::ValidatorOk(_) => "check_ok",
             Event::Log(_, _) => "log",
             Event::PromptStart => "prompt_start",
             Event::ApplyPatch => "apply_patch",
@@ -76,8 +76,8 @@ impl Event {
         match self {
             Event::Snippet(s)
             | Event::FormattingOk(s)
-            | Event::CheckStart(s)
-            | Event::CheckOk(s) => s.clone(),
+            | Event::ValidatorStart(s)
+            | Event::ValidatorOk(s) => s.clone(),
             Event::Log(_, s) => s.clone(),
             _ => String::new(),
         }
@@ -86,11 +86,11 @@ impl Event {
     /// Returns an optional String if there's a commencement message related to the event
     pub fn step_start_message(&self) -> Option<String> {
         match self {
-            Event::PreflightStart => Some("Starting preflight checks...".to_string()),
-            Event::FormattingStart => Some("Starting formatting...".to_string()),
-            Event::ValidationStart => Some("Starting post-patch validation...".to_string()),
-            Event::CheckStart(name) => Some(format!("Running check {}...", name)),
-            Event::PromptStart => Some("Prompting model...".to_string()),
+            Event::PreflightStart => Some("Preflight checks...".to_string()),
+            Event::FormattingStart => Some("Formatting...".to_string()),
+            Event::ValidationStart => Some("Post-patch validation...".to_string()),
+            Event::ValidatorStart(name) => Some(format!("Validator {}...", name)),
+            Event::PromptStart => Some("Prompting...".to_string()),
             Event::ApplyPatch => Some("Applying patch...".to_string()),
             _ => None,
         }

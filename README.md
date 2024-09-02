@@ -2,9 +2,14 @@
 [![Docs](https://docs.rs/tenx/badge.svg)](https://docs.rs/tenx)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-# Tenx 
+# Tenx
 
-An AI-powered coding assistant for expert developers. 
+A sharp command-line tool for AI-assisted coding.
+
+```bash
+cargo install tenx
+```
+
 
 ## Features
 
@@ -13,33 +18,12 @@ An AI-powered coding assistant for expert developers.
 - Patch validation and automated retry on failure
 - Undo, retry and re-edit steps in the session
 - First-class Rust support
-    - Validation with `cargo check` and `cargo test`
-    - Documentation for any crate (local or from crates.io) using [Ruskel](https://github.com/cortesi/ruskel).
+    - Pre and post-patch validation with `cargo check` and `cargo test`
+    - Formatting with `cargo fmt`
+    - Provide documentation context for any crate (local or from crates.io)
+      using [Ruskel](https://github.com/cortesi/ruskel).
+- Built on **libtenx**, a Rust library for building advanced AI-assisted coding tools.
 
-## tenx
-
-**tenx** is a sharp, ergonomic command-line tool for AI-assisted coding. It
-uses a session-based workflow, giving you fine-grained control over context and
-editable files. The tool provides commands to create and manage sessions, add
-context and editable files, perform AI-assisted edits, and review changes. It
-offers options to customize behavior, including verbosity levels, API key
-management, and preflight checks.
-
-```bash
-cargo install tenx
-```
-
-
-## libtenx
-
-**libtenx** is a Rust library for building advanced AI-assisted coding tools.
-It's the engine behind the **tenx** CLI and can be used to create custom
-integrations or plugins for other dev environments. I'm working on a tenx
-plugin for neovim.
-
-```bash
-cargo install libtenx
-```
 
 ## Glossary
 
@@ -53,10 +37,11 @@ cargo install libtenx
   AI's response, and any resulting changes to editable files
 
 
-## Developing with Rust
+## Rust Support
 
 Tenx is built from the ground up with Rust in mind, using advanced tools and
 techniques to supercharge AI-assisted Rust development.
+
 
 ### Ruskel Integration
 
@@ -75,6 +60,27 @@ validators:
 These validators work with Rust's powerful type system to catch issues early in
 the dev process.
 
+## Configuration
+
+Tenx uses a flexible configuration system with multiple levels:
+
+1. **Global Configuration**: Located at `~/.config/tenx/tenx.toml`
+2. **Project-specific Configuration**: `.tenx.toml` in the project root
+3. **Environment Variables**: e.g., `ANTHROPIC_API_KEY`
+4. **Command-line Arguments**: Overrides for specific runs
+
+Configuration files use TOML format. The project-specific config overrides the
+global config, and command-line arguments take highest precedence.
+
+```toml
+anthropic_key = "your-api-key-here"
+retry_limit = 5
+default_model = "claude"
+```
+
+Use `tenx conf` to view your current configuration and `tenx conf --defaults` to see all available options.
+
+
 ## Development
 
 ### Ethos
@@ -90,6 +96,4 @@ the dev process.
 - Support for more AI models (OpenAI, DeepSeek)
 - Git commit dialect
 - Neovim plugin based on libtenx
-
-Feel free to submit a Pull Request!
 
