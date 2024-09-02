@@ -119,6 +119,15 @@ struct Cli {
 }
 
 #[derive(Subcommand)]
+enum DialectCommands {
+    /// Print the current dialect and its settings
+    Info,
+    /// Print the complete system prompt
+    #[clap(alias = "sys")]
+    System,
+}
+
+#[derive(Subcommand)]
 enum Commands {
     /// Print the current configuration
     Conf {
@@ -132,11 +141,11 @@ enum Commands {
         #[clap(long)]
         defaults: bool,
     },
-    /// Print the current dialect and its settings
+    /// Commands related to the dialect
+    #[clap(alias = "dia")]
     Dialect {
-        /// Print the complete system prompt
-        #[clap(long)]
-        system: bool,
+        #[clap(subcommand)]
+        command: DialectCommands,
     },
     /// Add context to an existing session
     AddCtx {
@@ -437,13 +446,17 @@ async fn main() -> anyhow::Result<()> {
                 }
                 Ok(()) as anyhow::Result<()>
             }
-            Commands::Dialect { system } => {
+            Commands::Dialect { command } => {
                 let dialect = config.dialect()?;
-                println!("Current dialect: {}", dialect.name());
-                if *system {
-                    println!("\nSystem prompt:\n{}", dialect.system());
-                } else {
-                    println!("\nSettings:\n{:#?}", config.tags);
+                match command {
+                    DialectCommands::Info => {
+                        println!("Current dialect: {}", dialect.name());
+                        println!("\nSettings:\n{:#?}", config.tags);
+                    }
+                    DialectCommands::System => {
+                        println!("Current dialect: {}", dialect.name());
+                        println!("\nSystem prompt:\n{}", dialect.system());
+                    }
                 }
                 Ok(())
             }

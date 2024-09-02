@@ -85,9 +85,8 @@ Use `tenx conf` to view your current configuration and `tenx conf --defaults` to
 
 ### Ethos
 
-- Built for expert developers and power users
-- Uses the best current coding models (currently Claude 3.5 Sonnet)
-- Exploits Rust's type system for robust AI-generated code validation
+- Built with an uncompromsing focus on expert developers and power users
+- Tracks whatever the best current coding models are (currently Claude 3.5 Sonnet)
 
 ### Next up
 
