@@ -109,6 +109,11 @@ impl Session {
         &self.context
     }
 
+    /// Returns the relative paths of the editables for this session.
+    pub fn editable(&self) -> &Vec<PathBuf> {
+        &self.editable
+    }
+
     /// Calculates the relative path from the root to the given absolute path.
     pub fn relpath(&self, path: &Path) -> PathBuf {
         diff_paths(path, &self.root).unwrap_or_else(|| path.to_path_buf())
@@ -120,11 +125,6 @@ impl Session {
             .join(path)
             .canonicalize()
             .map_err(|e| TenxError::fio(e, path))
-    }
-
-    /// Returns the relative paths of the editables for this session.
-    pub fn rel_editables(&self) -> Result<Vec<PathBuf>> {
-        Ok(self.editable.clone())
     }
 
     /// Returns the absolute paths of the editables for this session.

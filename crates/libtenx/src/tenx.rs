@@ -1,7 +1,7 @@
 use std::{env, path::Path};
 
 use tokio::sync::mpsc;
-use tracing::warn;
+use tracing::{debug, warn};
 
 use crate::{
     config::Config, events::Event, prompt::Prompt, session_store::normalize_path, Result, Session,
@@ -96,19 +96,21 @@ impl Tenx {
                     session.set_last_error(&e);
                     session_store.save(session)?;
                     if let Some(model_message) = e.should_retry() {
+                        Self::send_event(&sender, Event::Retry(format!("{}", e)))?;
                         retry_count += 1;
                         if retry_count >= self.config.retry_limit {
                             warn!("Retry limit reached. Last error: {}", e);
                             return Err(e);
                         }
-                        warn!(
+                        debug!(
                             "Retryable error (attempt {}/{}): {}",
                             retry_count, self.config.retry_limit, e
                         );
                         session.add_prompt(Prompt::Auto(model_message.to_string()))?;
                         session_store.save(session)?;
                     } else {
-                        warn!("Non-retryable error: {}", e);
+                        debug!("Non-retryable error: {}", e);
+                        Self::send_event(&sender, Event::Fatal(format!("{}", e)))?;
                         return Err(e);
                     }
                 }

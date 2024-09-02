@@ -1,3 +1,4 @@
+//! This is an experimental feature, not ready for use!
 use crate::error::{Result, TenxError};
 use diffy::{apply, Patch as DiffyPatch};
 use serde::{Deserialize, Serialize};

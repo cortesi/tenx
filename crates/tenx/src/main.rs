@@ -309,6 +309,8 @@ async fn progress_events(mut receiver: mpsc::Receiver<Event>) {
             println!();
         }
         match event {
+            Event::Retry(ref message) => println!("{}", format!("Retrying: {}", message).yellow()),
+            Event::Fatal(ref message) => println!("{}", format!("Fatal: {}", message).red()),
             Event::PromptStart => println!("{}", "Prompting model...".blue()),
             Event::ApplyPatch => println!("{}", "Applying patch...".blue()),
             Event::Snippet(ref chunk) => {

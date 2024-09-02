@@ -37,6 +37,10 @@ pub enum Event {
     PromptStart,
     /// Patch application has started
     ApplyPatch,
+    /// A retryable error has occurred
+    Retry(String),
+    /// A fatal error has occurred
+    Fatal(String),
 }
 
 impl Event {
@@ -56,6 +60,8 @@ impl Event {
             Event::Log(_, _) => "log",
             Event::PromptStart => "prompt_start",
             Event::ApplyPatch => "apply_patch",
+            Event::Retry(_) => "retry",
+            Event::Fatal(_) => "fatal",
         }
     }
 

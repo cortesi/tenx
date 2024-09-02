@@ -1,3 +1,4 @@
+//! This is an experimental feature, not ready for use!
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
