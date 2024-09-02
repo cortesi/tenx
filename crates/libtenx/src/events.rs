@@ -35,6 +35,8 @@ pub enum Event {
     Log(LogLevel, String),
     /// A model prompt has started
     PromptStart,
+    /// Prompt has completed successfully
+    PromptDone,
     /// Patch application has started
     ApplyPatch,
     /// A retryable error has occurred
@@ -62,6 +64,7 @@ impl Event {
             Event::ApplyPatch => "apply_patch",
             Event::Retry(_) => "retry",
             Event::Fatal(_) => "fatal",
+            Event::PromptDone => "prompt_done",
         }
     }
 
@@ -74,6 +77,19 @@ impl Event {
             | Event::CheckOk(s) => s.clone(),
             Event::Log(_, s) => s.clone(),
             _ => String::new(),
+        }
+    }
+
+    /// Returns an optional String if there's a commencement message related to the event
+    pub fn step_start_message(&self) -> Option<String> {
+        match self {
+            Event::PreflightStart => Some("Starting preflight checks...".to_string()),
+            Event::FormattingStart => Some("Starting formatting...".to_string()),
+            Event::ValidationStart => Some("Starting post-patch validation...".to_string()),
+            Event::CheckStart(name) => Some(format!("Checking {}...", name)),
+            Event::PromptStart => Some("Prompting model...".to_string()),
+            Event::ApplyPatch => Some("Applying patch...".to_string()),
+            _ => None,
         }
     }
 }

@@ -87,9 +87,11 @@ impl Tenx {
 
         let mut retry_count = 0;
         loop {
+            Self::send_event(&sender, Event::PromptStart)?;
             let result = self.execute_prompt_cycle(session, sender.clone()).await;
             match result {
                 Ok(()) => {
+                    Self::send_event(&sender, Event::PromptDone)?;
                     session_store.save(session)?;
                     return Ok(());
                 }
@@ -124,7 +126,6 @@ impl Tenx {
         session: &mut Session,
         sender: Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
-        Self::send_event(&sender, Event::PromptStart)?;
         session.prompt(&self.config, sender.clone()).await?;
         Self::send_event(&sender, Event::ApplyPatch)?;
         session.apply_last_patch()?;
