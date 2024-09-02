@@ -7,6 +7,7 @@ use std::{
 use anyhow::{Context as AnyhowContext, Result};
 use clap::{CommandFactory, Parser, Subcommand};
 use colored::*;
+use indicatif::{ProgressBar, ProgressStyle};
 use serde_json::to_string_pretty;
 use tokio::sync::mpsc;
 use tracing::Subscriber;
@@ -301,38 +302,113 @@ async fn print_events(mut receiver: mpsc::Receiver<Event>) {
     }
 }
 
-/// Handles events with minimal progress output
+/// Handles events with improved progress output using indicatif
 async fn progress_events(mut receiver: mpsc::Receiver<Event>) {
-    let mut last_was_snippet = false;
+    let spinner_style = ProgressStyle::with_template("{spinner:.blue} {msg}")
+        .unwrap()
+        .tick_strings(&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]);
+
+    let mut spinner: Option<ProgressBar> = None;
+
     while let Some(event) = receiver.recv().await {
-        if last_was_snippet && !matches!(event, Event::Snippet(_)) {
-            println!();
+        if spinner.is_none() {
+            spinner = Some(ProgressBar::new_spinner().with_style(spinner_style.clone()));
+            spinner
+                .as_ref()
+                .unwrap()
+                .enable_steady_tick(std::time::Duration::from_millis(100));
         }
+
         match event {
-            Event::Retry(ref message) => println!("{}", format!("Retrying: {}", message).yellow()),
-            Event::Fatal(ref message) => println!("{}", format!("Fatal: {}", message).red()),
-            Event::PromptStart => println!("{}", "Prompting model...".blue()),
-            Event::ApplyPatch => println!("{}", "Applying patch...".blue()),
+            Event::Retry(ref message) => {
+                spinner.as_ref().unwrap().finish_and_clear();
+                println!("{}", format!("Retrying: {}", message).yellow());
+                spinner = None;
+            }
+            Event::Fatal(ref message) => {
+                spinner.as_ref().unwrap().finish_and_clear();
+                println!("{}", format!("Fatal: {}", message).red());
+                spinner = None;
+            }
+            Event::PromptStart => {
+                spinner.as_ref().unwrap().set_message("Prompting model...");
+            }
+            Event::ApplyPatch => {
+                spinner.as_ref().unwrap().set_message("Applying patch...");
+            }
             Event::Snippet(ref chunk) => {
+                spinner.as_ref().unwrap().finish_and_clear();
                 print!("{}", chunk);
                 io::stdout().flush().unwrap();
+                spinner = None;
             }
-            Event::PreflightStart => println!("{}", "Starting preflight checks...".blue()),
-            Event::PreflightEnd => println!("{}", "Preflight checks completed.".blue()),
-            Event::FormattingStart => println!("{}", "Starting formatting...".blue()),
-            Event::FormattingEnd => println!("{}", "Formatting completed.".blue()),
-            Event::FormattingOk(ref name) => println!(
-                "\t{} {}",
-                format!("'{}' completed.", name).green(),
-                "✓".green()
-            ),
-            Event::ValidationStart => println!("{}", "Starting post-patch validation...".blue()),
-            Event::ValidationEnd => println!("{}", "Post-patch validation completed.".blue()),
-            Event::CheckStart(ref name) => print!("\t{}...", name),
-            Event::CheckOk(_) => println!(" done"),
+            Event::PreflightStart => {
+                spinner
+                    .as_ref()
+                    .unwrap()
+                    .set_message("Starting preflight checks...");
+            }
+            Event::PreflightEnd => {
+                spinner
+                    .as_ref()
+                    .unwrap()
+                    .finish_with_message("Preflight checks completed.");
+                spinner = None;
+            }
+            Event::FormattingStart => {
+                spinner
+                    .as_ref()
+                    .unwrap()
+                    .set_message("Starting formatting...");
+            }
+            Event::FormattingEnd => {
+                spinner
+                    .as_ref()
+                    .unwrap()
+                    .finish_with_message("Formatting completed.");
+                spinner = None;
+            }
+            Event::FormattingOk(ref name) => {
+                spinner.as_ref().unwrap().suspend(|| {
+                    println!(
+                        "\t{} {}",
+                        format!("'{}' completed.", name).green(),
+                        "✓".green()
+                    );
+                });
+            }
+            Event::ValidationStart => {
+                spinner
+                    .as_ref()
+                    .unwrap()
+                    .set_message("Starting post-patch validation...");
+            }
+            Event::ValidationEnd => {
+                spinner
+                    .as_ref()
+                    .unwrap()
+                    .finish_with_message("Post-patch validation completed.");
+                spinner = None;
+            }
+            Event::CheckStart(ref name) => {
+                spinner
+                    .as_ref()
+                    .unwrap()
+                    .set_message(format!("Checking {}...", name));
+            }
+            Event::CheckOk(_) => {
+                spinner.as_ref().unwrap().finish_and_clear();
+                spinner = Some(ProgressBar::new_spinner().with_style(spinner_style.clone()));
+                spinner
+                    .as_ref()
+                    .unwrap()
+                    .enable_steady_tick(std::time::Duration::from_millis(100));
+            }
             Event::Log(_, _) => {} // Ignore Log events in progress_events
         }
-        last_was_snippet = matches!(event, Event::Snippet(_));
+    }
+    if let Some(s) = spinner {
+        s.finish_and_clear();
     }
 }
 
