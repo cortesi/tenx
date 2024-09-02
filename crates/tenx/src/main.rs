@@ -128,6 +128,40 @@ enum DialectCommands {
 }
 
 #[derive(Subcommand)]
+enum SessionCommands {
+    /// Show the current session
+    Show {
+        /// Print the entire session object verbosely
+        #[clap(long)]
+        raw: bool,
+
+        /// Output the rendered session
+        #[clap(long)]
+        render: bool,
+
+        /// Show full details
+        #[clap(long)]
+        full: bool,
+    },
+    /// Add context to an existing session
+    AddCtx {
+        /// Specifies files to add as context
+        #[clap(value_parser)]
+        files: Vec<PathBuf>,
+
+        /// Add ruskel documentation
+        #[clap(long)]
+        ruskel: Vec<String>,
+    },
+    /// Add editable files to an existing session
+    AddEdit {
+        /// Specifies files to add as editable
+        #[clap(value_parser)]
+        files: Vec<PathBuf>,
+    },
+}
+
+#[derive(Subcommand)]
 enum Commands {
     /// Print the current configuration
     Conf {
@@ -147,21 +181,11 @@ enum Commands {
         #[clap(subcommand)]
         command: DialectCommands,
     },
-    /// Add context to an existing session
-    AddCtx {
-        /// Specifies files to add as context
-        #[clap(value_parser)]
-        files: Vec<PathBuf>,
-
-        /// Add ruskel documentation
-        #[clap(long)]
-        ruskel: Vec<String>,
-    },
-    /// Add editable files to an existing session
-    AddEdit {
-        /// Specifies files to add as editable
-        #[clap(value_parser)]
-        files: Vec<PathBuf>,
+    /// Commands related to session management
+    #[clap(alias = "sess", alias = "s")]
+    Session {
+        #[clap(subcommand)]
+        command: SessionCommands,
     },
     /// Perform an AI-assisted edit
     Edit {
@@ -227,20 +251,6 @@ enum Commands {
         /// Add ruskel documentation as context
         #[clap(long)]
         ruskel: Vec<String>,
-    },
-    /// Show the current session
-    Show {
-        /// Print the entire session object verbosely
-        #[clap(long)]
-        raw: bool,
-
-        /// Output the rendered session
-        #[clap(long)]
-        render: bool,
-
-        /// Show full details
-        #[clap(long)]
-        full: bool,
     },
 }
 
@@ -490,21 +500,6 @@ async fn main() -> anyhow::Result<()> {
                 println!("Session reset to step {}", step_offset);
                 Ok(())
             }
-            Commands::AddCtx { files, ruskel } => {
-                let mut session = tx.load_session_cwd()?;
-
-                for file in files {
-                    session.add_ctx_path(file)?;
-                }
-
-                for ruskel_doc in ruskel {
-                    session.add_ctx_ruskel(ruskel_doc.clone())?;
-                }
-
-                tx.save_session(&session)?;
-                println!("context added");
-                Ok(())
-            }
             Commands::Retry {
                 step_offset,
                 edit,
@@ -587,29 +582,46 @@ async fn main() -> anyhow::Result<()> {
                 tx.resume(&mut session, Some(sender)).await?;
                 Ok(())
             }
-            Commands::AddEdit { files } => {
-                let mut session = tx.load_session_cwd()?;
-
-                for file in files {
-                    session.add_editable(file)?;
+            Commands::Session { command } => match command {
+                SessionCommands::Show { raw, render, full } => {
+                    let model = config.model()?;
+                    let session = tx.load_session_cwd()?;
+                    if *raw {
+                        println!("{:#?}", session);
+                    } else if *render {
+                        println!("{}", model.render(&config, &session)?);
+                    } else {
+                        println!("{}", pretty::session(&session, *full)?);
+                    }
+                    Ok(())
                 }
+                SessionCommands::AddCtx { files, ruskel } => {
+                    let mut session = tx.load_session_cwd()?;
 
-                tx.save_session(&session)?;
-                println!("editable files added");
-                Ok(())
-            }
-            Commands::Show { raw, render, full } => {
-                let model = config.model()?;
-                let session = tx.load_session_cwd()?;
-                if *raw {
-                    println!("{:#?}", session);
-                } else if *render {
-                    println!("{}", model.render(&config, &session)?);
-                } else {
-                    println!("{}", pretty::session(&session, *full)?);
+                    for file in files {
+                        session.add_ctx_path(file)?;
+                    }
+
+                    for ruskel_doc in ruskel {
+                        session.add_ctx_ruskel(ruskel_doc.clone())?;
+                    }
+
+                    tx.save_session(&session)?;
+                    println!("context added");
+                    Ok(())
                 }
-                Ok(())
-            }
+                SessionCommands::AddEdit { files } => {
+                    let mut session = tx.load_session_cwd()?;
+
+                    for file in files {
+                        session.add_editable(file)?;
+                    }
+
+                    tx.save_session(&session)?;
+                    println!("editable files added");
+                    Ok(())
+                }
+            },
         },
         None => {
             // This incredibly clunky way of doing things is because Clap is just broken when it
