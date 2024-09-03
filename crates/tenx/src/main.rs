@@ -123,7 +123,6 @@ enum DialectCommands {
     /// Print the current dialect and its settings
     Info,
     /// Print the complete system prompt
-    #[clap(alias = "sys")]
     System,
 }
 
@@ -159,6 +158,35 @@ enum SessionCommands {
         #[clap(value_parser)]
         files: Vec<PathBuf>,
     },
+    /// Reset the session to a specific step
+    Reset {
+        /// The step offset to reset to
+        step_offset: usize,
+    },
+    /// Retry a prompt
+    Retry {
+        /// The step offset to retry from
+        step_offset: Option<usize>,
+        /// Edit the prompt before retrying
+        #[clap(long)]
+        edit: bool,
+        /// Add files as context
+        #[clap(long)]
+        ctx: Vec<PathBuf>,
+        /// Add ruskel documentation as context
+        #[clap(long)]
+        ruskel: Vec<String>,
+    },
+    /// Create a new session
+    New {
+        /// Specifies files to add as context
+        #[clap(value_parser)]
+        files: Vec<PathBuf>,
+
+        /// Add ruskel documentation
+        #[clap(long)]
+        ruskel: Vec<String>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -175,19 +203,19 @@ enum Commands {
         #[clap(long)]
         defaults: bool,
     },
-    /// Commands related to the dialect
+    /// Dialect commands (alias: dia
     #[clap(alias = "dia")]
     Dialect {
         #[clap(subcommand)]
         command: DialectCommands,
     },
-    /// Commands related to session management
+    /// Session management commands (alias: sess, s)
     #[clap(alias = "sess", alias = "s")]
     Session {
         #[clap(subcommand)]
         command: SessionCommands,
     },
-    /// Perform an AI-assisted edit
+    /// Perform an AI-assisted edit with the current session
     Edit {
         /// Specifies files to edit
         #[clap(value_parser)]
@@ -209,16 +237,6 @@ enum Commands {
         #[clap(long)]
         ctx: Vec<PathBuf>,
     },
-    /// Create a new session
-    New {
-        /// Specifies files to add as context
-        #[clap(value_parser)]
-        files: Vec<PathBuf>,
-
-        /// Add ruskel documentation
-        #[clap(long)]
-        ruskel: Vec<String>,
-    },
     /// Start a new session, edit the prompt, and run it
     Oneshot {
         /// Specifies files to edit
@@ -232,25 +250,6 @@ enum Commands {
         /// Add files as context
         #[clap(long)]
         ctx: Vec<PathBuf>,
-    },
-    /// Reset the session to a specific step
-    Reset {
-        /// The step offset to reset to
-        step_offset: usize,
-    },
-    /// Retry a prompt
-    Retry {
-        /// The step offset to retry from
-        step_offset: Option<usize>,
-        /// Edit the prompt before retrying
-        #[clap(long)]
-        edit: bool,
-        /// Add files as context
-        #[clap(long)]
-        ctx: Vec<PathBuf>,
-        /// Add ruskel documentation as context
-        #[clap(long)]
-        ruskel: Vec<String>,
     },
 }
 
@@ -494,56 +493,6 @@ async fn main() -> anyhow::Result<()> {
                 tx.resume(&mut session, Some(sender.clone())).await?;
                 Ok(())
             }
-            Commands::Reset { step_offset } => {
-                let mut session = tx.load_session_cwd()?;
-                tx.reset(&mut session, *step_offset)?;
-                println!("Session reset to step {}", step_offset);
-                Ok(())
-            }
-            Commands::Retry {
-                step_offset,
-                edit,
-                ctx,
-                ruskel,
-            } => {
-                let mut session = tx.load_session_cwd()?;
-
-                let offset = step_offset.unwrap_or(session.steps().len() - 1);
-                tx.reset(&mut session, offset)?;
-
-                for file in ctx {
-                    session.add_ctx_path(file)?;
-                }
-
-                for ruskel_doc in ruskel {
-                    session.add_ctx_ruskel(ruskel_doc.clone())?;
-                }
-
-                if *edit {
-                    match edit::edit_prompt(&session)? {
-                        Some(prompt) => session.set_last_prompt(prompt)?,
-                        None => return Ok(()),
-                    }
-                }
-
-                tx.resume(&mut session, Some(sender.clone())).await?;
-                Ok(())
-            }
-            Commands::New { files, ruskel } => {
-                let mut session = Session::from_cwd()?;
-
-                for file in files {
-                    session.add_ctx_path(file)?;
-                }
-
-                for ruskel_doc in ruskel {
-                    session.add_ctx_ruskel(ruskel_doc.clone())?;
-                }
-
-                tx.save_session(&session)?;
-                println!("new session: {}", session.root.display());
-                Ok(())
-            }
             Commands::Edit {
                 files,
                 prompt,
@@ -619,6 +568,56 @@ async fn main() -> anyhow::Result<()> {
 
                     tx.save_session(&session)?;
                     println!("editable files added");
+                    Ok(())
+                }
+                SessionCommands::Reset { step_offset } => {
+                    let mut session = tx.load_session_cwd()?;
+                    tx.reset(&mut session, *step_offset)?;
+                    println!("Session reset to step {}", step_offset);
+                    Ok(())
+                }
+                SessionCommands::Retry {
+                    step_offset,
+                    edit,
+                    ctx,
+                    ruskel,
+                } => {
+                    let mut session = tx.load_session_cwd()?;
+
+                    let offset = step_offset.unwrap_or(session.steps().len() - 1);
+                    tx.reset(&mut session, offset)?;
+
+                    for file in ctx {
+                        session.add_ctx_path(file)?;
+                    }
+
+                    for ruskel_doc in ruskel {
+                        session.add_ctx_ruskel(ruskel_doc.clone())?;
+                    }
+
+                    if *edit {
+                        match edit::edit_prompt(&session)? {
+                            Some(prompt) => session.set_last_prompt(prompt)?,
+                            None => return Ok(()),
+                        }
+                    }
+
+                    tx.resume(&mut session, Some(sender.clone())).await?;
+                    Ok(())
+                }
+                SessionCommands::New { files, ruskel } => {
+                    let mut session = Session::from_cwd()?;
+
+                    for file in files {
+                        session.add_ctx_path(file)?;
+                    }
+
+                    for ruskel_doc in ruskel {
+                        session.add_ctx_ruskel(ruskel_doc.clone())?;
+                    }
+
+                    tx.save_session(&session)?;
+                    println!("new session: {}", session.root.display());
                     Ok(())
                 }
             },
