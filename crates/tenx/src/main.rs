@@ -251,6 +251,20 @@ enum Commands {
         #[clap(long)]
         ctx: Vec<PathBuf>,
     },
+    /// Start a new session and attempt to fix any preflight failures
+    Fix {
+        /// Specifies files to edit
+        #[clap(value_parser)]
+        files: Vec<PathBuf>,
+
+        /// Add ruskel documentation as context
+        #[clap(long)]
+        ruskel: Vec<String>,
+
+        /// Add files as context
+        #[clap(long)]
+        ctx: Vec<PathBuf>,
+    },
 }
 
 /// Creates a Config from disk and CLI arguments
@@ -496,7 +510,7 @@ async fn main() -> anyhow::Result<()> {
                     None => return Ok(()),
                 };
 
-                tx.resume(&mut session, Some(sender.clone())).await?;
+                tx.prompt(&mut session, Some(sender.clone())).await?;
                 Ok(())
             }
             Commands::Edit {
@@ -534,7 +548,7 @@ async fn main() -> anyhow::Result<()> {
                     session.add_ctx_ruskel(ruskel_doc.clone())?;
                 }
 
-                tx.resume(&mut session, Some(sender)).await?;
+                tx.prompt(&mut session, Some(sender)).await?;
                 Ok(())
             }
             Commands::Session { command } => match command {
@@ -608,7 +622,7 @@ async fn main() -> anyhow::Result<()> {
                         }
                     }
 
-                    tx.resume(&mut session, Some(sender.clone())).await?;
+                    tx.retry(&mut session, Some(sender.clone())).await?;
                     Ok(())
                 }
                 SessionCommands::New { files, ruskel } => {
@@ -627,6 +641,29 @@ async fn main() -> anyhow::Result<()> {
                     Ok(())
                 }
             },
+            Commands::Fix { files, ruskel, ctx } => {
+                let mut session = Session::from_cwd()?;
+
+                for file in files {
+                    session.add_editable(file)?;
+                }
+
+                for file in ctx {
+                    session.add_ctx_path(file)?;
+                }
+
+                for ruskel_doc in ruskel {
+                    session.add_ctx_ruskel(ruskel_doc.clone())?;
+                }
+
+                tx.fix(&mut session, Some(sender.clone())).await?;
+                if session.pending_prompt() {
+                    tx.prompt(&mut session, Some(sender.clone())).await?;
+                } else {
+                    println!("No issues to fix");
+                }
+                Ok(())
+            }
         },
         None => {
             // This incredibly clunky way of doing things is because Clap is just broken when it

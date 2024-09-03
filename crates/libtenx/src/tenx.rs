@@ -19,6 +19,23 @@ impl Tenx {
         Self { config }
     }
 
+    /// Attempts to fix issues in the session by running preflight checks and adding a new prompt if there's an error.
+    pub async fn fix(
+        &self,
+        session: &mut Session,
+        sender: Option<mpsc::Sender<Event>>,
+    ) -> Result<()> {
+        let preflight_result = self.run_preflight_validators(session, &sender);
+        if let Err(e) = preflight_result {
+            session.add_prompt(Prompt::Auto(
+                "Running the preflight checks to find errors to fix.".to_string(),
+            ))?;
+            session.set_last_error(&e);
+            self.save_session(session)?;
+        }
+        Ok(())
+    }
+
     /// Helper function to send an event and handle potential errors.
     fn send_event(sender: &Option<mpsc::Sender<Event>>, event: Event) -> Result<()> {
         if let Some(sender) = sender {
@@ -52,15 +69,24 @@ impl Tenx {
         self.load_session(root)
     }
 
-    /// Resumes a session by sending a prompt to the model. If the last step has changes, they are
-    /// rolled back.
-    pub async fn resume(
+    /// Retries the last prompt by rolling it back and sending it off for prompting..
+    pub async fn retry(
         &self,
         session: &mut Session,
         sender: Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
         let session_store = SessionStore::open(self.config.session_store_dir())?;
         session.rollback_last()?;
+        self.process_prompt(session, sender, &session_store).await
+    }
+
+    /// Sends a session off to the model for prompting.
+    pub async fn prompt(
+        &self,
+        session: &mut Session,
+        sender: Option<mpsc::Sender<Event>>,
+    ) -> Result<()> {
+        let session_store = SessionStore::open(self.config.session_store_dir())?;
         self.process_prompt(session, sender, &session_store).await
     }
 
@@ -79,14 +105,39 @@ impl Tenx {
         session_store: &SessionStore,
     ) -> Result<()> {
         session_store.save(session)?;
-        if let Err(e) = self.run_preflight_validators(session, &sender) {
-            session.set_last_error(&e);
-            session_store.save(session)?;
-            return Err(e);
+        if session.last_step_error().is_none() {
+            if let Err(e) = self.run_preflight_validators(session, &sender) {
+                session.set_last_error(&e);
+                session_store.save(session)?;
+                return Err(e);
+            }
         }
 
         let mut retry_count = 0;
         loop {
+            // Pull out the next step generation, so that both fix and resuming a sesison with an
+            // error works as expected.
+            if let Some(e) = session.last_step_error() {
+                if let Some(model_message) = e.should_retry() {
+                    Self::send_event(&sender, Event::Retry(format!("{}", e)))?;
+                    retry_count += 1;
+                    if retry_count >= self.config.retry_limit {
+                        warn!("Retry limit reached. Last error: {}", e);
+                        return Err(e.clone());
+                    }
+                    debug!(
+                        "Retryable error (attempt {}/{}): {}",
+                        retry_count, self.config.retry_limit, e
+                    );
+                    session.add_prompt(Prompt::Auto(model_message.to_string()))?;
+                    session_store.save(session)?;
+                } else {
+                    debug!("Non-retryable error: {}", e);
+                    Self::send_event(&sender, Event::Fatal(format!("{}", e)))?;
+                    return Err(e.clone());
+                }
+            }
+
             Self::send_event(&sender, Event::PromptStart)?;
             let result = self.execute_prompt_cycle(session, sender.clone()).await;
             Self::send_event(&sender, Event::PromptDone)?;
@@ -98,25 +149,6 @@ impl Tenx {
                 }
                 Err(e) => {
                     session.set_last_error(&e);
-                    session_store.save(session)?;
-                    if let Some(model_message) = e.should_retry() {
-                        Self::send_event(&sender, Event::Retry(format!("{}", e)))?;
-                        retry_count += 1;
-                        if retry_count >= self.config.retry_limit {
-                            warn!("Retry limit reached. Last error: {}", e);
-                            return Err(e);
-                        }
-                        debug!(
-                            "Retryable error (attempt {}/{}): {}",
-                            retry_count, self.config.retry_limit, e
-                        );
-                        session.add_prompt(Prompt::Auto(model_message.to_string()))?;
-                        session_store.save(session)?;
-                    } else {
-                        debug!("Non-retryable error: {}", e);
-                        Self::send_event(&sender, Event::Fatal(format!("{}", e)))?;
-                        return Err(e);
-                    }
                 }
             }
         }
@@ -163,9 +195,7 @@ impl Tenx {
         for validator in preflight_validators {
             Self::send_event(sender, Event::ValidatorStart(validator.name().to_string()))?;
             if let Err(e) = validator.validate(session) {
-                if let TenxError::Validation { name, user, model } = e {
-                    return Err(TenxError::Preflight { name, user, model });
-                }
+                Self::send_event(sender, Event::PreflightEnd)?;
                 return Err(e);
             }
             Self::send_event(sender, Event::ValidatorOk(validator.name().to_string()))?;

@@ -146,6 +146,11 @@ impl Session {
         }
     }
 
+    /// Return the error if the last step has one, else None.
+    pub fn last_step_error(&self) -> Option<&TenxError> {
+        self.steps.last().and_then(|step| step.err.as_ref())
+    }
+
     /// Adds a patch to the final step
     pub fn set_last_patch(&mut self, patch: &Patch) {
         if let Some(step) = self.steps.last_mut() {
@@ -153,7 +158,7 @@ impl Session {
         }
     }
 
-    /// Adds a patch to the final step
+    /// Adds an error to the final step
     pub fn set_last_error(&mut self, err: &TenxError) {
         if let Some(step) = self.steps.last_mut() {
             step.err = Some(err.clone());
