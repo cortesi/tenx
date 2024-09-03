@@ -204,17 +204,18 @@ mod tests {
     #[tokio::test]
     async fn test_tenx_process_prompt() -> Result<()> {
         let temp_dir = tempdir().unwrap();
-        let config = Config::default()
-            .with_dummy_model(crate::model::DummyModel::from_patch(Patch {
+        let mut config =
+            Config::default().with_dummy_model(crate::model::DummyModel::from_patch(Patch {
                 changes: vec![Change::Write(WriteFile {
                     path: PathBuf::from("test.txt"),
                     content: "Updated content".to_string(),
                 })],
                 comment: Some("Test comment".to_string()),
                 cache: Default::default(),
-            }))
-            .with_session_store_dir(Some(temp_dir.path().into()))
-            .with_retry_limit(Some(1));
+            }));
+        config.session_store_dir = temp_dir.path().into();
+        config.retry_limit = 1;
+
         let tenx = Tenx::new(config);
         let test_file_path = temp_dir.path().join("test.txt");
         fs::write(&test_file_path, "Initial content").unwrap();

@@ -203,7 +203,7 @@ enum Commands {
         #[clap(long)]
         defaults: bool,
     },
-    /// Dialect commands (alias: dia
+    /// Dialect commands (alias: dia)
     #[clap(alias = "dia")]
     Dialect {
         #[clap(subcommand)]
@@ -278,17 +278,23 @@ fn load_config(cli: &Cli) -> Result<config::Config> {
         config.merge(&local_config);
     }
 
+    macro_rules! set_config {
+    ($config:expr, $($field:ident).+, $value:expr) => {
+        if let Some(val) = $value {
+            $config.$($field).+ = val;
+        }
+    };
+}
+
     // Apply CLI arguments
-    config = config
-        .load_env()
-        .with_session_store_dir(cli.session_store_dir.clone())
-        .with_anthropic_key(cli.anthropic_key.clone())
-        .with_default_model(config::ConfigModel::Claude)
-        .with_no_preflight(cli.no_preflight)
-        .with_retry_limit(cli.retry_limit)
-        .with_tags_smart(cli.tags_smart)
-        .with_tags_replace(cli.tags_replace)
-        .with_tags_udiff(cli.tags_udiff);
+    config = config.load_env();
+    set_config!(config, session_store_dir, cli.session_store_dir.clone());
+    set_config!(config, anthropic_key, cli.anthropic_key.clone());
+    set_config!(config, retry_limit, cli.retry_limit);
+    set_config!(config, tags.smart, cli.tags_smart);
+    set_config!(config, tags.replace, cli.tags_replace);
+    set_config!(config, tags.udiff, cli.tags_udiff);
+    config.no_preflight = cli.no_preflight;
 
     Ok(config)
 }

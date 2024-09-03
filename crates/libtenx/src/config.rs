@@ -217,20 +217,6 @@ impl Config {
             .map_err(|e| TenxError::Internal(format!("Failed to serialize to TOML: {}", e)))
     }
 
-    /// Sets the Anthropic API key. If None, the existing value is unchanged.
-    pub fn with_anthropic_key(mut self, key: Option<String>) -> Self {
-        if let Some(key) = key {
-            self.anthropic_key = key;
-        }
-        self
-    }
-
-    /// Sets the configured model
-    pub fn with_default_model(mut self, model: ConfigModel) -> Self {
-        self.default_model = model;
-        self
-    }
-
     pub fn with_dummy_model(mut self, model: model::DummyModel) -> Self {
         self.dummy_model = Some(model);
         self
@@ -238,58 +224,6 @@ impl Config {
 
     pub fn with_dummy_dialect(mut self, dialect: dialect::DummyDialect) -> Self {
         self.dummy_dialect = Some(dialect);
-        self
-    }
-
-    /// Sets the configured dialect
-    pub fn with_default_dialect(mut self, dialect: ConfigDialect) -> Self {
-        self.default_dialect = dialect;
-        self
-    }
-
-    /// Sets the state directory if Some, otherwise leaves it unchanged.
-    pub fn with_session_store_dir(mut self, dir: Option<PathBuf>) -> Self {
-        if let Some(dir) = dir {
-            self.session_store_dir = dir;
-        }
-        self
-    }
-
-    /// Sets the retry limit if Some, otherwise leaves it unchanged.
-    pub fn with_retry_limit(mut self, limit: Option<usize>) -> Self {
-        if let Some(l) = limit {
-            self.retry_limit = l;
-        }
-        self
-    }
-
-    /// Sets the no_preflight flag.
-    pub fn with_no_preflight(mut self, no_preflight: bool) -> Self {
-        self.no_preflight = no_preflight;
-        self
-    }
-
-    /// Sets the smart flag for the Tags dialect.
-    pub fn with_tags_smart(mut self, smart: Option<bool>) -> Self {
-        if let Some(s) = smart {
-            self.tags.smart = s;
-        }
-        self
-    }
-
-    /// Sets the replace flag for the Tags dialect.
-    pub fn with_tags_replace(mut self, replace: Option<bool>) -> Self {
-        if let Some(r) = replace {
-            self.tags.replace = r;
-        }
-        self
-    }
-
-    /// Sets the udiff flag for the Tags dialect.
-    pub fn with_tags_udiff(mut self, udiff: Option<bool>) -> Self {
-        if let Some(u) = udiff {
-            self.tags.udiff = u;
-        }
         self
     }
 
@@ -330,16 +264,22 @@ impl Config {
 mod tests {
     use super::*;
 
+    macro_rules! set_config {
+        ($config:expr, $($field:ident).+, $value:expr) => {
+            $config.$($field).+ = $value;
+        };
+    }
+
     #[test]
     fn test_toml_serialization() {
-        let config = Config::default()
-            .with_anthropic_key(Some("test_key".to_string()))
-            .with_session_store_dir(Some(PathBuf::from("/tmp/test")))
-            .with_retry_limit(Some(5))
-            .with_no_preflight(true)
-            .with_tags_smart(Some(false))
-            .with_default_model(ConfigModel::Claude)
-            .with_default_dialect(ConfigDialect::Tags);
+        let mut config = Config::default();
+        set_config!(config, anthropic_key, "test_key".to_string());
+        set_config!(config, session_store_dir, PathBuf::from("/tmp/test"));
+        set_config!(config, retry_limit, 5);
+        set_config!(config, no_preflight, true);
+        set_config!(config, tags.smart, false);
+        set_config!(config, default_model, ConfigModel::Claude);
+        set_config!(config, default_dialect, ConfigDialect::Tags);
 
         let toml_str = config.to_toml().unwrap();
         println!("Serialized TOML:\n{}", toml_str);
@@ -377,14 +317,14 @@ mod tests {
 
     #[test]
     fn test_config_merge() {
-        let mut base_config = Config::default()
-            .with_anthropic_key(Some("base_key".to_string()))
-            .with_retry_limit(Some(5));
+        let mut base_config = Config::default();
+        set_config!(base_config, anthropic_key, "base_key".to_string());
+        set_config!(base_config, retry_limit, 5);
 
-        let other_config = Config::default()
-            .with_anthropic_key(Some("other_key".to_string()))
-            .with_session_store_dir(Some(PathBuf::from("/tmp/other")))
-            .with_no_preflight(true);
+        let mut other_config = Config::default();
+        set_config!(other_config, anthropic_key, "other_key".to_string());
+        set_config!(other_config, session_store_dir, PathBuf::from("/tmp/other"));
+        set_config!(other_config, no_preflight, true);
 
         base_config.merge(&other_config);
 
@@ -398,33 +338,43 @@ mod tests {
     }
 
     #[test]
-    fn test_with_session_store_dir_option() {
+    fn test_session_store_dir_option() {
         let config = Config::default();
 
-        let config_with_dir = config
-            .clone()
-            .with_session_store_dir(Some(PathBuf::from("/tmp/test")));
+        let mut config_with_dir = config.clone();
+        set_config!(
+            config_with_dir,
+            session_store_dir,
+            PathBuf::from("/tmp/test")
+        );
         assert_eq!(
             config_with_dir.session_store_dir,
             PathBuf::from("/tmp/test")
         );
 
-        let config_without_change = config.clone().with_session_store_dir(None);
-
+        let config_without_change = config.clone();
         assert_eq!(
             config_without_change.session_store_dir(),
             home_config_dir().join("state")
         );
         assert_eq!(config_without_change.session_store_dir, PathBuf::new());
 
-        let config_with_existing =
-            Config::default().with_session_store_dir(Some(PathBuf::from("/tmp/existing")));
-        let config_override = config_with_existing
-            .clone()
-            .with_session_store_dir(Some(PathBuf::from("/tmp/new")));
+        let mut config_with_existing = Config::default();
+        set_config!(
+            config_with_existing,
+            session_store_dir,
+            PathBuf::from("/tmp/existing")
+        );
+
+        let mut config_override = config_with_existing.clone();
+        set_config!(
+            config_override,
+            session_store_dir,
+            PathBuf::from("/tmp/new")
+        );
         assert_eq!(config_override.session_store_dir, PathBuf::from("/tmp/new"));
 
-        let config_keep_existing = config_with_existing.clone().with_session_store_dir(None);
+        let config_keep_existing = config_with_existing.clone();
         assert_eq!(
             config_keep_existing.session_store_dir,
             PathBuf::from("/tmp/existing")
