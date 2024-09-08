@@ -2440,7 +2440,6 @@ dependencies = [
  "diffy",
  "dirs",
  "fs-err",
- "git2",
  "globset",
  "indoc",
  "libruskel",

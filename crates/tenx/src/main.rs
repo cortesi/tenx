@@ -140,6 +140,8 @@ enum Commands {
         #[clap(long)]
         defaults: bool,
     },
+    /// List files included in the project
+    LsFiles,
     /// Dialect commands (alias: dia)
     #[clap(alias = "dia")]
     Dialect {
@@ -465,6 +467,14 @@ async fn main() -> anyhow::Result<()> {
                     println!("{}", conf.to_toml()?);
                 }
                 Ok(()) as anyhow::Result<()>
+            }
+            Commands::LsFiles => {
+                let session = Session::from_cwd()?;
+                let files = config.included_files(&session.root)?;
+                for file in files {
+                    println!("{}", file.display());
+                }
+                Ok(())
             }
             Commands::Dialect { command } => {
                 let dialect = config.dialect()?;

@@ -1,6 +1,7 @@
 use std::{
     env, fs,
     path::{Path, PathBuf},
+    process::Command,
 };
 
 use globset::{Glob, GlobSetBuilder};
@@ -205,7 +206,30 @@ impl Config {
 
     pub fn included_files(&self, project_root: &Path) -> Result<Vec<PathBuf>> {
         match &self.include {
-            Include::Git => Ok(Vec::new()),
+            Include::Git => {
+                let output = Command::new("git")
+                    .arg("ls-files")
+                    .current_dir(project_root)
+                    .output()
+                    .map_err(|e| {
+                        TenxError::Internal(format!("Failed to execute git ls-files: {}", e))
+                    })?;
+
+                if !output.status.success() {
+                    return Err(TenxError::Internal(
+                        "git ls-files command failed".to_string(),
+                    ));
+                }
+
+                let files = String::from_utf8(output.stdout).map_err(|e| {
+                    TenxError::Internal(format!("Failed to parse git ls-files output: {}", e))
+                })?;
+
+                Ok(files
+                    .lines()
+                    .map(|line| PathBuf::from(line.trim()))
+                    .collect())
+            }
             Include::Glob(patterns) => {
                 let mut builder = GlobSetBuilder::new();
                 for pattern in patterns {
