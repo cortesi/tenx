@@ -11,8 +11,8 @@ repository.workspace = true
 
 [dependencies]
 misanthropy = { path = "../../../misanthropy/crates/misanthropy" }
+libruskel = { path = "../../../ruskel/crates/libruskel" }
 
-libruskel = "0.0.6"
 quick-xml = "0.36.1"
 tempfile = "3.11.0"
 thiserror = "1.0.63"
@@ -28,6 +28,8 @@ pathdiff = "0.2.1"
 toml = { version = "0.8.19", features = ["display"] }
 diffy = "0.4.0"
 fs-err = "2.11.0"
+globset = "0.4.14"
+git2 = "0.19.0"
 
 [dev-dependencies]
 indoc = "2.0.5"

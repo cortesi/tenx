@@ -19,6 +19,9 @@
   change to the comment.
 - Be parsimonious with inline comments. In general, the code speaks for itself.
   You only add explanatory comments when absolutely necessary.
+- Your code is included verbatim in the project. Never, ever include comments
+  like "previous code remains the same", or "implement such and such here".
+
 
 
 # User Input

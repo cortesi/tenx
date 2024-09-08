@@ -1,13 +1,17 @@
 use std::{
-    env,
+    env, fs,
     path::{Path, PathBuf},
 };
 
+use globset::{Glob, GlobSetBuilder};
 use serde::{
     ser::{SerializeStruct, Serializer},
     Deserialize, Serialize,
 };
 use toml;
+
+#[cfg(test)]
+use tempfile;
 
 use crate::{dialect, model, Result, TenxError};
 
@@ -99,13 +103,34 @@ pub enum Include {
 #[derive(Debug, Clone, Deserialize)]
 /// Configuration for the Tenx application.
 pub struct Config {
-    /// Which files are included by default
-    #[serde(default)]
-    pub include: Include,
-
     /// The Anthropic API key.
     #[serde(default)]
     pub anthropic_key: String,
+
+    /// The default dialect.
+    #[serde(default)]
+    pub default_dialect: ConfigDialect,
+
+    /// The default model.
+    #[serde(default)]
+    pub default_model: ConfigModel,
+
+    /// Which files are included by default
+    ///
+    /// TOML examples:
+    /// ```toml
+    /// # Default Git include
+    /// include = "git"
+    ///
+    /// # Glob include
+    /// include = { glob = ["*.rs", "*.toml"] }
+    /// ```
+    #[serde(default)]
+    pub include: Include,
+
+    /// Skip the preflight check.
+    #[serde(default)]
+    pub no_preflight: bool,
 
     /// The directory to store session state.
     #[serde(default)]
@@ -114,18 +139,6 @@ pub struct Config {
     /// The number of times to retry a request.
     #[serde(default = "default_retry_limit")]
     pub retry_limit: usize,
-
-    /// Skip the preflight check.
-    #[serde(default)]
-    pub no_preflight: bool,
-
-    /// The default model.
-    #[serde(default)]
-    pub default_model: ConfigModel,
-
-    /// The default dialect.
-    #[serde(default)]
-    pub default_dialect: ConfigDialect,
 
     /// The tags dialect configuration.
     #[serde(default)]
@@ -188,6 +201,47 @@ impl Config {
         } else {
             self.session_store_dir.clone()
         }
+    }
+
+    pub fn included_files(&self, project_root: &Path) -> Result<Vec<PathBuf>> {
+        match &self.include {
+            Include::Git => Ok(Vec::new()),
+            Include::Glob(patterns) => {
+                let mut builder = GlobSetBuilder::new();
+                for pattern in patterns {
+                    builder
+                        .add(Glob::new(pattern).map_err(|e| TenxError::Internal(e.to_string()))?);
+                }
+                let globset = builder
+                    .build()
+                    .map_err(|e| TenxError::Internal(e.to_string()))?;
+
+                let mut included_files = Vec::new();
+                self.walk_directory(project_root, project_root, &globset, &mut included_files)?;
+                Ok(included_files)
+            }
+        }
+    }
+
+    fn walk_directory(
+        &self,
+        root: &Path,
+        current_dir: &Path,
+        globset: &globset::GlobSet,
+        files: &mut Vec<PathBuf>,
+    ) -> Result<()> {
+        for entry in fs::read_dir(current_dir).map_err(|e| TenxError::Io(e.to_string()))? {
+            let entry = entry.map_err(|e| TenxError::Io(e.to_string()))?;
+            let path = entry.path();
+            if path.is_dir() {
+                self.walk_directory(root, &path, globset, files)?;
+            } else if let Ok(relative_path) = path.strip_prefix(root) {
+                if globset.is_match(relative_path) {
+                    files.push(relative_path.to_path_buf());
+                }
+            }
+        }
+        Ok(())
     }
 
     /// Sets the full serialization flag.
@@ -449,5 +503,38 @@ mod tests {
         assert_eq!(config.default_model, ConfigModel::Claude);
         assert_eq!(config.default_dialect, ConfigDialect::Tags);
         assert!(!config.tags.smart);
+    }
+
+    #[test]
+    fn test_included_files() {
+        use std::fs::File;
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let root_path = temp_dir.path();
+
+        // Create dummy files
+        File::create(root_path.join("file1.rs")).unwrap();
+        File::create(root_path.join("file2.txt")).unwrap();
+        std::fs::create_dir(root_path.join("subdir")).unwrap();
+        File::create(root_path.join("subdir").join("file3.rs")).unwrap();
+        File::create(root_path.join("subdir").join("file4.txt")).unwrap();
+
+        let mut config = Config::default();
+        config.include = Include::Glob(vec!["*.rs".to_string(), "subdir/*.txt".to_string()]);
+
+        let included_files = config.included_files(root_path).unwrap();
+
+        let mut expected_files: Vec<PathBuf> = vec![
+            PathBuf::from("file1.rs"),
+            PathBuf::from("subdir/file3.rs"),
+            PathBuf::from("subdir/file4.txt"),
+        ];
+        expected_files.sort();
+
+        let mut included_files: Vec<PathBuf> = included_files.into_iter().collect();
+        included_files.sort();
+
+        assert_eq!(included_files, expected_files);
     }
 }
