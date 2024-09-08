@@ -66,8 +66,11 @@ pub enum ConfigDialect {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Tags {
+    /// EXPERIMENTAL: enable smart change type
     pub smart: bool,
+    /// Enable replace change type
     pub replace: bool,
+    /// EXPERIMENTAL: enable udiff change type
     pub udiff: bool,
 }
 
@@ -81,6 +84,14 @@ impl Default for Tags {
     }
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, Default, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum Include {
+    #[default]
+    Git,
+    Glob(Vec<String>),
+}
+
 // Note that we can't use Optional values in the config. TOML includes no way to render
 // optional values, so our strategy of rendering the full config with a default config for
 // documentation falls by the wayside.
@@ -88,6 +99,10 @@ impl Default for Tags {
 #[derive(Debug, Clone, Deserialize)]
 /// Configuration for the Tenx application.
 pub struct Config {
+    /// Which files are included by default
+    #[serde(default)]
+    pub include: Include,
+
     /// The Anthropic API key.
     #[serde(default)]
     pub anthropic_key: String,
@@ -136,6 +151,7 @@ impl Serialize for Config {
     {
         let default = Config::default();
         let mut state = serializer.serialize_struct("Config", 7)?;
+        serialize_if_different!(state, self, default, include);
         serialize_if_different!(state, self, default, anthropic_key);
         serialize_if_different!(state, self, default, session_store_dir);
         serialize_if_different!(state, self, default, retry_limit);
@@ -150,6 +166,7 @@ impl Serialize for Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
+            include: Include::Git,
             anthropic_key: String::new(),
             session_store_dir: PathBuf::new(),
             retry_limit: DEFAULT_RETRY_LIMIT,
@@ -188,6 +205,9 @@ impl Config {
     /// Merge another Config into this one, only overriding non-default values.
     pub fn merge(&mut self, other: &Config) {
         let dflt = Config::default();
+        if other.include != dflt.include {
+            self.include = other.include.clone();
+        }
         if other.anthropic_key != dflt.anthropic_key {
             self.anthropic_key = other.anthropic_key.clone();
         }
@@ -325,6 +345,11 @@ mod tests {
         set_config!(other_config, anthropic_key, "other_key".to_string());
         set_config!(other_config, session_store_dir, PathBuf::from("/tmp/other"));
         set_config!(other_config, no_preflight, true);
+        set_config!(
+            other_config,
+            include,
+            Include::Glob(vec!["*.rs".to_string()])
+        );
 
         base_config.merge(&other_config);
 
@@ -335,6 +360,37 @@ mod tests {
         assert_eq!(base_config.default_model, ConfigModel::Claude);
         assert_eq!(base_config.default_dialect, ConfigDialect::Tags);
         assert!(!base_config.tags.smart);
+        assert!(matches!(base_config.include, Include::Glob(_)));
+        if let Include::Glob(patterns) = &base_config.include {
+            assert_eq!(patterns, &vec!["*.rs".to_string()]);
+        }
+    }
+
+    #[test]
+    fn test_include_serialization() {
+        let mut config = Config::default();
+        set_config!(
+            config,
+            include,
+            Include::Glob(vec!["*.rs".to_string(), "*.toml".to_string()])
+        );
+
+        let toml_str = config.to_toml().unwrap();
+        println!("Serialized TOML:\n{}", toml_str);
+
+        let deserialized_config = Config::from_toml(&toml_str).unwrap();
+
+        assert!(matches!(deserialized_config.include, Include::Glob(_)));
+        if let Include::Glob(patterns) = deserialized_config.include {
+            assert_eq!(patterns, vec!["*.rs".to_string(), "*.toml".to_string()]);
+        }
+
+        // Test default value (Git) is not serialized
+        let default_config = Config::default();
+        let default_toml_str = default_config.to_toml().unwrap();
+        let parsed_toml: toml::Value = toml::from_str(&default_toml_str).unwrap();
+        let table = parsed_toml.as_table().unwrap();
+        assert!(!table.contains_key("include"));
     }
 
     #[test]
