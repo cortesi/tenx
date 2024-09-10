@@ -207,13 +207,16 @@ impl Session {
     /// Adds a new context to the session, ignoring duplicates.
     ///
     /// If a context with the same name and type already exists, it will not be added again.
-    pub fn add_context(&mut self, context: Context) {
+    pub fn add_context(&mut self, context: Context) -> usize {
         if !self
             .context
             .iter()
             .any(|c| c.name == context.name && c.ty == context.ty)
         {
             self.context.push(context);
+            1
+        } else {
+            0
         }
     }
 
@@ -249,23 +252,24 @@ impl Session {
     }
 
     /// Adds a file path context to the session, normalizing relative paths.
-    pub fn add_ctx_path<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
+    pub fn add_ctx_path<P: AsRef<Path>>(&mut self, path: P) -> Result<usize> {
         let normalized_path = self.normalize_path(path)?;
-        self.add_context(Context {
+        Ok(self.add_context(Context {
             ty: ContextType::File,
             name: normalized_path.to_string_lossy().into_owned(),
             data: ContextData::Path(normalized_path),
-        });
-        Ok(())
+        }))
     }
 
     /// Adds an editable file path to the session, normalizing relative paths.
-    pub fn add_editable_path<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
+    pub fn add_editable_path<P: AsRef<Path>>(&mut self, path: P) -> Result<usize> {
         let normalized_path = self.normalize_path(path)?;
         if !self.editable.contains(&normalized_path) {
             self.editable.push(normalized_path);
+            Ok(1)
+        } else {
+            Ok(0)
         }
-        Ok(())
     }
 
     /// Helper function to match files based on a glob pattern
@@ -320,31 +324,33 @@ impl Session {
     }
 
     /// Adds editable files to the session based on a glob pattern.
-    pub fn add_editable_glob(&mut self, config: &config::Config, pattern: &str) -> Result<()> {
+    pub fn add_editable_glob(&mut self, config: &config::Config, pattern: &str) -> Result<usize> {
         let matched_files = self.match_files_with_glob(config, pattern)?;
+        let mut added = 0;
         for file in matched_files {
-            self.add_editable_path(file)?;
+            added += self.add_editable_path(file)?;
         }
-        Ok(())
+        Ok(added)
     }
 
     /// Adds context files to the session based on a glob pattern. The glob match is over the
     /// total set of included files in the configuration, with paths relative to the root of the
     /// project.
-    pub fn add_ctx_glob(&mut self, config: &config::Config, pattern: &str) -> Result<()> {
+    pub fn add_ctx_glob(&mut self, config: &config::Config, pattern: &str) -> Result<usize> {
         let matched_files = self.match_files_with_glob(config, pattern)?;
+        let mut added = 0;
         for file in matched_files {
-            self.add_context(Context {
+            added += self.add_context(Context {
                 ty: ContextType::File,
                 name: file.to_string_lossy().into_owned(),
                 data: ContextData::Path(file),
             });
         }
-        Ok(())
+        Ok(added)
     }
 
     /// Adds context to the session, either as a single file or as a glob pattern.
-    pub fn add_ctx(&mut self, config: &config::Config, path: &str) -> Result<()> {
+    pub fn add_ctx(&mut self, config: &config::Config, path: &str) -> Result<usize> {
         if is_glob(path) {
             self.add_ctx_glob(config, path)
         } else {
@@ -353,7 +359,7 @@ impl Session {
     }
 
     /// Adds an editable file or glob pattern to the session.
-    pub fn add_editable(&mut self, config: &config::Config, path: &str) -> Result<()> {
+    pub fn add_editable(&mut self, config: &config::Config, path: &str) -> Result<usize> {
         if is_glob(path) {
             self.add_editable_glob(config, path)
         } else {
@@ -362,18 +368,17 @@ impl Session {
     }
 
     /// Adds a Ruskel context to the session and resolves it.
-    pub fn add_ctx_ruskel(&mut self, name: String) -> Result<()> {
+    pub fn add_ctx_ruskel(&mut self, name: String) -> Result<usize> {
         let ruskel = Ruskel::new(&name);
         let resolved = ruskel
             .render(false, false)
             .map_err(|e| TenxError::Resolve(e.to_string()))?;
 
-        self.add_context(Context {
+        Ok(self.add_context(Context {
             ty: ContextType::Ruskel,
             name,
             data: ContextData::String(resolved),
-        });
-        Ok(())
+        }))
     }
 
     /// Apply a patch, entering the modified files into the patch cache. It is the caller's

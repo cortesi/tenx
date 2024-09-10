@@ -20,6 +20,24 @@ use libtenx::{
     Session, Tenx,
 };
 
+/// Helper function to add context to a session
+/// Returns the total number of new context items added
+fn add_context(
+    session: &mut Session,
+    config: &config::Config,
+    ctx: &[String],
+    ruskel: &[String],
+) -> anyhow::Result<usize> {
+    let mut total_added = 0;
+    for file in ctx {
+        total_added += session.add_ctx(config, file)?;
+    }
+    for ruskel_doc in ruskel {
+        total_added += session.add_ctx_ruskel(ruskel_doc.clone())?;
+    }
+    Ok(total_added)
+}
+
 mod edit;
 mod pretty;
 
@@ -493,16 +511,10 @@ async fn main() -> anyhow::Result<()> {
             Commands::Oneshot { files, ruskel, ctx } => {
                 let mut session = Session::from_cwd()?;
 
-                for file in ctx {
-                    session.add_ctx(&config, &file)?;
-                }
-
-                for ruskel_doc in ruskel {
-                    session.add_ctx_ruskel(ruskel_doc.clone())?;
-                }
+                add_context(&mut session, &config, ctx, ruskel)?;
 
                 for file in files {
-                    session.add_editable(&config, &file)?;
+                    session.add_editable(&config, file)?;
                 }
 
                 session.add_prompt(Prompt::User(String::new()))?;
@@ -541,13 +553,7 @@ async fn main() -> anyhow::Result<()> {
                     session.add_editable(&config, &f)?;
                 }
 
-                for file in ctx {
-                    session.add_ctx(&config, &file)?;
-                }
-
-                for ruskel_doc in ruskel {
-                    session.add_ctx_ruskel(ruskel_doc.clone())?;
-                }
+                add_context(&mut session, &config, ctx, ruskel)?;
 
                 tx.prompt(&mut session, Some(sender)).await?;
                 Ok(())
@@ -567,27 +573,30 @@ async fn main() -> anyhow::Result<()> {
             Commands::AddCtx { files, ruskel } => {
                 let mut session = tx.load_session_cwd()?;
 
-                for file in files {
-                    session.add_ctx(&config, &file)?;
-                }
+                let added = add_context(&mut session, &config, files, ruskel)?;
 
-                for ruskel_doc in ruskel {
-                    session.add_ctx_ruskel(ruskel_doc.clone())?;
+                if added == 0 {
+                    return Err(anyhow::anyhow!("No new context items were added"));
                 }
 
                 tx.save_session(&session)?;
-                println!("context added");
+                println!("{} new context item(s) added", added);
                 Ok(())
             }
             Commands::AddEdit { files } => {
                 let mut session = tx.load_session_cwd()?;
 
+                let mut total_added = 0;
                 for file in files {
-                    session.add_editable(&config, &file)?;
+                    total_added += session.add_editable(&config, file)?;
+                }
+
+                if total_added == 0 {
+                    return Err(anyhow::anyhow!("No new editable files were added"));
                 }
 
                 tx.save_session(&session)?;
-                println!("editable files added");
+                println!("{} new editable file(s) added", total_added);
                 Ok(())
             }
             Commands::Reset { step_offset } => {
@@ -607,13 +616,7 @@ async fn main() -> anyhow::Result<()> {
                 let offset = step_offset.unwrap_or(session.steps().len() - 1);
                 tx.reset(&mut session, offset)?;
 
-                for file in ctx {
-                    session.add_ctx(&config, &file)?;
-                }
-
-                for ruskel_doc in ruskel {
-                    session.add_ctx_ruskel(ruskel_doc.clone())?;
-                }
+                add_context(&mut session, &config, ctx, ruskel)?;
 
                 if *edit {
                     match edit::edit_prompt(&session)? {
@@ -628,13 +631,7 @@ async fn main() -> anyhow::Result<()> {
             Commands::New { files, ruskel } => {
                 let mut session = Session::from_cwd()?;
 
-                for file in files {
-                    session.add_ctx(&config, &file)?;
-                }
-
-                for ruskel_doc in ruskel {
-                    session.add_ctx_ruskel(ruskel_doc.clone())?;
-                }
+                add_context(&mut session, &config, files, ruskel)?;
 
                 tx.save_session(&session)?;
                 println!("new session: {}", session.root.display());
@@ -644,16 +641,10 @@ async fn main() -> anyhow::Result<()> {
                 let mut session = Session::from_cwd()?;
 
                 for file in files {
-                    session.add_editable(&config, &file)?;
+                    session.add_editable(&config, file)?;
                 }
 
-                for file in ctx {
-                    session.add_ctx(&config, &file)?;
-                }
-
-                for ruskel_doc in ruskel {
-                    session.add_ctx_ruskel(ruskel_doc.clone())?;
-                }
+                add_context(&mut session, &config, ctx, ruskel)?;
 
                 tx.fix(&mut session, Some(sender.clone())).await?;
                 if session.pending_prompt() {
