@@ -9,10 +9,8 @@ use serde::{
     ser::{SerializeStruct, Serializer},
     Deserialize, Serialize,
 };
-use toml;
 
-#[cfg(test)]
-use tempfile;
+use toml;
 
 use crate::{dialect, model, Result, TenxError};
 
@@ -41,6 +39,26 @@ pub fn home_config_dir() -> PathBuf {
         .join("tenx")
 }
 
+fn walk_directory(
+    root: &Path,
+    current_dir: &Path,
+    globset: &globset::GlobSet,
+    files: &mut Vec<PathBuf>,
+) -> Result<()> {
+    for entry in fs::read_dir(current_dir).map_err(|e| TenxError::Io(e.to_string()))? {
+        let entry = entry.map_err(|e| TenxError::Io(e.to_string()))?;
+        let path = entry.path();
+        if path.is_dir() {
+            walk_directory(root, &path, globset, files)?;
+        } else if let Ok(relative_path) = path.strip_prefix(root) {
+            if globset.is_match(relative_path) {
+                files.push(relative_path.to_path_buf());
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Finds the root directory based on a specified working directory or git repo root.
 pub fn find_project_root(current_dir: &Path) -> PathBuf {
     let mut dir = current_dir.to_path_buf();
@@ -53,6 +71,15 @@ pub fn find_project_root(current_dir: &Path) -> PathBuf {
         }
     }
     current_dir.to_path_buf()
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct DefaultContext {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ruskel: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub path: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
@@ -145,6 +172,10 @@ pub struct Config {
     #[serde(default)]
     pub tags: Tags,
 
+    /// The default context configuration.
+    #[serde(default)]
+    pub default_context: DefaultContext,
+
     /// Set a dummy model for end-to-end testing. Over-rides the configured model.
     #[serde(skip)]
     dummy_model: Option<model::DummyModel>,
@@ -164,7 +195,7 @@ impl Serialize for Config {
         S: Serializer,
     {
         let default = Config::default();
-        let mut state = serializer.serialize_struct("Config", 7)?;
+        let mut state = serializer.serialize_struct("Config", 9)?;
         serialize_if_different!(state, self, default, include);
         serialize_if_different!(state, self, default, anthropic_key);
         serialize_if_different!(state, self, default, session_store_dir);
@@ -173,6 +204,7 @@ impl Serialize for Config {
         serialize_if_different!(state, self, default, default_model);
         serialize_if_different!(state, self, default, default_dialect);
         serialize_if_different!(state, self, default, tags);
+        serialize_if_different!(state, self, default, default_context);
         state.end()
     }
 }
@@ -190,6 +222,7 @@ impl Default for Config {
             dummy_model: None,
             dummy_dialect: None,
             tags: Tags::default(),
+            default_context: DefaultContext::default(),
             full: false,
         }
     }
@@ -241,31 +274,10 @@ impl Config {
                     .map_err(|e| TenxError::Internal(e.to_string()))?;
 
                 let mut included_files = Vec::new();
-                self.walk_directory(project_root, project_root, &globset, &mut included_files)?;
+                walk_directory(project_root, project_root, &globset, &mut included_files)?;
                 Ok(included_files)
             }
         }
-    }
-
-    fn walk_directory(
-        &self,
-        root: &Path,
-        current_dir: &Path,
-        globset: &globset::GlobSet,
-        files: &mut Vec<PathBuf>,
-    ) -> Result<()> {
-        for entry in fs::read_dir(current_dir).map_err(|e| TenxError::Io(e.to_string()))? {
-            let entry = entry.map_err(|e| TenxError::Io(e.to_string()))?;
-            let path = entry.path();
-            if path.is_dir() {
-                self.walk_directory(root, &path, globset, files)?;
-            } else if let Ok(relative_path) = path.strip_prefix(root) {
-                if globset.is_match(relative_path) {
-                    files.push(relative_path.to_path_buf());
-                }
-            }
-        }
-        Ok(())
     }
 
     /// Sets the full serialization flag.
@@ -306,6 +318,9 @@ impl Config {
         }
         if other.tags != dflt.tags {
             self.tags = other.tags.clone();
+        }
+        if other.default_context != dflt.default_context {
+            self.default_context = other.default_context.clone();
         }
     }
 
@@ -361,6 +376,8 @@ impl Config {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs::File;
+    use tempfile::TempDir;
 
     macro_rules! set_config {
         ($config:expr, $($field:ident).+, $value:expr) => {
@@ -531,9 +548,6 @@ mod tests {
 
     #[test]
     fn test_included_files() {
-        use std::fs::File;
-        use tempfile::TempDir;
-
         let temp_dir = TempDir::new().unwrap();
         let root_path = temp_dir.path();
 

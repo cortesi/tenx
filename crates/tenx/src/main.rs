@@ -487,7 +487,7 @@ async fn main() -> anyhow::Result<()> {
                 Ok(()) as anyhow::Result<()>
             }
             Commands::LsFiles => {
-                let session = Session::from_cwd()?;
+                let session = Session::from_cwd(&config)?;
                 let files = config.included_files(&session.root)?;
                 for file in files {
                     println!("{}", file.display());
@@ -509,7 +509,7 @@ async fn main() -> anyhow::Result<()> {
                 Ok(())
             }
             Commands::Oneshot { files, ruskel, ctx } => {
-                let mut session = Session::from_cwd()?;
+                let mut session = Session::from_cwd(&config)?;
 
                 add_context(&mut session, &config, ctx, ruskel)?;
 
@@ -629,7 +629,7 @@ async fn main() -> anyhow::Result<()> {
                 Ok(())
             }
             Commands::New { files, ruskel } => {
-                let mut session = Session::from_cwd()?;
+                let mut session = Session::from_cwd(&config)?;
 
                 add_context(&mut session, &config, files, ruskel)?;
 
@@ -638,7 +638,7 @@ async fn main() -> anyhow::Result<()> {
                 Ok(())
             }
             Commands::Fix { files, ruskel, ctx } => {
-                let mut session = Session::from_cwd()?;
+                let mut session = Session::from_cwd(&config)?;
 
                 for file in files {
                     session.add_editable(&config, file)?;

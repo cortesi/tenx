@@ -101,14 +101,23 @@ impl Session {
         }
     }
 
-    /// Creates a new Session, discovering the root from the current working directory. At the
-    /// moment, this means the enclosing git repository, if there is one, otherwise the current
-    /// directory.
-    pub fn from_cwd() -> Result<Self> {
+    /// Creates a new Session, discovering the root from the current working directory and
+    /// adding the default context from the config.
+    pub fn from_cwd(config: &config::Config) -> Result<Self> {
         let cwd = env::current_dir()
             .map_err(|e| TenxError::Internal(format!("Could not access cwd: {}", e)))?;
         let root = config::find_project_root(&cwd);
-        Ok(Self::new(root))
+        let mut session = Self::new(root);
+
+        // Add default context
+        for ruskel in &config.default_context.ruskel {
+            session.add_ctx_ruskel(ruskel.clone())?;
+        }
+        for path in &config.default_context.path {
+            session.add_ctx(config, path)?;
+        }
+
+        Ok(session)
     }
 
     pub fn steps(&self) -> &Vec<Step> {
