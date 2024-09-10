@@ -152,7 +152,7 @@ enum Commands {
     Edit {
         /// Specifies files to edit
         #[clap(value_parser)]
-        files: Option<Vec<PathBuf>>,
+        files: Option<Vec<String>>,
 
         /// User prompt for the edit operation
         #[clap(long)]
@@ -168,13 +168,13 @@ enum Commands {
 
         /// Add files as context
         #[clap(long)]
-        ctx: Vec<PathBuf>,
+        ctx: Vec<String>,
     },
     /// Start a new session, edit the prompt, and run it
     Oneshot {
         /// Specifies files to edit
         #[clap(value_parser)]
-        files: Vec<PathBuf>,
+        files: Vec<String>,
 
         /// Add ruskel documentation as context
         #[clap(long)]
@@ -182,13 +182,13 @@ enum Commands {
 
         /// Add files as context
         #[clap(long)]
-        ctx: Vec<PathBuf>,
+        ctx: Vec<String>,
     },
     /// Start a new session and attempt to fix any preflight failures
     Fix {
         /// Specifies files to edit
         #[clap(value_parser)]
-        files: Vec<PathBuf>,
+        files: Vec<String>,
 
         /// Add ruskel documentation as context
         #[clap(long)]
@@ -196,7 +196,7 @@ enum Commands {
 
         /// Add files as context
         #[clap(long)]
-        ctx: Vec<PathBuf>,
+        ctx: Vec<String>,
     },
     /// Show the current session (alias: sess)
     #[clap(alias = "sess")]
@@ -217,7 +217,7 @@ enum Commands {
     AddCtx {
         /// Specifies files to add as context
         #[clap(value_parser)]
-        files: Vec<PathBuf>,
+        files: Vec<String>,
 
         /// Add ruskel documentation
         #[clap(long)]
@@ -227,7 +227,7 @@ enum Commands {
     AddEdit {
         /// Specifies files to add as editable
         #[clap(value_parser)]
-        files: Vec<PathBuf>,
+        files: Vec<String>,
     },
     /// Reset the session to a specific step
     Reset {
@@ -243,7 +243,7 @@ enum Commands {
         edit: bool,
         /// Add files as context
         #[clap(long)]
-        ctx: Vec<PathBuf>,
+        ctx: Vec<String>,
         /// Add ruskel documentation as context
         #[clap(long)]
         ruskel: Vec<String>,
@@ -252,7 +252,7 @@ enum Commands {
     New {
         /// Specifies files to add as context
         #[clap(value_parser)]
-        files: Vec<PathBuf>,
+        files: Vec<String>,
 
         /// Add ruskel documentation
         #[clap(long)]
@@ -494,7 +494,7 @@ async fn main() -> anyhow::Result<()> {
                 let mut session = Session::from_cwd()?;
 
                 for file in ctx {
-                    session.add_ctx_path(file)?;
+                    session.add_ctx(&config, &file)?;
                 }
 
                 for ruskel_doc in ruskel {
@@ -502,7 +502,7 @@ async fn main() -> anyhow::Result<()> {
                 }
 
                 for file in files {
-                    session.add_editable(file)?;
+                    session.add_editable(&config, &file)?;
                 }
 
                 session.add_prompt(Prompt::User(String::new()))?;
@@ -538,11 +538,11 @@ async fn main() -> anyhow::Result<()> {
                 };
                 session.set_last_prompt(user_prompt)?;
                 for f in files.clone().unwrap_or_default() {
-                    session.add_editable(f)?;
+                    session.add_editable(&config, &f)?;
                 }
 
                 for file in ctx {
-                    session.add_ctx_path(file)?;
+                    session.add_ctx(&config, &file)?;
                 }
 
                 for ruskel_doc in ruskel {
@@ -568,7 +568,7 @@ async fn main() -> anyhow::Result<()> {
                 let mut session = tx.load_session_cwd()?;
 
                 for file in files {
-                    session.add_ctx_path(file)?;
+                    session.add_ctx(&config, &file)?;
                 }
 
                 for ruskel_doc in ruskel {
@@ -583,7 +583,7 @@ async fn main() -> anyhow::Result<()> {
                 let mut session = tx.load_session_cwd()?;
 
                 for file in files {
-                    session.add_editable(file)?;
+                    session.add_editable(&config, &file)?;
                 }
 
                 tx.save_session(&session)?;
@@ -608,7 +608,7 @@ async fn main() -> anyhow::Result<()> {
                 tx.reset(&mut session, offset)?;
 
                 for file in ctx {
-                    session.add_ctx_path(file)?;
+                    session.add_ctx(&config, &file)?;
                 }
 
                 for ruskel_doc in ruskel {
@@ -629,7 +629,7 @@ async fn main() -> anyhow::Result<()> {
                 let mut session = Session::from_cwd()?;
 
                 for file in files {
-                    session.add_ctx_path(file)?;
+                    session.add_ctx(&config, &file)?;
                 }
 
                 for ruskel_doc in ruskel {
@@ -644,11 +644,11 @@ async fn main() -> anyhow::Result<()> {
                 let mut session = Session::from_cwd()?;
 
                 for file in files {
-                    session.add_editable(file)?;
+                    session.add_editable(&config, &file)?;
                 }
 
                 for file in ctx {
-                    session.add_ctx_path(file)?;
+                    session.add_ctx(&config, &file)?;
                 }
 
                 for ruskel_doc in ruskel {

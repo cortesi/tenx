@@ -252,7 +252,7 @@ mod tests {
 
         let mut session = Session::new(temp_dir.path().to_path_buf());
         session.add_prompt(Prompt::User("Test prompt".to_string()))?;
-        session.add_editable(test_file_path.clone())?;
+        session.add_editable_path(test_file_path.clone())?;
 
         let session_store = SessionStore::open(temp_dir.path().to_path_buf())?;
         tenx.process_prompt(&mut session, None, &session_store)

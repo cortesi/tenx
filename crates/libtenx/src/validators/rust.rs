@@ -117,7 +117,7 @@ mod tests {
         let mut session = Session::new(temp_dir.path().to_path_buf());
         session.add_prompt(prompt.clone())?;
         for p in edit_paths {
-            session.add_editable(&p)?;
+            session.add_editable_path(&p)?;
         }
 
         let checker = CargoChecker;
@@ -141,7 +141,7 @@ mod tests {
         let mut session = Session::new(temp_dir.path().to_path_buf());
         session.add_prompt(prompt)?;
         for p in edit_paths {
-            session.add_editable(&p)?;
+            session.add_editable_path(&p)?;
         }
 
         let workspace = RustWorkspace::discover(&session)?;
@@ -165,7 +165,7 @@ mod tests {
         let mut session = Session::new(temp_dir.path().to_path_buf());
         session.add_prompt(prompt)?;
         for p in edit_paths {
-            session.add_editable(&p)?;
+            session.add_editable_path(&p)?;
         }
 
         let workspace = RustWorkspace::discover(&session)?;
@@ -186,7 +186,7 @@ mod tests {
 
         let mut session = Session::new(temp_dir.path().to_path_buf());
         session.add_prompt(prompt)?;
-        session.add_editable(temp_dir.path())?;
+        session.add_editable_path(temp_dir.path())?;
 
         let result = RustWorkspace::discover(&session);
 
@@ -231,7 +231,7 @@ mod tests {
         let mut session = Session::new(temp_dir1.path().to_path_buf());
         session.add_prompt(prompt)?;
         for f in edit_paths {
-            session.add_editable(&f)?;
+            session.add_editable_path(&f)?;
         }
 
         let result = RustWorkspace::discover(&session);

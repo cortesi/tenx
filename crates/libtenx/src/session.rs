@@ -4,6 +4,7 @@ use std::{
 };
 
 use fs_err as fs;
+use globset::Glob;
 use libruskel::Ruskel;
 use pathdiff::diff_paths;
 use serde::{Deserialize, Serialize};
@@ -57,6 +58,14 @@ pub struct Step {
     pub patch: Option<Patch>,
     pub err: Option<TenxError>,
     pub usage: Option<Usage>,
+}
+
+/// Determines if a given string is a glob pattern or a rooted path.
+///
+/// Returns false if the string starts with "./", indicating a rooted path.
+/// Returns true otherwise, suggesting it might be a glob pattern.
+fn is_glob(s: &str) -> bool {
+    !s.starts_with("./")
 }
 
 /// A serializable session, which persists between invocations.
@@ -251,12 +260,94 @@ impl Session {
     }
 
     /// Adds an editable file path to the session, normalizing relative paths.
-    pub fn add_editable<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
+    pub fn add_editable_path<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
         let normalized_path = self.normalize_path(path)?;
         if !self.editable.contains(&normalized_path) {
             self.editable.push(normalized_path);
         }
         Ok(())
+    }
+
+    /// Adds editable files to the session based on a glob pattern.
+    pub fn add_editable_glob(&mut self, config: &config::Config, pattern: &str) -> Result<()> {
+        let glob = Glob::new(pattern)
+            .map_err(|e| TenxError::Internal(format!("Invalid glob pattern: {}", e)))?;
+        let included_files = config.included_files(&self.root)?;
+
+        for file in included_files {
+            if glob.compile_matcher().is_match(&file) {
+                self.add_editable_path(file)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Adds context files to the session based on a glob pattern. The glob match is over the
+    /// total set of included files in the configuration, with paths relative to the root of the
+    /// project.
+    pub fn add_ctx_glob(&mut self, config: &config::Config, pattern: &str) -> Result<()> {
+        let glob = Glob::new(pattern)
+            .map_err(|e| TenxError::Internal(format!("Invalid glob pattern: {}", e)))?;
+        let included_files = config.included_files(&self.root)?;
+
+        let current_dir = env::current_dir()
+            .map_err(|e| TenxError::Internal(format!("Failed to get current directory: {}", e)))?;
+
+        for file in included_files {
+            let relative_path = if file.is_absolute() {
+                file.strip_prefix(&self.root).unwrap_or(&file)
+            } else {
+                &file
+            };
+
+            let match_path = if current_dir != self.root {
+                // If we're in a subdirectory, we need to adjust the path for matching
+                diff_paths(
+                    relative_path,
+                    current_dir
+                        .strip_prefix(&self.root)
+                        .unwrap_or(Path::new("")),
+                )
+                .unwrap_or_else(|| relative_path.to_path_buf())
+            } else {
+                relative_path.to_path_buf()
+            };
+
+            if glob.compile_matcher().is_match(&match_path) {
+                let absolute_path = self.root.join(relative_path);
+                if absolute_path.exists() {
+                    self.add_context(Context {
+                        ty: ContextType::File,
+                        name: relative_path.to_string_lossy().into_owned(),
+                        data: ContextData::Path(relative_path.to_path_buf()),
+                    });
+                } else {
+                    return Err(TenxError::Internal(format!(
+                        "File does not exist: {:?}",
+                        absolute_path
+                    )));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Adds context to the session, either as a single file or as a glob pattern.
+    pub fn add_ctx(&mut self, config: &config::Config, path: &str) -> Result<()> {
+        if is_glob(path) {
+            self.add_ctx_glob(config, path)
+        } else {
+            self.add_ctx_path(path)
+        }
+    }
+
+    /// Adds an editable file or glob pattern to the session.
+    pub fn add_editable(&mut self, config: &config::Config, path: &str) -> Result<()> {
+        if is_glob(path) {
+            self.add_editable_glob(config, path)
+        } else {
+            self.add_editable_path(path)
+        }
     }
 
     /// Adds a Ruskel context to the session and resolves it.
@@ -490,6 +581,103 @@ mod tests {
 
         assert_eq!(session.steps.len(), 1);
         assert_eq!(fs::read_to_string(&file_path).unwrap(), "Content 1");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_add_ctx_glob() -> Result<()> {
+        let temp_dir = tempdir()
+            .map_err(|e| TenxError::Internal(format!("Failed to create temp dir: {}", e)))?;
+        let root_dir = temp_dir
+            .path()
+            .canonicalize()
+            .map_err(|e| TenxError::Internal(format!("Failed to canonicalize temp dir: {}", e)))?;
+        let mut session = Session::new(root_dir.clone());
+
+        // Create directory structure
+        fs::create_dir_all(root_dir.join("src/subdir"))
+            .map_err(|e| TenxError::Internal(format!("Failed to create src/subdir: {}", e)))?;
+        fs::create_dir_all(root_dir.join("tests"))
+            .map_err(|e| TenxError::Internal(format!("Failed to create tests dir: {}", e)))?;
+        fs::write(root_dir.join("src/file1.rs"), "content1")
+            .map_err(|e| TenxError::Internal(format!("Failed to write src/file1.rs: {}", e)))?;
+        fs::write(root_dir.join("src/subdir/file2.rs"), "content2").map_err(|e| {
+            TenxError::Internal(format!("Failed to write src/subdir/file2.rs: {}", e))
+        })?;
+        fs::write(root_dir.join("tests/test1.rs"), "test_content1")
+            .map_err(|e| TenxError::Internal(format!("Failed to write tests/test1.rs: {}", e)))?;
+        fs::write(root_dir.join("README.md"), "readme_content")
+            .map_err(|e| TenxError::Internal(format!("Failed to write README.md: {}", e)))?;
+
+        // Create a mock config
+        let mut config = config::Config::default();
+        config.include =
+            config::Include::Glob(vec!["**/*.rs".to_string(), "README.md".to_string()]);
+
+        // Test adding context from root directory
+        session.add_ctx_glob(&config, "src/**/*.rs")?;
+        assert_eq!(
+            session.context.len(),
+            2,
+            "Expected 2 contexts, got {}",
+            session.context.len()
+        );
+        assert!(
+            session.context.iter().any(|c| c.name == "src/file1.rs"),
+            "src/file1.rs not found in context"
+        );
+        assert!(
+            session
+                .context
+                .iter()
+                .any(|c| c.name == "src/subdir/file2.rs"),
+            "src/subdir/file2.rs not found in context"
+        );
+
+        // Store the original working directory
+        let original_dir = env::current_dir()?;
+
+        // Test adding context from subdirectory
+        env::set_current_dir(root_dir.join("src"))?;
+        session.add_ctx_glob(&config, "**/*.rs")?;
+        assert_eq!(
+            session.context.len(),
+            3,
+            "Expected 3 contexts, got {}",
+            session.context.len()
+        );
+        assert!(
+            session.context.iter().any(|c| c.name == "src/file1.rs"),
+            "src/file1.rs not found in context"
+        );
+        assert!(
+            session
+                .context
+                .iter()
+                .any(|c| c.name == "src/subdir/file2.rs"),
+            "src/subdir/file2.rs not found in context"
+        );
+        assert!(
+            session.context.iter().any(|c| c.name == "tests/test1.rs"),
+            "tests/test1.rs not found in context"
+        );
+
+        // Test adding non-Rust files
+        session.add_ctx_glob(&config, "../*.md")?;
+        assert_eq!(
+            session.context.len(),
+            4,
+            "Expected 4 contexts, got {}",
+            session.context.len()
+        );
+        assert!(
+            session.context.iter().any(|c| c.name == "README.md"),
+            "README.md not found in context"
+        );
+
+        // Reset the working directory
+        env::set_current_dir(original_dir)?;
 
         Ok(())
     }
