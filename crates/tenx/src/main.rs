@@ -276,6 +276,8 @@ enum Commands {
         #[clap(long)]
         ruskel: Vec<String>,
     },
+    /// Clear the current session
+    Clear,
 }
 
 /// Creates a Config from disk and CLI arguments
@@ -652,6 +654,13 @@ async fn main() -> anyhow::Result<()> {
                 } else {
                     println!("No issues to fix");
                 }
+                Ok(())
+            }
+            Commands::Clear => {
+                let mut session = tx.load_session_cwd()?;
+                session.clear();
+                tx.save_session(&session)?;
+                println!("Session cleared");
                 Ok(())
             }
         },

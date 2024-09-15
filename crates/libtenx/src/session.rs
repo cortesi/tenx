@@ -88,6 +88,11 @@ impl Session {
         self.steps[offset].prompt = prompt;
         Ok(())
     }
+
+    /// Clears all steps in the session, but keeps the current editable and context intact.
+    pub fn clear(&mut self) {
+        self.steps.clear();
+    }
 }
 
 impl Session {
