@@ -215,6 +215,10 @@ enum Commands {
         /// Add files as context
         #[clap(long)]
         ctx: Vec<String>,
+
+        /// Clear the current session, and use it to fix
+        #[clap(long)]
+        clear: bool,
     },
     /// Show the current session (alias: sess)
     #[clap(alias = "sess")]
@@ -639,8 +643,19 @@ async fn main() -> anyhow::Result<()> {
                 println!("new session: {}", session.root.display());
                 Ok(())
             }
-            Commands::Fix { files, ruskel, ctx } => {
-                let mut session = Session::from_cwd(&config)?;
+            Commands::Fix {
+                files,
+                ruskel,
+                ctx,
+                clear,
+            } => {
+                let mut session = if *clear {
+                    let mut current_session = tx.load_session_cwd()?;
+                    current_session.clear();
+                    current_session
+                } else {
+                    Session::from_cwd(&config)?
+                };
 
                 for file in files {
                     session.add_editable(&config, file)?;
@@ -654,6 +669,7 @@ async fn main() -> anyhow::Result<()> {
                 } else {
                     println!("No issues to fix");
                 }
+                tx.save_session(&session)?;
                 Ok(())
             }
             Commands::Clear => {
