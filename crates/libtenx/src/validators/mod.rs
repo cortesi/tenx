@@ -19,14 +19,14 @@ pub fn preflight(config: &Config, state: &Session) -> Result<Vec<Box<dyn Validat
         .iter()
         .any(|path| path.extension().map_or(false, |ext| ext == "rs"))
     {
-        if config.validators.cargo_check {
-            validators.push(Box::new(CargoChecker));
+        if config.validators.rust_cargo_check {
+            validators.push(Box::new(RustCargoCheck));
         }
-        if config.validators.cargo_test {
-            validators.push(Box::new(CargoTester));
+        if config.validators.rust_cargo_test {
+            validators.push(Box::new(RustCargoTest));
         }
-        if config.validators.cargo_clippy {
-            validators.push(Box::new(CargoClippy));
+        if config.validators.rust_cargo_clippy {
+            validators.push(Box::new(RustCargoClippy));
         }
     }
 
@@ -43,14 +43,14 @@ pub fn post_patch(config: &Config, state: &Session) -> Result<Vec<Box<dyn Valida
                 .iter()
                 .any(|path| path.extension().map_or(false, |ext| ext == "rs"))
             {
-                if config.validators.cargo_check {
-                    validators.push(Box::new(CargoChecker));
+                if config.validators.rust_cargo_check {
+                    validators.push(Box::new(RustCargoCheck));
                 }
-                if config.validators.cargo_test {
-                    validators.push(Box::new(CargoTester));
+                if config.validators.rust_cargo_test {
+                    validators.push(Box::new(RustCargoTest));
                 }
-                if config.validators.cargo_clippy {
-                    validators.push(Box::new(CargoClippy));
+                if config.validators.rust_cargo_clippy {
+                    validators.push(Box::new(RustCargoClippy));
                 }
             }
         }

@@ -4,13 +4,13 @@ use std::process::Command;
 use super::Validator;
 use crate::{Result, Session, TenxError};
 
-pub struct CargoChecker;
-pub struct CargoTester;
-pub struct CargoClippy;
+pub struct RustCargoCheck;
+pub struct RustCargoTest;
+pub struct RustCargoClippy;
 
-impl Validator for CargoChecker {
+impl Validator for RustCargoCheck {
     fn name(&self) -> &'static str {
-        "cargo check"
+        "rust: cargo check"
     }
 
     fn validate(&self, state: &Session) -> Result<()> {
@@ -18,9 +18,9 @@ impl Validator for CargoChecker {
     }
 }
 
-impl Validator for CargoTester {
+impl Validator for RustCargoTest {
     fn name(&self) -> &'static str {
-        "cargo test"
+        "rust: cargo test"
     }
 
     fn validate(&self, state: &Session) -> Result<()> {
@@ -28,9 +28,9 @@ impl Validator for CargoTester {
     }
 }
 
-impl Validator for CargoClippy {
+impl Validator for RustCargoClippy {
     fn name(&self) -> &'static str {
-        "cargo clippy"
+        "rust: cargo clippy"
     }
 
     fn validate(&self, state: &Session) -> Result<()> {
@@ -131,7 +131,7 @@ mod tests {
             session.add_editable_path(&p)?;
         }
 
-        let checker = CargoChecker;
+        let checker = RustCargoCheck;
         assert!(checker.validate(&session).is_ok());
 
         Ok(())

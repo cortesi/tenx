@@ -125,18 +125,18 @@ pub enum Include {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct Validation {
-    pub cargo_check: bool,
-    pub cargo_test: bool,
-    pub cargo_clippy: bool,
+pub struct Validators {
+    pub rust_cargo_check: bool,
+    pub rust_cargo_test: bool,
+    pub rust_cargo_clippy: bool,
 }
 
-impl Default for Validation {
+impl Default for Validators {
     fn default() -> Self {
         Self {
-            cargo_check: true,
-            cargo_test: true,
-            cargo_clippy: false,
+            rust_cargo_check: true,
+            rust_cargo_test: true,
+            rust_cargo_clippy: false,
         }
     }
 }
@@ -195,7 +195,7 @@ pub struct Config {
 
     /// Validation configuration.
     #[serde(default)]
-    pub validators: Validation,
+    pub validators: Validators,
 
     /// Set a dummy model for end-to-end testing. Over-rides the configured model.
     #[serde(skip)]
@@ -226,6 +226,7 @@ impl Serialize for Config {
         serialize_if_different!(state, self, default, default_dialect);
         serialize_if_different!(state, self, default, tags);
         serialize_if_different!(state, self, default, default_context);
+        serialize_if_different!(state, self, default, validators);
         state.end()
     }
 }
@@ -245,7 +246,7 @@ impl Default for Config {
             tags: Tags::default(),
             default_context: DefaultContext::default(),
             full: false,
-            validators: Validation::default(),
+            validators: Validators::default(),
         }
     }
 }

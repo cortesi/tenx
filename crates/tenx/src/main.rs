@@ -132,6 +132,18 @@ struct Cli {
     #[clap(long, global = true)]
     tags_udiff: Option<bool>,
 
+    /// Enable or disable Rust Cargo Clippy validator
+    #[clap(long, global = true)]
+    rust_cargo_clippy: Option<bool>,
+
+    /// Enable or disable Rust Cargo Check validator
+    #[clap(long, global = true)]
+    rust_cargo_check: Option<bool>,
+
+    /// Enable or disable Rust Cargo Test validator
+    #[clap(long, global = true)]
+    rust_cargo_test: Option<bool>,
+
     #[clap(subcommand)]
     command: Option<Commands>,
 }
@@ -326,6 +338,17 @@ fn load_config(cli: &Cli) -> Result<config::Config> {
     set_config!(config, tags.replace, cli.tags_replace);
     set_config!(config, tags.udiff, cli.tags_udiff);
     config.no_preflight = cli.no_preflight;
+
+    // Override validator configurations
+    if let Some(value) = cli.rust_cargo_clippy {
+        config.validators.rust_cargo_clippy = value;
+    }
+    if let Some(value) = cli.rust_cargo_check {
+        config.validators.rust_cargo_check = value;
+    }
+    if let Some(value) = cli.rust_cargo_test {
+        config.validators.rust_cargo_test = value;
+    }
 
     Ok(config)
 }
