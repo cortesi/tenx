@@ -385,7 +385,7 @@ impl Session {
     pub fn add_ctx_ruskel(&mut self, name: String) -> Result<usize> {
         let ruskel = Ruskel::new(&name);
         let resolved = ruskel
-            .render(false, false)
+            .render(false, false, true)
             .map_err(|e| TenxError::Resolve(e.to_string()))?;
 
         Ok(self.add_context(Context {
