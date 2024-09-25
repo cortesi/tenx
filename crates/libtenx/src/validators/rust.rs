@@ -34,7 +34,11 @@ impl Validator for RustCargoClippy {
     }
 
     fn validate(&self, state: &Session) -> Result<()> {
-        run_cargo_command(self.name(), state, &["clippy", "--no-deps"])
+        run_cargo_command(
+            self.name(),
+            state,
+            &["clippy", "--no-deps", "--all", "--tests", "-q"],
+        )
     }
 }
 
@@ -50,16 +54,23 @@ fn run_cargo_command(name: &str, state: &Session, args: &[&str]) -> Result<()> {
             model: e.to_string(),
         })?;
 
-    if output.status.success() {
-        Ok(())
-    } else {
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let stderr = String::from_utf8_lossy(&output.stderr);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    if args[0] == "clippy" && !stderr.is_empty() {
+        Err(TenxError::Validation {
+            name: name.to_string(),
+            user: "Cargo clippy found issues".to_string(),
+            model: format!("stderr:\n{}", stderr),
+        })
+    } else if !output.status.success() {
         Err(TenxError::Validation {
             name: name.to_string(),
             user: format!("Cargo {} failed", args[0]),
             model: format!("stdout:\n{}\n\nstderr:\n{}", stdout, stderr),
         })
+    } else {
+        Ok(())
     }
 }
 
