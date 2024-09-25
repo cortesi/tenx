@@ -13,17 +13,14 @@ repository.workspace = true
 misanthropy = { path = "../../../misanthropy/crates/misanthropy" }
 libruskel = { path = "../../../ruskel/crates/libruskel" }
 
-quick-xml = "0.36.1"
 tempfile = "3.11.0"
 thiserror = "1.0.63"
-walkdir = "2.5.0"
 tracing = "0.1.40"
 serde = { version = "1.0.205", features = ["derive"] }
 tokio = {version = "1.39.2", features = ["full"] }
 async-trait = "0.1.81"
 dirs = "5.0.1"
 serde_json = "1.0.124"
-colored = "2.1.0"
 pathdiff = "0.2.1"
 toml = { version = "0.8.19", features = ["display"] }
 diffy = "0.4.0"

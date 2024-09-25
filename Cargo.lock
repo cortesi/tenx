@@ -497,7 +497,7 @@ dependencies = [
  "anstyle",
  "clap_lex",
  "strsim",
- "terminal_size",
+ "terminal_size 0.3.0",
 ]
 
 [[package]]
@@ -2384,7 +2384,7 @@ dependencies = [
 
 [[package]]
 name = "libruskel"
-version = "0.0.6"
+version = "0.0.7"
 dependencies = [
  "anyhow",
  "cargo",
@@ -2429,7 +2429,6 @@ name = "libtenx"
 version = "0.0.1"
 dependencies = [
  "async-trait",
- "colored",
  "diffy",
  "dirs",
  "fs-err",
@@ -2439,7 +2438,6 @@ dependencies = [
  "misanthropy",
  "pathdiff",
  "pretty_assertions",
- "quick-xml",
  "serde",
  "serde_json",
  "tempfile",
@@ -2447,7 +2445,6 @@ dependencies = [
  "tokio",
  "toml",
  "tracing",
- "walkdir",
 ]
 
 [[package]]
@@ -2961,15 +2958,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "quick-xml"
-version = "0.36.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f7649a7b4df05aed9ea7ec6f628c67c9953a43869b8bc50929569b2999d443fe"
-dependencies = [
- "memchr",
-]
-
-[[package]]
 name = "quote"
 version = "1.0.37"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3209,9 +3197,9 @@ dependencies = [
 
 [[package]]
 name = "rustdoc-types"
-version = "0.29.1"
+version = "0.30.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5df53bab0198f33fc88c110aaabdb2df2cfee4b8a72aeaf942088e12bb305142"
+checksum = "89e3124c5a7883153fe3e762da9998cf36c302dbf1cc237869d297f9713e5655"
 dependencies = [
  "serde",
 ]
@@ -3703,9 +3691,9 @@ dependencies = [
 
 [[package]]
 name = "tar"
-version = "0.4.41"
+version = "0.4.42"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb797dad5fb5b76fcf519e702f4a589483b5ef06567f160c392832c1f5e44909"
+checksum = "4ff6c40d3aedb5e06b57c6f669ad17ab063dd1e63d977c6a88e7f4dfa4f04020"
 dependencies = [
  "filetime",
  "libc",
@@ -3737,7 +3725,7 @@ dependencies = [
  "pretty_assertions",
  "serde_json",
  "tempfile",
- "terminal_size",
+ "terminal_size 0.4.0",
  "textwrap",
  "tokio",
  "tracing",
@@ -3752,6 +3740,16 @@ checksum = "21bebf2b7c9e0a515f6e0f8c51dc0f8e4696391e6f1ff30379559f8365fb0df7"
 dependencies = [
  "rustix",
  "windows-sys 0.48.0",
+]
+
+[[package]]
+name = "terminal_size"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4f599bd7ca042cfdf8f4512b277c02ba102247820f9d9d4a9f521f496751a6ef"
+dependencies = [
+ "rustix",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
