@@ -1,7 +1,7 @@
 pub mod rust;
 pub use rust::*;
 
-use crate::{Result, Session};
+use crate::{config::Config, Result, Session};
 
 pub trait Validator {
     /// Returns the name of the validator.
@@ -12,22 +12,29 @@ pub trait Validator {
 }
 
 /// Returns a list of preflight checkers based on the given prompt and state.
-pub fn preflight(state: &Session) -> Result<Vec<Box<dyn Validator>>> {
+pub fn preflight(config: &Config, state: &Session) -> Result<Vec<Box<dyn Validator>>> {
     let mut validators: Vec<Box<dyn Validator>> = vec![];
     if state
         .abs_editables()?
         .iter()
         .any(|path| path.extension().map_or(false, |ext| ext == "rs"))
     {
-        validators.push(Box::new(CargoChecker));
-        validators.push(Box::new(CargoTester));
+        if config.validators.cargo_check {
+            validators.push(Box::new(CargoChecker));
+        }
+        if config.validators.cargo_test {
+            validators.push(Box::new(CargoTester));
+        }
+        if config.validators.cargo_clippy {
+            validators.push(Box::new(CargoClippy));
+        }
     }
 
     Ok(validators)
 }
 
 /// Returns a list of post-patch checkers based on the given state.
-pub fn post_patch(state: &Session) -> Result<Vec<Box<dyn Validator>>> {
+pub fn post_patch(config: &Config, state: &Session) -> Result<Vec<Box<dyn Validator>>> {
     let mut validators: Vec<Box<dyn Validator>> = vec![];
     if let Some(last_step) = state.steps().last() {
         if let Some(patch) = &last_step.patch {
@@ -36,8 +43,15 @@ pub fn post_patch(state: &Session) -> Result<Vec<Box<dyn Validator>>> {
                 .iter()
                 .any(|path| path.extension().map_or(false, |ext| ext == "rs"))
             {
-                validators.push(Box::new(CargoChecker));
-                validators.push(Box::new(CargoTester));
+                if config.validators.cargo_check {
+                    validators.push(Box::new(CargoChecker));
+                }
+                if config.validators.cargo_test {
+                    validators.push(Box::new(CargoTester));
+                }
+                if config.validators.cargo_clippy {
+                    validators.push(Box::new(CargoClippy));
+                }
             }
         }
     }

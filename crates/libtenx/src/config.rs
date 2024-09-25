@@ -124,6 +124,23 @@ pub enum Include {
     Glob(Vec<String>),
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Validation {
+    pub cargo_check: bool,
+    pub cargo_test: bool,
+    pub cargo_clippy: bool,
+}
+
+impl Default for Validation {
+    fn default() -> Self {
+        Self {
+            cargo_check: true,
+            cargo_test: true,
+            cargo_clippy: false,
+        }
+    }
+}
+
 // Note that we can't use Optional values in the config. TOML includes no way to render
 // optional values, so our strategy of rendering the full config with a default config for
 // documentation falls by the wayside.
@@ -176,6 +193,10 @@ pub struct Config {
     #[serde(default)]
     pub default_context: DefaultContext,
 
+    /// Validation configuration.
+    #[serde(default)]
+    pub validators: Validation,
+
     /// Set a dummy model for end-to-end testing. Over-rides the configured model.
     #[serde(skip)]
     dummy_model: Option<model::DummyModel>,
@@ -224,6 +245,7 @@ impl Default for Config {
             tags: Tags::default(),
             default_context: DefaultContext::default(),
             full: false,
+            validators: Validation::default(),
         }
     }
 }

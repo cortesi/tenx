@@ -6,6 +6,7 @@ use crate::{Result, Session, TenxError};
 
 pub struct CargoChecker;
 pub struct CargoTester;
+pub struct CargoClippy;
 
 impl Validator for CargoChecker {
     fn name(&self) -> &'static str {
@@ -24,6 +25,16 @@ impl Validator for CargoTester {
 
     fn validate(&self, state: &Session) -> Result<()> {
         run_cargo_command(self.name(), state, &["test"])
+    }
+}
+
+impl Validator for CargoClippy {
+    fn name(&self) -> &'static str {
+        "cargo clippy"
+    }
+
+    fn validate(&self, state: &Session) -> Result<()> {
+        run_cargo_command(self.name(), state, &["clippy", "--no-deps"])
     }
 }
 
