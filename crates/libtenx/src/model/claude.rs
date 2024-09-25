@@ -88,12 +88,13 @@ impl Claude {
         while let Some(event) = streamed_response.next().await {
             let event = event?;
             match event {
-                StreamEvent::ContentBlockDelta { delta, .. } => {
-                    if let ContentBlockDelta::TextDelta { text } = delta {
-                        if let Some(sender) = &sender {
-                            if let Err(e) = sender.send(Event::Snippet(text)).await {
-                                warn!("Error sending message to channel: {:?}", e);
-                            }
+                StreamEvent::ContentBlockDelta {
+                    delta: ContentBlockDelta::TextDelta { text },
+                    ..
+                } => {
+                    if let Some(sender) = &sender {
+                        if let Err(e) = sender.send(Event::Snippet(text)).await {
+                            warn!("Error sending message to channel: {:?}", e);
                         }
                     }
                 }

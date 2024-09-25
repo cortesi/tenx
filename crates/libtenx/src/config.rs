@@ -581,8 +581,10 @@ mod tests {
         File::create(root_path.join("subdir").join("file3.rs")).unwrap();
         File::create(root_path.join("subdir").join("file4.txt")).unwrap();
 
-        let mut config = Config::default();
-        config.include = Include::Glob(vec!["*.rs".to_string(), "subdir/*.txt".to_string()]);
+        let config = Config {
+            include: Include::Glob(vec!["*.rs".to_string(), "subdir/*.txt".to_string()]),
+            ..Default::default()
+        };
 
         let included_files = config.included_files(root_path).unwrap();
 
