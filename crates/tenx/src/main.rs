@@ -168,6 +168,8 @@ enum Commands {
         #[clap(long)]
         ruskel: Vec<String>,
     },
+    /// Run preflight validation suite on the current session
+    Preflight,
     /// Add editable files to an existing session
     AddEdit {
         /// Specifies files to add as editable
@@ -768,6 +770,11 @@ async fn main() -> anyhow::Result<()> {
                 let mut session = tx.load_session_cwd()?;
                 tx.run_formatters(&mut session, &Some(sender.clone()))?;
                 tx.save_session(&session)?;
+                Ok(())
+            }
+            Commands::Preflight => {
+                let mut session = tx.load_session_cwd()?;
+                tx.run_preflight_validators(&mut session, &Some(sender.clone()))?;
                 Ok(())
             }
         },
