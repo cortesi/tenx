@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use super::Validator;
-use crate::{Result, Session, TenxError};
+use crate::{config::Config, Result, Session, TenxError};
 
 pub struct RustCargoCheck;
 pub struct RustCargoTest;
@@ -16,6 +16,10 @@ impl Validator for RustCargoCheck {
     fn validate(&self, state: &Session) -> Result<()> {
         run_cargo_command(self.name(), state, &["check", "--tests"])
     }
+
+    fn is_relevant(&self, config: &Config, state: &Session) -> Result<bool> {
+        Ok(config.validators.rust_cargo_check && should_run_rust_validator(state)?)
+    }
 }
 
 impl Validator for RustCargoTest {
@@ -24,7 +28,11 @@ impl Validator for RustCargoTest {
     }
 
     fn validate(&self, state: &Session) -> Result<()> {
-        run_cargo_command(self.name(), state, &["test"])
+        run_cargo_command(self.name(), state, &["test", "-q"])
+    }
+
+    fn is_relevant(&self, config: &Config, state: &Session) -> Result<bool> {
+        Ok(config.validators.rust_cargo_test && should_run_rust_validator(state)?)
     }
 }
 
@@ -40,6 +48,29 @@ impl Validator for RustCargoClippy {
             &["clippy", "--no-deps", "--all", "--tests", "-q"],
         )
     }
+
+    fn is_relevant(&self, config: &Config, state: &Session) -> Result<bool> {
+        Ok(config.validators.rust_cargo_clippy && should_run_rust_validator(state)?)
+    }
+}
+
+fn should_run_rust_validator(state: &Session) -> Result<bool> {
+    if !is_cargo_installed() {
+        return Ok(false);
+    }
+
+    Ok(state
+        .abs_editables()?
+        .iter()
+        .any(|path| path.extension().map_or(false, |ext| ext == "rs")))
+}
+
+fn is_cargo_installed() -> bool {
+    Command::new("cargo")
+        .arg("--version")
+        .output()
+        .map(|output| output.status.success())
+        .unwrap_or(false)
 }
 
 fn run_cargo_command(name: &str, state: &Session, args: &[&str]) -> Result<()> {

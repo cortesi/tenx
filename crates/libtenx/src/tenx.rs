@@ -191,7 +191,7 @@ impl Tenx {
             return Ok(());
         }
         Self::send_event(sender, Event::PreflightStart)?;
-        let preflight_validators = crate::validators::preflight(&self.config, session)?;
+        let preflight_validators = crate::validators::relevant_validators(&self.config, session)?;
         for validator in preflight_validators {
             Self::send_event(sender, Event::ValidatorStart(validator.name().to_string()))?;
             if let Err(e) = validator.validate(session) {
@@ -209,14 +209,19 @@ impl Tenx {
         session: &mut Session,
         sender: &Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
-        Self::send_event(sender, Event::ValidationStart)?;
-        let post_patch_validators = crate::validators::post_patch(&self.config, session)?;
-        for validator in post_patch_validators {
-            Self::send_event(sender, Event::ValidatorStart(validator.name().to_string()))?;
-            validator.validate(session)?;
-            Self::send_event(sender, Event::ValidatorOk(validator.name().to_string()))?;
+        if let Some(last_step) = session.steps().last() {
+            if last_step.patch.is_some() {
+                Self::send_event(sender, Event::ValidationStart)?;
+                let post_patch_validators =
+                    crate::validators::relevant_validators(&self.config, session)?;
+                for validator in post_patch_validators {
+                    Self::send_event(sender, Event::ValidatorStart(validator.name().to_string()))?;
+                    validator.validate(session)?;
+                    Self::send_event(sender, Event::ValidatorOk(validator.name().to_string()))?;
+                }
+                Self::send_event(sender, Event::ValidationEnd)?;
+            }
         }
-        Self::send_event(sender, Event::ValidationEnd)?;
         Ok(())
     }
 }
