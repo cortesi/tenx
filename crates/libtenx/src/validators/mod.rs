@@ -1,7 +1,5 @@
-pub mod python;
-
+pub use crate::lang::python::*;
 pub use crate::lang::rust::*;
-pub use python::*;
 
 use crate::{config::Config, Result, Session};
 
