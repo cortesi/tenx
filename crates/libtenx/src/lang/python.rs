@@ -35,7 +35,7 @@ impl Validator for PythonRuffCheck {
         if is_ruff_installed() {
             Ok(Runnable::Ok)
         } else {
-            Ok(Runnable::Error("Ruff is not installed".to_string()))
+            Ok(Runnable::Error("ruff is not installed".to_string()))
         }
     }
 }

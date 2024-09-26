@@ -546,7 +546,7 @@ async fn main() -> anyhow::Result<()> {
                         match runnable {
                             Ok(libtenx::Runnable::Ok) => "✓".green().to_string(),
                             Ok(libtenx::Runnable::Error(msg)) => {
-                                format!("{} ({})", "✗".red(), msg.red())
+                                format!("{}  ({})", "✗".red(), msg.red())
                             }
                             Err(_) => "✗".red().to_string(),
                         }
@@ -568,7 +568,7 @@ async fn main() -> anyhow::Result<()> {
                         match runnable {
                             Ok(libtenx::Runnable::Ok) => "✓".green().to_string(),
                             Ok(libtenx::Runnable::Error(msg)) => {
-                                format!("{} ({})", "✗".red(), msg.red())
+                                format!("{}  ({})", "✗".red(), msg.red())
                             }
                             Err(_) => "✗".red().to_string(),
                         }
