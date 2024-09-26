@@ -144,6 +144,10 @@ struct Cli {
     #[clap(long, global = true)]
     rust_cargo_test: Option<bool>,
 
+    /// Enable or disable Python Ruff Check validator
+    #[clap(long, global = true)]
+    python_ruff_check: Option<bool>,
+
     #[clap(subcommand)]
     command: Option<Commands>,
 }
@@ -350,6 +354,9 @@ fn load_config(cli: &Cli) -> Result<config::Config> {
     }
     if let Some(value) = cli.rust_cargo_test {
         config.validators.rust_cargo_test = value;
+    }
+    if let Some(value) = cli.python_ruff_check {
+        config.validators.python_ruff_check = value;
     }
 
     Ok(config)

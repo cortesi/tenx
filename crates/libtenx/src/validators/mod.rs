@@ -1,4 +1,7 @@
+pub mod python;
 pub mod rust;
+
+pub use python::*;
 pub use rust::*;
 
 use crate::{config::Config, Result, Session};
@@ -37,6 +40,7 @@ pub fn all_validators() -> Vec<Box<dyn Validator>> {
         Box::new(RustCargoCheck),
         Box::new(RustCargoTest),
         Box::new(RustCargoClippy),
+        Box::new(PythonRuffCheck),
     ]
 }
 

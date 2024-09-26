@@ -129,6 +129,7 @@ pub struct Validators {
     pub rust_cargo_check: bool,
     pub rust_cargo_test: bool,
     pub rust_cargo_clippy: bool,
+    pub python_ruff_check: bool,
 }
 
 impl Default for Validators {
@@ -137,6 +138,7 @@ impl Default for Validators {
             rust_cargo_check: true,
             rust_cargo_test: true,
             rust_cargo_clippy: false,
+            python_ruff_check: true,
         }
     }
 }
