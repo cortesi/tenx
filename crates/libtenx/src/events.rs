@@ -29,10 +29,12 @@ pub enum Event {
 
     /// The formatting suite has started
     FormattingStart,
+    /// A formatter has started running
+    FormatterStart(String),
+    /// A formatter has finished running
+    FormatterEnd(String),
     /// The formatting suite has ended
     FormattingEnd,
-    /// A formatter has run successfully
-    FormattingOk(String),
 
     /// The validation suite has started
     ValidationStart,
@@ -43,7 +45,7 @@ pub enum Event {
     /// The validation suite has ended
     ValidationEnd,
 
-    /// The session has finished successfully
+    /// The command has finished successfully
     Finish,
 
     /// A log message with a specified log level
@@ -68,7 +70,8 @@ impl Event {
 
             Event::FormattingStart => "formatting_start",
             Event::FormattingEnd => "formatting_end",
-            Event::FormattingOk(_) => "formatting_ok",
+            Event::FormatterStart(_) => "formatter_start",
+            Event::FormatterEnd(_) => "formatter_end",
 
             Event::ValidationStart => "validation_start",
             Event::ValidatorStart(_) => "check_start",
@@ -86,7 +89,8 @@ impl Event {
     pub fn display(&self) -> String {
         match self {
             Event::Snippet(s)
-            | Event::FormattingOk(s)
+            | Event::FormatterStart(s)
+            | Event::FormatterEnd(s)
             | Event::ValidatorStart(s)
             | Event::ValidatorOk(s) => s.clone(),
             Event::Log(_, s) => s.clone(),

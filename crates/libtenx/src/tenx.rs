@@ -167,7 +167,7 @@ impl Tenx {
         Ok(())
     }
 
-    fn run_formatters(
+    pub fn run_formatters(
         &self,
         session: &mut Session,
         sender: &Option<mpsc::Sender<Event>>,
@@ -175,14 +175,15 @@ impl Tenx {
         Self::send_event(sender, Event::FormattingStart)?;
         let formatters = crate::formatters::relevant_formatters(&self.config, session)?;
         for formatter in formatters {
+            Self::send_event(sender, Event::FormatterStart(formatter.name().to_string()))?;
             formatter.format(session)?;
-            Self::send_event(sender, Event::FormattingOk(formatter.name().to_string()))?;
+            Self::send_event(sender, Event::FormatterEnd(formatter.name().to_string()))?;
         }
         Self::send_event(sender, Event::FormattingEnd)?;
         Ok(())
     }
 
-    fn run_preflight_validators(
+    pub fn run_preflight_validators(
         &self,
         session: &mut Session,
         sender: &Option<mpsc::Sender<Event>>,

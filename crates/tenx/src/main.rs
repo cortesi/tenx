@@ -1,8 +1,4 @@
-use std::{
-    fs,
-    io::{self, Write},
-    path::PathBuf,
-};
+use std::{fs, path::PathBuf};
 
 use anyhow::{Context as AnyhowContext, Result};
 use clap::{CommandFactory, Parser, Subcommand};
@@ -180,6 +176,8 @@ enum Commands {
     },
     /// Clear the current session
     Clear,
+    /// Run formatters on the current session
+    Format,
     /// Print the current configuration
     Conf {
         /// Output as JSON instead of TOML
@@ -391,7 +389,7 @@ async fn print_events(mut receiver: mpsc::Receiver<Event>) {
     }
 }
 
-/// Handles events with improved progress output using indicatif
+/// Handles events with improved progress output
 async fn progress_events(mut receiver: mpsc::Receiver<Event>) {
     let spinner_style = ProgressStyle::with_template("{spinner:.blue.bold} {msg}")
         .unwrap()
@@ -412,6 +410,20 @@ async fn progress_events(mut receiver: mpsc::Receiver<Event>) {
         }
     }
 
+    fn start_new_spinner(
+        current_spinner: &mut Option<ProgressBar>,
+        style: &ProgressStyle,
+        message: &str,
+    ) {
+        if let Some(spinner) = current_spinner.as_ref() {
+            spinner.finish();
+        }
+        let new_spinner = ProgressBar::new_spinner().with_style(style.clone());
+        new_spinner.enable_steady_tick(std::time::Duration::from_millis(100));
+        new_spinner.set_message(message.to_string());
+        *current_spinner = Some(new_spinner);
+    }
+
     while let Some(event) = receiver.recv().await {
         match event {
             Event::Retry(ref message) => {
@@ -425,44 +437,39 @@ async fn progress_events(mut receiver: mpsc::Receiver<Event>) {
             Event::Snippet(ref chunk) => {
                 manage_spinner(&mut current_spinner, |s| s.finish_and_clear());
                 print!("{}", chunk);
-                io::stdout().flush().unwrap();
             }
             Event::PromptDone => {
                 println!("\n\n");
             }
             Event::PreflightEnd | Event::FormattingEnd | Event::ValidationEnd => {
-                manage_spinner(&mut current_spinner, |s| s.finish_and_clear());
+                manage_spinner(&mut current_spinner, |s| s.finish());
             }
-            Event::FormattingOk(_) => {
-                manage_spinner(&mut current_spinner, |s| s.finish_and_clear());
-            }
-            Event::ValidatorOk(_) => {
+            Event::ValidatorOk(_) | Event::FormatterEnd(_) => {
                 manage_spinner(&mut current_spinner, |s| s.finish());
             }
             Event::Finish => {
-                manage_spinner(&mut current_spinner, |s| s.finish_and_clear());
-                println!("{}", "Done.".green().bold());
+                manage_spinner(&mut current_spinner, |s| s.finish());
+            }
+            Event::FormatterStart(msg) => {
+                start_new_spinner(&mut current_spinner, &spinner_style, &format!("  {}", msg));
+            }
+            Event::PreflightStart => {
+                println!("{}", "Preflight checks".to_string().blue());
+            }
+            Event::FormattingStart => {
+                println!("{}", "Formatting".to_string().blue());
             }
             Event::ValidatorStart(msg) => {
-                if let Some(spinner) = current_spinner.as_ref() {
-                    spinner.finish();
-                }
-                let new_spinner =
-                    ProgressBar::new_spinner().with_style(validator_spinner_style.clone());
-                new_spinner.enable_steady_tick(std::time::Duration::from_millis(100));
-                new_spinner.set_message(format!("  Checking: {}", msg));
-                current_spinner = Some(new_spinner);
+                start_new_spinner(
+                    &mut current_spinner,
+                    &validator_spinner_style,
+                    &format!("  {}", msg),
+                );
             }
             Event::Log(_, _) => {} // Ignore Log events in progress_events
             _ => {
                 if let Some(msg) = event.step_start_message() {
-                    if let Some(spinner) = current_spinner.as_ref() {
-                        spinner.finish();
-                    }
-                    let new_spinner = ProgressBar::new_spinner().with_style(spinner_style.clone());
-                    new_spinner.enable_steady_tick(std::time::Duration::from_millis(100));
-                    new_spinner.set_message(msg);
-                    current_spinner = Some(new_spinner);
+                    start_new_spinner(&mut current_spinner, &spinner_style, &msg);
                 }
             }
         }
@@ -755,6 +762,12 @@ async fn main() -> anyhow::Result<()> {
                 session.clear();
                 tx.save_session(&session)?;
                 println!("Session cleared");
+                Ok(())
+            }
+            Commands::Format => {
+                let mut session = tx.load_session_cwd()?;
+                tx.run_formatters(&mut session, &Some(sender.clone()))?;
+                tx.save_session(&session)?;
                 Ok(())
             }
         },
