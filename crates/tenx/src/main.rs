@@ -172,6 +172,8 @@ enum Commands {
     },
     /// List files included in the project
     LsFiles,
+    /// List all validators and their status
+    Validators,
     /// Dialect commands (alias: dia)
     #[clap(alias = "dia")]
     Dialect {
@@ -520,6 +522,28 @@ async fn main() -> anyhow::Result<()> {
                 let files = config.included_files(&session.root)?;
                 for file in files {
                     println!("{}", file.display());
+                }
+                Ok(())
+            }
+            Commands::Validators => {
+                for validator in libtenx::all_validators() {
+                    let name = validator.name();
+                    let configured = validator.is_configured(&config);
+                    let runnable = validator.runnable();
+
+                    let status = if !configured {
+                        format!("{} {}", "✗".yellow(), " (disabled)".yellow())
+                    } else {
+                        match runnable {
+                            Ok(libtenx::Runnable::Ok) => "✓".green().to_string(),
+                            Ok(libtenx::Runnable::Error(msg)) => {
+                                format!("{} ({})", "✗".red(), msg.red())
+                            }
+                            Err(_) => "✗".red().to_string(),
+                        }
+                    };
+
+                    println!("{:<30} {}", name, status);
                 }
                 Ok(())
             }
