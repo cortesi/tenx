@@ -19,6 +19,24 @@ impl Tenx {
         Self { config }
     }
 
+    /// Adds context to a session
+    /// Returns the total number of new context items added
+    pub fn add_context(
+        &self,
+        session: &mut Session,
+        ctx: &[String],
+        ruskel: &[String],
+    ) -> Result<usize> {
+        let mut total_added = 0;
+        for file in ctx {
+            total_added += session.add_ctx(&self.config, file)?;
+        }
+        for ruskel_doc in ruskel {
+            total_added += session.add_ctx_ruskel(ruskel_doc.clone())?;
+        }
+        Ok(total_added)
+    }
+
     /// Attempts to fix issues in the session by running preflight checks and adding a new prompt if there's an error.
     pub async fn fix(
         &self,
