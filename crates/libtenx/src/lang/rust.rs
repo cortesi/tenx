@@ -90,7 +90,7 @@ impl Validator for RustCargoClippy {
 
 impl Formatter for CargoFormatter {
     fn name(&self) -> &'static str {
-        "cargo fmt"
+        "rust: cargo fmt"
     }
 
     fn format(&self, state: &Session) -> Result<()> {

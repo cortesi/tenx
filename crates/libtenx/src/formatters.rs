@@ -1,3 +1,4 @@
+pub use crate::lang::python::PythonRuffFormatter;
 pub use crate::lang::rust::*;
 
 use crate::{config::Config, validators::Runnable, Result, Session};
@@ -11,7 +12,7 @@ pub trait Formatter {
 }
 
 pub fn all_formatters() -> Vec<Box<dyn Formatter>> {
-    vec![Box::new(CargoFormatter)]
+    vec![Box::new(CargoFormatter), Box::new(PythonRuffFormatter)]
 }
 
 pub fn relevant_formatters(config: &Config, state: &Session) -> Result<Vec<Box<dyn Formatter>>> {

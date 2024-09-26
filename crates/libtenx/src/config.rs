@@ -146,12 +146,14 @@ impl Default for Validators {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Formatters {
     pub rust_cargo_fmt: bool,
+    pub python_ruff_fmt: bool,
 }
 
 impl Default for Formatters {
     fn default() -> Self {
         Self {
             rust_cargo_fmt: true,
+            python_ruff_fmt: true,
         }
     }
 }
