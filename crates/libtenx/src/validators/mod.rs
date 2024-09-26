@@ -1,8 +1,7 @@
 pub mod python;
-pub mod rust;
 
+pub use crate::lang::rust::*;
 pub use python::*;
-pub use rust::*;
 
 use crate::{config::Config, Result, Session};
 

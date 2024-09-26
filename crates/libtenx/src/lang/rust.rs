@@ -1,12 +1,14 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use super::{Runnable, Validator};
+use crate::formatters::Formatter;
+use crate::validators::{Runnable, Validator};
 use crate::{config::Config, Result, Session, TenxError};
 
 pub struct RustCargoCheck;
 pub struct RustCargoTest;
 pub struct RustCargoClippy;
+pub struct CargoFormatter;
 
 fn cargo_runnable() -> Result<Runnable> {
     if is_cargo_installed() {
@@ -83,6 +85,16 @@ impl Validator for RustCargoClippy {
 
     fn runnable(&self) -> Result<Runnable> {
         cargo_runnable()
+    }
+}
+
+impl Formatter for CargoFormatter {
+    fn name(&self) -> &'static str {
+        "cargo fmt"
+    }
+
+    fn format(&self, state: &Session) -> Result<()> {
+        run_cargo_command(self.name(), state, &["fmt", "--all"])
     }
 }
 

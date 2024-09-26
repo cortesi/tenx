@@ -1,5 +1,6 @@
 mod error;
 mod events;
+mod lang;
 mod session;
 mod session_store;
 mod tenx;
