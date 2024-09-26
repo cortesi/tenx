@@ -1,12 +1,20 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use super::Validator;
+use super::{Runnable, Validator};
 use crate::{config::Config, Result, Session, TenxError};
 
 pub struct RustCargoCheck;
 pub struct RustCargoTest;
 pub struct RustCargoClippy;
+
+fn cargo_runnable() -> Result<Runnable> {
+    if is_cargo_installed() {
+        Ok(Runnable::Ok)
+    } else {
+        Ok(Runnable::Error("Cargo is not installed".to_string()))
+    }
+}
 
 impl Validator for RustCargoCheck {
     fn name(&self) -> &'static str {
@@ -17,8 +25,16 @@ impl Validator for RustCargoCheck {
         run_cargo_command(self.name(), state, &["check", "--tests"])
     }
 
-    fn is_relevant(&self, config: &Config, state: &Session) -> Result<bool> {
-        Ok(config.validators.rust_cargo_check && should_run_rust_validator(state)?)
+    fn is_relevant(&self, _config: &Config, state: &Session) -> Result<bool> {
+        should_run_rust_validator(state)
+    }
+
+    fn is_configured(&self, config: &Config) -> bool {
+        config.validators.rust_cargo_check
+    }
+
+    fn runnable(&self) -> Result<Runnable> {
+        cargo_runnable()
     }
 }
 
@@ -31,8 +47,16 @@ impl Validator for RustCargoTest {
         run_cargo_command(self.name(), state, &["test", "-q"])
     }
 
-    fn is_relevant(&self, config: &Config, state: &Session) -> Result<bool> {
-        Ok(config.validators.rust_cargo_test && should_run_rust_validator(state)?)
+    fn is_relevant(&self, _config: &Config, state: &Session) -> Result<bool> {
+        should_run_rust_validator(state)
+    }
+
+    fn is_configured(&self, config: &Config) -> bool {
+        config.validators.rust_cargo_test
+    }
+
+    fn runnable(&self) -> Result<Runnable> {
+        cargo_runnable()
     }
 }
 
@@ -49,16 +73,20 @@ impl Validator for RustCargoClippy {
         )
     }
 
-    fn is_relevant(&self, config: &Config, state: &Session) -> Result<bool> {
-        Ok(config.validators.rust_cargo_clippy && should_run_rust_validator(state)?)
+    fn is_relevant(&self, _config: &Config, state: &Session) -> Result<bool> {
+        should_run_rust_validator(state)
+    }
+
+    fn is_configured(&self, config: &Config) -> bool {
+        config.validators.rust_cargo_clippy
+    }
+
+    fn runnable(&self) -> Result<Runnable> {
+        cargo_runnable()
     }
 }
 
 fn should_run_rust_validator(state: &Session) -> Result<bool> {
-    if !is_cargo_installed() {
-        return Ok(false);
-    }
-
     Ok(state
         .abs_editables()?
         .iter()
