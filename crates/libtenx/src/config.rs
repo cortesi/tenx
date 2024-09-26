@@ -143,6 +143,19 @@ impl Default for Validators {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Formatters {
+    pub rust_cargo_fmt: bool,
+}
+
+impl Default for Formatters {
+    fn default() -> Self {
+        Self {
+            rust_cargo_fmt: true,
+        }
+    }
+}
+
 // Note that we can't use Optional values in the config. TOML includes no way to render
 // optional values, so our strategy of rendering the full config with a default config for
 // documentation falls by the wayside.
@@ -199,6 +212,10 @@ pub struct Config {
     #[serde(default)]
     pub validators: Validators,
 
+    /// Formatting configuration.
+    #[serde(default)]
+    pub formatters: Formatters,
+
     /// Set a dummy model for end-to-end testing. Over-rides the configured model.
     #[serde(skip)]
     dummy_model: Option<model::DummyModel>,
@@ -229,6 +246,7 @@ impl Serialize for Config {
         serialize_if_different!(state, self, default, tags);
         serialize_if_different!(state, self, default, default_context);
         serialize_if_different!(state, self, default, validators);
+        serialize_if_different!(state, self, default, formatters);
         state.end()
     }
 }
@@ -249,6 +267,7 @@ impl Default for Config {
             default_context: DefaultContext::default(),
             full: false,
             validators: Validators::default(),
+            formatters: Formatters::default(),
         }
     }
 }

@@ -178,6 +178,8 @@ enum Commands {
     LsFiles,
     /// List all validators and their status
     Validators,
+    /// List all formatters and their status
+    Formatters,
     /// Dialect commands (alias: dia)
     #[clap(alias = "dia")]
     Dialect {
@@ -537,6 +539,28 @@ async fn main() -> anyhow::Result<()> {
                     let name = validator.name();
                     let configured = validator.is_configured(&config);
                     let runnable = validator.runnable();
+
+                    let status = if !configured {
+                        format!("{} {}", "✗".yellow(), " (disabled)".yellow())
+                    } else {
+                        match runnable {
+                            Ok(libtenx::Runnable::Ok) => "✓".green().to_string(),
+                            Ok(libtenx::Runnable::Error(msg)) => {
+                                format!("{} ({})", "✗".red(), msg.red())
+                            }
+                            Err(_) => "✗".red().to_string(),
+                        }
+                    };
+
+                    println!("{:<30} {}", name, status);
+                }
+                Ok(())
+            }
+            Commands::Formatters => {
+                for formatter in libtenx::formatters::all_formatters() {
+                    let name = formatter.name();
+                    let configured = formatter.is_configured(&config);
+                    let runnable = formatter.runnable();
 
                     let status = if !configured {
                         format!("{} {}", "✗".yellow(), " (disabled)".yellow())

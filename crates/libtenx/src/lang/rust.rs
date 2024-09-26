@@ -96,6 +96,18 @@ impl Formatter for CargoFormatter {
     fn format(&self, state: &Session) -> Result<()> {
         run_cargo_command(self.name(), state, &["fmt", "--all"])
     }
+
+    fn is_relevant(&self, _config: &Config, state: &Session) -> Result<bool> {
+        should_run_rust_validator(state)
+    }
+
+    fn is_configured(&self, config: &Config) -> bool {
+        config.formatters.rust_cargo_fmt
+    }
+
+    fn runnable(&self) -> Result<Runnable> {
+        cargo_runnable()
+    }
 }
 
 fn should_run_rust_validator(state: &Session) -> Result<bool> {

@@ -173,7 +173,7 @@ impl Tenx {
         sender: &Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
         Self::send_event(sender, Event::FormattingStart)?;
-        let formatters = crate::formatters::formatters(session)?;
+        let formatters = crate::formatters::relevant_formatters(&self.config, session)?;
         for formatter in formatters {
             formatter.format(session)?;
             Self::send_event(sender, Event::FormattingOk(formatter.name().to_string()))?;
