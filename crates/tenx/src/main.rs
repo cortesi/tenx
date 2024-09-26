@@ -162,6 +162,24 @@ enum DialectCommands {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Add context to an existing session
+    AddCtx {
+        /// Specifies files to add as context
+        #[clap(value_parser)]
+        files: Vec<String>,
+
+        /// Add ruskel documentation
+        #[clap(long)]
+        ruskel: Vec<String>,
+    },
+    /// Add editable files to an existing session
+    AddEdit {
+        /// Specifies files to add as editable
+        #[clap(value_parser)]
+        files: Vec<String>,
+    },
+    /// Clear the current session
+    Clear,
     /// Print the current configuration
     Conf {
         /// Output as JSON instead of TOML
@@ -174,12 +192,6 @@ enum Commands {
         #[clap(long)]
         defaults: bool,
     },
-    /// List files included in the project
-    LsFiles,
-    /// List all validators and their status
-    Validators,
-    /// List all formatters and their status
-    Formatters,
     /// Dialect commands (alias: dia)
     #[clap(alias = "dia")]
     Dialect {
@@ -208,20 +220,6 @@ enum Commands {
         #[clap(long)]
         ctx: Vec<String>,
     },
-    /// Start a new session, edit the prompt, and run it
-    Oneshot {
-        /// Specifies files to edit
-        #[clap(value_parser)]
-        files: Vec<String>,
-
-        /// Add ruskel documentation as context
-        #[clap(long)]
-        ruskel: Vec<String>,
-
-        /// Add files as context
-        #[clap(long)]
-        ctx: Vec<String>,
-    },
     /// Start a new session and attempt to fix any preflight failures
     Fix {
         /// Specifies files to edit
@@ -240,23 +238,12 @@ enum Commands {
         #[clap(long)]
         clear: bool,
     },
-    /// Show the current session (alias: sess)
-    #[clap(alias = "sess")]
-    Session {
-        /// Print the entire session object verbosely
-        #[clap(long)]
-        raw: bool,
-
-        /// Output the rendered session
-        #[clap(long)]
-        render: bool,
-
-        /// Show full details
-        #[clap(long)]
-        full: bool,
-    },
-    /// Add context to an existing session
-    AddCtx {
+    /// List all formatters and their status
+    Formatters,
+    /// List files included in the project
+    LsFiles,
+    /// Create a new session
+    New {
         /// Specifies files to add as context
         #[clap(value_parser)]
         files: Vec<String>,
@@ -265,11 +252,19 @@ enum Commands {
         #[clap(long)]
         ruskel: Vec<String>,
     },
-    /// Add editable files to an existing session
-    AddEdit {
-        /// Specifies files to add as editable
+    /// Start a new session, edit the prompt, and run it
+    Oneshot {
+        /// Specifies files to edit
         #[clap(value_parser)]
         files: Vec<String>,
+
+        /// Add ruskel documentation as context
+        #[clap(long)]
+        ruskel: Vec<String>,
+
+        /// Add files as context
+        #[clap(long)]
+        ctx: Vec<String>,
     },
     /// Reset the session to a specific step
     Reset {
@@ -290,18 +285,23 @@ enum Commands {
         #[clap(long)]
         ruskel: Vec<String>,
     },
-    /// Create a new session
-    New {
-        /// Specifies files to add as context
-        #[clap(value_parser)]
-        files: Vec<String>,
-
-        /// Add ruskel documentation
+    /// Show the current session (alias: sess)
+    #[clap(alias = "sess")]
+    Session {
+        /// Print the entire session object verbosely
         #[clap(long)]
-        ruskel: Vec<String>,
+        raw: bool,
+
+        /// Output the rendered session
+        #[clap(long)]
+        render: bool,
+
+        /// Show full details
+        #[clap(long)]
+        full: bool,
     },
-    /// Clear the current session
-    Clear,
+    /// List all validators and their status
+    Validators,
 }
 
 /// Creates a Config from disk and CLI arguments
