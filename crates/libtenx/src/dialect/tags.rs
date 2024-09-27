@@ -59,17 +59,13 @@ impl DialectProvider for Tags {
 
         let mut rendered = String::new();
         rendered.push_str("<context>\n");
-        for ctx in s.context() {
-            rendered.push_str(&format!(
-                "<item name=\"{}\" type=\"{:?}\">\n{}\n</item>\n",
-                ctx.name(),
-                ctx.typ(),
-                ctx.contexts(&crate::config::Config::default(), s)?
-                    .iter()
-                    .map(|c| c.body.as_str())
-                    .collect::<Vec<_>>()
-                    .join("\n\n")
-            ));
+        for cspec in s.context() {
+            for ctx in cspec.contexts(&crate::config::Config::default(), s)? {
+                rendered.push_str(&format!(
+                    "<item name=\"{}\" type=\"{:?}\">\n{}\n</item>\n",
+                    ctx.name, ctx.ty, ctx.body
+                ))
+            }
         }
         rendered.push_str("</context>");
         Ok(rendered)
