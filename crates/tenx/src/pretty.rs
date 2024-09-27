@@ -265,12 +265,7 @@ fn wrapped_block(text: &str, width: usize, indent: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use libtenx::{
-        context::{ContextData, ContextSpec, ContextType},
-        patch::Patch,
-        prompt::Prompt,
-        Step, TenxError,
-    };
+    use libtenx::{context::ContextSpec, patch::Patch, prompt::Prompt, Step, TenxError};
     use tempfile::TempDir;
 
     fn create_test_session() -> (TempDir, Session) {
@@ -280,11 +275,9 @@ mod tests {
         session
             .add_prompt(Prompt::User("Test prompt".to_string()))
             .unwrap();
-        session.add_context(ContextSpec {
-            ty: ContextType::File,
-            name: "test_file.rs".to_string(),
-            data: ContextData::String("Test content".to_string()),
-        });
+        let test_file_path = root_path.join("test_file.rs");
+        std::fs::write(&test_file_path, "Test content").unwrap();
+        session.add_context(ContextSpec::new_path(test_file_path));
         (temp_dir, session)
     }
 

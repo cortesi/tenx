@@ -2,7 +2,8 @@ use fs_err as fs;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
-use crate::{Result, Session};
+use crate::{Result, Session, TenxError};
+use libruskel::Ruskel;
 
 /// A specification for reference material included in the prompt.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
@@ -19,6 +20,7 @@ pub struct Context {
 pub enum ContextType {
     Ruskel,
     File,
+    Glob,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
@@ -33,17 +35,17 @@ pub enum ContextData {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct ContextSpec {
     /// The type of documentation.
-    pub ty: ContextType,
+    ty: ContextType,
     /// The name of the documentation.
-    pub name: String,
+    name: String,
     /// The contents of the help document.
-    pub data: ContextData,
+    data: ContextData,
 }
 
 pub trait ContextProvider {
     fn typ(&self) -> &ContextType;
     fn name(&self) -> &str;
-    fn contexts(&self, session: &Session) -> Result<Vec<Context>>;
+    fn contexts(&self, config: &crate::config::Config, session: &Session) -> Result<Vec<Context>>;
 }
 
 impl ContextSpec {
@@ -58,11 +60,25 @@ impl ContextSpec {
     }
 
     /// Creates a new Context for a Ruskel document.
-    pub fn new_ruskel(name: String, content: String) -> Self {
-        ContextSpec {
+    pub fn new_ruskel(name: String) -> Result<Self> {
+        let ruskel = Ruskel::new(&name);
+        let resolved = ruskel
+            .render(false, false, true)
+            .map_err(|e| TenxError::Resolve(e.to_string()))?;
+
+        Ok(ContextSpec {
             ty: ContextType::Ruskel,
             name,
-            data: ContextData::String(content),
+            data: ContextData::String(resolved),
+        })
+    }
+
+    /// Creates a new Context for a glob pattern.
+    pub fn new_glob(pattern: String) -> Self {
+        ContextSpec {
+            ty: ContextType::Glob,
+            name: pattern.clone(),
+            data: ContextData::String(pattern),
         }
     }
 
@@ -84,12 +100,31 @@ impl ContextProvider for ContextSpec {
         &self.name
     }
 
-    fn contexts(&self, session: &Session) -> Result<Vec<Context>> {
-        let body = self.body(session)?;
-        Ok(vec![Context {
-            ty: self.ty.clone(),
-            name: self.name.clone(),
-            body,
-        }])
+    fn contexts(&self, config: &crate::config::Config, session: &Session) -> Result<Vec<Context>> {
+        match &self.ty {
+            ContextType::Glob => {
+                let pattern = self.body(session)?;
+                let matched_files = session.match_files_with_glob(config, &pattern)?;
+                let mut contexts = Vec::new();
+                for file in matched_files {
+                    let abs_path = session.abspath(&file)?;
+                    let body = fs::read_to_string(&abs_path)?;
+                    contexts.push(Context {
+                        ty: ContextType::File,
+                        name: file.to_string_lossy().into_owned(),
+                        body,
+                    });
+                }
+                Ok(contexts)
+            }
+            _ => {
+                let body = self.body(session)?;
+                Ok(vec![Context {
+                    ty: self.ty.clone(),
+                    name: self.name.clone(),
+                    body,
+                }])
+            }
+        }
     }
 }

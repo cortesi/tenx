@@ -29,7 +29,7 @@ impl Tenx {
     ) -> Result<usize> {
         let mut total_added = 0;
         for file in ctx {
-            total_added += session.add_ctx(&self.config, file)?;
+            total_added += session.add_ctx(file)?;
         }
         for ruskel_doc in ruskel {
             total_added += session.add_ctx_ruskel(ruskel_doc.clone())?;

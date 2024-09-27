@@ -64,7 +64,7 @@ impl DialectProvider for Tags {
                 "<item name=\"{}\" type=\"{:?}\">\n{}\n</item>\n",
                 ctx.name(),
                 ctx.typ(),
-                ctx.contexts(s)?
+                ctx.contexts(&crate::config::Config::default(), s)?
                     .iter()
                     .map(|c| c.body.as_str())
                     .collect::<Vec<_>>()

@@ -5,7 +5,6 @@ use std::{
 
 use fs_err as fs;
 use globset::Glob;
-use libruskel::Ruskel;
 use pathdiff::diff_paths;
 use serde::{Deserialize, Serialize};
 
@@ -83,7 +82,7 @@ impl Session {
             session.add_ctx_ruskel(ruskel.clone())?;
         }
         for path in &config.default_context.path {
-            session.add_ctx(config, path)?;
+            session.add_ctx(path)?;
         }
 
         Ok(session)
@@ -247,7 +246,7 @@ impl Session {
     }
 
     /// Helper function to match files based on a glob pattern
-    fn match_files_with_glob(
+    pub fn match_files_with_glob(
         &self,
         config: &config::Config,
         pattern: &str,
@@ -307,26 +306,17 @@ impl Session {
         Ok(added)
     }
 
-    /// Adds context files to the session based on a glob pattern. The glob match is over the
-    /// total set of included files in the configuration, with paths relative to the root of the
-    /// project.
-    pub fn add_ctx_glob(&mut self, config: &config::Config, pattern: &str) -> Result<usize> {
-        let matched_files = self.match_files_with_glob(config, pattern)?;
-        let mut added = 0;
-        for file in matched_files {
-            added += self.add_context(context::ContextSpec {
-                ty: context::ContextType::File,
-                name: file.to_string_lossy().into_owned(),
-                data: context::ContextData::Path(file),
-            });
-        }
-        Ok(added)
+    /// Adds a glob context to the session. The glob pattern is stored and will be resolved
+    /// when the context is used.
+    pub fn add_ctx_glob(&mut self, pattern: &str) -> Result<usize> {
+        let glob_context = context::ContextSpec::new_glob(pattern.to_string());
+        Ok(self.add_context(glob_context))
     }
 
     /// Adds context to the session, either as a single file or as a glob pattern.
-    pub fn add_ctx(&mut self, config: &config::Config, path: &str) -> Result<usize> {
+    pub fn add_ctx(&mut self, path: &str) -> Result<usize> {
         if is_glob(path) {
-            self.add_ctx_glob(config, path)
+            self.add_ctx_glob(path)
         } else {
             self.add_ctx_path(path)
         }
@@ -341,14 +331,10 @@ impl Session {
         }
     }
 
-    /// Adds a Ruskel context to the session and resolves it.
+    /// Adds a Ruskel context to the session.
     pub fn add_ctx_ruskel(&mut self, name: String) -> Result<usize> {
-        let ruskel = Ruskel::new(&name);
-        let resolved = ruskel
-            .render(false, false, true)
-            .map_err(|e| TenxError::Resolve(e.to_string()))?;
-
-        Ok(self.add_context(context::ContextSpec::new_ruskel(name, resolved)))
+        let context_spec = context::ContextSpec::new_ruskel(name)?;
+        Ok(self.add_context(context_spec))
     }
 
     /// Apply a patch, entering the modified files into the patch cache. It is the caller's
