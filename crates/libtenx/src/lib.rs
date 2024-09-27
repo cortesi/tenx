@@ -8,6 +8,7 @@ mod testutils;
 mod validators;
 
 pub mod config;
+pub mod context;
 pub mod dialect;
 pub mod model;
 pub mod patch;

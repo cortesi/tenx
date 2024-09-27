@@ -10,46 +10,10 @@ use pathdiff::diff_paths;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    config, events::Event, model::ModelProvider, patch::Patch, prompt::Prompt, Result, TenxError,
+    config, context, context::ContextProvider, events::Event, model::ModelProvider, model::Usage,
+    patch::Patch, prompt::Prompt, Result, TenxError,
 };
 use tokio::sync::mpsc;
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub enum ContextType {
-    Ruskel,
-    File,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
-pub enum ContextData {
-    /// Unresolved content that should be read from a file each time the session is rendered.
-    Path(PathBuf),
-    /// Resolved content that can be passed to the model.
-    String(String),
-}
-
-/// Reference material included in the prompt.
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
-pub struct Context {
-    /// The type of documentation.
-    pub ty: ContextType,
-    /// The name of the documentation.
-    pub name: String,
-    /// The contents of the help document.
-    pub data: ContextData,
-}
-
-impl Context {
-    /// Converts a Docs to a string representation.
-    pub fn body(&self, session: &Session) -> Result<String> {
-        match &self.data {
-            ContextData::String(content) => Ok(content.clone()),
-            ContextData::Path(path) => Ok(fs::read_to_string(session.abspath(path)?)?),
-        }
-    }
-}
-
-use crate::model::Usage;
 
 /// A single step in the session - basically a prompt and a patch.
 #[derive(Debug, Deserialize, Serialize)]
@@ -75,7 +39,7 @@ pub struct Session {
     /// always relative to the root.
     pub root: PathBuf,
     steps: Vec<Step>,
-    context: Vec<Context>,
+    context: Vec<context::ContextSpec>,
     editable: Vec<PathBuf>,
 }
 
@@ -129,7 +93,7 @@ impl Session {
         &self.steps
     }
 
-    pub fn context(&self) -> &Vec<Context> {
+    pub fn context(&self) -> &Vec<context::ContextSpec> {
         &self.context
     }
 
@@ -221,13 +185,13 @@ impl Session {
     /// Adds a new context to the session, ignoring duplicates.
     ///
     /// If a context with the same name and type already exists, it will not be added again.
-    pub fn add_context(&mut self, context: Context) -> usize {
+    pub fn add_context(&mut self, new_context: context::ContextSpec) -> usize {
         if !self
             .context
             .iter()
-            .any(|c| c.name == context.name && c.ty == context.ty)
+            .any(|c| c.name() == new_context.name() && c.typ() == new_context.typ())
         {
-            self.context.push(context);
+            self.context.push(new_context);
             1
         } else {
             0
@@ -268,11 +232,7 @@ impl Session {
     /// Adds a file path context to the session, normalizing relative paths.
     pub fn add_ctx_path<P: AsRef<Path>>(&mut self, path: P) -> Result<usize> {
         let normalized_path = self.normalize_path(path)?;
-        Ok(self.add_context(Context {
-            ty: ContextType::File,
-            name: normalized_path.to_string_lossy().into_owned(),
-            data: ContextData::Path(normalized_path),
-        }))
+        Ok(self.add_context(context::ContextSpec::new_path(normalized_path)))
     }
 
     /// Adds an editable file path to the session, normalizing relative paths.
@@ -354,10 +314,10 @@ impl Session {
         let matched_files = self.match_files_with_glob(config, pattern)?;
         let mut added = 0;
         for file in matched_files {
-            added += self.add_context(Context {
-                ty: ContextType::File,
+            added += self.add_context(context::ContextSpec {
+                ty: context::ContextType::File,
                 name: file.to_string_lossy().into_owned(),
-                data: ContextData::Path(file),
+                data: context::ContextData::Path(file),
             });
         }
         Ok(added)
@@ -388,11 +348,7 @@ impl Session {
             .render(false, false, true)
             .map_err(|e| TenxError::Resolve(e.to_string()))?;
 
-        Ok(self.add_context(Context {
-            ty: ContextType::Ruskel,
-            name,
-            data: ContextData::String(resolved),
-        }))
+        Ok(self.add_context(context::ContextSpec::new_ruskel(name, resolved)))
     }
 
     /// Apply a patch, entering the modified files into the patch cache. It is the caller's
@@ -500,22 +456,17 @@ mod tests {
         let temp_dir = tempdir().unwrap();
         let mut session = Session::new(temp_dir.path().to_path_buf());
 
-        let context1 = Context {
-            ty: ContextType::File,
-            name: "test.txt".to_string(),
-            data: ContextData::String("content".to_string()),
-        };
-        let context2 = Context {
-            ty: ContextType::File,
-            name: "test.txt".to_string(),
-            data: ContextData::String("different content".to_string()),
-        };
+        let test_file = temp_dir.path().join("test.txt");
+        fs::write(&test_file, "content").unwrap();
+
+        let context1 = context::ContextSpec::new_path(&test_file);
+        let context2 = context::ContextSpec::new_path(&test_file);
 
         session.add_context(context1.clone());
         session.add_context(context2);
 
         assert_eq!(session.context.len(), 1);
-        assert_eq!(session.context[0].name, "test.txt");
+        assert!(session.context[0].name().ends_with("test.txt"));
         assert_eq!(session.context[0].body(&session).unwrap(), "content");
     }
 

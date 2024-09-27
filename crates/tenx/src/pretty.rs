@@ -1,5 +1,5 @@
 use colored::*;
-use libtenx::{prompt::Prompt, Result, Session, TenxError};
+use libtenx::{context::ContextProvider, prompt::Prompt, Result, Session, TenxError};
 use terminal_size::{terminal_size, Width};
 use textwrap::{wrap, Options};
 
@@ -44,7 +44,12 @@ fn print_context(session: &Session) -> String {
     if !session.context().is_empty() {
         output.push_str(&format!("{}\n", "context:".blue().bold()));
         for context in session.context() {
-            output.push_str(&format!("{}- {:?}: {}\n", INDENT, context.ty, context.name));
+            output.push_str(&format!(
+                "{}- {:?}: {}\n",
+                INDENT,
+                context.typ(),
+                context.name()
+            ));
         }
     }
     output
@@ -261,7 +266,10 @@ fn wrapped_block(text: &str, width: usize, indent: usize) -> String {
 mod tests {
     use super::*;
     use libtenx::{
-        patch::Patch, prompt::Prompt, Context, ContextData, ContextType, Step, TenxError,
+        context::{ContextData, ContextSpec, ContextType},
+        patch::Patch,
+        prompt::Prompt,
+        Step, TenxError,
     };
     use tempfile::TempDir;
 
@@ -272,7 +280,7 @@ mod tests {
         session
             .add_prompt(Prompt::User("Test prompt".to_string()))
             .unwrap();
-        session.add_context(Context {
+        session.add_context(ContextSpec {
             ty: ContextType::File,
             name: "test_file.rs".to_string(),
             data: ContextData::String("Test content".to_string()),

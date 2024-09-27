@@ -5,6 +5,7 @@ use std::path::PathBuf;
 
 use super::{xmlish, DialectProvider};
 use crate::{
+    context::ContextProvider,
     patch::{Change, Patch, Replace, Smart, UDiff, WriteFile},
     Result, Session, TenxError,
 };
@@ -61,9 +62,13 @@ impl DialectProvider for Tags {
         for ctx in s.context() {
             rendered.push_str(&format!(
                 "<item name=\"{}\" type=\"{:?}\">\n{}\n</item>\n",
-                ctx.name,
-                ctx.ty,
-                ctx.body(s)?
+                ctx.name(),
+                ctx.typ(),
+                ctx.contexts(s)?
+                    .iter()
+                    .map(|c| c.body.as_str())
+                    .collect::<Vec<_>>()
+                    .join("\n\n")
             ));
         }
         rendered.push_str("</context>");
