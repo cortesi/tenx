@@ -82,7 +82,7 @@ impl Session {
             session.add_ctx_ruskel(ruskel.clone())?;
         }
         for path in &config.default_context.path {
-            session.add_ctx(path)?;
+            session.add_ctx_glob(path)?;
         }
 
         Ok(session)
@@ -184,12 +184,9 @@ impl Session {
     /// Adds a new context to the session, ignoring duplicates.
     ///
     /// If a context with the same name and type already exists, it will not be added again.
-    pub fn add_context(&mut self, new_context: context::ContextSpec) -> usize {
+    pub fn add_context(&mut self, new_context: context::ContextSpec) {
         if !self.context.contains(&new_context) {
             self.context.push(new_context);
-            1
-        } else {
-            0
         }
     }
 
@@ -298,16 +295,20 @@ impl Session {
 
     /// Adds a glob context to the session. The glob pattern is stored and will be resolved
     /// when the context is used.
-    fn add_ctx_glob(&mut self, pattern: &str) -> Result<usize> {
+    pub fn add_ctx_glob(&mut self, pattern: &str) -> Result<()> {
         let glob_context = context::ContextSpec::new_glob(pattern.to_string());
-        Ok(self.add_context(glob_context))
+        self.add_context(glob_context);
+        Ok(())
+    }
+
+    /// Adds a Ruskel context to the session.
+    pub fn add_ctx_ruskel(&mut self, name: String) -> Result<()> {
+        let context_spec = context::ContextSpec::new_ruskel(name)?;
+        self.add_context(context_spec);
+        Ok(())
     }
 
     /// Adds context to the session, either as a single file or as a glob pattern.
-    pub fn add_ctx(&mut self, path: &str) -> Result<usize> {
-        self.add_ctx_glob(path)
-    }
-
     /// Adds an editable file or glob pattern to the session.
     pub fn add_editable(&mut self, config: &config::Config, path: &str) -> Result<usize> {
         if is_glob(path) {
@@ -315,12 +316,6 @@ impl Session {
         } else {
             self.add_editable_path(path)
         }
-    }
-
-    /// Adds a Ruskel context to the session.
-    pub fn add_ctx_ruskel(&mut self, name: String) -> Result<usize> {
-        let context_spec = context::ContextSpec::new_ruskel(name)?;
-        Ok(self.add_context(context_spec))
     }
 
     /// Apply a patch, entering the modified files into the patch cache. It is the caller's

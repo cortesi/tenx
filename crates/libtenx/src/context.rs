@@ -30,6 +30,7 @@ pub trait ContextProvider {
         session: &Session,
     ) -> Result<Vec<ContextItem>>;
     fn human(&self) -> String;
+    fn count(&self, config: &crate::config::Config, session: &Session) -> Result<usize>;
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
@@ -71,6 +72,10 @@ impl ContextProvider for Ruskel {
 
     fn human(&self) -> String {
         format!("ruskel: {}", self.name)
+    }
+
+    fn count(&self, _config: &crate::config::Config, _session: &Session) -> Result<usize> {
+        Ok(1)
     }
 }
 
@@ -115,6 +120,11 @@ impl ContextProvider for Glob {
 
     fn human(&self) -> String {
         self.pattern.to_string()
+    }
+
+    fn count(&self, config: &crate::config::Config, session: &Session) -> Result<usize> {
+        let matched_files = session.match_files_with_glob(config, &self.pattern)?;
+        Ok(matched_files.len())
     }
 }
 
@@ -167,6 +177,13 @@ impl ContextProvider for ContextSpec {
         match self {
             ContextSpec::Ruskel(r) => r.human(),
             ContextSpec::Glob(g) => g.human(),
+        }
+    }
+
+    fn count(&self, config: &crate::config::Config, session: &Session) -> Result<usize> {
+        match self {
+            ContextSpec::Ruskel(r) => r.count(config, session),
+            ContextSpec::Glob(g) => g.count(config, session),
         }
     }
 }

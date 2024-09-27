@@ -4,8 +4,8 @@ use tokio::sync::mpsc;
 use tracing::{debug, warn};
 
 use crate::{
-    config::Config, events::Event, prompt::Prompt, session_store::normalize_path, Result, Session,
-    SessionStore, TenxError,
+    config::Config, context::ContextProvider, events::Event, prompt::Prompt,
+    session_store::normalize_path, Result, Session, SessionStore, TenxError,
 };
 
 /// Tenx is an AI-driven coding assistant.
@@ -19,22 +19,36 @@ impl Tenx {
         Self { config }
     }
 
-    /// Adds context to a session
-    /// Returns the total number of new context items added
-    pub fn add_context(
+    /// Helper function to add multiple contexts and count items
+    fn add_contexts_and_count(
         &self,
         session: &mut Session,
-        ctx: &[String],
-        ruskel: &[String],
+        contexts: Vec<crate::context::ContextSpec>,
     ) -> Result<usize> {
-        let mut total_added = 0;
-        for file in ctx {
-            total_added += session.add_ctx(file)?;
+        let mut total_count = 0;
+        for context in contexts {
+            total_count += context.count(&self.config, session)?;
+            session.add_context(context);
         }
-        for ruskel_doc in ruskel {
-            total_added += session.add_ctx_ruskel(ruskel_doc.clone())?;
-        }
-        Ok(total_added)
+        Ok(total_count)
+    }
+
+    /// Adds glob context to a session. Returns the total count of items added across all globs.
+    pub fn add_ctx_globs(&self, session: &mut Session, ctx: &[String]) -> Result<usize> {
+        let contexts = ctx
+            .iter()
+            .map(|file| crate::context::ContextSpec::new_glob(file.to_string()))
+            .collect();
+        self.add_contexts_and_count(session, contexts)
+    }
+
+    /// Adds ruskel context to a session. Returns the total count of items added.
+    pub fn add_ctx_ruskels(&self, session: &mut Session, ruskel: &[String]) -> Result<usize> {
+        let contexts = ruskel
+            .iter()
+            .map(|ruskel_doc| crate::context::ContextSpec::new_ruskel(ruskel_doc.clone()))
+            .collect::<Result<Vec<_>>>()?;
+        self.add_contexts_and_count(session, contexts)
     }
 
     /// Attempts to fix issues in the session by running preflight checks and adding a new prompt if there's an error.
