@@ -9,8 +9,8 @@ use pathdiff::diff_paths;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    config, context, context::ContextProvider, events::Event, model::ModelProvider, model::Usage,
-    patch::Patch, prompt::Prompt, Result, TenxError,
+    config, context, events::Event, model::ModelProvider, model::Usage, patch::Patch,
+    prompt::Prompt, Result, TenxError,
 };
 use tokio::sync::mpsc;
 
@@ -185,11 +185,7 @@ impl Session {
     ///
     /// If a context with the same name and type already exists, it will not be added again.
     pub fn add_context(&mut self, new_context: context::ContextSpec) -> usize {
-        if !self
-            .context
-            .iter()
-            .any(|c| c.name() == new_context.name() && c.typ() == new_context.typ())
-        {
+        if !self.context.contains(&new_context) {
             self.context.push(new_context);
             1
         } else {
@@ -423,6 +419,7 @@ impl Session {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::context::ContextProvider;
     use crate::patch::{Change, Patch, WriteFile};
     use std::fs;
     use tempfile::tempdir;

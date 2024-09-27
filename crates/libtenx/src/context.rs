@@ -29,6 +29,7 @@ pub trait ContextProvider {
         config: &crate::config::Config,
         session: &Session,
     ) -> Result<Vec<ContextItem>>;
+    fn human(&self) -> String;
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
@@ -66,6 +67,10 @@ impl ContextProvider for Ruskel {
             name: self.name.clone(),
             body: self.content.clone(),
         }])
+    }
+
+    fn human(&self) -> String {
+        format!("ruskel: {}", self.name)
     }
 }
 
@@ -106,6 +111,10 @@ impl ContextProvider for Glob {
             });
         }
         Ok(contexts)
+    }
+
+    fn human(&self) -> String {
+        self.pattern.to_string()
     }
 }
 
@@ -151,6 +160,13 @@ impl ContextProvider for ContextSpec {
         match self {
             ContextSpec::Ruskel(r) => r.contexts(config, session),
             ContextSpec::Glob(g) => g.contexts(config, session),
+        }
+    }
+
+    fn human(&self) -> String {
+        match self {
+            ContextSpec::Ruskel(r) => r.human(),
+            ContextSpec::Glob(g) => g.human(),
         }
     }
 }

@@ -23,7 +23,7 @@ pub fn session(session: &Session, full: bool) -> Result<String> {
         .unwrap_or(DEFAULT_WIDTH);
     let mut output = String::new();
     output.push_str(&print_session_info(session));
-    output.push_str(&print_context(session));
+    output.push_str(&print_context_specs(session));
     output.push_str(&print_editables(session)?);
     output.push_str(&print_steps(session, full, width)?);
     Ok(output)
@@ -39,17 +39,12 @@ fn print_session_info(session: &Session) -> String {
     output
 }
 
-fn print_context(session: &Session) -> String {
+fn print_context_specs(session: &Session) -> String {
     let mut output = String::new();
     if !session.context().is_empty() {
         output.push_str(&format!("{}\n", "context:".blue().bold()));
         for context in session.context() {
-            output.push_str(&format!(
-                "{}- {:?}: {}\n",
-                INDENT,
-                context.typ(),
-                context.name()
-            ));
+            output.push_str(&format!("{}- {}\n", INDENT, context.human()));
         }
     }
     output
