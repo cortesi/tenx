@@ -69,24 +69,7 @@ impl Session {
         }
     }
 
-    /// Creates a new Session, discovering the root from the current working directory and
-    /// adding the default context from the config.
-    pub fn from_cwd(config: &config::Config) -> Result<Self> {
-        let cwd = env::current_dir()
-            .map_err(|e| TenxError::Internal(format!("Could not access cwd: {}", e)))?;
-        let root = config::find_project_root(&cwd);
-        let mut session = Self::new(root);
-
-        // Add default context
-        for ruskel in &config.default_context.ruskel {
-            session.add_ctx_ruskel(ruskel.clone())?;
-        }
-        for path in &config.default_context.path {
-            session.add_ctx_glob(path)?;
-        }
-
-        Ok(session)
-    }
+    // Removed from_cwd method
 
     pub fn steps(&self) -> &Vec<Step> {
         &self.steps
@@ -291,21 +274,6 @@ impl Session {
             added += self.add_editable_path(file)?;
         }
         Ok(added)
-    }
-
-    /// Adds a glob context to the session. The glob pattern is stored and will be resolved
-    /// when the context is used.
-    pub fn add_ctx_glob(&mut self, pattern: &str) -> Result<()> {
-        let glob_context = context::ContextSpec::new_glob(pattern.to_string());
-        self.add_context(glob_context);
-        Ok(())
-    }
-
-    /// Adds a Ruskel context to the session.
-    pub fn add_ctx_ruskel(&mut self, name: String) -> Result<()> {
-        let context_spec = context::ContextSpec::new_ruskel(name)?;
-        self.add_context(context_spec);
-        Ok(())
     }
 
     /// Adds context to the session, either as a single file or as a glob pattern.

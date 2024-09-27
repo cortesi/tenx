@@ -536,7 +536,7 @@ async fn main() -> anyhow::Result<()> {
                 Ok(()) as anyhow::Result<()>
             }
             Commands::LsFiles => {
-                let session = Session::from_cwd(&config)?;
+                let session = tx.session_from_cwd()?;
                 let files = config.included_files(&session.root)?;
                 for file in files {
                     println!("{}", file.display());
@@ -602,7 +602,7 @@ async fn main() -> anyhow::Result<()> {
                 Ok(())
             }
             Commands::Oneshot { files, ruskel, ctx } => {
-                let mut session = Session::from_cwd(&config)?;
+                let mut session = tx.session_from_cwd()?;
 
                 add_context(&tx, &mut session, ctx, ruskel)?;
 
@@ -722,7 +722,7 @@ async fn main() -> anyhow::Result<()> {
                 Ok(())
             }
             Commands::New { files, ruskel } => {
-                let mut session = Session::from_cwd(&config)?;
+                let mut session = tx.session_from_cwd()?;
 
                 add_context(&tx, &mut session, files, ruskel)?;
 
@@ -741,7 +741,7 @@ async fn main() -> anyhow::Result<()> {
                     current_session.clear();
                     current_session
                 } else {
-                    Session::from_cwd(&config)?
+                    tx.session_from_cwd()?
                 };
 
                 for file in files {

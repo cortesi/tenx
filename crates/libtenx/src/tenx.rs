@@ -19,6 +19,21 @@ impl Tenx {
         Self { config }
     }
 
+    /// Creates a new Session, discovering the root from the current working directory and
+    /// adding the default context from the config.
+    pub fn session_from_cwd(&self) -> Result<Session> {
+        let cwd = env::current_dir()
+            .map_err(|e| TenxError::Internal(format!("Could not access cwd: {}", e)))?;
+        let root = crate::config::find_project_root(&cwd);
+        let mut session = Session::new(root);
+
+        // Add default context
+        self.add_ctx_ruskels(&mut session, &self.config.default_context.ruskel)?;
+        self.add_ctx_globs(&mut session, &self.config.default_context.path)?;
+
+        Ok(session)
+    }
+
     /// Helper function to add multiple contexts and count items
     fn add_contexts_and_count(
         &self,
