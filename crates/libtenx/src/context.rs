@@ -1,6 +1,5 @@
 use fs_err as fs;
 use serde::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
 
 use crate::{Result, Session, TenxError};
 use libruskel::Ruskel as LibRuskel;
@@ -19,18 +18,7 @@ pub struct ContextItem {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ContextType {
     Ruskel,
-    File,
     Glob,
-}
-
-impl ToString for ContextType {
-    fn to_string(&self) -> String {
-        match self {
-            ContextType::Ruskel => "Ruskel".to_string(),
-            ContextType::File => "File".to_string(),
-            ContextType::Glob => "Glob".to_string(),
-        }
-    }
 }
 
 pub trait ContextProvider {
@@ -74,46 +62,9 @@ impl ContextProvider for Ruskel {
         _session: &Session,
     ) -> Result<Vec<ContextItem>> {
         Ok(vec![ContextItem {
-            ty: self.typ().to_string(),
+            ty: "ruskel".to_string(),
             name: self.name.clone(),
             body: self.content.clone(),
-        }])
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
-pub struct File {
-    path: PathBuf,
-}
-
-impl File {
-    pub fn new(path: impl AsRef<Path>) -> Self {
-        Self {
-            path: path.as_ref().to_path_buf(),
-        }
-    }
-}
-
-impl ContextProvider for File {
-    fn typ(&self) -> &ContextType {
-        &ContextType::File
-    }
-
-    fn name(&self) -> &str {
-        self.path.to_str().unwrap_or("")
-    }
-
-    fn contexts(
-        &self,
-        _config: &crate::config::Config,
-        session: &Session,
-    ) -> Result<Vec<ContextItem>> {
-        let abs_path = session.abspath(&self.path)?;
-        let body = fs::read_to_string(&abs_path)?;
-        Ok(vec![ContextItem {
-            ty: self.typ().to_string(),
-            name: self.name().to_string(),
-            body,
         }])
     }
 }
@@ -149,7 +100,7 @@ impl ContextProvider for Glob {
             let abs_path = session.abspath(&file)?;
             let body = fs::read_to_string(&abs_path)?;
             contexts.push(ContextItem {
-                ty: ContextType::File.to_string(),
+                ty: "file".to_string(),
                 name: file.to_string_lossy().into_owned(),
                 body,
             });
@@ -162,16 +113,10 @@ impl ContextProvider for Glob {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub enum ContextSpec {
     Ruskel(Ruskel),
-    File(File),
     Glob(Glob),
 }
 
 impl ContextSpec {
-    /// Creates a new Context for a file path.
-    pub fn new_path(path: impl AsRef<Path>) -> Self {
-        ContextSpec::File(File::new(path))
-    }
-
     /// Creates a new Context for a Ruskel document.
     pub fn new_ruskel(name: String) -> Result<Self> {
         Ok(ContextSpec::Ruskel(Ruskel::new(name)?))
@@ -187,7 +132,6 @@ impl ContextProvider for ContextSpec {
     fn typ(&self) -> &ContextType {
         match self {
             ContextSpec::Ruskel(r) => r.typ(),
-            ContextSpec::File(f) => f.typ(),
             ContextSpec::Glob(g) => g.typ(),
         }
     }
@@ -195,7 +139,6 @@ impl ContextProvider for ContextSpec {
     fn name(&self) -> &str {
         match self {
             ContextSpec::Ruskel(r) => r.name(),
-            ContextSpec::File(f) => f.name(),
             ContextSpec::Glob(g) => g.name(),
         }
     }
@@ -207,7 +150,6 @@ impl ContextProvider for ContextSpec {
     ) -> Result<Vec<ContextItem>> {
         match self {
             ContextSpec::Ruskel(r) => r.contexts(config, session),
-            ContextSpec::File(f) => f.contexts(config, session),
             ContextSpec::Glob(g) => g.contexts(config, session),
         }
     }

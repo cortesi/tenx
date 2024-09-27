@@ -277,7 +277,7 @@ mod tests {
             .unwrap();
         let test_file_path = root_path.join("test_file.rs");
         std::fs::write(&test_file_path, "Test content").unwrap();
-        session.add_context(ContextSpec::new_path(test_file_path));
+        session.add_context(ContextSpec::new_glob("test_file.rs".to_string()));
         (temp_dir, session)
     }
 

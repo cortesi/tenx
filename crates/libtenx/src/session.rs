@@ -228,12 +228,6 @@ impl Session {
         }
     }
 
-    /// Adds a file path context to the session, normalizing relative paths.
-    pub fn add_ctx_path<P: AsRef<Path>>(&mut self, path: P) -> Result<usize> {
-        let normalized_path = self.normalize_path(path)?;
-        Ok(self.add_context(context::ContextSpec::new_path(normalized_path)))
-    }
-
     /// Adds an editable file path to the session, normalizing relative paths.
     pub fn add_editable_path<P: AsRef<Path>>(&mut self, path: P) -> Result<usize> {
         let normalized_path = self.normalize_path(path)?;
@@ -308,18 +302,14 @@ impl Session {
 
     /// Adds a glob context to the session. The glob pattern is stored and will be resolved
     /// when the context is used.
-    pub fn add_ctx_glob(&mut self, pattern: &str) -> Result<usize> {
+    fn add_ctx_glob(&mut self, pattern: &str) -> Result<usize> {
         let glob_context = context::ContextSpec::new_glob(pattern.to_string());
         Ok(self.add_context(glob_context))
     }
 
     /// Adds context to the session, either as a single file or as a glob pattern.
     pub fn add_ctx(&mut self, path: &str) -> Result<usize> {
-        if is_glob(path) {
-            self.add_ctx_glob(path)
-        } else {
-            self.add_ctx_path(path)
-        }
+        self.add_ctx_glob(path)
     }
 
     /// Adds an editable file or glob pattern to the session.
@@ -445,17 +435,20 @@ mod tests {
         let test_file = temp_dir.path().join("test.txt");
         fs::write(&test_file, "content").unwrap();
 
-        let context1 = context::ContextSpec::new_path(&test_file);
-        let context2 = context::ContextSpec::new_path(&test_file);
+        let context1 = context::ContextSpec::new_glob("test.txt".to_string());
+        let context2 = context::ContextSpec::new_glob("test.txt".to_string());
 
         session.add_context(context1.clone());
         session.add_context(context2);
 
         assert_eq!(session.context.len(), 1);
-        assert!(session.context[0].name().ends_with("test.txt"));
-        let context_items = session.context[0]
-            .contexts(&Default::default(), &session)
-            .unwrap();
+        assert_eq!(session.context[0].name(), "test.txt");
+
+        // Create a mock config that doesn't rely on git
+        let mut config = crate::config::Config::default();
+        config.include = crate::config::Include::Glob(vec!["**/*".to_string()]);
+
+        let context_items = session.context[0].contexts(&config, &session).unwrap();
         assert_eq!(context_items[0].body, "content");
     }
 
