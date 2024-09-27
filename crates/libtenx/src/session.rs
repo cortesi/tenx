@@ -453,7 +453,10 @@ mod tests {
 
         assert_eq!(session.context.len(), 1);
         assert!(session.context[0].name().ends_with("test.txt"));
-        assert_eq!(session.context[0].body(&session).unwrap(), "content");
+        let context_items = session.context[0]
+            .contexts(&Default::default(), &session)
+            .unwrap();
+        assert_eq!(context_items[0].body, "content");
     }
 
     #[test]
