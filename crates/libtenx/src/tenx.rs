@@ -41,7 +41,8 @@ impl Tenx {
         contexts: Vec<crate::context::ContextSpec>,
     ) -> Result<usize> {
         let mut total_count = 0;
-        for context in contexts {
+        for mut context in contexts {
+            context.refresh()?;
             total_count += context.count(&self.config, session)?;
             session.add_context(context);
         }
@@ -62,7 +63,7 @@ impl Tenx {
         let contexts = ruskel
             .iter()
             .map(|ruskel_doc| crate::context::ContextSpec::new_ruskel(ruskel_doc.clone()))
-            .collect::<Result<Vec<_>>>()?;
+            .collect::<Vec<_>>();
         self.add_contexts_and_count(session, contexts)
     }
 

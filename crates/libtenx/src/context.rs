@@ -22,15 +22,27 @@ pub enum ContextType {
 }
 
 pub trait ContextProvider {
+    /// Returns the type of the context provider.
     fn typ(&self) -> &ContextType;
+
+    /// Returns the name of the context provider.
     fn name(&self) -> &str;
+
+    /// Retrieves the context items for this provider.
     fn contexts(
         &self,
         config: &crate::config::Config,
         session: &Session,
     ) -> Result<Vec<ContextItem>>;
+
+    /// Returns a human-readable representation of the context provider.
     fn human(&self) -> String;
+
+    /// Counts the number of context items for this provider.
     fn count(&self, config: &crate::config::Config, session: &Session) -> Result<usize>;
+
+    /// Refreshes the content of the context provider.
+    fn refresh(&mut self) -> Result<()>;
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
@@ -40,12 +52,11 @@ pub struct Ruskel {
 }
 
 impl Ruskel {
-    pub fn new(name: String) -> Result<Self> {
-        let ruskel = LibRuskel::new(&name);
-        let content = ruskel
-            .render(false, false, true)
-            .map_err(|e| TenxError::Resolve(e.to_string()))?;
-        Ok(Self { name, content })
+    pub(crate) fn new(name: String) -> Self {
+        Self {
+            name,
+            content: String::new(),
+        }
     }
 }
 
@@ -77,6 +88,14 @@ impl ContextProvider for Ruskel {
     fn count(&self, _config: &crate::config::Config, _session: &Session) -> Result<usize> {
         Ok(1)
     }
+
+    fn refresh(&mut self) -> Result<()> {
+        let ruskel = LibRuskel::new(&self.name);
+        self.content = ruskel
+            .render(false, false, true)
+            .map_err(|e| TenxError::Resolve(e.to_string()))?;
+        Ok(())
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
@@ -85,7 +104,7 @@ pub struct Glob {
 }
 
 impl Glob {
-    pub fn new(pattern: String) -> Self {
+    pub(crate) fn new(pattern: String) -> Self {
         Self { pattern }
     }
 }
@@ -126,9 +145,15 @@ impl ContextProvider for Glob {
         let matched_files = session.match_files_with_glob(config, &self.pattern)?;
         Ok(matched_files.len())
     }
+
+    fn refresh(&mut self) -> Result<()> {
+        // Glob context doesn't need refreshing
+        Ok(())
+    }
 }
 
-/// A specification for reference material included in the prompt.
+/// A specification for reference material included in the prompt. This may be turned into actual
+/// Context objects with the ContextProvider::contexts() method.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub enum ContextSpec {
     Ruskel(Ruskel),
@@ -137,8 +162,8 @@ pub enum ContextSpec {
 
 impl ContextSpec {
     /// Creates a new Context for a Ruskel document.
-    pub fn new_ruskel(name: String) -> Result<Self> {
-        Ok(ContextSpec::Ruskel(Ruskel::new(name)?))
+    pub fn new_ruskel(name: String) -> Self {
+        ContextSpec::Ruskel(Ruskel::new(name))
     }
 
     /// Creates a new Context for a glob pattern.
@@ -184,6 +209,13 @@ impl ContextProvider for ContextSpec {
         match self {
             ContextSpec::Ruskel(r) => r.count(config, session),
             ContextSpec::Glob(g) => g.count(config, session),
+        }
+    }
+
+    fn refresh(&mut self) -> Result<()> {
+        match self {
+            ContextSpec::Ruskel(r) => r.refresh(),
+            ContextSpec::Glob(g) => g.refresh(),
         }
     }
 }
