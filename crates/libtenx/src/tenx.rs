@@ -38,43 +38,40 @@ impl Tenx {
         let mut session = Session::new(root);
 
         // Add default context
-        self.add_ctx_ruskels(&mut session, &self.config.default_context.ruskel)?;
-        self.add_ctx_globs(&mut session, &self.config.default_context.path)?;
+        self.add_contexts(
+            &mut session,
+            &self.config.default_context.path,
+            &self.config.default_context.ruskel,
+        )?;
 
         Ok(session)
     }
 
-    /// Helper function to add multiple contexts and count items
-    fn add_contexts_and_count(
+    /// Adds contexts to a session in a batch. Returns the total count of items added.
+    pub fn add_contexts(
         &self,
         session: &mut Session,
-        contexts: Vec<crate::context::ContextSpec>,
+        glob: &[String],
+        ruskel: &[String],
     ) -> Result<usize> {
-        let mut total_count = 0;
+        let mut contexts = Vec::new();
+
+        for file in glob {
+            contexts.push(crate::context::ContextSpec::new_glob(file.to_string()));
+        }
+
+        for ruskel_doc in ruskel {
+            contexts.push(crate::context::ContextSpec::new_ruskel(ruskel_doc.clone()));
+        }
+
+        let mut total_added = 0;
         for mut context in contexts {
             context.refresh()?;
-            total_count += context.count(&self.config, session)?;
+            total_added += context.count(&self.config, session)?;
             session.add_context(context);
         }
-        Ok(total_count)
-    }
 
-    /// Adds glob context to a session. Returns the total count of items added across all globs.
-    pub fn add_ctx_globs(&self, session: &mut Session, ctx: &[String]) -> Result<usize> {
-        let contexts = ctx
-            .iter()
-            .map(|file| crate::context::ContextSpec::new_glob(file.to_string()))
-            .collect();
-        self.add_contexts_and_count(session, contexts)
-    }
-
-    /// Adds ruskel context to a session. Returns the total count of items added.
-    pub fn add_ctx_ruskels(&self, session: &mut Session, ruskel: &[String]) -> Result<usize> {
-        let contexts = ruskel
-            .iter()
-            .map(|ruskel_doc| crate::context::ContextSpec::new_ruskel(ruskel_doc.clone()))
-            .collect::<Vec<_>>();
-        self.add_contexts_and_count(session, contexts)
+        Ok(total_added)
     }
 
     /// Attempts to fix issues in the session by running preflight checks and adding a new prompt if there's an error.

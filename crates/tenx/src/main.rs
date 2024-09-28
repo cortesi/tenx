@@ -13,7 +13,7 @@ use tracing_subscriber::{fmt, EnvFilter};
 
 use libtenx::{
     self, config, dialect::DialectProvider, model::ModelProvider, prompt::Prompt, Event, LogLevel,
-    Result as TenxResult, Session, Tenx,
+    Tenx,
 };
 
 // Removed the add_context function as it's now part of the Tenx struct
@@ -475,17 +475,7 @@ async fn main() -> anyhow::Result<()> {
     let config = load_config(&cli)?;
     let tx = Tenx::new(config.clone());
 
-    fn add_context(
-        tx: &Tenx,
-        session: &mut Session,
-        ctx: &[String],
-        ruskel: &[String],
-    ) -> TenxResult<usize> {
-        let mut total_added = 0;
-        total_added += tx.add_ctx_globs(session, ctx)?;
-        total_added += tx.add_ctx_ruskels(session, ruskel)?;
-        Ok(total_added)
-    }
+    // Removed add_context function
 
     if cli.color {
         colored::control::set_override(true);
@@ -604,7 +594,7 @@ async fn main() -> anyhow::Result<()> {
             Commands::Oneshot { files, ruskel, ctx } => {
                 let mut session = tx.session_from_cwd()?;
 
-                add_context(&tx, &mut session, ctx, ruskel)?;
+                tx.add_contexts(&mut session, ctx, ruskel)?;
 
                 for file in files {
                     session.add_editable(&config, file)?;
@@ -646,7 +636,7 @@ async fn main() -> anyhow::Result<()> {
                     session.add_editable(&config, &f)?;
                 }
 
-                add_context(&tx, &mut session, ctx, ruskel)?;
+                tx.add_contexts(&mut session, ctx, ruskel)?;
 
                 tx.prompt(&mut session, Some(sender)).await?;
                 Ok(())
@@ -666,7 +656,7 @@ async fn main() -> anyhow::Result<()> {
             Commands::AddCtx { files, ruskel } => {
                 let mut session = tx.load_session_cwd()?;
 
-                let added = add_context(&tx, &mut session, files, ruskel)?;
+                let added = tx.add_contexts(&mut session, files, ruskel)?;
 
                 if added == 0 {
                     return Err(anyhow::anyhow!("No new context items were added"));
@@ -709,7 +699,7 @@ async fn main() -> anyhow::Result<()> {
                 let offset = step_offset.unwrap_or(session.steps().len() - 1);
                 tx.reset(&mut session, offset)?;
 
-                add_context(&tx, &mut session, ctx, ruskel)?;
+                tx.add_contexts(&mut session, ctx, ruskel)?;
 
                 if *edit {
                     match edit::edit_prompt(&session)? {
@@ -724,7 +714,7 @@ async fn main() -> anyhow::Result<()> {
             Commands::New { files, ruskel } => {
                 let mut session = tx.session_from_cwd()?;
 
-                add_context(&tx, &mut session, files, ruskel)?;
+                tx.add_contexts(&mut session, files, ruskel)?;
 
                 tx.save_session(&session)?;
                 println!("new session: {}", session.root.display());
@@ -748,7 +738,7 @@ async fn main() -> anyhow::Result<()> {
                     session.add_editable(&config, file)?;
                 }
 
-                add_context(&tx, &mut session, ctx, ruskel)?;
+                tx.add_contexts(&mut session, ctx, ruskel)?;
 
                 tx.fix(&mut session, Some(sender.clone())).await?;
                 if session.pending_prompt() {
