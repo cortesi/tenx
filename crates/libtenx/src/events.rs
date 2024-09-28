@@ -18,12 +18,33 @@ pub enum Event {
     /// The preflight check suite has ended
     PreflightEnd,
 
+    /// The post-patch validation suite has started
+    PostPatchStart,
+    /// The post-patch validation suite has ended
+    PostPatchEnd,
+
+    /// Context operations have started
+    ContextStart,
+    /// Context operations have ended
+    ContextEnd,
+
+    /// A context refresh operation started
+    ContextRefreshStart(String),
+    /// A context refresh operation ended
+    ContextRefreshEnd(String),
+
+    /// A a preflight or post-patch check has started
+    ValidatorStart(String),
+    /// A a preflight or post-patch check has passed
+    ValidatorOk(String),
+
     /// A model prompt has started
     PromptStart,
+    /// Prompt has completed successfully
+    PromptEnd,
+
     /// A snippet of output text received from a model
     Snippet(String),
-    /// Prompt has completed successfully
-    PromptDone,
     /// Patch application has started
     ApplyPatch,
 
@@ -35,15 +56,6 @@ pub enum Event {
     FormatterEnd(String),
     /// The formatting suite has ended
     FormattingEnd,
-
-    /// The validation suite has started
-    ValidationStart,
-    /// A a preflight or post-patch check has started
-    ValidatorStart(String),
-    /// A a preflight or post-patch check has passed
-    ValidatorOk(String),
-    /// The validation suite has ended
-    ValidationEnd,
 
     /// The command has finished successfully
     Finish,
@@ -60,12 +72,20 @@ impl Event {
     /// Returns the camelcase name of the event variant
     pub fn name(&self) -> &'static str {
         match self {
+            Event::ContextStart => "context_start",
+            Event::ContextEnd => "context_end",
+
+            Event::ContextRefreshEnd(_) => "context_refresh_end",
+            Event::ContextRefreshStart(_) => "context_refresh_start",
+
             Event::PreflightStart => "preflight_start",
             Event::PreflightEnd => "preflight_end",
 
+            Event::PostPatchStart => "post_patch_start",
+
             Event::PromptStart => "prompt_start",
             Event::Snippet(_) => "snippet",
-            Event::PromptDone => "prompt_done",
+            Event::PromptEnd => "prompt_done",
             Event::ApplyPatch => "apply_patch",
 
             Event::FormattingStart => "formatting_start",
@@ -73,10 +93,10 @@ impl Event {
             Event::FormatterStart(_) => "formatter_start",
             Event::FormatterEnd(_) => "formatter_end",
 
-            Event::ValidationStart => "validation_start",
+            // These events are common for preflight and post-patch validation.
             Event::ValidatorStart(_) => "check_start",
             Event::ValidatorOk(_) => "check_ok",
-            Event::ValidationEnd => "validation_end",
+            Event::PostPatchEnd => "validation_end",
 
             Event::Log(_, _) => "log",
             Event::Retry(_) => "retry",
@@ -103,7 +123,7 @@ impl Event {
         match self {
             Event::PreflightStart => Some("Preflight checks...".to_string()),
             Event::FormattingStart => Some("Formatting...".to_string()),
-            Event::ValidationStart => Some("Post-patch validation...".to_string()),
+            Event::PostPatchStart => Some("Post-patch validation...".to_string()),
             Event::ValidatorStart(name) => Some(format!("Validator {}...", name)),
             Event::PromptStart => Some("Prompting...".to_string()),
             Event::ApplyPatch => Some("Applying patch...".to_string()),

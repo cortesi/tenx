@@ -424,10 +424,10 @@ async fn progress_events(mut receiver: mpsc::Receiver<Event>) {
                 manage_spinner(&mut current_spinner, |s| s.finish_and_clear());
                 print!("{}", chunk);
             }
-            Event::PromptDone => {
+            Event::PromptEnd => {
                 println!("\n\n");
             }
-            Event::PreflightEnd | Event::FormattingEnd | Event::ValidationEnd => {
+            Event::PreflightEnd | Event::FormattingEnd | Event::PostPatchEnd => {
                 manage_spinner(&mut current_spinner, |s| s.finish());
             }
             Event::ValidatorOk(_) | Event::FormatterEnd(_) => {

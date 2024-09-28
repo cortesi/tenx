@@ -8,6 +8,16 @@ use crate::{
     session_store::normalize_path, Result, Session, SessionStore, TenxError,
 };
 
+/// Helper function to send an event and handle potential errors.
+fn send_event(sender: &Option<mpsc::Sender<Event>>, event: Event) -> Result<()> {
+    if let Some(sender) = sender {
+        sender
+            .try_send(event)
+            .map_err(|e| TenxError::EventSend(e.to_string()))?;
+    }
+    Ok(())
+}
+
 /// Tenx is an AI-driven coding assistant.
 pub struct Tenx {
     pub config: Config,
@@ -80,16 +90,6 @@ impl Tenx {
             ))?;
             session.set_last_error(&e);
             self.save_session(session)?;
-        }
-        Ok(())
-    }
-
-    /// Helper function to send an event and handle potential errors.
-    fn send_event(sender: &Option<mpsc::Sender<Event>>, event: Event) -> Result<()> {
-        if let Some(sender) = sender {
-            sender
-                .try_send(event)
-                .map_err(|e| TenxError::EventSend(e.to_string()))?;
         }
         Ok(())
     }
@@ -167,7 +167,7 @@ impl Tenx {
             // error works as expected.
             if let Some(e) = session.last_step_error() {
                 if let Some(model_message) = e.should_retry() {
-                    Self::send_event(&sender, Event::Retry(format!("{}", e)))?;
+                    send_event(&sender, Event::Retry(format!("{}", e)))?;
                     retry_count += 1;
                     if retry_count >= self.config.retry_limit {
                         warn!("Retry limit reached. Last error: {}", e);
@@ -181,18 +181,18 @@ impl Tenx {
                     session_store.save(session)?;
                 } else {
                     debug!("Non-retryable error: {}", e);
-                    Self::send_event(&sender, Event::Fatal(format!("{}", e)))?;
+                    send_event(&sender, Event::Fatal(format!("{}", e)))?;
                     return Err(e.clone());
                 }
             }
 
-            Self::send_event(&sender, Event::PromptStart)?;
+            send_event(&sender, Event::PromptStart)?;
             let result = self.execute_prompt_cycle(session, sender.clone()).await;
-            Self::send_event(&sender, Event::PromptDone)?;
+            send_event(&sender, Event::PromptEnd)?;
             match result {
                 Ok(()) => {
                     session_store.save(session)?;
-                    Self::send_event(&sender, Event::Finish)?;
+                    send_event(&sender, Event::Finish)?;
                     return Ok(());
                 }
                 Err(e) => {
@@ -208,7 +208,7 @@ impl Tenx {
         sender: Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
         session.prompt(&self.config, sender.clone()).await?;
-        Self::send_event(&sender, Event::ApplyPatch)?;
+        send_event(&sender, Event::ApplyPatch)?;
         session.apply_last_patch()?;
         self.run_formatters(session, &sender)?;
         self.run_post_patch_validators(session, &sender)?;
@@ -220,14 +220,14 @@ impl Tenx {
         session: &mut Session,
         sender: &Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
-        Self::send_event(sender, Event::FormattingStart)?;
+        send_event(sender, Event::FormattingStart)?;
         let formatters = crate::formatters::relevant_formatters(&self.config, session)?;
         for formatter in formatters {
-            Self::send_event(sender, Event::FormatterStart(formatter.name().to_string()))?;
+            send_event(sender, Event::FormatterStart(formatter.name().to_string()))?;
             formatter.format(session)?;
-            Self::send_event(sender, Event::FormatterEnd(formatter.name().to_string()))?;
+            send_event(sender, Event::FormatterEnd(formatter.name().to_string()))?;
         }
-        Self::send_event(sender, Event::FormattingEnd)?;
+        send_event(sender, Event::FormattingEnd)?;
         Ok(())
     }
 
@@ -239,17 +239,17 @@ impl Tenx {
         if self.config.no_preflight {
             return Ok(());
         }
-        Self::send_event(sender, Event::PreflightStart)?;
+        send_event(sender, Event::PreflightStart)?;
         let preflight_validators = crate::validators::relevant_validators(&self.config, session)?;
         for validator in preflight_validators {
-            Self::send_event(sender, Event::ValidatorStart(validator.name().to_string()))?;
+            send_event(sender, Event::ValidatorStart(validator.name().to_string()))?;
             if let Err(e) = validator.validate(session) {
-                Self::send_event(sender, Event::PreflightEnd)?;
+                send_event(sender, Event::PreflightEnd)?;
                 return Err(e);
             }
-            Self::send_event(sender, Event::ValidatorOk(validator.name().to_string()))?;
+            send_event(sender, Event::ValidatorOk(validator.name().to_string()))?;
         }
-        Self::send_event(sender, Event::PreflightEnd)?;
+        send_event(sender, Event::PreflightEnd)?;
         Ok(())
     }
 
@@ -260,15 +260,15 @@ impl Tenx {
     ) -> Result<()> {
         if let Some(last_step) = session.steps().last() {
             if last_step.patch.is_some() {
-                Self::send_event(sender, Event::ValidationStart)?;
+                send_event(sender, Event::PostPatchStart)?;
                 let post_patch_validators =
                     crate::validators::relevant_validators(&self.config, session)?;
                 for validator in post_patch_validators {
-                    Self::send_event(sender, Event::ValidatorStart(validator.name().to_string()))?;
+                    send_event(sender, Event::ValidatorStart(validator.name().to_string()))?;
                     validator.validate(session)?;
-                    Self::send_event(sender, Event::ValidatorOk(validator.name().to_string()))?;
+                    send_event(sender, Event::ValidatorOk(validator.name().to_string()))?;
                 }
-                Self::send_event(sender, Event::ValidationEnd)?;
+                send_event(sender, Event::PostPatchEnd)?;
             }
         }
         Ok(())
