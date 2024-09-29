@@ -77,19 +77,19 @@ struct Cli {
     quiet: bool,
 
     /// Anthropic API key [env: ANTHROPIC_API_KEY]
-    #[clap(long, global = true)]
+    #[clap(long)]
     anthropic_key: Option<String>,
 
     /// Session storage directory (~/.config/tenx/state by default)
-    #[clap(long, global = true)]
+    #[clap(long)]
     session_store_dir: Option<PathBuf>,
 
     /// Number of times to retry a prompt before failing
-    #[clap(long, global = true)]
+    #[clap(long)]
     retry_limit: Option<usize>,
 
     /// Skip preflight checks
-    #[clap(long, global = true)]
+    #[clap(long)]
     no_preflight: bool,
 
     /// Force colored output
@@ -97,35 +97,35 @@ struct Cli {
     color: bool,
 
     /// Disable colored output
-    #[clap(long, global = true)]
+    #[clap(long)]
     no_color: bool,
 
     /// Smart mode for the Tags dialect
-    #[clap(long, global = true)]
+    #[clap(long)]
     tags_smart: Option<bool>,
 
     /// Replace mode for the Tags dialect
-    #[clap(long, global = true)]
+    #[clap(long)]
     tags_replace: Option<bool>,
 
     /// Udiff mode for the Tags dialect
-    #[clap(long, global = true)]
+    #[clap(long)]
     tags_udiff: Option<bool>,
 
     /// Rust Cargo Clippy validator
-    #[clap(long, global = true)]
+    #[clap(long)]
     rust_cargo_clippy: Option<bool>,
 
     /// Rust Cargo Check validator
-    #[clap(long, global = true)]
+    #[clap(long)]
     rust_cargo_check: Option<bool>,
 
     /// Rust Cargo Test validator
-    #[clap(long, global = true)]
+    #[clap(long)]
     rust_cargo_test: Option<bool>,
 
     /// Python Ruff Check validator
-    #[clap(long, global = true)]
+    #[clap(long)]
     python_ruff_check: Option<bool>,
 
     #[clap(subcommand)]
