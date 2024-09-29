@@ -162,7 +162,7 @@ enum Commands {
         #[clap(value_parser)]
         files: Vec<String>,
     },
-    /// Clear the current session
+    /// Clear the current session without resetting changes
     Clear,
     /// Run formatters on the current session
     Format,
@@ -252,7 +252,7 @@ enum Commands {
         #[clap(long)]
         ctx: Vec<String>,
     },
-    /// Reset the session to a specific step
+    /// Reset the session to a specific step, undoing changes
     Reset {
         /// The step offset to reset to
         step_offset: usize,
@@ -351,34 +351,40 @@ fn load_config(cli: &Cli) -> Result<config::Config> {
 }
 
 /// Prints events from the event channel
-async fn print_events(mut receiver: mpsc::Receiver<Event>) {
-    while let Some(event) = receiver.recv().await {
-        match event {
-            Event::Log(level, message) => {
-                let severity = match level {
-                    LogLevel::Error => "error".red(),
-                    LogLevel::Warn => "warn".yellow(),
-                    LogLevel::Info => "info".green(),
-                    LogLevel::Debug => "debug".cyan(),
-                    LogLevel::Trace => "trace".magenta(),
-                };
-                println!("{}: {}", severity, message);
-            }
-            _ => {
-                let name = event.name().to_string();
-                let display = event.display();
-                if display.is_empty() {
-                    println!("{}", name.blue());
-                } else {
-                    println!("{}: {}", name.blue(), display);
+async fn print_events(mut receiver: mpsc::Receiver<Event>, mut kill_signal: mpsc::Receiver<()>) {
+    loop {
+        tokio::select! {
+            Some(event) = receiver.recv() => {
+                match event {
+                    Event::Log(level, message) => {
+                        let severity = match level {
+                            LogLevel::Error => "error".red(),
+                            LogLevel::Warn => "warn".yellow(),
+                            LogLevel::Info => "info".green(),
+                            LogLevel::Debug => "debug".cyan(),
+                            LogLevel::Trace => "trace".magenta(),
+                        };
+                        println!("{}: {}", severity, message);
+                    }
+                    _ => {
+                        let name = event.name().to_string();
+                        let display = event.display();
+                        if display.is_empty() {
+                            println!("{}", name.blue());
+                        } else {
+                            println!("{}: {}", name.blue(), display);
+                        }
+                    }
                 }
             }
+            _ = kill_signal.recv() => break,
+            else => break,
         }
     }
 }
 
 /// Handles events with improved progress output
-async fn progress_events(mut receiver: mpsc::Receiver<Event>) {
+async fn progress_events(mut receiver: mpsc::Receiver<Event>, mut kill_signal: mpsc::Receiver<()>) {
     let validator_spinner_style = ProgressStyle::with_template("    {spinner:.green.bold} {msg}")
         .unwrap()
         .tick_strings(&["▹▹▹▹▹", "▸▹▹▹▹", "▹▸▹▹▹", "▹▹▸▹▹", "▹▹▹▸▹", "▹▹▹▹▸"]);
@@ -408,35 +414,41 @@ async fn progress_events(mut receiver: mpsc::Receiver<Event>) {
         *current_spinner = Some(new_spinner);
     }
 
-    while let Some(event) = receiver.recv().await {
-        if let Some(header) = event.header_message() {
-            manage_spinner(&mut current_spinner, |s| s.finish());
-            println!("{}", header.blue());
-        } else if let Some(progress_event) = event.progress_event() {
-            start_new_spinner(
-                &mut current_spinner,
-                &validator_spinner_style,
-                &progress_event,
-            );
-        }
+    loop {
+        tokio::select! {
+            Some(event) = receiver.recv() => {
+                if let Some(header) = event.header_message() {
+                    manage_spinner(&mut current_spinner, |s| s.finish());
+                    println!("{}", header.blue());
+                } else if let Some(progress_event) = event.progress_event() {
+                    start_new_spinner(
+                        &mut current_spinner,
+                        &validator_spinner_style,
+                        &progress_event,
+                    );
+                }
 
-        match event {
-            Event::Retry(ref message) => {
-                manage_spinner(&mut current_spinner, |s| s.finish());
-                println!("{}", format!("Retrying: {}", message).yellow());
+                match event {
+                    Event::Retry(ref message) => {
+                        manage_spinner(&mut current_spinner, |s| s.finish());
+                        println!("{}", format!("Retrying: {}", message).yellow());
+                    }
+                    Event::Fatal(ref message) => {
+                        manage_spinner(&mut current_spinner, |s| s.finish());
+                        println!("{}", format!("Fatal: {}", message).red());
+                    }
+                    Event::Snippet(ref chunk) => {
+                        manage_spinner(&mut current_spinner, |s| s.finish());
+                        print!("{}", chunk);
+                    }
+                    Event::PromptEnd => {
+                        println!("\n\n");
+                    }
+                    _ => {}
+                }
             }
-            Event::Fatal(ref message) => {
-                manage_spinner(&mut current_spinner, |s| s.finish());
-                println!("{}", format!("Fatal: {}", message).red());
-            }
-            Event::Snippet(ref chunk) => {
-                manage_spinner(&mut current_spinner, |s| s.finish());
-                print!("{}", chunk);
-            }
-            Event::PromptEnd => {
-                println!("\n\n");
-            }
-            _ => {}
+            _ = kill_signal.recv() => break,
+            else => break,
         }
     }
 
@@ -459,23 +471,13 @@ async fn main() -> anyhow::Result<()> {
     }
 
     let (sender, receiver) = mpsc::channel(100);
-    let (event_kill_tx, mut event_kill_rx) = mpsc::channel(1);
+    let (event_kill_tx, event_kill_rx) = mpsc::channel(1);
     let subscriber = create_subscriber(verbosity, sender.clone());
     subscriber.init();
     let event_task = if verbosity > 0 {
-        tokio::spawn(async move {
-            tokio::select! {
-                _ = print_events(receiver) => {},
-                _ = event_kill_rx.recv() => {},
-            }
-        })
+        tokio::spawn(print_events(receiver, event_kill_rx))
     } else {
-        tokio::spawn(async move {
-            tokio::select! {
-                _ = progress_events(receiver) => {},
-                _ = event_kill_rx.recv() => {},
-            }
-        })
+        tokio::spawn(progress_events(receiver, event_kill_rx))
     };
 
     let result = match &cli.command {
@@ -688,9 +690,7 @@ async fn main() -> anyhow::Result<()> {
             }
             Commands::New { files, ruskel } => {
                 let mut session = tx.session_from_cwd(&Some(sender.clone()))?;
-
                 tx.add_contexts(&mut session, files, ruskel, &Some(sender.clone()))?;
-
                 tx.save_session(&session)?;
                 println!("new session: {}", session.root.display());
                 Ok(())
@@ -746,7 +746,6 @@ async fn main() -> anyhow::Result<()> {
                 let mut session = tx.load_session_cwd()?;
                 tx.refresh_context(&mut session, &Some(sender.clone()))?;
                 tx.save_session(&session)?;
-                println!("Contexts refreshed");
                 Ok(())
             }
         },
@@ -767,12 +766,11 @@ async fn main() -> anyhow::Result<()> {
         }
     };
 
-    result?;
-
-    // Signal the event task to terminate
-    let _ = event_kill_tx.send(()).await;
     // Wait for the event task to finish
-    let _ = tokio::time::timeout(std::time::Duration::from_millis(100), event_task).await;
+    let _ = event_kill_tx.send(()).await;
+    let _ = tokio::time::timeout(std::time::Duration::from_secs(1), event_task).await;
+
+    result?;
 
     Ok(())
 }
