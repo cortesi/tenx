@@ -427,10 +427,13 @@ async fn progress_events(mut receiver: mpsc::Receiver<Event>) {
             Event::PromptEnd => {
                 println!("\n\n");
             }
-            Event::PreflightEnd | Event::FormattingEnd | Event::PostPatchEnd => {
+            Event::PreflightEnd
+            | Event::FormattingEnd
+            | Event::PostPatchEnd
+            | Event::ContextEnd => {
                 manage_spinner(&mut current_spinner, |s| s.finish());
             }
-            Event::ValidatorOk(_) | Event::FormatterEnd(_) => {
+            Event::ValidatorOk(_) | Event::FormatterEnd(_) | Event::ContextRefreshEnd(_) => {
                 manage_spinner(&mut current_spinner, |s| s.finish());
             }
             Event::Finish => {
@@ -448,6 +451,16 @@ async fn progress_events(mut receiver: mpsc::Receiver<Event>) {
             }
             Event::FormattingStart => {
                 println!("{}", "Formatting".to_string().blue());
+            }
+            Event::ContextStart => {
+                println!("{}", "Context".to_string().blue());
+            }
+            Event::ContextRefreshStart(ref name) => {
+                start_new_spinner(
+                    &mut current_spinner,
+                    &validator_spinner_style,
+                    &format!("  {}", name),
+                );
             }
             Event::ValidatorStart(msg) => {
                 start_new_spinner(
@@ -526,7 +539,7 @@ async fn main() -> anyhow::Result<()> {
                 Ok(()) as anyhow::Result<()>
             }
             Commands::LsFiles => {
-                let session = tx.session_from_cwd()?;
+                let session = tx.load_session_cwd()?;
                 let files = config.included_files(&session.root)?;
                 for file in files {
                     println!("{}", file.display());
@@ -592,9 +605,9 @@ async fn main() -> anyhow::Result<()> {
                 Ok(())
             }
             Commands::Oneshot { files, ruskel, ctx } => {
-                let mut session = tx.session_from_cwd()?;
+                let mut session = tx.session_from_cwd(&Some(sender.clone()))?;
 
-                tx.add_contexts(&mut session, ctx, ruskel)?;
+                tx.add_contexts(&mut session, ctx, ruskel, &Some(sender.clone()))?;
 
                 for file in files {
                     session.add_editable(&config, file)?;
@@ -636,7 +649,7 @@ async fn main() -> anyhow::Result<()> {
                     session.add_editable(&config, &f)?;
                 }
 
-                tx.add_contexts(&mut session, ctx, ruskel)?;
+                tx.add_contexts(&mut session, ctx, ruskel, &Some(sender.clone()))?;
 
                 tx.prompt(&mut session, Some(sender)).await?;
                 Ok(())
@@ -656,7 +669,7 @@ async fn main() -> anyhow::Result<()> {
             Commands::AddCtx { files, ruskel } => {
                 let mut session = tx.load_session_cwd()?;
 
-                let added = tx.add_contexts(&mut session, files, ruskel)?;
+                let added = tx.add_contexts(&mut session, files, ruskel, &Some(sender.clone()))?;
 
                 if added == 0 {
                     return Err(anyhow::anyhow!("No new context items were added"));
@@ -699,7 +712,7 @@ async fn main() -> anyhow::Result<()> {
                 let offset = step_offset.unwrap_or(session.steps().len() - 1);
                 tx.reset(&mut session, offset)?;
 
-                tx.add_contexts(&mut session, ctx, ruskel)?;
+                tx.add_contexts(&mut session, ctx, ruskel, &Some(sender.clone()))?;
 
                 if *edit {
                     match edit::edit_prompt(&session)? {
@@ -712,9 +725,9 @@ async fn main() -> anyhow::Result<()> {
                 Ok(())
             }
             Commands::New { files, ruskel } => {
-                let mut session = tx.session_from_cwd()?;
+                let mut session = tx.session_from_cwd(&Some(sender.clone()))?;
 
-                tx.add_contexts(&mut session, files, ruskel)?;
+                tx.add_contexts(&mut session, files, ruskel, &Some(sender.clone()))?;
 
                 tx.save_session(&session)?;
                 println!("new session: {}", session.root.display());
@@ -731,14 +744,14 @@ async fn main() -> anyhow::Result<()> {
                     current_session.clear();
                     current_session
                 } else {
-                    tx.session_from_cwd()?
+                    tx.session_from_cwd(&Some(sender.clone()))?
                 };
 
                 for file in files {
                     session.add_editable(&config, file)?;
                 }
 
-                tx.add_contexts(&mut session, ctx, ruskel)?;
+                tx.add_contexts(&mut session, ctx, ruskel, &Some(sender.clone()))?;
 
                 tx.fix(&mut session, Some(sender.clone())).await?;
                 if session.pending_prompt() {

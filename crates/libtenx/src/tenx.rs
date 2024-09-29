@@ -31,7 +31,7 @@ impl Tenx {
 
     /// Creates a new Session, discovering the root from the current working directory and
     /// adding the default context from the config.
-    pub fn session_from_cwd(&self) -> Result<Session> {
+    pub fn session_from_cwd(&self, sender: &Option<mpsc::Sender<Event>>) -> Result<Session> {
         let cwd = env::current_dir()
             .map_err(|e| TenxError::Internal(format!("Could not access cwd: {}", e)))?;
         let root = crate::config::find_project_root(&cwd);
@@ -42,6 +42,7 @@ impl Tenx {
             &mut session,
             &self.config.default_context.path,
             &self.config.default_context.ruskel,
+            sender,
         )?;
 
         Ok(session)
@@ -53,22 +54,29 @@ impl Tenx {
         session: &mut Session,
         glob: &[String],
         ruskel: &[String],
+        sender: &Option<mpsc::Sender<Event>>,
     ) -> Result<usize> {
         let mut contexts = Vec::new();
-
         for file in glob {
             contexts.push(crate::context::ContextSpec::new_glob(file.to_string()));
         }
-
         for ruskel_doc in ruskel {
             contexts.push(crate::context::ContextSpec::new_ruskel(ruskel_doc.clone()));
         }
-
         let mut total_added = 0;
-        for mut context in contexts {
-            context.refresh()?;
-            total_added += context.count(&self.config, session)?;
-            session.add_context(context);
+        if !contexts.is_empty() {
+            send_event(sender, Event::ContextStart)?;
+            for mut context in contexts {
+                send_event(
+                    sender,
+                    Event::ContextRefreshStart(context.name().to_string()),
+                )?;
+                context.refresh()?;
+                send_event(sender, Event::ContextRefreshEnd(context.name().to_string()))?;
+                total_added += context.count(&self.config, session)?;
+                session.add_context(context);
+            }
+            send_event(sender, Event::ContextEnd)?;
         }
 
         Ok(total_added)
