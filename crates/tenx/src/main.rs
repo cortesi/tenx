@@ -69,11 +69,11 @@ fn create_subscriber(verbosity: u8, sender: mpsc::Sender<Event>) -> impl Subscri
 #[clap(about = "AI-powered coding assistant", long_about = None)]
 struct Cli {
     /// Increase output verbosity
-    #[clap(short, long, action = clap::ArgAction::Count, global = true, default_value = "0")]
+    #[clap(short, long, action = clap::ArgAction::Count,  default_value = "0")]
     verbose: u8,
 
     /// Decrease output verbosity
-    #[clap(short, long, global = true)]
+    #[clap(short, long)]
     quiet: bool,
 
     /// Anthropic API key [env: ANTHROPIC_API_KEY]
@@ -93,38 +93,38 @@ struct Cli {
     no_preflight: bool,
 
     /// Force colored output
-    #[clap(long, global = true, conflicts_with = "no_color")]
+    #[clap(long, conflicts_with = "no_color")]
     color: bool,
 
     /// Disable colored output
     #[clap(long, global = true)]
     no_color: bool,
 
-    /// Enable or disable smart mode for the Tags dialect
+    /// Smart mode for the Tags dialect
     #[clap(long, global = true)]
     tags_smart: Option<bool>,
 
-    /// Enable or disable replace mode for the Tags dialect
+    /// Replace mode for the Tags dialect
     #[clap(long, global = true)]
     tags_replace: Option<bool>,
 
-    /// Enable or disable udiff mode for the Tags dialect
+    /// Udiff mode for the Tags dialect
     #[clap(long, global = true)]
     tags_udiff: Option<bool>,
 
-    /// Enable or disable Rust Cargo Clippy validator
+    /// Rust Cargo Clippy validator
     #[clap(long, global = true)]
     rust_cargo_clippy: Option<bool>,
 
-    /// Enable or disable Rust Cargo Check validator
+    /// Rust Cargo Check validator
     #[clap(long, global = true)]
     rust_cargo_check: Option<bool>,
 
-    /// Enable or disable Rust Cargo Test validator
+    /// Rust Cargo Test validator
     #[clap(long, global = true)]
     rust_cargo_test: Option<bool>,
 
-    /// Enable or disable Python Ruff Check validator
+    /// Python Ruff Check validator
     #[clap(long, global = true)]
     python_ruff_check: Option<bool>,
 
