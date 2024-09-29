@@ -82,6 +82,27 @@ impl Tenx {
         Ok(total_added)
     }
 
+    /// Refreshes all contexts in the specified session.
+    pub fn refresh_context(
+        &self,
+        session: &mut Session,
+        sender: &Option<mpsc::Sender<Event>>,
+    ) -> Result<()> {
+        send_event(sender, Event::ContextStart)?;
+        {
+            for context in session.context.iter_mut() {
+                send_event(
+                    sender,
+                    Event::ContextRefreshStart(context.name().to_string()),
+                )?;
+                context.refresh()?;
+                send_event(sender, Event::ContextRefreshEnd(context.name().to_string()))?;
+            }
+        }
+        send_event(sender, Event::ContextEnd)?;
+        Ok(())
+    }
+
     /// Attempts to fix issues in the session by running preflight checks and adding a new prompt if there's an error.
     pub async fn fix(
         &self,

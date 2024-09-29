@@ -152,6 +152,8 @@ enum Commands {
         #[clap(long)]
         ruskel: Vec<String>,
     },
+    /// Refresh all contexts in the current session
+    Refresh,
     /// Run preflight validation suite on the current session
     Preflight,
     /// Add editable files to an existing session
@@ -225,7 +227,7 @@ enum Commands {
     /// List all formatters and their status
     Formatters,
     /// List files included in the project
-    LsFiles,
+    Files,
     /// Create a new session
     New {
         /// Specifies files to add as context
@@ -538,7 +540,7 @@ async fn main() -> anyhow::Result<()> {
                 }
                 Ok(()) as anyhow::Result<()>
             }
-            Commands::LsFiles => {
+            Commands::Files => {
                 let session = tx.load_session_cwd()?;
                 let files = config.included_files(&session.root)?;
                 for file in files {
@@ -778,6 +780,13 @@ async fn main() -> anyhow::Result<()> {
             Commands::Preflight => {
                 let mut session = tx.load_session_cwd()?;
                 tx.run_preflight_validators(&mut session, &Some(sender.clone()))?;
+                Ok(())
+            }
+            Commands::Refresh => {
+                let mut session = tx.load_session_cwd()?;
+                tx.refresh_context(&mut session, &Some(sender.clone()))?;
+                tx.save_session(&session)?;
+                println!("Contexts refreshed");
                 Ok(())
             }
         },

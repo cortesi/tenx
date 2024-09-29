@@ -38,7 +38,7 @@ pub struct Session {
     /// always relative to the root.
     pub root: PathBuf,
     steps: Vec<Step>,
-    context: Vec<context::ContextSpec>,
+    pub(crate) context: Vec<context::ContextSpec>,
     editable: Vec<PathBuf>,
 }
 
