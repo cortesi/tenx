@@ -379,11 +379,7 @@ async fn print_events(mut receiver: mpsc::Receiver<Event>) {
 
 /// Handles events with improved progress output
 async fn progress_events(mut receiver: mpsc::Receiver<Event>) {
-    let spinner_style = ProgressStyle::with_template("{spinner:.blue.bold} {msg}")
-        .unwrap()
-        .tick_strings(&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]);
-
-    let validator_spinner_style = ProgressStyle::with_template("{spinner:.blue.bold} {msg}")
+    let validator_spinner_style = ProgressStyle::with_template("    {spinner:.green.bold} {msg}")
         .unwrap()
         .tick_strings(&["▹▹▹▹▹", "▸▹▹▹▹", "▹▸▹▹▹", "▹▹▸▹▹", "▹▹▹▸▹", "▹▹▹▹▸"]);
 
@@ -413,74 +409,38 @@ async fn progress_events(mut receiver: mpsc::Receiver<Event>) {
     }
 
     while let Some(event) = receiver.recv().await {
+        if let Some(header) = event.header_message() {
+            manage_spinner(&mut current_spinner, |s| s.finish());
+            println!("{}", header.blue());
+        } else if let Some(progress_event) = event.progress_event() {
+            start_new_spinner(
+                &mut current_spinner,
+                &validator_spinner_style,
+                &progress_event,
+            );
+        }
+
         match event {
             Event::Retry(ref message) => {
-                manage_spinner(&mut current_spinner, |s| s.finish_and_clear());
+                manage_spinner(&mut current_spinner, |s| s.finish());
                 println!("{}", format!("Retrying: {}", message).yellow());
             }
             Event::Fatal(ref message) => {
-                manage_spinner(&mut current_spinner, |s| s.finish_and_clear());
+                manage_spinner(&mut current_spinner, |s| s.finish());
                 println!("{}", format!("Fatal: {}", message).red());
             }
             Event::Snippet(ref chunk) => {
-                manage_spinner(&mut current_spinner, |s| s.finish_and_clear());
+                manage_spinner(&mut current_spinner, |s| s.finish());
                 print!("{}", chunk);
             }
             Event::PromptEnd => {
                 println!("\n\n");
             }
-            Event::PreflightEnd
-            | Event::FormattingEnd
-            | Event::PostPatchEnd
-            | Event::ContextEnd => {
-                manage_spinner(&mut current_spinner, |s| s.finish());
-            }
-            Event::ValidatorOk(_) | Event::FormatterEnd(_) | Event::ContextRefreshEnd(_) => {
-                manage_spinner(&mut current_spinner, |s| s.finish());
-            }
-            Event::Finish => {
-                manage_spinner(&mut current_spinner, |s| s.finish());
-            }
-            Event::FormatterStart(msg) => {
-                start_new_spinner(
-                    &mut current_spinner,
-                    &validator_spinner_style,
-                    &format!("  {}", msg),
-                );
-            }
-            Event::PreflightStart => {
-                println!("{}", "Preflight checks".to_string().blue());
-            }
-            Event::FormattingStart => {
-                println!("{}", "Formatting".to_string().blue());
-            }
-            Event::ContextStart => {
-                println!("{}", "Context".to_string().blue());
-            }
-            Event::ContextRefreshStart(ref name) => {
-                start_new_spinner(
-                    &mut current_spinner,
-                    &validator_spinner_style,
-                    &format!("  {}", name),
-                );
-            }
-            Event::ValidatorStart(msg) => {
-                start_new_spinner(
-                    &mut current_spinner,
-                    &validator_spinner_style,
-                    &format!("  {}", msg),
-                );
-            }
-            Event::Log(_, _) => {} // Ignore Log events in progress_events
-            _ => {
-                if let Some(msg) = event.step_start_message() {
-                    start_new_spinner(&mut current_spinner, &spinner_style, &msg);
-                }
-            }
+            _ => {}
         }
     }
 
-    manage_spinner(&mut current_spinner, |s| s.finish_and_clear());
+    manage_spinner(&mut current_spinner, |s| s.finish());
 }
 
 #[tokio::main]

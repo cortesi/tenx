@@ -1,4 +1,6 @@
+use heck::ToSnakeCase;
 use serde::{Deserialize, Serialize};
+use serde_variant::to_variant_name;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum LogLevel {
@@ -70,38 +72,30 @@ pub enum Event {
 
 impl Event {
     /// Returns the camelcase name of the event variant
-    pub fn name(&self) -> &'static str {
+    pub fn name(&self) -> String {
+        to_variant_name(self).unwrap().to_snake_case()
+    }
+
+    /// If this event should have a progress bar or spinner, return an indicator string
+    pub fn progress_event(&self) -> Option<String> {
         match self {
-            Event::ContextStart => "context_start",
-            Event::ContextEnd => "context_end",
+            Event::ContextRefreshStart(s) => Some(s.clone()),
+            Event::ValidatorStart(s) => Some(s.clone()),
+            Event::FormatterStart(s) => Some(s.clone()),
+            _ => None,
+        }
+    }
 
-            Event::ContextRefreshEnd(_) => "context_refresh_end",
-            Event::ContextRefreshStart(_) => "context_refresh_start",
-
-            Event::PreflightStart => "preflight_start",
-            Event::PreflightEnd => "preflight_end",
-
-            Event::PostPatchStart => "post_patch_start",
-
-            Event::PromptStart => "prompt_start",
-            Event::Snippet(_) => "snippet",
-            Event::PromptEnd => "prompt_done",
-            Event::ApplyPatch => "apply_patch",
-
-            Event::FormattingStart => "formatting_start",
-            Event::FormattingEnd => "formatting_end",
-            Event::FormatterStart(_) => "formatter_start",
-            Event::FormatterEnd(_) => "formatter_end",
-
-            // These events are common for preflight and post-patch validation.
-            Event::ValidatorStart(_) => "check_start",
-            Event::ValidatorOk(_) => "check_ok",
-            Event::PostPatchEnd => "validation_end",
-
-            Event::Log(_, _) => "log",
-            Event::Retry(_) => "retry",
-            Event::Fatal(_) => "fatal",
-            Event::Finish => "finish",
+    /// If this event is a section header, return a string description
+    pub fn header_message(&self) -> Option<String> {
+        match self {
+            Event::ApplyPatch => Some("applying patch".to_string()),
+            Event::ContextStart => Some("context".to_string()),
+            Event::FormattingStart => Some("formatting".to_string()),
+            Event::PreflightStart => Some("preflight validation".to_string()),
+            Event::PostPatchStart => Some("post-patch validation".to_string()),
+            Event::PromptStart => Some("prompting".to_string()),
+            _ => None,
         }
     }
 
