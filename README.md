@@ -15,12 +15,14 @@ cargo install tenx
 
 - AI-assisted code editing and generation
 - Session-based workflow for organized development
-- Patch validation and automated retry on failure
+- Preflight validation to ensure the project is consistent before prompting
+- Post-patch validation of AI changes, with automated retry on failure
+- Auto-formatting of AI changes
 - Undo, retry and re-edit steps in the session
 - First-class Rust support
     - Pre and post-patch validation with `cargo check` and `cargo test`
     - Formatting with `cargo fmt`
-    - Provide documentation context for any crate (local or from crates.io)
+    - Include documentation for any crate (local or from crates.io)
       using [Ruskel](https://github.com/cortesi/ruskel).
 - Built on **libtenx**, a Rust library for building advanced AI-assisted coding tools.
 
