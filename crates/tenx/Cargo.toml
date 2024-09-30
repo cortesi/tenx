@@ -10,7 +10,7 @@ repository.workspace = true
 
 [dependencies]
 anyhow = "1.0.86"
-clap = { version = "4.5.13", features = ["derive", "env"] }
+clap = { version = "4.5.13", features = ["derive", "env", "wrap_help"] }
 colored = "2.1.0"
 indicatif = "0.17.8"
 indoc = "2.0.5"

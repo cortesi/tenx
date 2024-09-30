@@ -66,6 +66,7 @@ fn create_subscriber(verbosity: u8, sender: mpsc::Sender<Event>) -> impl Subscri
 #[clap(name = "tenx")]
 #[clap(author = "Aldo Cortesi")]
 #[clap(version = "0.1.0")]
+#[clap(max_term_width = 80)]
 #[clap(about = "AI-powered coding assistant", long_about = None)]
 struct Cli {
     /// Increase output verbosity
@@ -142,7 +143,7 @@ enum DialectCommands {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Add files orcontext to a session
+    /// Add context or editable files to a session
     Add {
         /// Specifies files to add (as editable by default)
         #[clap(value_parser)]
@@ -439,6 +440,9 @@ async fn progress_events(mut receiver: mpsc::Receiver<Event>, mut kill_signal: m
                         manage_spinner(&mut current_spinner, |s| s.finish());
                         print!("{}", chunk);
                     }
+                    Event::Finish => {
+                        manage_spinner(&mut current_spinner, |s| s.finish());
+                    }
                     Event::PromptEnd => {
                         println!("\n\n");
                     }
@@ -568,9 +572,7 @@ async fn main() -> anyhow::Result<()> {
             }
             Commands::Oneshot { files, ruskel, ctx } => {
                 let mut session = tx.session_from_cwd(&Some(sender.clone()))?;
-
                 tx.add_contexts(&mut session, ctx, ruskel, &Some(sender.clone()))?;
-
                 for file in files {
                     session.add_editable(&config, file)?;
                 }

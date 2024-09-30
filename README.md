@@ -24,7 +24,7 @@ cargo install tenx
     - Formatting with `cargo fmt`
     - Include documentation for any crate (local or from crates.io)
       using [Ruskel](https://github.com/cortesi/ruskel).
-- Built on **libtenx**, a Rust library for building advanced AI-assisted coding tools.
+- Built on **libtenx**, a Rust library for building AI-assisted coding tools.
 
 
 ## Glossary

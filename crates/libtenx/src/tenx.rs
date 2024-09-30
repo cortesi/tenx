@@ -45,6 +45,7 @@ impl Tenx {
             sender,
         )?;
 
+        send_event(sender, Event::Finish)?;
         Ok(session)
     }
 
@@ -79,6 +80,7 @@ impl Tenx {
             send_event(sender, Event::ContextEnd)?;
         }
 
+        send_event(sender, Event::Finish)?;
         Ok(total_added)
     }
 
@@ -117,6 +119,7 @@ impl Tenx {
             session.set_last_error(&e);
             self.save_session(session)?;
         }
+        send_event(&sender, Event::Finish)?;
         Ok(())
     }
 
@@ -151,7 +154,11 @@ impl Tenx {
     ) -> Result<()> {
         let session_store = SessionStore::open(self.config.session_store_dir())?;
         session.rollback_last()?;
-        self.process_prompt(session, sender, &session_store).await
+        let result = self
+            .process_prompt(session, sender.clone(), &session_store)
+            .await;
+        send_event(&sender, Event::Finish)?;
+        result
     }
 
     /// Sends a session off to the model for prompting.
@@ -161,13 +168,18 @@ impl Tenx {
         sender: Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
         let session_store = SessionStore::open(self.config.session_store_dir())?;
-        self.process_prompt(session, sender, &session_store).await
+        let result = self
+            .process_prompt(session, sender.clone(), &session_store)
+            .await;
+        send_event(&sender, Event::Finish)?;
+        result
     }
 
     /// Resets the session to a specific step.
     pub fn reset(&self, session: &mut Session, offset: usize) -> Result<()> {
         session.reset(offset)?;
-        self.save_session(session)
+        let result = self.save_session(session);
+        result
     }
 
     /// Common logic for processing a prompt and updating the state. The prompt that will be
