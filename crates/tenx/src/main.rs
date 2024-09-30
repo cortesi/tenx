@@ -16,8 +16,6 @@ use libtenx::{
     Tenx,
 };
 
-// Removed the add_context function as it's now part of the Tenx struct
-
 mod edit;
 mod pretty;
 
@@ -250,6 +248,14 @@ enum Commands {
         /// Add files as context
         #[clap(long)]
         ctx: Vec<String>,
+
+        /// User prompt for the edit operation
+        #[clap(long)]
+        prompt: Option<String>,
+
+        /// Path to a file containing the prompt
+        #[clap(long)]
+        prompt_file: Option<PathBuf>,
     },
     /// Reset the session to a specific step, undoing changes
     Reset {
@@ -570,18 +576,33 @@ async fn main() -> anyhow::Result<()> {
                 }
                 Ok(())
             }
-            Commands::Oneshot { files, ruskel, ctx } => {
+            Commands::Oneshot {
+                files,
+                ruskel,
+                ctx,
+                prompt,
+                prompt_file,
+            } => {
                 let mut session = tx.session_from_cwd(&Some(sender.clone()))?;
                 tx.add_contexts(&mut session, ctx, ruskel, &Some(sender.clone()))?;
                 for file in files {
                     session.add_editable(&config, file)?;
                 }
 
-                session.add_prompt(Prompt::User(String::new()))?;
-                match edit::edit_prompt(&session)? {
-                    Some(p) => session.set_last_prompt(p)?,
-                    None => return Ok(()),
+                let user_prompt = if let Some(p) = prompt {
+                    Prompt::User(p.clone())
+                } else if let Some(file_path) = prompt_file {
+                    let prompt_content =
+                        fs::read_to_string(file_path).context("Failed to read prompt file")?;
+                    Prompt::User(prompt_content)
+                } else {
+                    session.add_prompt(Prompt::User(String::new()))?;
+                    match edit::edit_prompt(&session)? {
+                        Some(p) => p,
+                        None => return Ok(()),
+                    }
                 };
+                session.set_last_prompt(user_prompt)?;
 
                 tx.prompt(&mut session, Some(sender.clone())).await?;
                 Ok(())

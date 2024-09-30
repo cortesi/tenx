@@ -155,12 +155,21 @@ impl Session {
     }
 
     /// Sets the prompt for the last step in the session.
+    /// If there are no steps, it creates a new one.
     pub fn set_last_prompt(&mut self, prompt: Prompt) -> Result<()> {
-        if let Some(last_step) = self.steps.last_mut() {
+        if self.steps.is_empty() {
+            self.steps.push(Step {
+                prompt,
+                patch: None,
+                err: None,
+                usage: None,
+            });
+            Ok(())
+        } else if let Some(last_step) = self.steps.last_mut() {
             last_step.prompt = prompt;
             Ok(())
         } else {
-            Err(TenxError::Internal("No steps in the session".into()))
+            Err(TenxError::Internal("Failed to set prompt".into()))
         }
     }
 
