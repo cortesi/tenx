@@ -155,6 +155,8 @@ enum Commands {
         #[clap(long)]
         ruskel: Vec<String>,
     },
+    /// Print information about the current project
+    Project,
     /// Refresh all contexts in the current session
     Refresh,
     /// Run preflight validation suite on the current session
@@ -509,6 +511,16 @@ async fn main() -> anyhow::Result<()> {
                     println!("{}", conf.to_toml()?);
                 }
                 Ok(()) as anyhow::Result<()>
+            }
+            Commands::Project => {
+                let project_root = config::find_project_root(&std::env::current_dir()?);
+                println!(
+                    "{} {}",
+                    "project root:".blue().bold(),
+                    project_root.display()
+                );
+                println!("{} {}", "include strategy:".blue().bold(), config.include);
+                Ok(())
             }
             Commands::Files => {
                 let session = tx.load_session_cwd()?;

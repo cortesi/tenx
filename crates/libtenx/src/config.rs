@@ -125,6 +125,21 @@ pub enum Include {
     Glob(Vec<String>),
 }
 
+impl std::fmt::Display for Include {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Include::Git => write!(f, "git"),
+            Include::Glob(patterns) => {
+                write!(f, "glob patterns:")?;
+                for pattern in patterns {
+                    write!(f, " {}", pattern)?;
+                }
+                Ok(())
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Validators {
     pub rust_cargo_check: bool,
