@@ -44,6 +44,10 @@ pub enum Event {
     PromptStart,
     /// Prompt has completed successfully
     PromptEnd,
+    /// A model request has started
+    ModelRequestStart,
+    /// A model request has completed
+    ModelRequestEnd,
 
     /// A snippet of output text received from a model
     Snippet(String),
@@ -105,8 +109,7 @@ impl Event {
             Event::Snippet(s)
             | Event::FormatterStart(s)
             | Event::FormatterEnd(s)
-            | Event::ValidatorStart(s)
-            | Event::ValidatorOk(s) => s.clone(),
+            | Event::ValidatorStart(s) => s.clone(),
             Event::Log(_, s) => s.clone(),
             _ => String::new(),
         }

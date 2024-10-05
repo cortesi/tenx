@@ -178,8 +178,7 @@ impl Tenx {
     /// Resets the session to a specific step.
     pub fn reset(&self, session: &mut Session, offset: usize) -> Result<()> {
         session.reset(offset)?;
-        let result = self.save_session(session);
-        result
+        self.save_session(session)
     }
 
     /// Common logic for processing a prompt and updating the state. The prompt that will be
@@ -245,7 +244,10 @@ impl Tenx {
         session: &mut Session,
         sender: Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
-        session.prompt(&self.config, sender.clone()).await?;
+        send_event(&sender, Event::ModelRequestStart)?;
+        let prompt_result = session.prompt(&self.config, sender.clone()).await;
+        send_event(&sender, Event::ModelRequestEnd)?;
+        prompt_result?;
         send_event(&sender, Event::ApplyPatch)?;
         session.apply_last_patch()?;
         self.run_formatters(session, &sender)?;

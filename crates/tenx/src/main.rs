@@ -451,8 +451,9 @@ async fn progress_events(mut receiver: mpsc::Receiver<Event>, mut kill_signal: m
                     Event::Finish => {
                         manage_spinner(&mut current_spinner, |s| s.finish());
                     }
-                    Event::PromptEnd => {
-                        println!("\n\n");
+                    Event::ModelRequestEnd => {
+                        manage_spinner(&mut current_spinner, |s| s.finish());
+                        println!("\n");
                     }
                     _ => {}
                 }
