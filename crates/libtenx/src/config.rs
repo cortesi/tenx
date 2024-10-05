@@ -521,6 +521,11 @@ impl Config {
         self
     }
 
+    pub fn with_root<P: AsRef<Path>>(mut self, path: P) -> Self {
+        self.project_root = ProjectRoot::Path(path.as_ref().into());
+        self
+    }
+
     /// Loads the Anthropic API key from the ANTHROPIC_API_KEY environment variable, if it exists.
     pub fn load_env(mut self) -> Self {
         if let Ok(key) = env::var("ANTHROPIC_API_KEY") {

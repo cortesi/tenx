@@ -731,7 +731,7 @@ async fn main() -> anyhow::Result<()> {
                 let mut session = tx.session_from_cwd(&Some(sender.clone()))?;
                 tx.add_contexts(&mut session, files, ruskel, &Some(sender.clone()))?;
                 tx.save_session(&session)?;
-                println!("new session: {}", session.root.display());
+                println!("new session: {}", config.project_root().display());
                 Ok(())
             }
             Commands::Fix {

@@ -30,8 +30,7 @@ impl Tenx {
     /// Creates a new Session, discovering the root from the current working directory and
     /// adding the default context from the config.
     pub fn session_from_cwd(&self, sender: &Option<mpsc::Sender<Event>>) -> Result<Session> {
-        let root = self.config.project_root();
-        let mut session = Session::new(root);
+        let mut session = Session::new();
 
         // Add default context
         self.add_contexts(
@@ -122,7 +121,7 @@ impl Tenx {
     /// Saves a session to the store.
     pub fn save_session(&self, session: &Session) -> Result<()> {
         let session_store = SessionStore::open(self.config.session_store_dir())?;
-        session_store.save(session)?;
+        session_store.save(&self.config, session)?;
         Ok(())
     }
 
@@ -182,11 +181,11 @@ impl Tenx {
         sender: Option<mpsc::Sender<Event>>,
         session_store: &SessionStore,
     ) -> Result<()> {
-        session_store.save(session)?;
+        session_store.save(&self.config, session)?;
         if session.last_step_error().is_none() {
             if let Err(e) = self.run_preflight_validators(session, &sender) {
                 session.set_last_error(&e);
-                session_store.save(session)?;
+                session_store.save(&self.config, session)?;
                 return Err(e);
             }
         }
@@ -208,7 +207,7 @@ impl Tenx {
                         retry_count, self.config.retry_limit, e
                     );
                     session.add_prompt(Prompt::Auto(model_message.to_string()))?;
-                    session_store.save(session)?;
+                    session_store.save(&self.config, session)?;
                 } else {
                     debug!("Non-retryable error: {}", e);
                     send_event(&sender, Event::Fatal(format!("{}", e)))?;
@@ -221,7 +220,7 @@ impl Tenx {
             send_event(&sender, Event::PromptEnd)?;
             match result {
                 Ok(()) => {
-                    session_store.save(session)?;
+                    session_store.save(&self.config, session)?;
                     send_event(&sender, Event::Finish)?;
                     return Ok(());
                 }
@@ -312,10 +311,7 @@ impl Tenx {
 mod tests {
     use super::*;
 
-    use crate::{
-        config::ProjectRoot,
-        patch::{Change, Patch, WriteFile},
-    };
+    use crate::patch::{Change, Patch, WriteFile};
 
     use fs_err as fs;
     use std::path::PathBuf;
@@ -323,32 +319,37 @@ mod tests {
     use tempfile::tempdir;
 
     #[tokio::test]
-    async fn test_tenx_process_prompt() -> Result<()> {
+    async fn test_tenx_process_prompt() {
         let temp_dir = tempdir().unwrap();
-        let mut config =
-            Config::default().with_dummy_model(crate::model::DummyModel::from_patch(Patch {
+        let mut config = Config::default()
+            .with_dummy_model(crate::model::DummyModel::from_patch(Patch {
                 changes: vec![Change::Write(WriteFile {
                     path: PathBuf::from("test.txt"),
                     content: "Updated content".to_string(),
                 })],
                 comment: Some("Test comment".to_string()),
                 cache: Default::default(),
-            }));
-        config.project_root = ProjectRoot::Path(temp_dir.path().into());
-        config.session_store_dir = temp_dir.path().into();
+            }))
+            .with_root(temp_dir.path());
+        config.session_store_dir = temp_dir.path().join("sess");
         config.retry_limit = 1;
 
         let tenx = Tenx::new(config.clone());
         let test_file_path = temp_dir.path().join("test.txt");
         fs::write(&test_file_path, "Initial content").unwrap();
 
-        let mut session = Session::new(temp_dir.path().to_path_buf());
-        session.add_prompt(Prompt::User("Test prompt".to_string()))?;
-        session.add_editable_path(&config, test_file_path.clone())?;
+        let mut session = Session::new();
+        session
+            .add_prompt(Prompt::User("Test prompt".to_string()))
+            .unwrap();
+        session
+            .add_editable_path(&config, test_file_path.clone())
+            .unwrap();
 
-        let session_store = SessionStore::open(temp_dir.path().to_path_buf())?;
+        let session_store = SessionStore::open(config.session_store_dir).unwrap();
         tenx.process_prompt(&mut session, None, &session_store)
-            .await?;
+            .await
+            .unwrap();
 
         assert_eq!(session.steps().len(), 1);
         assert!(session.steps()[0].patch.is_some());
@@ -359,7 +360,5 @@ mod tests {
 
         let file_content = fs::read_to_string(&test_file_path).unwrap();
         assert_eq!(file_content, "Updated content");
-
-        Ok(())
     }
 }

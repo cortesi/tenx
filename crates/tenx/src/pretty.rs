@@ -24,19 +24,19 @@ pub fn session(config: &Config, session: &Session, full: bool) -> Result<String>
         .map(|(Width(w), _)| w as usize)
         .unwrap_or(DEFAULT_WIDTH);
     let mut output = String::new();
-    output.push_str(&print_session_info(session));
+    output.push_str(&print_session_info(config, session));
     output.push_str(&print_context_specs(session));
     output.push_str(&print_editables(config, session)?);
     output.push_str(&print_steps(config, session, full, width)?);
     Ok(output)
 }
 
-fn print_session_info(session: &Session) -> String {
+fn print_session_info(config: &Config, _: &Session) -> String {
     let mut output = String::new();
     output.push_str(&format!(
         "{} {}\n",
         "root:".blue().bold(),
-        session.root.display()
+        config.project_root().display()
     ));
     output
 }
@@ -248,7 +248,7 @@ mod tests {
     fn create_test_session() -> (TempDir, Session) {
         let temp_dir = TempDir::new().unwrap();
         let root_path = temp_dir.path().to_path_buf();
-        let mut session = Session::new(root_path.clone());
+        let mut session = Session::new();
         session
             .add_prompt(Prompt::User("Test prompt".to_string()))
             .unwrap();

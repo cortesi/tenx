@@ -211,8 +211,8 @@ mod tests {
 
     #[test]
     fn test_cargo_checker() -> Result<()> {
-        let config = Config::default();
         let temp_dir = TempDir::new().unwrap();
+        let config = Config::default().with_root(temp_dir.path());
         create_dummy_project(temp_dir.path()).unwrap();
 
         let edit_paths = vec![
@@ -221,7 +221,7 @@ mod tests {
         ];
         let prompt = Prompt::User(String::new());
 
-        let mut session = Session::new(temp_dir.path().to_path_buf());
+        let mut session = Session::new();
         session.add_prompt(prompt.clone())?;
         for p in edit_paths {
             session.add_editable_path(&config, &p)?;
@@ -236,7 +236,7 @@ mod tests {
     #[test]
     fn test_discover_workspace() -> Result<()> {
         let temp_dir = TempDir::new().unwrap();
-        let config = Config::default();
+        let config = Config::default().with_root(temp_dir.path());
         create_dummy_project(temp_dir.path()).unwrap();
 
         let edit_paths = vec![
@@ -246,7 +246,7 @@ mod tests {
 
         let prompt = Prompt::User(String::new());
 
-        let mut session = Session::new(temp_dir.path().to_path_buf());
+        let mut session = Session::new();
         session.add_prompt(prompt)?;
         for p in edit_paths {
             session.add_editable_path(&config, &p)?;
@@ -263,15 +263,15 @@ mod tests {
 
     #[test]
     fn test_discover_single_crate() -> Result<()> {
-        let config = Config::default();
         let temp_dir = TempDir::new().unwrap();
+        let config = Config::default().with_root(temp_dir.path());
         create_dummy_project(temp_dir.path()).unwrap();
 
         let edit_paths = vec![temp_dir.path().join("crate1/src/lib.rs")];
 
         let prompt = Prompt::User(String::new());
 
-        let mut session = Session::new(temp_dir.path().to_path_buf());
+        let mut session = Session::new();
         session.add_prompt(prompt)?;
         for p in edit_paths {
             session.add_editable_path(&config, &p)?;
@@ -289,12 +289,12 @@ mod tests {
 
     #[test]
     fn test_no_cargo_toml() -> Result<()> {
-        let config = Config::default();
         let temp_dir = TempDir::new().unwrap();
+        let config = Config::default().with_root(temp_dir.path());
 
         let prompt = Prompt::User(String::new());
 
-        let mut session = Session::new(temp_dir.path().to_path_buf());
+        let mut session = Session::new();
         session.add_prompt(prompt)?;
         session.add_editable_path(&config, temp_dir.path())?;
 
@@ -308,12 +308,12 @@ mod tests {
 
     #[test]
     fn test_no_paths_provided() -> Result<()> {
-        let config = Config::default();
         let temp_dir = TempDir::new().unwrap();
+        let config = Config::default().with_root(temp_dir.path());
 
         let prompt = Prompt::default();
 
-        let mut session = Session::new(temp_dir.path().to_path_buf());
+        let mut session = Session::new();
         session.add_prompt(prompt)?;
 
         let result = RustWorkspace::discover(&config, &session);
@@ -329,8 +329,9 @@ mod tests {
 
     #[test]
     fn test_no_common_ancestor() -> Result<()> {
-        let config = Config::default();
         let temp_dir1 = TempDir::new().unwrap();
+        let config = Config::default().with_root(temp_dir1.path());
+
         let temp_dir2 = TempDir::new().unwrap();
 
         let edit_paths = vec![
@@ -340,7 +341,7 @@ mod tests {
 
         let prompt = Prompt::User(String::new());
 
-        let mut session = Session::new(temp_dir1.path().to_path_buf());
+        let mut session = Session::new();
         session.add_prompt(prompt)?;
         for f in edit_paths {
             session.add_editable_path(&config, &f)?;

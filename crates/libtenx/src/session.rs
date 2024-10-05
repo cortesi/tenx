@@ -29,9 +29,6 @@ fn is_glob(s: &str) -> bool {
 /// A serializable session, which persists between invocations.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Session {
-    /// The session root directory. This is always an absolute path. Context and editable files are
-    /// always relative to the root.
-    pub root: PathBuf,
     steps: Vec<Step>,
     pub(crate) context: Vec<context::ContextSpec>,
     editable: Vec<PathBuf>,
@@ -55,9 +52,8 @@ impl Session {
 
 impl Session {
     /// Creates a new Session with the specified root directory, dialect, and model.
-    pub fn new(root: PathBuf) -> Self {
+    pub fn new() -> Self {
         Self {
-            root: root.canonicalize().unwrap(),
             steps: vec![],
             context: vec![],
             editable: vec![],
@@ -306,7 +302,7 @@ mod tests {
     #[test]
     fn test_add_context_ignores_duplicates() {
         let temp_dir = tempdir().unwrap();
-        let mut session = Session::new(temp_dir.path().to_path_buf());
+        let mut session = Session::new();
 
         let test_file = temp_dir.path().join("test.txt");
         fs::write(&test_file, "content").unwrap();
@@ -342,7 +338,7 @@ mod tests {
 
         config.project_root = ProjectRoot::Path(root_dir.clone());
 
-        let mut session = Session::new(root_dir.clone());
+        let mut session = Session::new();
 
         // Create initial file
         fs::write(&file_path, "Initial content").unwrap();

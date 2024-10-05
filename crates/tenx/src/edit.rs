@@ -99,7 +99,6 @@ mod tests {
     use indoc::indoc;
     use libtenx::patch::Patch;
     use pretty_assertions::assert_eq;
-    use std::path::PathBuf;
 
     #[test]
     fn test_parse_edited_text() {
@@ -127,7 +126,7 @@ mod tests {
 
     #[test]
     fn test_render_initial_text() {
-        let mut session = Session::new(PathBuf::from("/"));
+        let mut session = Session::new();
         session
             .add_prompt(Prompt::User(
                 "First prompt\nwith multiple lines".to_string(),

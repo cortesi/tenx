@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use fs_err as fs;
 
-use crate::{Result, Session, TenxError};
+use crate::{config::Config, Result, Session, TenxError};
 
 /// Normalizes a path for use as a filename by replacing problematic characters.
 pub fn normalize_path(path: &Path) -> String {
@@ -25,8 +25,8 @@ impl SessionStore {
     }
 
     /// Saves the given State to a file.
-    pub fn save(&self, state: &Session) -> Result<()> {
-        let file_name = normalize_path(&state.root);
+    pub fn save(&self, config: &Config, state: &Session) -> Result<()> {
+        let file_name = normalize_path(&config.project_root());
         let file_path = self.base_dir.join(file_name);
         let serialized = serde_json::to_string(state)
             .map_err(|e| TenxError::SessionStore(format!("serialization failed: {}", e)))?;
@@ -45,6 +45,7 @@ impl SessionStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::ProjectRoot;
     use tempfile::TempDir;
 
     #[test]
@@ -60,14 +61,16 @@ mod tests {
     #[test]
     fn test_state_store() -> Result<()> {
         let temp_dir = TempDir::new().unwrap();
+        let mut config = Config::default();
+        config.project_root = ProjectRoot::Path(temp_dir.path().into());
+
         let state_store = SessionStore::open(temp_dir.path().into()).unwrap();
 
-        let state = Session::new(temp_dir.path().to_path_buf());
-        state_store.save(&state).unwrap();
+        let state = Session::new();
+        state_store.save(&config, &state).unwrap();
 
-        let name = normalize_path(&state.root);
-        let loaded_state = state_store.load(name)?;
-        assert_eq!(loaded_state.root, state.root);
+        let name = normalize_path(&config.project_root());
+        let _ = state_store.load(name)?;
         Ok(())
     }
 }
