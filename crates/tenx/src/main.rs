@@ -155,16 +155,8 @@ enum Commands {
         #[clap(long)]
         ruskel: Vec<String>,
     },
-    /// Print information about the current project
-    Project,
-    /// Refresh all contexts in the current session
-    Refresh,
-    /// Run preflight validation suite on the current session
-    Preflight,
     /// Clear the current session without resetting changes
     Clear,
-    /// Run formatters on the current session
-    Format,
     /// Print the current configuration
     Conf {
         /// Output as JSON instead of TOML
@@ -205,6 +197,8 @@ enum Commands {
         #[clap(long)]
         ctx: Vec<String>,
     },
+    /// List files included in the project
+    Files,
     /// Start a new session and attempt to fix any preflight failures
     Fix {
         /// Specifies files to edit
@@ -223,10 +217,10 @@ enum Commands {
         #[clap(long)]
         clear: bool,
     },
+    /// Run formatters on the current session
+    Format,
     /// List all formatters and their status
     Formatters,
-    /// List files included in the project
-    Files,
     /// Create a new session
     New {
         /// Specifies files to add as context
@@ -259,6 +253,12 @@ enum Commands {
         #[clap(long)]
         prompt_file: Option<PathBuf>,
     },
+    /// Run preflight validation suite on the current session
+    Preflight,
+    /// Print information about the current project
+    Project,
+    /// Refresh all contexts in the current session
+    Refresh,
     /// Reset the session to a specific step, undoing changes
     Reset {
         /// The step offset to reset to
