@@ -60,7 +60,7 @@ fn walk_directory(
 
 /// Finds the root directory based on a specified working directory, git repo root, or .tenx.conf
 /// file.
-pub fn find_project_root(current_dir: &Path) -> PathBuf {
+fn find_project_root(current_dir: &Path) -> PathBuf {
     let mut dir = current_dir.to_path_buf();
     loop {
         if dir.join(".git").is_dir() || dir.join(LOCAL_CONFIG_FILE).is_file() {

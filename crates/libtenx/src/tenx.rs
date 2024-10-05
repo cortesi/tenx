@@ -1,5 +1,3 @@
-use std::{env, path::Path};
-
 use tokio::sync::mpsc;
 use tracing::{debug, warn};
 
@@ -32,9 +30,7 @@ impl Tenx {
     /// Creates a new Session, discovering the root from the current working directory and
     /// adding the default context from the config.
     pub fn session_from_cwd(&self, sender: &Option<mpsc::Sender<Event>>) -> Result<Session> {
-        let cwd = env::current_dir()
-            .map_err(|e| TenxError::Internal(format!("Could not access cwd: {}", e)))?;
-        let root = crate::config::find_project_root(&cwd);
+        let root = self.config.project_root();
         let mut session = Session::new(root);
 
         // Add default context
@@ -131,8 +127,8 @@ impl Tenx {
     }
 
     /// Loads a session from the store based on the given path.
-    pub fn load_session<P: AsRef<Path>>(&self, path: P) -> Result<Session> {
-        let root = crate::config::find_project_root(path.as_ref());
+    pub fn load_session(&self) -> Result<Session> {
+        let root = self.config.project_root();
         let session_store = SessionStore::open(self.config.session_store_dir())?;
         let name = normalize_path(&root);
         session_store.load(name)
@@ -140,10 +136,7 @@ impl Tenx {
 
     /// Loads a session from the store based on the current working directory.
     pub fn load_session_cwd(&self) -> Result<Session> {
-        let current_dir = env::current_dir()
-            .map_err(|e| TenxError::Internal(format!("Could not get cwd: {}", e)))?;
-        let root = crate::config::find_project_root(&current_dir);
-        self.load_session(root)
+        self.load_session()
     }
 
     /// Retries the last prompt by rolling it back and sending it off for prompting..

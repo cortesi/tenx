@@ -312,7 +312,7 @@ fn load_config(cli: &Cli) -> Result<config::Config> {
     }
 
     // Load from local config file
-    let project_root = config::find_project_root(&std::env::current_dir()?);
+    let project_root = config.project_root();
     let local_config_path = project_root.join(config::LOCAL_CONFIG_FILE);
     if local_config_path.exists() {
         let local_config_str =
@@ -514,7 +514,7 @@ async fn main() -> anyhow::Result<()> {
                 Ok(()) as anyhow::Result<()>
             }
             Commands::Project => {
-                let project_root = config::find_project_root(&std::env::current_dir()?);
+                let project_root = config.project_root();
                 println!(
                     "{} {}",
                     "project root:".blue().bold(),
