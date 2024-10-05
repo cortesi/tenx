@@ -334,6 +334,41 @@ impl Config {
             .map_err(|e| TenxError::Internal(format!("Could not canonicalize: {}", e)))
     }
 
+    /// Normalizes a path relative to the root directory.
+    pub fn normalize_path<P: AsRef<Path>>(&self, path: P) -> Result<PathBuf> {
+        self.normalize_path_with_cwd(
+            path,
+            env::current_dir()
+                .map_err(|e| TenxError::Internal(format!("Could not get cwd: {}", e)))?,
+        )
+    }
+
+    /// Normalizes a path relative to the root directory with a given current working directory.
+    pub fn normalize_path_with_cwd<P: AsRef<Path>>(
+        &self,
+        path: P,
+        current_dir: PathBuf,
+    ) -> Result<PathBuf> {
+        let path = path.as_ref();
+        if path.is_relative() {
+            let absolute_path = current_dir
+                .join(path)
+                .canonicalize()
+                .map_err(|e| TenxError::Internal(format!("Could not canonicalize: {}", e)))?;
+
+            Ok(absolute_path
+                .strip_prefix(
+                    self.project_root().canonicalize().map_err(|e| {
+                        TenxError::Internal(format!("Could not canonicalize: {}", e))
+                    })?,
+                )
+                .unwrap_or(&absolute_path)
+                .to_path_buf())
+        } else {
+            Ok(path.to_path_buf())
+        }
+    }
+
     /// Traverse the included files and return a list of files that match the given glob pattern.
     pub fn match_files_with_glob(&self, pattern: &str) -> Result<Vec<PathBuf>> {
         let project_root = &self.project_root();
@@ -827,6 +862,59 @@ mod tests {
 
         // Reset the working directory
         env::set_current_dir(original_dir)?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_normalize_path_with_cwd() -> Result<()> {
+        let temp_dir = tempdir().unwrap();
+        let root = temp_dir.path().join("root");
+        let mut config = Config::default();
+        config.project_root = ProjectRoot::Path(root.clone());
+
+        fs::create_dir(&root).unwrap();
+        let sub_dir = root.join("subdir");
+        fs::create_dir(&sub_dir).unwrap();
+
+        // Test 1: Current dir is the root directory
+        {
+            fs::File::create(root.join("file.txt")).unwrap();
+            let result = config.normalize_path_with_cwd("file.txt", root.clone())?;
+            assert_eq!(result, PathBuf::from("file.txt"));
+        }
+
+        // Test 2: Current dir is under the root directory
+        {
+            fs::File::create(sub_dir.join("subfile.txt")).unwrap();
+            let result = config.normalize_path_with_cwd("subfile.txt", sub_dir.clone())?;
+            assert_eq!(result, PathBuf::from("subdir/subfile.txt"));
+        }
+
+        // Test 3: Current dir is outside the root directory
+        {
+            let outside_dir = temp_dir.path().join("outside");
+            fs::create_dir(&outside_dir).unwrap();
+            fs::File::create(outside_dir.join("outsidefile.txt")).unwrap();
+            let result = config.normalize_path_with_cwd("outsidefile.txt", outside_dir.clone())?;
+            let expected = outside_dir
+                .join("outsidefile.txt")
+                .strip_prefix(&root)
+                .unwrap_or(&outside_dir.join("outsidefile.txt"))
+                .to_path_buf();
+            assert_eq!(
+                result.canonicalize().unwrap(),
+                expected.canonicalize().unwrap()
+            );
+        }
+
+        // Test 4: Absolute path
+        {
+            let abs_path = root.join("abs_file.txt");
+            fs::File::create(&abs_path).unwrap();
+            let result = config.normalize_path_with_cwd(&abs_path, root.clone())?;
+            assert_eq!(result, abs_path);
+        }
 
         Ok(())
     }

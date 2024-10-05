@@ -338,13 +338,13 @@ mod tests {
         config.session_store_dir = temp_dir.path().into();
         config.retry_limit = 1;
 
-        let tenx = Tenx::new(config);
+        let tenx = Tenx::new(config.clone());
         let test_file_path = temp_dir.path().join("test.txt");
         fs::write(&test_file_path, "Initial content").unwrap();
 
         let mut session = Session::new(temp_dir.path().to_path_buf());
         session.add_prompt(Prompt::User("Test prompt".to_string()))?;
-        session.add_editable_path(test_file_path.clone())?;
+        session.add_editable_path(&config, test_file_path.clone())?;
 
         let session_store = SessionStore::open(temp_dir.path().to_path_buf())?;
         tenx.process_prompt(&mut session, None, &session_store)
