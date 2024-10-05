@@ -6,6 +6,7 @@ use std::{
 };
 
 use globset::{Glob, GlobSetBuilder};
+use pathdiff::diff_paths;
 use serde::ser::{SerializeStruct, Serializer};
 
 use toml;
@@ -320,6 +321,54 @@ impl Config {
         }
     }
 
+    /// Traverse the included files and return a list of files that match the given glob pattern.
+    pub fn match_files_with_glob(&self, pattern: &str) -> Result<Vec<PathBuf>> {
+        let project_root = &self.project_root();
+        let glob = Glob::new(pattern)
+            .map_err(|e| TenxError::Internal(format!("Invalid glob pattern: {}", e)))?;
+        let included_files = self.included_files()?;
+
+        let current_dir = env::current_dir()
+            .map_err(|e| TenxError::Internal(format!("Failed to get current directory: {}", e)))?;
+
+        let mut matched_files = Vec::new();
+
+        for file in included_files {
+            let relative_path = if file.is_absolute() {
+                file.strip_prefix(project_root).unwrap_or(&file)
+            } else {
+                &file
+            };
+
+            let match_path = if current_dir != *project_root {
+                // If we're in a subdirectory, we need to adjust the path for matching
+                diff_paths(
+                    relative_path,
+                    current_dir
+                        .strip_prefix(project_root)
+                        .unwrap_or(Path::new("")),
+                )
+                .unwrap_or_else(|| relative_path.to_path_buf())
+            } else {
+                relative_path.to_path_buf()
+            };
+
+            if glob.compile_matcher().is_match(&match_path) {
+                let absolute_path = project_root.join(relative_path);
+                if absolute_path.exists() {
+                    matched_files.push(relative_path.to_path_buf());
+                } else {
+                    return Err(TenxError::Internal(format!(
+                        "File does not exist: {:?}",
+                        absolute_path
+                    )));
+                }
+            }
+        }
+
+        Ok(matched_files)
+    }
+
     pub fn included_files(&self) -> Result<Vec<PathBuf>> {
         let project_root = self.project_root();
         match &self.include {
@@ -461,6 +510,7 @@ impl Config {
 mod tests {
     use super::*;
     use std::fs::File;
+    use tempfile::tempdir;
     use tempfile::TempDir;
 
     macro_rules! set_config {
@@ -676,5 +726,95 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(config_path.project_root(), PathBuf::from("/custom/path"));
+    }
+
+    #[test]
+    fn test_match_files_with_glob() -> Result<()> {
+        let temp_dir = tempdir()
+            .map_err(|e| TenxError::Internal(format!("Failed to create temp dir: {}", e)))?;
+        let root_dir = temp_dir
+            .path()
+            .canonicalize()
+            .map_err(|e| TenxError::Internal(format!("Failed to canonicalize temp dir: {}", e)))?;
+
+        // Create directory structure
+        fs::create_dir_all(root_dir.join("src/subdir"))
+            .map_err(|e| TenxError::Internal(format!("Failed to create src/subdir: {}", e)))?;
+        fs::create_dir_all(root_dir.join("tests"))
+            .map_err(|e| TenxError::Internal(format!("Failed to create tests dir: {}", e)))?;
+        fs::write(root_dir.join("src/file1.rs"), "content1")
+            .map_err(|e| TenxError::Internal(format!("Failed to write src/file1.rs: {}", e)))?;
+        fs::write(root_dir.join("src/subdir/file2.rs"), "content2").map_err(|e| {
+            TenxError::Internal(format!("Failed to write src/subdir/file2.rs: {}", e))
+        })?;
+        fs::write(root_dir.join("tests/test1.rs"), "test_content1")
+            .map_err(|e| TenxError::Internal(format!("Failed to write tests/test1.rs: {}", e)))?;
+        fs::write(root_dir.join("README.md"), "readme_content")
+            .map_err(|e| TenxError::Internal(format!("Failed to write README.md: {}", e)))?;
+
+        // Create a mock config
+        let mut config = Config::default();
+        config.include = Include::Glob(vec!["**/*.rs".to_string(), "README.md".to_string()]);
+        config.project_root = ProjectRoot::Path(root_dir.clone());
+
+        // Test matching files from root directory
+        let matched_files = config.match_files_with_glob("src/**/*.rs")?;
+        assert_eq!(
+            matched_files.len(),
+            2,
+            "Expected 2 matched files, got {}",
+            matched_files.len()
+        );
+        assert!(
+            matched_files.contains(&PathBuf::from("src/file1.rs")),
+            "src/file1.rs not matched"
+        );
+        assert!(
+            matched_files.contains(&PathBuf::from("src/subdir/file2.rs")),
+            "src/subdir/file2.rs not matched"
+        );
+
+        // Store the original working directory
+        let original_dir = env::current_dir()?;
+
+        // Test matching files from subdirectory
+        env::set_current_dir(root_dir.join("src"))?;
+        let matched_files = config.match_files_with_glob("**/*.rs")?;
+        assert_eq!(
+            matched_files.len(),
+            3,
+            "Expected 3 matched files, got {}",
+            matched_files.len()
+        );
+        assert!(
+            matched_files.contains(&PathBuf::from("src/file1.rs")),
+            "src/file1.rs not matched"
+        );
+        assert!(
+            matched_files.contains(&PathBuf::from("src/subdir/file2.rs")),
+            "src/subdir/file2.rs not matched"
+        );
+        assert!(
+            matched_files.contains(&PathBuf::from("tests/test1.rs")),
+            "tests/test1.rs not matched"
+        );
+
+        // Test matching non-Rust files
+        let matched_files = config.match_files_with_glob("../*.md")?;
+        assert_eq!(
+            matched_files.len(),
+            1,
+            "Expected 1 matched file, got {}",
+            matched_files.len()
+        );
+        assert!(
+            matched_files.contains(&PathBuf::from("README.md")),
+            "README.md not matched"
+        );
+
+        // Reset the working directory
+        env::set_current_dir(original_dir)?;
+
+        Ok(())
     }
 }

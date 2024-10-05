@@ -123,7 +123,7 @@ impl ContextProvider for Glob {
         config: &crate::config::Config,
         session: &Session,
     ) -> Result<Vec<ContextItem>> {
-        let matched_files = session.match_files_with_glob(config, &self.pattern)?;
+        let matched_files = config.match_files_with_glob(&self.pattern)?;
         let mut contexts = Vec::new();
         for file in matched_files {
             let abs_path = session.abspath(&file)?;
@@ -141,8 +141,8 @@ impl ContextProvider for Glob {
         self.pattern.to_string()
     }
 
-    fn count(&self, config: &crate::config::Config, session: &Session) -> Result<usize> {
-        let matched_files = session.match_files_with_glob(config, &self.pattern)?;
+    fn count(&self, config: &crate::config::Config, _: &Session) -> Result<usize> {
+        let matched_files = config.match_files_with_glob(&self.pattern)?;
         Ok(matched_files.len())
     }
 
