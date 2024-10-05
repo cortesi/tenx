@@ -5,6 +5,7 @@ use std::path::PathBuf;
 
 use super::{xmlish, DialectProvider};
 use crate::{
+    config::Config,
     context::ContextProvider,
     patch::{Change, Patch, Replace, Smart, UDiff, WriteFile},
     Result, Session, TenxError,
@@ -52,7 +53,7 @@ impl DialectProvider for Tags {
         out
     }
 
-    fn render_context(&self, s: &Session) -> Result<String> {
+    fn render_context(&self, config: &Config, s: &Session) -> Result<String> {
         if self.system().is_empty() {
             return Ok("There is no non-editable context.".into());
         }
@@ -60,7 +61,7 @@ impl DialectProvider for Tags {
         let mut rendered = String::new();
         rendered.push_str("<context>\n");
         for cspec in s.context() {
-            for ctx in cspec.contexts(&crate::config::Config::default(), s)? {
+            for ctx in cspec.contexts(config, s)? {
                 rendered.push_str(&format!(
                     "<item name=\"{}\" type=\"{:?}\">\n{}\n</item>\n",
                     ctx.name, ctx.ty, ctx.body
@@ -71,10 +72,15 @@ impl DialectProvider for Tags {
         Ok(rendered)
     }
 
-    fn render_editables(&self, session: &Session, paths: Vec<PathBuf>) -> Result<String> {
+    fn render_editables(
+        &self,
+        config: &Config,
+        _session: &Session,
+        paths: Vec<PathBuf>,
+    ) -> Result<String> {
         let mut rendered = String::new();
         for path in paths {
-            let contents = fs::read_to_string(session.abspath(&path)?)?;
+            let contents = fs::read_to_string(config.abspath(&path)?)?;
             rendered.push_str(&format!(
                 "<editable path=\"{}\">\n{}</editable>\n\n",
                 path.display(),
@@ -84,7 +90,12 @@ impl DialectProvider for Tags {
         Ok(rendered)
     }
 
-    fn render_step_request(&self, session: &Session, offset: usize) -> Result<String> {
+    fn render_step_request(
+        &self,
+        _config: &Config,
+        session: &Session,
+        offset: usize,
+    ) -> Result<String> {
         let prompt = session
             .steps()
             .get(offset)
@@ -206,7 +217,12 @@ impl DialectProvider for Tags {
         Ok(change_set)
     }
 
-    fn render_step_response(&self, session: &Session, offset: usize) -> Result<String> {
+    fn render_step_response(
+        &self,
+        _config: &Config,
+        session: &Session,
+        offset: usize,
+    ) -> Result<String> {
         let step = session
             .steps()
             .get(offset)

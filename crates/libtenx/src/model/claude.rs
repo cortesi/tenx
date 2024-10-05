@@ -156,12 +156,13 @@ impl Claude {
     /// Returns a formatted string containing the rendered editables and omitted files.
     fn render_editables_with_omitted(
         &self,
+        config: &Config,
         session: &Session,
         dialect: &Dialect,
         files: Vec<PathBuf>,
         omitted: Vec<PathBuf>,
     ) -> Result<String> {
-        let mut result = dialect.render_editables(session, files)?;
+        let mut result = dialect.render_editables(config, session, files)?;
         if !omitted.is_empty() {
             result.push_str(&format!("\n{}\n", OMITTED_FILES_LEADIN));
             for file in omitted {
@@ -173,6 +174,7 @@ impl Claude {
 
     fn request(
         &self,
+        config: &Config,
         session: &Session,
         dialect: &Dialect,
     ) -> Result<misanthropy::MessagesRequest> {
@@ -183,7 +185,11 @@ impl Claude {
                 misanthropy::Message {
                     role: misanthropy::Role::User,
                     content: vec![misanthropy::Content::Text(misanthropy::Text {
-                        text: format!("{}\n{}", CONTEXT_LEADIN, dialect.render_context(session)?),
+                        text: format!(
+                            "{}\n{}",
+                            CONTEXT_LEADIN,
+                            dialect.render_context(config, session)?
+                        ),
                         cache_control: Some(misanthropy::CacheControl::Ephemeral),
                     })],
                 },
@@ -199,7 +205,9 @@ impl Claude {
                         {
                             let (included, omitted) =
                                 self.filter_files(session.editable(), session, 0);
-                            self.render_editables_with_omitted(session, dialect, included, omitted)?
+                            self.render_editables_with_omitted(
+                                config, session, dialect, included, omitted,
+                            )?
                         }
                     ))],
                 },
@@ -222,14 +230,14 @@ impl Claude {
             req.messages.push(misanthropy::Message {
                 role: misanthropy::Role::User,
                 content: vec![misanthropy::Content::text(
-                    dialect.render_step_request(session, i)?,
+                    dialect.render_step_request(config, session, i)?,
                 )],
             });
             if let Some(patch) = &s.patch {
                 req.messages.push(misanthropy::Message {
                     role: misanthropy::Role::Assistant,
                     content: vec![misanthropy::Content::text(
-                        dialect.render_step_response(session, i)?,
+                        dialect.render_step_response(config, session, i)?,
                     )],
                 });
                 let (included, omitted) = self.filter_files(&patch.changed_files(), session, i);
@@ -238,7 +246,9 @@ impl Claude {
                     content: vec![misanthropy::Content::text(format!(
                         "{}\n{}",
                         EDITABLE_UPDATE_LEADIN,
-                        self.render_editables_with_omitted(session, dialect, included, omitted)?
+                        self.render_editables_with_omitted(
+                            config, session, dialect, included, omitted
+                        )?
                     ))],
                 });
                 req.messages.push(misanthropy::Message {
@@ -278,7 +288,7 @@ impl ModelProvider for Claude {
             return Err(TenxError::Internal("No pending prompt to process.".into()));
         }
         let dialect = config.dialect()?;
-        let mut req = self.request(session, &dialect)?;
+        let mut req = self.request(config, session, &dialect)?;
         trace!("Sending request: {}", serde_json::to_string_pretty(&req)?);
         let resp = self
             .stream_response(&config.anthropic_key, &req, sender)
@@ -297,7 +307,7 @@ impl ModelProvider for Claude {
 
     fn render(&self, config: &Config, session: &Session) -> Result<String> {
         let dialect = config.dialect()?;
-        let req = self.request(session, &dialect)?;
+        let req = self.request(config, session, &dialect)?;
         let json = serde_json::to_string_pretty(&req)?;
         Ok(json)
     }

@@ -4,7 +4,6 @@ use std::{
 };
 
 use fs_err as fs;
-use pathdiff::diff_paths;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -83,25 +82,12 @@ impl Session {
         &self.editable
     }
 
-    /// Calculates the relative path from the root to the given absolute path.
-    pub fn relpath(&self, path: &Path) -> PathBuf {
-        diff_paths(path, &self.root).unwrap_or_else(|| path.to_path_buf())
-    }
-
-    /// Converts a path relative to the root directory to an absolute path
-    pub fn abspath(&self, path: &Path) -> Result<PathBuf> {
-        self.root
-            .join(path)
-            .canonicalize()
-            .map_err(|e| TenxError::Internal(format!("Could not canonicalize: {}", e)))
-    }
-
     /// Returns the absolute paths of the editables for this session.
-    pub fn abs_editables(&self) -> Result<Vec<PathBuf>> {
+    pub fn abs_editables(&self, config: &config::Config) -> Result<Vec<PathBuf>> {
         self.editable
             .clone()
             .iter()
-            .map(|p| self.abspath(p))
+            .map(|p| config.abspath(p))
             .collect()
     }
 
@@ -245,10 +231,10 @@ impl Session {
 
     /// Apply a patch, entering the modified files into the patch cache. It is the caller's
     /// responsibility to save the patch back to the session if needed.
-    pub fn apply_patch(&mut self, patch: &mut Patch) -> Result<()> {
+    pub fn apply_patch(&mut self, config: &config::Config, patch: &mut Patch) -> Result<()> {
         // First, enter all the modified files into the patch cache
         for path in patch.changed_files() {
-            let abs_path = self.abspath(&path)?;
+            let abs_path = config.abspath(&path)?;
             if let std::collections::hash_map::Entry::Vacant(e) = patch.cache.entry(path) {
                 let content = fs::read_to_string(&abs_path)?;
                 e.insert(content);
@@ -263,7 +249,7 @@ impl Session {
 
         // Finally, write all files to disk
         for (path, content) in modified_cache {
-            let abs_path = self.abspath(&path)?;
+            let abs_path = config.abspath(&path)?;
             fs::write(&abs_path, content)?;
         }
 
@@ -271,22 +257,22 @@ impl Session {
     }
 
     /// Rolls back the changes made by a patch, using the cached file contents.
-    pub fn rollback(&self, patch: &Patch) -> Result<()> {
+    pub fn rollback(&self, config: &config::Config, patch: &Patch) -> Result<()> {
         for (path, content) in &patch.cache {
-            fs::write(self.abspath(path)?, content)?;
+            fs::write(config.abspath(path)?, content)?;
         }
         Ok(())
     }
 
     /// Resets the session to a specific step, removing and rolling back all subsequent steps.
-    pub fn reset(&mut self, offset: usize) -> Result<()> {
+    pub fn reset(&mut self, config: &config::Config, offset: usize) -> Result<()> {
         if offset >= self.steps.len() {
             return Err(TenxError::Internal("Invalid rollback offset".into()));
         }
 
         for step in self.steps.iter().rev().take(self.steps.len() - offset - 1) {
             if let Some(patch) = &step.patch {
-                self.rollback(patch)?;
+                self.rollback(config, patch)?;
             }
         }
 
@@ -295,9 +281,9 @@ impl Session {
     }
 
     /// Rolls back the changes in the last step, if any, and sets the Patch and error to None.
-    pub fn rollback_last(&mut self) -> Result<()> {
+    pub fn rollback_last(&mut self, config: &config::Config) -> Result<()> {
         if let Some(patch) = self.steps.last().and_then(|step| step.patch.as_ref()) {
-            self.rollback(patch)?;
+            self.rollback(config, patch)?;
         }
         if let Some(last_step) = self.steps.last_mut() {
             last_step.patch = None;
@@ -322,13 +308,13 @@ impl Session {
     }
 
     /// Applies the final patch in the session.
-    pub fn apply_last_patch(&mut self) -> Result<()> {
+    pub fn apply_last_patch(&mut self, config: &config::Config) -> Result<()> {
         let mut last_patch = self
             .steps
             .last()
             .and_then(|step| step.patch.clone())
             .ok_or_else(|| TenxError::Internal("No patch in the last step".into()))?;
-        self.apply_patch(&mut last_patch)?;
+        self.apply_patch(config, &mut last_patch)?;
         if let Some(last_step) = self.steps.last_mut() {
             last_step.patch = Some(last_patch);
         }
@@ -339,8 +325,11 @@ impl Session {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::context::ContextProvider;
-    use crate::patch::{Change, Patch, WriteFile};
+    use crate::{
+        config::ProjectRoot,
+        context::ContextProvider,
+        patch::{Change, Patch, WriteFile},
+    };
     use std::fs;
     use tempfile::tempdir;
 
@@ -431,6 +420,9 @@ mod tests {
         let temp_dir = tempdir().unwrap();
         let root_dir = temp_dir.path().to_path_buf();
         let file_path = root_dir.join("test.txt");
+        let mut config = crate::config::Config::default();
+
+        config.project_root = ProjectRoot::Path(root_dir.clone());
 
         let mut session = Session::new(root_dir.clone());
 
@@ -455,14 +447,14 @@ mod tests {
             };
             session.add_prompt(Prompt::User(format!("Prompt {}", i)))?;
             session.set_last_patch(&patch);
-            session.apply_patch(&mut patch.clone())?;
+            session.apply_patch(&config, &mut patch.clone())?;
         }
 
         assert_eq!(session.steps.len(), 3);
         assert_eq!(fs::read_to_string(&file_path).unwrap(), "Content 3");
 
         // Rollback to the first step
-        session.reset(0)?;
+        session.reset(&config, 0)?;
 
         assert_eq!(session.steps.len(), 1);
         assert_eq!(fs::read_to_string(&file_path).unwrap(), "Content 1");

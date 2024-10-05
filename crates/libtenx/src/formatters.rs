@@ -5,7 +5,7 @@ use crate::{config::Config, validators::Runnable, Result, Session};
 
 pub trait Formatter {
     fn name(&self) -> &'static str;
-    fn format(&self, state: &Session) -> Result<()>;
+    fn format(&self, config: &Config, state: &Session) -> Result<()>;
     fn is_relevant(&self, config: &Config, state: &Session) -> Result<bool>;
     fn is_configured(&self, config: &Config) -> bool;
     fn runnable(&self) -> Result<Runnable>;

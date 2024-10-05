@@ -4,7 +4,7 @@ mod dummy_dialect;
 mod tags;
 mod xmlish;
 
-use crate::{patch::Patch, Result, Session};
+use crate::{config::Config, patch::Patch, Result, Session};
 
 pub use dummy_dialect::*;
 pub use tags::*;
@@ -20,16 +20,31 @@ pub trait DialectProvider {
 
     /// Render the immutable context to be sent to the model. This is included once in the
     /// conversation.
-    fn render_context(&self, p: &Session) -> Result<String>;
+    fn render_context(&self, config: &Config, p: &Session) -> Result<String>;
 
     /// Render the request portion of a step.
-    fn render_step_request(&self, session: &Session, offset: usize) -> Result<String>;
+    fn render_step_request(
+        &self,
+        config: &Config,
+        session: &Session,
+        offset: usize,
+    ) -> Result<String>;
 
     /// Render the response portion of a step.
-    fn render_step_response(&self, session: &Session, offset: usize) -> Result<String>;
+    fn render_step_response(
+        &self,
+        config: &Config,
+        session: &Session,
+        offset: usize,
+    ) -> Result<String>;
 
     /// Render the editable context section
-    fn render_editables(&self, session: &Session, paths: Vec<PathBuf>) -> Result<String>;
+    fn render_editables(
+        &self,
+        config: &Config,
+        session: &Session,
+        paths: Vec<PathBuf>,
+    ) -> Result<String>;
 
     /// Parse a model's response into concrete operations
     fn parse(&self, txt: &str) -> Result<Patch>;
@@ -56,24 +71,34 @@ impl DialectProvider for Dialect {
         }
     }
 
-    fn render_context(&self, s: &Session) -> Result<String> {
+    fn render_context(&self, config: &Config, s: &Session) -> Result<String> {
         match self {
-            Dialect::Tags(t) => t.render_context(s),
-            Dialect::Dummy(d) => d.render_context(s),
+            Dialect::Tags(t) => t.render_context(config, s),
+            Dialect::Dummy(d) => d.render_context(config, s),
         }
     }
 
-    fn render_editables(&self, session: &Session, paths: Vec<PathBuf>) -> Result<String> {
+    fn render_editables(
+        &self,
+        config: &Config,
+        session: &Session,
+        paths: Vec<PathBuf>,
+    ) -> Result<String> {
         match self {
-            Dialect::Tags(t) => t.render_editables(session, paths),
-            Dialect::Dummy(d) => d.render_editables(session, paths),
+            Dialect::Tags(t) => t.render_editables(config, session, paths),
+            Dialect::Dummy(d) => d.render_editables(config, session, paths),
         }
     }
 
-    fn render_step_request(&self, session: &Session, offset: usize) -> Result<String> {
+    fn render_step_request(
+        &self,
+        config: &Config,
+        session: &Session,
+        offset: usize,
+    ) -> Result<String> {
         match self {
-            Dialect::Tags(t) => t.render_step_request(session, offset),
-            Dialect::Dummy(d) => d.render_step_request(session, offset),
+            Dialect::Tags(t) => t.render_step_request(config, session, offset),
+            Dialect::Dummy(d) => d.render_step_request(config, session, offset),
         }
     }
 
@@ -84,10 +109,15 @@ impl DialectProvider for Dialect {
         }
     }
 
-    fn render_step_response(&self, session: &Session, offset: usize) -> Result<String> {
+    fn render_step_response(
+        &self,
+        config: &Config,
+        session: &Session,
+        offset: usize,
+    ) -> Result<String> {
         match self {
-            Dialect::Tags(t) => t.render_step_response(session, offset),
-            Dialect::Dummy(d) => d.render_step_response(session, offset),
+            Dialect::Tags(t) => t.render_step_response(config, session, offset),
+            Dialect::Dummy(d) => d.render_step_response(config, session, offset),
         }
     }
 }

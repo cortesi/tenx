@@ -146,7 +146,7 @@ impl Tenx {
         sender: Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
         let session_store = SessionStore::open(self.config.session_store_dir())?;
-        session.rollback_last()?;
+        session.rollback_last(&self.config)?;
         let result = self
             .process_prompt(session, sender.clone(), &session_store)
             .await;
@@ -170,7 +170,7 @@ impl Tenx {
 
     /// Resets the session to a specific step.
     pub fn reset(&self, session: &mut Session, offset: usize) -> Result<()> {
-        session.reset(offset)?;
+        session.reset(&self.config, offset)?;
         self.save_session(session)
     }
 
@@ -242,7 +242,7 @@ impl Tenx {
         send_event(&sender, Event::ModelRequestEnd)?;
         prompt_result?;
         send_event(&sender, Event::ApplyPatch)?;
-        session.apply_last_patch()?;
+        session.apply_last_patch(&self.config)?;
         self.run_formatters(session, &sender)?;
         self.run_post_patch_validators(session, &sender)?;
         Ok(())
@@ -257,7 +257,7 @@ impl Tenx {
         let formatters = crate::formatters::relevant_formatters(&self.config, session)?;
         for formatter in formatters {
             send_event(sender, Event::FormatterStart(formatter.name().to_string()))?;
-            formatter.format(session)?;
+            formatter.format(&self.config, session)?;
             send_event(sender, Event::FormatterEnd(formatter.name().to_string()))?;
         }
         send_event(sender, Event::FormattingEnd)?;
@@ -276,7 +276,7 @@ impl Tenx {
         let preflight_validators = crate::validators::relevant_validators(&self.config, session)?;
         for validator in preflight_validators {
             send_event(sender, Event::ValidatorStart(validator.name().to_string()))?;
-            if let Err(e) = validator.validate(session) {
+            if let Err(e) = validator.validate(&self.config, session) {
                 send_event(sender, Event::PreflightEnd)?;
                 return Err(e);
             }
@@ -298,7 +298,7 @@ impl Tenx {
                     crate::validators::relevant_validators(&self.config, session)?;
                 for validator in post_patch_validators {
                     send_event(sender, Event::ValidatorStart(validator.name().to_string()))?;
-                    validator.validate(session)?;
+                    validator.validate(&self.config, session)?;
                     send_event(sender, Event::ValidatorOk(validator.name().to_string()))?;
                 }
                 send_event(sender, Event::PostPatchEnd)?;
@@ -312,10 +312,14 @@ impl Tenx {
 mod tests {
     use super::*;
 
+    use crate::{
+        config::ProjectRoot,
+        patch::{Change, Patch, WriteFile},
+    };
+
     use fs_err as fs;
     use std::path::PathBuf;
 
-    use crate::patch::{Change, Patch, WriteFile};
     use tempfile::tempdir;
 
     #[tokio::test]
@@ -330,6 +334,7 @@ mod tests {
                 comment: Some("Test comment".to_string()),
                 cache: Default::default(),
             }));
+        config.project_root = ProjectRoot::Path(temp_dir.path().into());
         config.session_store_dir = temp_dir.path().into();
         config.retry_limit = 1;
 

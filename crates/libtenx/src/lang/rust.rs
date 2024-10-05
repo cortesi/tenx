@@ -23,12 +23,12 @@ impl Validator for RustCargoCheck {
         "rust: cargo check"
     }
 
-    fn validate(&self, state: &Session) -> Result<()> {
-        run_cargo_command(self.name(), state, &["check", "--tests"])
+    fn validate(&self, config: &Config, state: &Session) -> Result<()> {
+        run_cargo_command(config, self.name(), state, &["check", "--tests"])
     }
 
-    fn is_relevant(&self, _config: &Config, state: &Session) -> Result<bool> {
-        should_run_rust_validator(state)
+    fn is_relevant(&self, config: &Config, state: &Session) -> Result<bool> {
+        should_run_rust_validator(config, state)
     }
 
     fn is_configured(&self, config: &Config) -> bool {
@@ -45,12 +45,12 @@ impl Validator for RustCargoTest {
         "rust: cargo test"
     }
 
-    fn validate(&self, state: &Session) -> Result<()> {
-        run_cargo_command(self.name(), state, &["test", "-q"])
+    fn validate(&self, config: &Config, state: &Session) -> Result<()> {
+        run_cargo_command(config, self.name(), state, &["test", "-q"])
     }
 
-    fn is_relevant(&self, _config: &Config, state: &Session) -> Result<bool> {
-        should_run_rust_validator(state)
+    fn is_relevant(&self, config: &Config, state: &Session) -> Result<bool> {
+        should_run_rust_validator(config, state)
     }
 
     fn is_configured(&self, config: &Config) -> bool {
@@ -67,16 +67,17 @@ impl Validator for RustCargoClippy {
         "rust: cargo clippy"
     }
 
-    fn validate(&self, state: &Session) -> Result<()> {
+    fn validate(&self, config: &Config, state: &Session) -> Result<()> {
         run_cargo_command(
+            config,
             self.name(),
             state,
             &["clippy", "--no-deps", "--all", "--tests", "-q"],
         )
     }
 
-    fn is_relevant(&self, _config: &Config, state: &Session) -> Result<bool> {
-        should_run_rust_validator(state)
+    fn is_relevant(&self, config: &Config, state: &Session) -> Result<bool> {
+        should_run_rust_validator(config, state)
     }
 
     fn is_configured(&self, config: &Config) -> bool {
@@ -93,12 +94,12 @@ impl Formatter for CargoFormatter {
         "rust: cargo fmt"
     }
 
-    fn format(&self, state: &Session) -> Result<()> {
-        run_cargo_command(self.name(), state, &["fmt", "--all"])
+    fn format(&self, config: &Config, state: &Session) -> Result<()> {
+        run_cargo_command(config, self.name(), state, &["fmt", "--all"])
     }
 
-    fn is_relevant(&self, _config: &Config, state: &Session) -> Result<bool> {
-        should_run_rust_validator(state)
+    fn is_relevant(&self, config: &Config, state: &Session) -> Result<bool> {
+        should_run_rust_validator(config, state)
     }
 
     fn is_configured(&self, config: &Config) -> bool {
@@ -110,9 +111,9 @@ impl Formatter for CargoFormatter {
     }
 }
 
-fn should_run_rust_validator(state: &Session) -> Result<bool> {
+fn should_run_rust_validator(config: &Config, state: &Session) -> Result<bool> {
     Ok(state
-        .abs_editables()?
+        .abs_editables(config)?
         .iter()
         .any(|path| path.extension().map_or(false, |ext| ext == "rs")))
 }
@@ -125,8 +126,8 @@ fn is_cargo_installed() -> bool {
         .unwrap_or(false)
 }
 
-fn run_cargo_command(name: &str, state: &Session, args: &[&str]) -> Result<()> {
-    let workspace = RustWorkspace::discover(state)?;
+fn run_cargo_command(config: &Config, name: &str, state: &Session, args: &[&str]) -> Result<()> {
+    let workspace = RustWorkspace::discover(config, state)?;
     let output = Command::new("cargo")
         .args(args)
         .current_dir(&workspace.root_path)
@@ -163,8 +164,8 @@ pub struct RustWorkspace {
 }
 
 impl RustWorkspace {
-    pub fn discover(session: &Session) -> Result<Self> {
-        let common_ancestor = Self::find_common_ancestor(&session.abs_editables()?)?;
+    pub fn discover(config: &Config, session: &Session) -> Result<Self> {
+        let common_ancestor = Self::find_common_ancestor(&session.abs_editables(config)?)?;
         let root_path = Self::find_workspace_root(&common_ancestor)?;
 
         Ok(RustWorkspace { root_path })
@@ -210,6 +211,7 @@ mod tests {
 
     #[test]
     fn test_cargo_checker() -> Result<()> {
+        let config = Config::default();
         let temp_dir = TempDir::new().unwrap();
         create_dummy_project(temp_dir.path()).unwrap();
 
@@ -226,7 +228,7 @@ mod tests {
         }
 
         let checker = RustCargoCheck;
-        assert!(checker.validate(&session).is_ok());
+        assert!(checker.validate(&config, &session).is_ok());
 
         Ok(())
     }
@@ -234,6 +236,7 @@ mod tests {
     #[test]
     fn test_discover_workspace() -> Result<()> {
         let temp_dir = TempDir::new().unwrap();
+        let config = Config::default();
         create_dummy_project(temp_dir.path()).unwrap();
 
         let edit_paths = vec![
@@ -249,7 +252,7 @@ mod tests {
             session.add_editable_path(&p)?;
         }
 
-        let workspace = RustWorkspace::discover(&session)?;
+        let workspace = RustWorkspace::discover(&config, &session)?;
         assert_eq!(
             workspace.root_path.canonicalize().unwrap(),
             temp_dir.path().canonicalize().unwrap()
@@ -260,6 +263,7 @@ mod tests {
 
     #[test]
     fn test_discover_single_crate() -> Result<()> {
+        let config = Config::default();
         let temp_dir = TempDir::new().unwrap();
         create_dummy_project(temp_dir.path()).unwrap();
 
@@ -273,7 +277,7 @@ mod tests {
             session.add_editable_path(&p)?;
         }
 
-        let workspace = RustWorkspace::discover(&session)?;
+        let workspace = RustWorkspace::discover(&config, &session)?;
 
         assert_eq!(
             workspace.root_path.canonicalize().unwrap(),
@@ -285,6 +289,7 @@ mod tests {
 
     #[test]
     fn test_no_cargo_toml() -> Result<()> {
+        let config = Config::default();
         let temp_dir = TempDir::new().unwrap();
 
         let prompt = Prompt::User(String::new());
@@ -293,7 +298,7 @@ mod tests {
         session.add_prompt(prompt)?;
         session.add_editable_path(temp_dir.path())?;
 
-        let result = RustWorkspace::discover(&session);
+        let result = RustWorkspace::discover(&config, &session);
 
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().ends_with("root not found"));
@@ -303,6 +308,7 @@ mod tests {
 
     #[test]
     fn test_no_paths_provided() -> Result<()> {
+        let config = Config::default();
         let temp_dir = TempDir::new().unwrap();
 
         let prompt = Prompt::default();
@@ -310,7 +316,7 @@ mod tests {
         let mut session = Session::new(temp_dir.path().to_path_buf());
         session.add_prompt(prompt)?;
 
-        let result = RustWorkspace::discover(&session);
+        let result = RustWorkspace::discover(&config, &session);
 
         assert!(result.is_err());
         assert!(result
@@ -323,6 +329,7 @@ mod tests {
 
     #[test]
     fn test_no_common_ancestor() -> Result<()> {
+        let config = Config::default();
         let temp_dir1 = TempDir::new().unwrap();
         let temp_dir2 = TempDir::new().unwrap();
 
@@ -339,7 +346,7 @@ mod tests {
             session.add_editable_path(&f)?;
         }
 
-        let result = RustWorkspace::discover(&session);
+        let result = RustWorkspace::discover(&config, &session);
 
         assert!(result.is_err());
 

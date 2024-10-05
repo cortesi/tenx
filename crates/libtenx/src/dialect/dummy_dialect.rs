@@ -1,4 +1,4 @@
-use crate::{dialect::DialectProvider, patch::Patch, Result, Session};
+use crate::{config::Config, dialect::DialectProvider, patch::Patch, Result, Session};
 use std::path::PathBuf;
 
 /// A dummy dialect for testing purposes.
@@ -36,19 +36,34 @@ impl DialectProvider for DummyDialect {
         String::new()
     }
 
-    fn render_step_request(&self, _session: &Session, _offset: usize) -> Result<String> {
+    fn render_step_request(
+        &self,
+        _config: &Config,
+        _session: &Session,
+        _offset: usize,
+    ) -> Result<String> {
         Ok(String::new())
     }
 
-    fn render_editables(&self, _session: &Session, _paths: Vec<PathBuf>) -> Result<String> {
+    fn render_editables(
+        &self,
+        _config: &Config,
+        _session: &Session,
+        _paths: Vec<PathBuf>,
+    ) -> Result<String> {
         Ok(String::new())
     }
 
-    fn render_context(&self, _p: &Session) -> Result<String> {
+    fn render_context(&self, _config: &Config, _p: &Session) -> Result<String> {
         Ok(String::new())
     }
 
-    fn render_step_response(&self, _session: &Session, _offset: usize) -> Result<String> {
+    fn render_step_response(
+        &self,
+        _config: &Config,
+        _session: &Session,
+        _offset: usize,
+    ) -> Result<String> {
         Ok(String::new())
     }
 

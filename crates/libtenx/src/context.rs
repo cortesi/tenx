@@ -121,12 +121,12 @@ impl ContextProvider for Glob {
     fn contexts(
         &self,
         config: &crate::config::Config,
-        session: &Session,
+        _session: &Session,
     ) -> Result<Vec<ContextItem>> {
         let matched_files = config.match_files_with_glob(&self.pattern)?;
         let mut contexts = Vec::new();
         for file in matched_files {
-            let abs_path = session.abspath(&file)?;
+            let abs_path = config.abspath(&file)?;
             let body = fs::read_to_string(&abs_path)?;
             contexts.push(ContextItem {
                 ty: "file".to_string(),

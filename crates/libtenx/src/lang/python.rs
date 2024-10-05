@@ -13,8 +13,8 @@ impl Validator for PythonRuffCheck {
         "python: ruff check"
     }
 
-    fn validate(&self, state: &Session) -> Result<()> {
-        for file in state.abs_editables()? {
+    fn validate(&self, config: &Config, state: &Session) -> Result<()> {
+        for file in state.abs_editables(config)? {
             if file.extension().map_or(false, |ext| ext == "py") {
                 run_ruff_check(&file)?;
             }
@@ -22,9 +22,9 @@ impl Validator for PythonRuffCheck {
         Ok(())
     }
 
-    fn is_relevant(&self, _config: &Config, state: &Session) -> Result<bool> {
+    fn is_relevant(&self, config: &Config, state: &Session) -> Result<bool> {
         Ok(state
-            .abs_editables()?
+            .abs_editables(config)?
             .iter()
             .any(|path| path.extension().map_or(false, |ext| ext == "py")))
     }
@@ -47,8 +47,8 @@ impl Formatter for PythonRuffFormatter {
         "python: ruff format"
     }
 
-    fn format(&self, state: &Session) -> Result<()> {
-        for file in state.abs_editables()? {
+    fn format(&self, config: &Config, state: &Session) -> Result<()> {
+        for file in state.abs_editables(config)? {
             if file.extension().map_or(false, |ext| ext == "py") {
                 run_ruff_format(&file)?;
             }
@@ -56,9 +56,9 @@ impl Formatter for PythonRuffFormatter {
         Ok(())
     }
 
-    fn is_relevant(&self, _config: &Config, state: &Session) -> Result<bool> {
+    fn is_relevant(&self, config: &Config, state: &Session) -> Result<bool> {
         Ok(state
-            .abs_editables()?
+            .abs_editables(config)?
             .iter()
             .any(|path| path.extension().map_or(false, |ext| ext == "py")))
     }

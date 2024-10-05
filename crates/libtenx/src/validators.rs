@@ -19,7 +19,7 @@ pub trait Validator {
     fn name(&self) -> &'static str;
 
     /// Performs a check on the given PromptInput and State.
-    fn validate(&self, state: &Session) -> Result<()>;
+    fn validate(&self, config: &Config, state: &Session) -> Result<()>;
 
     /// Determines if the validator should run for the given session.
     fn is_relevant(&self, config: &Config, state: &Session) -> Result<bool>;

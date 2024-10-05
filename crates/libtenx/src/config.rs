@@ -321,6 +321,19 @@ impl Config {
         }
     }
 
+    /// Calculates the relative path from the root to the given absolute path.
+    pub fn relpath(&self, path: &Path) -> PathBuf {
+        diff_paths(path, self.project_root()).unwrap_or_else(|| path.to_path_buf())
+    }
+
+    /// Converts a path relative to the root directory to an absolute path
+    pub fn abspath(&self, path: &Path) -> Result<PathBuf> {
+        self.project_root()
+            .join(path)
+            .canonicalize()
+            .map_err(|e| TenxError::Internal(format!("Could not canonicalize: {}", e)))
+    }
+
     /// Traverse the included files and return a list of files that match the given glob pattern.
     pub fn match_files_with_glob(&self, pattern: &str) -> Result<Vec<PathBuf>> {
         let project_root = &self.project_root();

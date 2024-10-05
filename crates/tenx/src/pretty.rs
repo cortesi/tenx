@@ -1,5 +1,7 @@
 use colored::*;
-use libtenx::{context::ContextProvider, prompt::Prompt, Result, Session, TenxError};
+use libtenx::{
+    config::Config, context::ContextProvider, prompt::Prompt, Result, Session, TenxError,
+};
 use terminal_size::{terminal_size, Width};
 use textwrap::{wrap, Options};
 
@@ -17,15 +19,15 @@ fn format_usage(usage: &libtenx::model::Usage) -> String {
 }
 
 /// Pretty prints the Session information.
-pub fn session(session: &Session, full: bool) -> Result<String> {
+pub fn session(config: &Config, session: &Session, full: bool) -> Result<String> {
     let width = terminal_size()
         .map(|(Width(w), _)| w as usize)
         .unwrap_or(DEFAULT_WIDTH);
     let mut output = String::new();
     output.push_str(&print_session_info(session));
     output.push_str(&print_context_specs(session));
-    output.push_str(&print_editables(session)?);
-    output.push_str(&print_steps(session, full, width)?);
+    output.push_str(&print_editables(config, session)?);
+    output.push_str(&print_steps(config, session, full, width)?);
     Ok(output)
 }
 
@@ -50,23 +52,23 @@ fn print_context_specs(session: &Session) -> String {
     output
 }
 
-fn print_editables(session: &Session) -> Result<String> {
+fn print_editables(config: &Config, session: &Session) -> Result<String> {
     let mut output = String::new();
-    let editables = session.abs_editables()?;
+    let editables = session.abs_editables(config)?;
     if !editables.is_empty() {
         output.push_str(&format!("{}\n", "edit:".blue().bold()));
         for path in editables {
             output.push_str(&format!(
                 "{}- {}\n",
                 INDENT,
-                session.relpath(&path).display()
+                config.relpath(&path).display()
             ));
         }
     }
     Ok(output)
 }
 
-fn print_steps(session: &Session, full: bool, width: usize) -> Result<String> {
+fn print_steps(config: &Config, session: &Session, full: bool, width: usize) -> Result<String> {
     if session.steps().is_empty() {
         return Ok(String::new());
     }
@@ -78,7 +80,7 @@ fn print_steps(session: &Session, full: bool, width: usize) -> Result<String> {
         output.push_str(&render_step_prompt(step, width, full));
         output.push('\n');
         if let Some(patch) = &step.patch {
-            output.push_str(&print_patch(session, patch, full, width));
+            output.push_str(&print_patch(config, patch, full, width));
         }
         if let Some(err) = &step.err {
             output.push_str(&format!(
@@ -135,12 +137,7 @@ fn render_step_prompt(step: &libtenx::Step, width: usize, full: bool) -> String 
     }
 }
 
-fn print_patch(
-    session: &Session,
-    patch: &libtenx::patch::Patch,
-    full: bool,
-    width: usize,
-) -> String {
+fn print_patch(config: &Config, patch: &libtenx::patch::Patch, full: bool, width: usize) -> String {
     let mut output = String::new();
     if let Some(comment) = &patch.comment {
         output.push_str(&format!(
@@ -164,12 +161,7 @@ fn print_patch(
     for change in &patch.changes {
         match change {
             libtenx::patch::Change::Write(w) => {
-                let file_path = session
-                    .relpath(&w.path)
-                    .display()
-                    .to_string()
-                    .green()
-                    .bold();
+                let file_path = config.relpath(&w.path).display().to_string().green().bold();
                 output.push_str(&format!("{}- {} (write)\n", INDENT.repeat(3), file_path));
                 if full {
                     output.push_str(&wrapped_block(&w.content, width, INDENT.len() * 4));
@@ -184,12 +176,7 @@ fn print_patch(
                 }
             }
             libtenx::patch::Change::Replace(r) => {
-                let file_path = session
-                    .relpath(&r.path)
-                    .display()
-                    .to_string()
-                    .green()
-                    .bold();
+                let file_path = config.relpath(&r.path).display().to_string().green().bold();
                 output.push_str(&format!("{}- {} (replace)\n", INDENT.repeat(3), file_path));
                 if full {
                     output.push_str(&format!("{}{}\n", INDENT.repeat(4), "old:".yellow().bold()));
@@ -204,12 +191,7 @@ fn print_patch(
                 }
             }
             libtenx::patch::Change::Smart(s) => {
-                let file_path = session
-                    .relpath(&s.path)
-                    .display()
-                    .to_string()
-                    .green()
-                    .bold();
+                let file_path = config.relpath(&s.path).display().to_string().green().bold();
                 output.push_str(&format!("{}- {} (smart)\n", INDENT.repeat(3), file_path));
                 if full {
                     output.push_str(&wrapped_block(&s.text, width, INDENT.len() * 4));
@@ -278,8 +260,9 @@ mod tests {
 
     #[test]
     fn test_print_steps_empty_session() {
+        let config = Config::default();
         let (_temp_dir, session) = create_test_session();
-        let result = print_steps(&session, false, 80);
+        let result = print_steps(&config, &session, false, 80);
         assert!(result.is_ok());
         let output = result.unwrap();
         assert!(output.contains("Step 0"));
@@ -288,13 +271,14 @@ mod tests {
 
     #[test]
     fn test_print_steps_with_patch() {
+        let config = Config::default();
         let (_temp_dir, mut session) = create_test_session();
         let patch = Patch {
             comment: Some("Test comment".to_string()),
             ..Default::default()
         };
         session.set_last_patch(&patch);
-        let result = print_steps(&session, false, 80);
+        let result = print_steps(&config, &session, false, 80);
         assert!(result.is_ok());
         let output = result.unwrap();
         assert!(output.contains("Step 0"));
@@ -305,9 +289,10 @@ mod tests {
 
     #[test]
     fn test_print_steps_with_error() {
+        let config = Config::default();
         let (_temp_dir, mut session) = create_test_session();
         session.set_last_error(&TenxError::Internal("Test error".to_string()));
-        let result = print_steps(&session, false, 80);
+        let result = print_steps(&config, &session, false, 80);
         assert!(result.is_ok());
         let output = result.unwrap();
         assert!(output.contains("Step 0"));

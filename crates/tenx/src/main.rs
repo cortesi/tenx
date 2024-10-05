@@ -659,7 +659,7 @@ async fn main() -> anyhow::Result<()> {
                 } else if *render {
                     println!("{}", model.render(&config, &session)?);
                 } else {
-                    println!("{}", pretty::session(&session, *full)?);
+                    println!("{}", pretty::session(&config, &session, *full)?);
                 }
                 Ok(())
             }
