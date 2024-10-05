@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use std::{
     env, fs,
     path::{Path, PathBuf},
@@ -5,10 +6,7 @@ use std::{
 };
 
 use globset::{Glob, GlobSetBuilder};
-use serde::{
-    ser::{SerializeStruct, Serializer},
-    Deserialize, Serialize,
-};
+use serde::ser::{SerializeStruct, Serializer};
 
 use toml;
 
@@ -234,6 +232,10 @@ pub struct Config {
     #[serde(default)]
     pub formatters: Formatters,
 
+    /// Project root configuration.
+    #[serde(default)]
+    pub project_root: ProjectRoot,
+
     /// Set a dummy model for end-to-end testing. Over-rides the configured model.
     #[serde(skip)]
     dummy_model: Option<model::DummyModel>,
@@ -253,7 +255,7 @@ impl Serialize for Config {
         S: Serializer,
     {
         let default = Config::default();
-        let mut state = serializer.serialize_struct("Config", 9)?;
+        let mut state = serializer.serialize_struct("Config", 10)?;
         serialize_if_different!(state, self, default, include);
         serialize_if_different!(state, self, default, anthropic_key);
         serialize_if_different!(state, self, default, session_store_dir);
@@ -265,8 +267,17 @@ impl Serialize for Config {
         serialize_if_different!(state, self, default, default_context);
         serialize_if_different!(state, self, default, validators);
         serialize_if_different!(state, self, default, formatters);
+        serialize_if_different!(state, self, default, project_root);
         state.end()
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ProjectRoot {
+    #[default]
+    Discover,
+    Path(PathBuf),
 }
 
 impl Default for Config {
@@ -286,6 +297,7 @@ impl Default for Config {
             full: false,
             validators: Validators::default(),
             formatters: Formatters::default(),
+            project_root: ProjectRoot::default(),
         }
     }
 }
@@ -299,12 +311,22 @@ impl Config {
         }
     }
 
-    pub fn included_files(&self, project_root: &Path) -> Result<Vec<PathBuf>> {
+    pub fn project_root(&self) -> PathBuf {
+        match &self.project_root {
+            ProjectRoot::Discover => {
+                find_project_root(&std::env::current_dir().unwrap_or_default())
+            }
+            ProjectRoot::Path(path) => path.clone(),
+        }
+    }
+
+    pub fn included_files(&self) -> Result<Vec<PathBuf>> {
+        let project_root = self.project_root();
         match &self.include {
             Include::Git => {
                 let output = Command::new("git")
                     .arg("ls-files")
-                    .current_dir(project_root)
+                    .current_dir(&project_root)
                     .output()
                     .map_err(|e| {
                         TenxError::Internal(format!("Failed to execute git ls-files: {}", e))
@@ -336,7 +358,7 @@ impl Config {
                     .map_err(|e| TenxError::Internal(e.to_string()))?;
 
                 let mut included_files = Vec::new();
-                walk_directory(project_root, project_root, &globset, &mut included_files)?;
+                walk_directory(&project_root, &project_root, &globset, &mut included_files)?;
                 Ok(included_files)
             }
         }
@@ -622,10 +644,11 @@ mod tests {
 
         let config = Config {
             include: Include::Glob(vec!["*.rs".to_string(), "subdir/*.txt".to_string()]),
+            project_root: ProjectRoot::Path(root_path.to_path_buf()),
             ..Default::default()
         };
 
-        let included_files = config.included_files(root_path).unwrap();
+        let included_files = config.included_files().unwrap();
 
         let mut expected_files: Vec<PathBuf> = vec![
             PathBuf::from("file1.rs"),
@@ -638,5 +661,20 @@ mod tests {
         included_files.sort();
 
         assert_eq!(included_files, expected_files);
+    }
+
+    #[test]
+    fn test_project_root() {
+        let config_discover = Config::default();
+        assert!(matches!(
+            config_discover.project_root,
+            ProjectRoot::Discover
+        ));
+
+        let config_path = Config {
+            project_root: ProjectRoot::Path(PathBuf::from("/custom/path")),
+            ..Default::default()
+        };
+        assert_eq!(config_path.project_root(), PathBuf::from("/custom/path"));
     }
 }

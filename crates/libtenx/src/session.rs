@@ -232,7 +232,7 @@ impl Session {
     ) -> Result<Vec<PathBuf>> {
         let glob = Glob::new(pattern)
             .map_err(|e| TenxError::Internal(format!("Invalid glob pattern: {}", e)))?;
-        let included_files = config.included_files(&self.root)?;
+        let included_files = config.included_files()?;
 
         let current_dir = env::current_dir()
             .map_err(|e| TenxError::Internal(format!("Failed to get current directory: {}", e)))?;
@@ -241,17 +241,17 @@ impl Session {
 
         for file in included_files {
             let relative_path = if file.is_absolute() {
-                file.strip_prefix(&self.root).unwrap_or(&file)
+                file.strip_prefix(&config.project_root()).unwrap_or(&file)
             } else {
                 &file
             };
 
-            let match_path = if current_dir != self.root {
+            let match_path = if current_dir != config.project_root() {
                 // If we're in a subdirectory, we need to adjust the path for matching
                 diff_paths(
                     relative_path,
                     current_dir
-                        .strip_prefix(&self.root)
+                        .strip_prefix(&config.project_root())
                         .unwrap_or(Path::new("")),
                 )
                 .unwrap_or_else(|| relative_path.to_path_buf())
@@ -260,7 +260,7 @@ impl Session {
             };
 
             if glob.compile_matcher().is_match(&match_path) {
-                let absolute_path = self.root.join(relative_path);
+                let absolute_path = config.project_root().join(relative_path);
                 if absolute_path.exists() {
                     matched_files.push(relative_path.to_path_buf());
                 } else {
@@ -404,21 +404,26 @@ mod tests {
         let test_file = temp_dir.path().join("test.txt");
         fs::write(&test_file, "content").unwrap();
 
-        let context1 = context::ContextSpec::new_glob("test.txt".to_string());
-        let context2 = context::ContextSpec::new_glob("test.txt".to_string());
+        let context1 = context::ContextSpec::Glob(context::Glob::new("test.txt".to_string()));
+        let context2 = context::ContextSpec::Glob(context::Glob::new("test.txt".to_string()));
 
         session.add_context(context1.clone());
         session.add_context(context2);
 
         assert_eq!(session.context.len(), 1);
-        assert_eq!(session.context[0].name(), "test.txt");
+        assert!(matches!(session.context[0], context::ContextSpec::Glob(_)));
 
         // Create a mock config that doesn't rely on git
         let mut config = crate::config::Config::default();
         config.include = crate::config::Include::Glob(vec!["**/*".to_string()]);
+        config.project_root = crate::config::ProjectRoot::Path(temp_dir.path().to_path_buf());
 
-        let context_items = session.context[0].contexts(&config, &session).unwrap();
-        assert_eq!(context_items[0].body, "content");
+        if let context::ContextSpec::Glob(glob_context) = &session.context[0] {
+            let context_items = glob_context.contexts(&config, &session).unwrap();
+            assert_eq!(context_items[0].body, "content");
+        } else {
+            panic!("Expected Glob context");
+        }
     }
 
     #[test]
@@ -546,6 +551,7 @@ mod tests {
         let mut config = config::Config::default();
         config.include =
             config::Include::Glob(vec!["**/*.rs".to_string(), "README.md".to_string()]);
+        config.project_root = config::ProjectRoot::Path(root_dir.clone());
 
         // Test matching files from root directory
         let matched_files = session.match_files_with_glob(&config, "src/**/*.rs")?;

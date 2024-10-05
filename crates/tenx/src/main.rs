@@ -524,8 +524,7 @@ async fn main() -> anyhow::Result<()> {
                 Ok(())
             }
             Commands::Files => {
-                let session = tx.load_session_cwd()?;
-                let files = config.included_files(&session.root)?;
+                let files = config.included_files()?;
                 for file in files {
                     println!("{}", file.display());
                 }
@@ -673,8 +672,7 @@ async fn main() -> anyhow::Result<()> {
                 let mut total = 0;
 
                 if *context {
-                    let added =
-                        tx.add_contexts(&mut session, files, ruskel, &Some(sender.clone()))?;
+                    let added = tx.add_contexts(&mut session, files, &[], &Some(sender.clone()))?;
                     if added == 0 {
                         return Err(anyhow::anyhow!("glob did not match any files"));
                     }
