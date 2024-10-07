@@ -27,7 +27,7 @@ fn is_glob(s: &str) -> bool {
 }
 
 /// A serializable session, which persists between invocations.
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Default)]
 pub struct Session {
     steps: Vec<Step>,
     pub(crate) context: Vec<context::ContextSpec>,
@@ -51,17 +51,6 @@ impl Session {
 }
 
 impl Session {
-    /// Creates a new Session with the specified root directory, dialect, and model.
-    pub fn new() -> Self {
-        Self {
-            steps: vec![],
-            context: vec![],
-            editable: vec![],
-        }
-    }
-
-    // Removed from_cwd method
-
     pub fn steps(&self) -> &Vec<Step> {
         &self.steps
     }
@@ -302,7 +291,7 @@ mod tests {
     #[test]
     fn test_add_context_ignores_duplicates() {
         let temp_dir = tempdir().unwrap();
-        let mut session = Session::new();
+        let mut session = Session::default();
 
         let test_file = temp_dir.path().join("test.txt");
         fs::write(&test_file, "content").unwrap();
@@ -338,7 +327,7 @@ mod tests {
 
         config.project_root = ProjectRoot::Path(root_dir.clone());
 
-        let mut session = Session::new();
+        let mut session = Session::default();
 
         // Create initial file
         fs::write(&file_path, "Initial content").unwrap();

@@ -66,7 +66,7 @@ mod tests {
 
         let state_store = SessionStore::open(temp_dir.path().into()).unwrap();
 
-        let state = Session::new();
+        let state = Session::default();
         state_store.save(&config, &state).unwrap();
 
         let name = normalize_path(&config.project_root());

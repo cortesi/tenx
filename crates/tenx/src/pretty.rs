@@ -248,7 +248,7 @@ mod tests {
     fn create_test_session() -> (TempDir, Session) {
         let temp_dir = TempDir::new().unwrap();
         let root_path = temp_dir.path().to_path_buf();
-        let mut session = Session::new();
+        let mut session = Session::default();
         session
             .add_prompt(Prompt::User("Test prompt".to_string()))
             .unwrap();

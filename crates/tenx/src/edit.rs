@@ -126,7 +126,7 @@ mod tests {
 
     #[test]
     fn test_render_initial_text() {
-        let mut session = Session::new();
+        let mut session = Session::default();
         session
             .add_prompt(Prompt::User(
                 "First prompt\nwith multiple lines".to_string(),

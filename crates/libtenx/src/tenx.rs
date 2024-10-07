@@ -30,7 +30,7 @@ impl Tenx {
     /// Creates a new Session, discovering the root from the current working directory and
     /// adding the default context from the config.
     pub fn session_from_cwd(&self, sender: &Option<mpsc::Sender<Event>>) -> Result<Session> {
-        let mut session = Session::new();
+        let mut session = Session::default();
 
         // Add default context
         self.add_contexts(
@@ -338,7 +338,7 @@ mod tests {
         let test_file_path = temp_dir.path().join("test.txt");
         fs::write(&test_file_path, "Initial content").unwrap();
 
-        let mut session = Session::new();
+        let mut session = Session::default();
         session
             .add_prompt(Prompt::User("Test prompt".to_string()))
             .unwrap();

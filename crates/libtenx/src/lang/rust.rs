@@ -221,7 +221,7 @@ mod tests {
         ];
         let prompt = Prompt::User(String::new());
 
-        let mut session = Session::new();
+        let mut session = Session::default();
         session.add_prompt(prompt.clone())?;
         for p in edit_paths {
             session.add_editable_path(&config, &p)?;
@@ -246,7 +246,7 @@ mod tests {
 
         let prompt = Prompt::User(String::new());
 
-        let mut session = Session::new();
+        let mut session = Session::default();
         session.add_prompt(prompt)?;
         for p in edit_paths {
             session.add_editable_path(&config, &p)?;
@@ -271,7 +271,7 @@ mod tests {
 
         let prompt = Prompt::User(String::new());
 
-        let mut session = Session::new();
+        let mut session = Session::default();
         session.add_prompt(prompt)?;
         for p in edit_paths {
             session.add_editable_path(&config, &p)?;
@@ -294,7 +294,7 @@ mod tests {
 
         let prompt = Prompt::User(String::new());
 
-        let mut session = Session::new();
+        let mut session = Session::default();
         session.add_prompt(prompt)?;
         session.add_editable_path(&config, temp_dir.path())?;
 
@@ -313,7 +313,7 @@ mod tests {
 
         let prompt = Prompt::default();
 
-        let mut session = Session::new();
+        let mut session = Session::default();
         session.add_prompt(prompt)?;
 
         let result = RustWorkspace::discover(&config, &session);
@@ -341,7 +341,7 @@ mod tests {
 
         let prompt = Prompt::User(String::new());
 
-        let mut session = Session::new();
+        let mut session = Session::default();
         session.add_prompt(prompt)?;
         for f in edit_paths {
             session.add_editable_path(&config, &f)?;
