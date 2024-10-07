@@ -18,7 +18,7 @@ pub struct ContextItem {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ContextType {
     Ruskel,
-    Glob,
+    Path,
 }
 
 pub trait ContextProvider {
@@ -99,19 +99,19 @@ impl ContextProvider for Ruskel {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
-pub struct Glob {
+pub struct Path {
     pattern: String,
 }
 
-impl Glob {
+impl Path {
     pub(crate) fn new(config: &Config, pattern: String) -> Result<Self> {
         Ok(Self { pattern })
     }
 }
 
-impl ContextProvider for Glob {
+impl ContextProvider for Path {
     fn typ(&self) -> &ContextType {
-        &ContextType::Glob
+        &ContextType::Path
     }
 
     fn name(&self) -> &str {
@@ -147,7 +147,6 @@ impl ContextProvider for Glob {
     }
 
     fn refresh(&mut self) -> Result<()> {
-        // Glob context doesn't need refreshing
         Ok(())
     }
 }
@@ -157,7 +156,7 @@ impl ContextProvider for Glob {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub enum ContextSpec {
     Ruskel(Ruskel),
-    Glob(Glob),
+    Path(Path),
 }
 
 impl ContextSpec {
@@ -168,7 +167,7 @@ impl ContextSpec {
 
     /// Creates a new Context for a glob pattern.
     pub fn new_glob(config: &Config, pattern: String) -> Result<Self> {
-        Ok(ContextSpec::Glob(Glob::new(config, pattern)?))
+        Ok(ContextSpec::Path(Path::new(config, pattern)?))
     }
 }
 
@@ -176,14 +175,14 @@ impl ContextProvider for ContextSpec {
     fn typ(&self) -> &ContextType {
         match self {
             ContextSpec::Ruskel(r) => r.typ(),
-            ContextSpec::Glob(g) => g.typ(),
+            ContextSpec::Path(g) => g.typ(),
         }
     }
 
     fn name(&self) -> &str {
         match self {
             ContextSpec::Ruskel(r) => r.name(),
-            ContextSpec::Glob(g) => g.name(),
+            ContextSpec::Path(g) => g.name(),
         }
     }
 
@@ -194,28 +193,28 @@ impl ContextProvider for ContextSpec {
     ) -> Result<Vec<ContextItem>> {
         match self {
             ContextSpec::Ruskel(r) => r.contexts(config, session),
-            ContextSpec::Glob(g) => g.contexts(config, session),
+            ContextSpec::Path(g) => g.contexts(config, session),
         }
     }
 
     fn human(&self) -> String {
         match self {
             ContextSpec::Ruskel(r) => r.human(),
-            ContextSpec::Glob(g) => g.human(),
+            ContextSpec::Path(g) => g.human(),
         }
     }
 
     fn count(&self, config: &crate::config::Config, session: &Session) -> Result<usize> {
         match self {
             ContextSpec::Ruskel(r) => r.count(config, session),
-            ContextSpec::Glob(g) => g.count(config, session),
+            ContextSpec::Path(g) => g.count(config, session),
         }
     }
 
     fn refresh(&mut self) -> Result<()> {
         match self {
             ContextSpec::Ruskel(r) => r.refresh(),
-            ContextSpec::Glob(g) => g.refresh(),
+            ContextSpec::Path(g) => g.refresh(),
         }
     }
 }
