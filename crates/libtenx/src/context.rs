@@ -1,7 +1,7 @@
 use fs_err as fs;
 use serde::{Deserialize, Serialize};
 
-use crate::{Result, Session, TenxError};
+use crate::{config::Config, Result, Session, TenxError};
 use libruskel::Ruskel as LibRuskel;
 
 /// An individual context item.
@@ -104,8 +104,8 @@ pub struct Glob {
 }
 
 impl Glob {
-    pub(crate) fn new(pattern: String) -> Self {
-        Self { pattern }
+    pub(crate) fn new(config: &Config, pattern: String) -> Result<Self> {
+        Ok(Self { pattern })
     }
 }
 
@@ -167,8 +167,8 @@ impl ContextSpec {
     }
 
     /// Creates a new Context for a glob pattern.
-    pub fn new_glob(pattern: String) -> Self {
-        ContextSpec::Glob(Glob::new(pattern))
+    pub fn new_glob(config: &Config, pattern: String) -> Result<Self> {
+        Ok(ContextSpec::Glob(Glob::new(config, pattern)?))
     }
 }
 

@@ -248,13 +248,14 @@ mod tests {
     fn create_test_session() -> (TempDir, Session) {
         let temp_dir = TempDir::new().unwrap();
         let root_path = temp_dir.path().to_path_buf();
+        let config = Config::default();
         let mut session = Session::default();
         session
             .add_prompt(Prompt::User("Test prompt".to_string()))
             .unwrap();
         let test_file_path = root_path.join("test_file.rs");
         std::fs::write(&test_file_path, "Test content").unwrap();
-        session.add_context(ContextSpec::new_glob("test_file.rs".to_string()));
+        session.add_context(ContextSpec::new_glob(&config, "test_file.rs".to_string()).unwrap());
         (temp_dir, session)
     }
 

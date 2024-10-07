@@ -292,23 +292,26 @@ mod tests {
     fn test_add_context_ignores_duplicates() {
         let temp_dir = tempdir().unwrap();
         let mut session = Session::default();
+        // Create a mock config that doesn't rely on git
+        let mut config = crate::config::Config::default();
+        config.include = crate::config::Include::Glob(vec!["**/*".to_string()]);
+        config.project_root = crate::config::ProjectRoot::Path(temp_dir.path().to_path_buf());
 
         let test_file = temp_dir.path().join("test.txt");
         fs::write(&test_file, "content").unwrap();
 
-        let context1 = context::ContextSpec::Glob(context::Glob::new("test.txt".to_string()));
-        let context2 = context::ContextSpec::Glob(context::Glob::new("test.txt".to_string()));
+        let context1 = context::ContextSpec::Glob(
+            context::Glob::new(&config, "test.txt".to_string()).unwrap(),
+        );
+        let context2 = context::ContextSpec::Glob(
+            context::Glob::new(&config, "test.txt".to_string()).unwrap(),
+        );
 
         session.add_context(context1.clone());
         session.add_context(context2);
 
         assert_eq!(session.context.len(), 1);
         assert!(matches!(session.context[0], context::ContextSpec::Glob(_)));
-
-        // Create a mock config that doesn't rely on git
-        let mut config = crate::config::Config::default();
-        config.include = crate::config::Include::Glob(vec!["**/*".to_string()]);
-        config.project_root = crate::config::ProjectRoot::Path(temp_dir.path().to_path_buf());
 
         if let context::ContextSpec::Glob(glob_context) = &session.context[0] {
             let context_items = glob_context.contexts(&config, &session).unwrap();

@@ -335,6 +335,7 @@ impl Config {
     }
 
     /// Normalizes a path relative to the root directory.
+    /// If the path contains glob patterns ("*" or "**"), it will be returned as-is.
     pub fn normalize_path<P: AsRef<Path>>(&self, path: P) -> Result<PathBuf> {
         self.normalize_path_with_cwd(
             path,
@@ -344,12 +345,16 @@ impl Config {
     }
 
     /// Normalizes a path relative to the root directory with a given current working directory.
+    /// If the path contains glob patterns ("*" or "**"), it will be returned as-is.
     pub fn normalize_path_with_cwd<P: AsRef<Path>>(
         &self,
         path: P,
         current_dir: PathBuf,
     ) -> Result<PathBuf> {
         let path = path.as_ref();
+        if path.to_str().map_or(false, |s| s.contains('*')) {
+            return Ok(path.to_path_buf());
+        }
         if path.is_relative() {
             let absolute_path = current_dir
                 .join(path)

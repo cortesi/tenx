@@ -2,8 +2,12 @@ use tokio::sync::mpsc;
 use tracing::{debug, warn};
 
 use crate::{
-    config::Config, context::ContextProvider, events::Event, prompt::Prompt,
-    session_store::normalize_path, Result, Session, SessionStore, TenxError,
+    config::Config,
+    context::{ContextProvider, ContextSpec},
+    events::Event,
+    prompt::Prompt,
+    session_store::normalize_path,
+    Result, Session, SessionStore, TenxError,
 };
 
 /// Helper function to send an event and handle potential errors.
@@ -54,10 +58,10 @@ impl Tenx {
     ) -> Result<usize> {
         let mut contexts = Vec::new();
         for file in glob {
-            contexts.push(crate::context::ContextSpec::new_glob(file.to_string()));
+            contexts.push(ContextSpec::new_glob(&self.config, file.to_string())?);
         }
         for ruskel_doc in ruskel {
-            contexts.push(crate::context::ContextSpec::new_ruskel(ruskel_doc.clone()));
+            contexts.push(ContextSpec::new_ruskel(ruskel_doc.clone()));
         }
         let mut total_added = 0;
         if !contexts.is_empty() {
