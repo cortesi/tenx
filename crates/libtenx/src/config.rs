@@ -739,16 +739,21 @@ mod tests {
     }
 
     #[test]
-    fn test_included_files() {
-        let temp_dir = TempDir::new().unwrap();
+    fn test_included_files() -> Result<()> {
+        use crate::testutils::create_file_tree;
+
+        let temp_dir = TempDir::new()?;
         let root_path = temp_dir.path();
 
-        // Create dummy files
-        File::create(root_path.join("file1.rs")).unwrap();
-        File::create(root_path.join("file2.txt")).unwrap();
-        std::fs::create_dir(root_path.join("subdir")).unwrap();
-        File::create(root_path.join("subdir").join("file3.rs")).unwrap();
-        File::create(root_path.join("subdir").join("file4.txt")).unwrap();
+        create_file_tree(
+            root_path,
+            &[
+                "file1.rs",
+                "file2.txt",
+                "subdir/file3.rs",
+                "subdir/file4.txt",
+            ],
+        )?;
 
         let config = Config {
             include: Include::Glob(vec!["*.rs".to_string(), "subdir/*.txt".to_string()]),
@@ -756,19 +761,19 @@ mod tests {
             ..Default::default()
         };
 
-        let included_files = config.included_files().unwrap();
+        let mut included_files = config.included_files()?;
+        included_files.sort();
 
-        let mut expected_files: Vec<PathBuf> = vec![
+        let mut expected_files = vec![
             PathBuf::from("file1.rs"),
             PathBuf::from("subdir/file3.rs"),
             PathBuf::from("subdir/file4.txt"),
         ];
         expected_files.sort();
 
-        let mut included_files: Vec<PathBuf> = included_files.into_iter().collect();
-        included_files.sort();
-
         assert_eq!(included_files, expected_files);
+
+        Ok(())
     }
 
     #[test]
@@ -788,29 +793,21 @@ mod tests {
 
     #[test]
     fn test_match_files_with_glob() -> Result<()> {
-        let temp_dir = tempdir()
-            .map_err(|e| TenxError::Internal(format!("Failed to create temp dir: {}", e)))?;
-        let root_dir = temp_dir
-            .path()
-            .canonicalize()
-            .map_err(|e| TenxError::Internal(format!("Failed to canonicalize temp dir: {}", e)))?;
+        use crate::testutils::create_file_tree;
 
-        // Create directory structure
-        fs::create_dir_all(root_dir.join("src/subdir"))
-            .map_err(|e| TenxError::Internal(format!("Failed to create src/subdir: {}", e)))?;
-        fs::create_dir_all(root_dir.join("tests"))
-            .map_err(|e| TenxError::Internal(format!("Failed to create tests dir: {}", e)))?;
-        fs::write(root_dir.join("src/file1.rs"), "content1")
-            .map_err(|e| TenxError::Internal(format!("Failed to write src/file1.rs: {}", e)))?;
-        fs::write(root_dir.join("src/subdir/file2.rs"), "content2").map_err(|e| {
-            TenxError::Internal(format!("Failed to write src/subdir/file2.rs: {}", e))
-        })?;
-        fs::write(root_dir.join("tests/test1.rs"), "test_content1")
-            .map_err(|e| TenxError::Internal(format!("Failed to write tests/test1.rs: {}", e)))?;
-        fs::write(root_dir.join("README.md"), "readme_content")
-            .map_err(|e| TenxError::Internal(format!("Failed to write README.md: {}", e)))?;
+        let temp_dir = tempdir()?;
+        let root_dir = temp_dir.path().canonicalize()?;
 
-        // Create a mock config
+        create_file_tree(
+            &root_dir,
+            &[
+                "src/file1.rs",
+                "src/subdir/file2.rs",
+                "tests/test1.rs",
+                "README.md",
+            ],
+        )?;
+
         let mut config = Config::default();
         config.include = Include::Glob(vec!["**/*.rs".to_string(), "README.md".to_string()]);
         config.project_root = ProjectRoot::Path(root_dir.clone());
@@ -878,53 +875,50 @@ mod tests {
 
     #[test]
     fn test_normalize_path_with_cwd() -> Result<()> {
+        use crate::testutils::create_file_tree;
+
         let temp_dir = tempdir().unwrap();
         let root = temp_dir.path().join("root");
         let mut config = Config::default();
         config.project_root = ProjectRoot::Path(root.clone());
 
-        fs::create_dir(&root).unwrap();
+        create_file_tree(
+            temp_dir.path(),
+            &[
+                "root/file.txt",
+                "root/subdir/subfile.txt",
+                "outside/outsidefile.txt",
+                "root/abs_file.txt",
+            ],
+        )?;
+
         let sub_dir = root.join("subdir");
-        fs::create_dir(&sub_dir).unwrap();
 
         // Test 1: Current dir is the root directory
-        {
-            fs::File::create(root.join("file.txt")).unwrap();
-            let result = config.normalize_path_with_cwd("file.txt", root.clone())?;
-            assert_eq!(result, PathBuf::from("file.txt"));
-        }
+        let result = config.normalize_path_with_cwd("file.txt", root.clone())?;
+        assert_eq!(result, PathBuf::from("file.txt"));
 
         // Test 2: Current dir is under the root directory
-        {
-            fs::File::create(sub_dir.join("subfile.txt")).unwrap();
-            let result = config.normalize_path_with_cwd("subfile.txt", sub_dir.clone())?;
-            assert_eq!(result, PathBuf::from("subdir/subfile.txt"));
-        }
+        let result = config.normalize_path_with_cwd("subfile.txt", sub_dir.clone())?;
+        assert_eq!(result, PathBuf::from("subdir/subfile.txt"));
 
         // Test 3: Current dir is outside the root directory
-        {
-            let outside_dir = temp_dir.path().join("outside");
-            fs::create_dir(&outside_dir).unwrap();
-            fs::File::create(outside_dir.join("outsidefile.txt")).unwrap();
-            let result = config.normalize_path_with_cwd("outsidefile.txt", outside_dir.clone())?;
-            let expected = outside_dir
-                .join("outsidefile.txt")
-                .strip_prefix(&root)
-                .unwrap_or(&outside_dir.join("outsidefile.txt"))
-                .to_path_buf();
-            assert_eq!(
-                result.canonicalize().unwrap(),
-                expected.canonicalize().unwrap()
-            );
-        }
+        let outside_dir = temp_dir.path().join("outside");
+        let result = config.normalize_path_with_cwd("outsidefile.txt", outside_dir.clone())?;
+        let expected = outside_dir
+            .join("outsidefile.txt")
+            .strip_prefix(&root)
+            .unwrap_or(&outside_dir.join("outsidefile.txt"))
+            .to_path_buf();
+        assert_eq!(
+            result.canonicalize().unwrap(),
+            expected.canonicalize().unwrap()
+        );
 
         // Test 4: Absolute path
-        {
-            let abs_path = root.join("abs_file.txt");
-            fs::File::create(&abs_path).unwrap();
-            let result = config.normalize_path_with_cwd(&abs_path, root.clone())?;
-            assert_eq!(result, abs_path);
-        }
+        let abs_path = root.join("abs_file.txt");
+        let result = config.normalize_path_with_cwd(&abs_path, root.clone())?;
+        assert_eq!(result, abs_path);
 
         Ok(())
     }

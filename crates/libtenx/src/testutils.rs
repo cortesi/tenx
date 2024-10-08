@@ -30,3 +30,15 @@ pub fn create_dummy_project(temp_dir: &Path) -> std::io::Result<()> {
 
     Ok(())
 }
+
+/// Creates a file tree structure in the given directory based on the provided paths.
+pub fn create_file_tree(dir: &Path, paths: &[&str]) -> std::io::Result<()> {
+    for path in paths {
+        let full_path = dir.join(path);
+        if let Some(parent) = full_path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::File::create(full_path)?;
+    }
+    Ok(())
+}
