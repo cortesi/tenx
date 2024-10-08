@@ -99,13 +99,24 @@ impl ContextProvider for Ruskel {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub enum PathType {
+    SinglePath(String),
+    Pattern(String),
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct Path {
-    pattern: String,
+    path_type: PathType,
 }
 
 impl Path {
     pub(crate) fn new(config: &Config, pattern: String) -> Result<Self> {
-        Ok(Self { pattern })
+        let path_type = if pattern.contains('*') {
+            PathType::Pattern(pattern)
+        } else {
+            PathType::SinglePath(pattern)
+        };
+        Ok(Self { path_type })
     }
 }
 
@@ -115,7 +126,10 @@ impl ContextProvider for Path {
     }
 
     fn name(&self) -> &str {
-        &self.pattern
+        match &self.path_type {
+            PathType::SinglePath(path) => path,
+            PathType::Pattern(pattern) => pattern,
+        }
     }
 
     fn contexts(
@@ -123,7 +137,10 @@ impl ContextProvider for Path {
         config: &crate::config::Config,
         _session: &Session,
     ) -> Result<Vec<ContextItem>> {
-        let matched_files = config.match_files_with_glob(&self.pattern)?;
+        let matched_files = match &self.path_type {
+            PathType::SinglePath(path) => vec![std::path::PathBuf::from(path)],
+            PathType::Pattern(pattern) => config.match_files_with_glob(pattern)?,
+        };
         let mut contexts = Vec::new();
         for file in matched_files {
             let abs_path = config.abspath(&file)?;
@@ -138,12 +155,20 @@ impl ContextProvider for Path {
     }
 
     fn human(&self) -> String {
-        self.pattern.to_string()
+        match &self.path_type {
+            PathType::SinglePath(path) => path.to_string(),
+            PathType::Pattern(pattern) => pattern.to_string(),
+        }
     }
 
     fn count(&self, config: &crate::config::Config, _: &Session) -> Result<usize> {
-        let matched_files = config.match_files_with_glob(&self.pattern)?;
-        Ok(matched_files.len())
+        match &self.path_type {
+            PathType::SinglePath(_) => Ok(1),
+            PathType::Pattern(pattern) => {
+                let matched_files = config.match_files_with_glob(pattern)?;
+                Ok(matched_files.len())
+            }
+        }
     }
 
     fn refresh(&mut self) -> Result<()> {
