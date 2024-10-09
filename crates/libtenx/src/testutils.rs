@@ -56,7 +56,7 @@ pub struct TestProject {
 }
 
 /// Creates a new MockProject instance.
-///
+//
 /// This function sets up a temporary directory and initializes a Config and Session
 /// for use in tests.
 pub fn test_project() -> TestProject {
@@ -82,8 +82,12 @@ impl TestProject {
     /// # Arguments
     ///
     /// * `paths` - A slice of string slices representing the paths of files to create.
-    pub fn create_file_tree(&self, paths: &[&str]) -> std::io::Result<()> {
-        create_file_tree(self.tempdir.path(), paths)
+    ///
+    /// # Panics
+    ///
+    /// Panics if the file tree creation fails.
+    pub fn create_file_tree(&self, paths: &[&str]) {
+        create_file_tree(self.tempdir.path(), paths).expect("Failed to create file tree");
     }
 
     /// Sets the current working directory for the mock project's configuration.
@@ -94,5 +98,32 @@ impl TestProject {
     pub fn set_cwd<P: AsRef<Path>>(&mut self, path: P) {
         let new_cwd = self.tempdir.path().join(path);
         self.config = std::mem::take(&mut self.config).with_test_cwd(new_cwd);
+    }
+
+    /// Writes content to a file in the mock project's temporary directory.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - A path (relative to the temporary directory) where the file should be written.
+    /// * `content` - The content to write to the file.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the write operation fails.
+    pub fn write<P: AsRef<Path>, C: AsRef<[u8]>>(&self, path: P, content: C) {
+        fs::write(self.tempdir.path().join(path), content).expect("Failed to write file");
+    }
+
+    /// Reads content from a file in the mock project's temporary directory.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - A path (relative to the temporary directory) of the file to read.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the read operation fails.
+    pub fn read<P: AsRef<Path>>(&self, path: P) -> String {
+        fs::read_to_string(self.tempdir.path().join(path)).expect("Failed to read file")
     }
 }

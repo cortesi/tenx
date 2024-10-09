@@ -369,23 +369,21 @@ impl Config {
         if path.to_str().map_or(false, |s| s.contains('*')) {
             return Ok(path.to_path_buf());
         }
-        if path.is_relative() {
-            let absolute_path = current_dir
-                .join(path)
-                .canonicalize()
-                .map_err(|e| TenxError::Internal(format!("Could not canonicalize: {}", e)))?;
-
-            Ok(absolute_path
-                .strip_prefix(
-                    self.project_root().canonicalize().map_err(|e| {
-                        TenxError::Internal(format!("Could not canonicalize: {}", e))
-                    })?,
-                )
-                .unwrap_or(&absolute_path)
-                .to_path_buf())
+        let absolute_path = if path.is_relative() {
+            current_dir.join(path)
         } else {
-            Ok(path.to_path_buf())
-        }
+            path.to_path_buf()
+        };
+        let canonicalized_path = absolute_path
+            .canonicalize()
+            .map_err(|e| TenxError::Internal(format!("Could not canonicalize: {}", e)))?;
+        let project_root = self.project_root().canonicalize().map_err(|e| {
+            TenxError::Internal(format!("Could not canonicalize project root: {}", e))
+        })?;
+        Ok(canonicalized_path
+            .strip_prefix(&project_root)
+            .unwrap_or(&canonicalized_path)
+            .to_path_buf())
     }
 
     /// Traverse the included files and return a list of files that match the given glob pattern.
@@ -580,7 +578,8 @@ impl Config {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::tempdir;
+    use crate::testutils;
+
     use tempfile::TempDir;
 
     macro_rules! set_config {
@@ -752,12 +751,10 @@ mod tests {
 
     #[test]
     fn test_included_files() -> Result<()> {
-        use crate::testutils::create_file_tree;
-
         let temp_dir = TempDir::new()?;
         let root_path = temp_dir.path();
 
-        create_file_tree(
+        testutils::create_file_tree(
             root_path,
             &[
                 "file1.rs",
@@ -805,27 +802,21 @@ mod tests {
 
     #[test]
     fn test_match_files_with_glob() -> Result<()> {
-        use crate::testutils::create_file_tree;
+        use crate::testutils::test_project;
 
-        let temp_dir = tempdir()?;
-        let root_dir = temp_dir.path().canonicalize()?;
+        let mut project = test_project();
+        project.create_file_tree(&[
+            "src/file1.rs",
+            "src/subdir/file2.rs",
+            "tests/test1.rs",
+            "README.md",
+        ]);
 
-        create_file_tree(
-            &root_dir,
-            &[
-                "src/file1.rs",
-                "src/subdir/file2.rs",
-                "tests/test1.rs",
-                "README.md",
-            ],
-        )?;
-
-        let mut config = Config::default();
-        config.include = Include::Glob(vec!["**/*.rs".to_string(), "README.md".to_string()]);
-        config.project_root = ProjectRoot::Path(root_dir.clone());
+        project.config.include =
+            Include::Glob(vec!["**/*.rs".to_string(), "README.md".to_string()]);
 
         // Test matching files from root directory
-        let matched_files = config.match_files_with_glob("src/**/*.rs")?;
+        let matched_files = project.config.match_files_with_glob("src/**/*.rs")?;
         assert_eq!(
             matched_files.len(),
             2,
@@ -841,12 +832,9 @@ mod tests {
             "src/subdir/file2.rs not matched"
         );
 
-        // Store the original working directory
-        let original_dir = env::current_dir()?;
-
         // Test matching files from subdirectory
-        env::set_current_dir(root_dir.join("src"))?;
-        let matched_files = config.match_files_with_glob("**/*.rs")?;
+        project.set_cwd("src");
+        let matched_files = project.config.match_files_with_glob("**/*.rs")?;
         assert_eq!(
             matched_files.len(),
             3,
@@ -867,7 +855,7 @@ mod tests {
         );
 
         // Test matching non-Rust files
-        let matched_files = config.match_files_with_glob("../*.md")?;
+        let matched_files = project.config.match_files_with_glob("*.md")?;
         assert_eq!(
             matched_files.len(),
             1,
@@ -879,44 +867,39 @@ mod tests {
             "README.md not matched"
         );
 
-        // Reset the working directory
-        env::set_current_dir(original_dir)?;
-
         Ok(())
     }
 
     #[test]
     fn test_normalize_path_with_cwd() -> Result<()> {
-        use crate::testutils::create_file_tree;
+        let project = testutils::test_project();
+        project.create_file_tree(&[
+            "file.txt",
+            "subdir/subfile.txt",
+            "../outside/outsidefile.txt",
+            "abs_file.txt",
+        ]);
 
-        let temp_dir = tempdir().unwrap();
-        let root = temp_dir.path().join("root");
-        let mut config = Config::default();
-        config.project_root = ProjectRoot::Path(root.clone());
-
-        create_file_tree(
-            temp_dir.path(),
-            &[
-                "root/file.txt",
-                "root/subdir/subfile.txt",
-                "outside/outsidefile.txt",
-                "root/abs_file.txt",
-            ],
-        )?;
-
+        let root = project.tempdir.path().to_path_buf();
         let sub_dir = root.join("subdir");
+        let outside_dir = root.parent().unwrap().join("outside");
 
         // Test 1: Current dir is the root directory
-        let result = config.normalize_path_with_cwd("file.txt", root.clone())?;
+        let result = project
+            .config
+            .normalize_path_with_cwd("file.txt", root.clone())?;
         assert_eq!(result, PathBuf::from("file.txt"));
 
         // Test 2: Current dir is under the root directory
-        let result = config.normalize_path_with_cwd("subfile.txt", sub_dir.clone())?;
+        let result = project
+            .config
+            .normalize_path_with_cwd("subfile.txt", sub_dir.clone())?;
         assert_eq!(result, PathBuf::from("subdir/subfile.txt"));
 
         // Test 3: Current dir is outside the root directory
-        let outside_dir = temp_dir.path().join("outside");
-        let result = config.normalize_path_with_cwd("outsidefile.txt", outside_dir.clone())?;
+        let result = project
+            .config
+            .normalize_path_with_cwd("outsidefile.txt", outside_dir.clone())?;
         let expected = outside_dir
             .join("outsidefile.txt")
             .strip_prefix(&root)
@@ -929,8 +912,10 @@ mod tests {
 
         // Test 4: Absolute path
         let abs_path = root.join("abs_file.txt");
-        let result = config.normalize_path_with_cwd(&abs_path, root.clone())?;
-        assert_eq!(result, abs_path);
+        let result = project
+            .config
+            .normalize_path_with_cwd(&abs_path, root.clone())?;
+        assert_eq!(result, PathBuf::from("abs_file.txt"));
 
         Ok(())
     }

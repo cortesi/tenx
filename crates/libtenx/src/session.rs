@@ -281,40 +281,39 @@ impl Session {
 mod tests {
     use super::*;
     use crate::{
-        config::ProjectRoot,
+        config,
         context::ContextProvider,
         patch::{Change, Patch, WriteFile},
     };
-    use std::fs;
-    use tempfile::tempdir;
 
     #[test]
     fn test_add_context_ignores_duplicates() {
-        let temp_dir = tempdir().unwrap();
-        let mut session = Session::default();
-        // Create a mock config that doesn't rely on git
-        let mut config = crate::config::Config::default();
-        config.include = crate::config::Include::Glob(vec!["**/*".to_string()]);
-        config.project_root = crate::config::ProjectRoot::Path(temp_dir.path().to_path_buf());
+        let mut test_project = crate::testutils::test_project();
+        test_project.create_file_tree(&["test.txt"]);
+        test_project.write("test.txt", "content");
 
-        let test_file = temp_dir.path().join("test.txt");
-        fs::write(&test_file, "content").unwrap();
+        test_project.config.include = config::Include::Glob(vec!["**/*".to_string()]);
 
         let context1 = context::ContextSpec::Path(
-            context::Path::new(&config, "test.txt".to_string()).unwrap(),
+            context::Path::new(&test_project.config, "test.txt".to_string()).unwrap(),
         );
         let context2 = context::ContextSpec::Path(
-            context::Path::new(&config, "test.txt".to_string()).unwrap(),
+            context::Path::new(&test_project.config, "test.txt".to_string()).unwrap(),
         );
 
-        session.add_context(context1.clone());
-        session.add_context(context2);
+        test_project.session.add_context(context1.clone());
+        test_project.session.add_context(context2);
 
-        assert_eq!(session.context.len(), 1);
-        assert!(matches!(session.context[0], context::ContextSpec::Path(_)));
+        assert_eq!(test_project.session.context.len(), 1);
+        assert!(matches!(
+            test_project.session.context[0],
+            context::ContextSpec::Path(_)
+        ));
 
-        if let context::ContextSpec::Path(glob_context) = &session.context[0] {
-            let context_items = glob_context.contexts(&config, &session).unwrap();
+        if let context::ContextSpec::Path(glob_context) = &test_project.session.context[0] {
+            let context_items = glob_context
+                .contexts(&test_project.config, &test_project.session)
+                .unwrap();
             assert_eq!(context_items[0].body, "content");
         } else {
             panic!("Expected Glob context");
@@ -323,17 +322,9 @@ mod tests {
 
     #[test]
     fn test_reset() -> Result<()> {
-        let temp_dir = tempdir().unwrap();
-        let root_dir = temp_dir.path().to_path_buf();
-        let file_path = root_dir.join("test.txt");
-        let mut config = crate::config::Config::default();
-
-        config.project_root = ProjectRoot::Path(root_dir.clone());
-
-        let mut session = Session::default();
-
-        // Create initial file
-        fs::write(&file_path, "Initial content").unwrap();
+        let mut test_project = crate::testutils::test_project();
+        test_project.create_file_tree(&["test.txt"]);
+        test_project.write("test.txt", "Initial content");
 
         // Add three steps
         for i in 1..=3 {
@@ -344,26 +335,27 @@ mod tests {
                     content: content.clone(),
                 })],
                 comment: Some(format!("Step {}", i)),
-                cache: [(
-                    PathBuf::from("test.txt"),
-                    fs::read_to_string(&file_path).unwrap(),
-                )]
-                .into_iter()
-                .collect(),
+                cache: [(PathBuf::from("test.txt"), test_project.read("test.txt"))]
+                    .into_iter()
+                    .collect(),
             };
-            session.add_prompt(Prompt::User(format!("Prompt {}", i)))?;
-            session.set_last_patch(&patch);
-            session.apply_patch(&config, &mut patch.clone())?;
+            test_project
+                .session
+                .add_prompt(Prompt::User(format!("Prompt {}", i)))?;
+            test_project.session.set_last_patch(&patch);
+            test_project
+                .session
+                .apply_patch(&test_project.config, &mut patch.clone())?;
         }
 
-        assert_eq!(session.steps.len(), 3);
-        assert_eq!(fs::read_to_string(&file_path).unwrap(), "Content 3");
+        assert_eq!(test_project.session.steps.len(), 3);
+        assert_eq!(test_project.read("test.txt"), "Content 3");
 
         // Rollback to the first step
-        session.reset(&config, 0)?;
+        test_project.session.reset(&test_project.config, 0)?;
 
-        assert_eq!(session.steps.len(), 1);
-        assert_eq!(fs::read_to_string(&file_path).unwrap(), "Content 1");
+        assert_eq!(test_project.session.steps.len(), 1);
+        assert_eq!(test_project.read("test.txt"), "Content 1");
 
         Ok(())
     }
