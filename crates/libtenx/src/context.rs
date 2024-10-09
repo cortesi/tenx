@@ -110,7 +110,7 @@ pub struct Path {
 }
 
 impl Path {
-    pub(crate) fn new(config: &Config, pattern: String) -> Result<Self> {
+    pub(crate) fn new(_config: &Config, pattern: String) -> Result<Self> {
         let path_type = if pattern.contains('*') {
             PathType::Pattern(pattern)
         } else {

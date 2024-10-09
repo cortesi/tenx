@@ -248,6 +248,11 @@ pub struct Config {
     /// When true, serializes all fields regardless of default values.
     #[serde(skip)]
     full: bool,
+
+    /// The current working directory when testing. We need this, because we can't change the CWD
+    /// reliably in tests for reasons of concurrency.
+    #[serde(skip)]
+    test_cwd: Option<String>,
 }
 
 impl Serialize for Config {
@@ -299,11 +304,26 @@ impl Default for Config {
             validators: Validators::default(),
             formatters: Formatters::default(),
             project_root: ProjectRoot::default(),
+            test_cwd: None,
         }
     }
 }
 
 impl Config {
+    pub fn cwd(&self) -> Result<PathBuf> {
+        if let Some(test_cwd) = &self.test_cwd {
+            Ok(PathBuf::from(test_cwd))
+        } else {
+            env::current_dir()
+                .map_err(|e| TenxError::Internal(format!("Failed to get current directory: {}", e)))
+        }
+    }
+
+    pub fn with_test_cwd(mut self, path: PathBuf) -> Self {
+        self.test_cwd = Some(path.to_string_lossy().into_owned());
+        self
+    }
+
     pub fn session_store_dir(&self) -> PathBuf {
         if self.session_store_dir.as_os_str().is_empty() {
             home_config_dir().join("state")
@@ -314,9 +334,7 @@ impl Config {
 
     pub fn project_root(&self) -> PathBuf {
         match &self.project_root {
-            ProjectRoot::Discover => {
-                find_project_root(&std::env::current_dir().unwrap_or_default())
-            }
+            ProjectRoot::Discover => find_project_root(&self.cwd().unwrap_or_default()),
             ProjectRoot::Path(path) => path.clone(),
         }
     }
@@ -337,11 +355,7 @@ impl Config {
     /// Normalizes a path relative to the root directory.
     /// If the path contains glob patterns ("*" or "**"), it will be returned as-is.
     pub fn normalize_path<P: AsRef<Path>>(&self, path: P) -> Result<PathBuf> {
-        self.normalize_path_with_cwd(
-            path,
-            env::current_dir()
-                .map_err(|e| TenxError::Internal(format!("Could not get cwd: {}", e)))?,
-        )
+        self.normalize_path_with_cwd(path, self.cwd()?)
     }
 
     /// Normalizes a path relative to the root directory with a given current working directory.
@@ -381,8 +395,7 @@ impl Config {
             .map_err(|e| TenxError::Internal(format!("Invalid glob pattern: {}", e)))?;
         let included_files = self.included_files()?;
 
-        let current_dir = env::current_dir()
-            .map_err(|e| TenxError::Internal(format!("Failed to get current directory: {}", e)))?;
+        let current_dir = self.cwd()?;
 
         let mut matched_files = Vec::new();
 
@@ -567,7 +580,6 @@ impl Config {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs::File;
     use tempfile::tempdir;
     use tempfile::TempDir;
 

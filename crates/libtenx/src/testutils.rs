@@ -1,7 +1,9 @@
 #![cfg(test)]
 
+use crate::{config::Config, Session};
 use fs_err as fs;
 use std::path::Path;
+use tempfile::{tempdir, TempDir};
 
 pub fn create_dummy_project(temp_dir: &Path) -> std::io::Result<()> {
     // Create workspace Cargo.toml
@@ -41,4 +43,56 @@ pub fn create_file_tree(dir: &Path, paths: &[&str]) -> std::io::Result<()> {
         fs::File::create(full_path)?;
     }
     Ok(())
+}
+
+/// A structure representing a mock project for testing purposes.
+pub struct TestProject {
+    /// The configuration for the mock project.
+    pub config: Config,
+    /// The session associated with the mock project.
+    pub session: Session,
+    /// A temporary directory for the mock project.
+    pub tempdir: TempDir,
+}
+
+/// Creates a new MockProject instance.
+///
+/// This function sets up a temporary directory and initializes a Config and Session
+/// for use in tests.
+pub fn test_project() -> TestProject {
+    let tempdir = tempdir().unwrap();
+    let tempdir_path = tempdir.path().to_path_buf();
+
+    let config = Config::default()
+        .with_root(tempdir_path.clone())
+        .with_test_cwd(tempdir_path.clone());
+
+    let session = Session::default();
+
+    TestProject {
+        config,
+        session,
+        tempdir,
+    }
+}
+
+impl TestProject {
+    /// Creates a file tree structure in the mock project's temporary directory.
+    ///
+    /// # Arguments
+    ///
+    /// * `paths` - A slice of string slices representing the paths of files to create.
+    pub fn create_file_tree(&self, paths: &[&str]) -> std::io::Result<()> {
+        create_file_tree(self.tempdir.path(), paths)
+    }
+
+    /// Sets the current working directory for the mock project's configuration.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - A path (relative to the temporary directory) to set as the new working directory.
+    pub fn set_cwd<P: AsRef<Path>>(&mut self, path: P) {
+        let new_cwd = self.tempdir.path().join(path);
+        self.config = std::mem::take(&mut self.config).with_test_cwd(new_cwd);
+    }
 }
