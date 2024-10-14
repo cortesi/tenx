@@ -337,4 +337,56 @@ mod tests {
             panic!("Expected ContextSpec::Path");
         }
     }
+
+    #[test]
+    fn test_file_context_outside_project_root() {
+        use std::path::PathBuf;
+        use tempfile::tempdir;
+
+        let test_project = test_project();
+        let outside_dir = tempdir().unwrap();
+        let outside_file_path = outside_dir.path().join("outside.txt");
+        std::fs::write(&outside_file_path, "Outside content").unwrap();
+
+        // Test with absolute path
+        let config = test_project.config.clone();
+        let context_spec =
+            ContextSpec::new_path(&config, outside_file_path.to_str().unwrap().to_string())
+                .unwrap();
+        assert!(matches!(context_spec, ContextSpec::Path(_)));
+
+        if let ContextSpec::Path(path) = context_spec {
+            let contexts = path.contexts(&config, &test_project.session).unwrap();
+
+            assert_eq!(contexts.len(), 1);
+            let context = &contexts[0];
+            assert_eq!(context.name, outside_file_path.to_str().unwrap());
+            assert_eq!(context.ty, "file");
+            assert_eq!(context.body, "Outside content");
+        } else {
+            panic!("Expected ContextSpec::Path");
+        }
+
+        // Test with relative path
+        let mut config_with_outside_cwd = config.clone();
+        config_with_outside_cwd =
+            config_with_outside_cwd.with_test_cwd(outside_dir.path().to_path_buf());
+        let relative_context_spec =
+            ContextSpec::new_path(&config_with_outside_cwd, "outside.txt".to_string()).unwrap();
+        assert!(matches!(relative_context_spec, ContextSpec::Path(_)));
+
+        if let ContextSpec::Path(path) = relative_context_spec {
+            let contexts = path
+                .contexts(&config_with_outside_cwd, &test_project.session)
+                .unwrap();
+
+            assert_eq!(contexts.len(), 1);
+            let context = &contexts[0];
+            assert_eq!(context.name, outside_file_path.to_str().unwrap());
+            assert_eq!(context.ty, "file");
+            assert_eq!(context.body, "Outside content");
+        } else {
+            panic!("Expected ContextSpec::Path");
+        }
+    }
 }
