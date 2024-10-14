@@ -64,8 +64,8 @@ pub fn test_project() -> TestProject {
     let tempdir_path = tempdir.path().to_path_buf();
 
     let config = Config::default()
-        .with_root(tempdir_path.clone())
-        .with_test_cwd(tempdir_path.clone());
+        .with_root(&tempdir_path)
+        .with_test_cwd(tempdir_path);
 
     let session = Session::default();
 

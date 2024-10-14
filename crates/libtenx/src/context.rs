@@ -110,7 +110,8 @@ pub struct Path {
 }
 
 impl Path {
-    pub(crate) fn new(_config: &Config, pattern: String) -> Result<Self> {
+    pub(crate) fn new(config: &Config, pattern: String) -> Result<Self> {
+        let pattern = config.normalize_path(pattern)?.display().to_string();
         let path_type = if pattern.contains('*') {
             PathType::Pattern(pattern)
         } else {
@@ -299,8 +300,8 @@ mod tests {
             "Cargo.toml",
         ]);
 
+        // Test with absolute path from project root
         let config = test_project.config.clone();
-
         let context_spec = ContextSpec::new_path(&config, "src/main.rs".to_string()).unwrap();
         assert!(matches!(context_spec, ContextSpec::Path(_)));
 
@@ -309,8 +310,27 @@ mod tests {
 
             assert_eq!(contexts.len(), 1);
             let context = &contexts[0];
-
             assert_eq!(context.name, "src/main.rs");
+            assert_eq!(context.ty, "file");
+            assert_eq!(test_project.read(&context.name), context.body);
+        } else {
+            panic!("Expected ContextSpec::Path");
+        }
+
+        // Test with relative path from subdirectory
+        let mut config_in_src = test_project.config.clone();
+        config_in_src = config_in_src.with_test_cwd(test_project.tempdir.path().join("src"));
+        let context_spec = ContextSpec::new_path(&config_in_src, "lib.rs".to_string()).unwrap();
+        assert!(matches!(context_spec, ContextSpec::Path(_)));
+
+        if let ContextSpec::Path(path) = context_spec {
+            let contexts = path
+                .contexts(&config_in_src, &test_project.session)
+                .unwrap();
+
+            assert_eq!(contexts.len(), 1);
+            let context = &contexts[0];
+            assert_eq!(context.name, "src/lib.rs");
             assert_eq!(context.ty, "file");
             assert_eq!(test_project.read(&context.name), context.body);
         } else {

@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::{
     env, fs,
-    path::{Path, PathBuf},
+    path::{absolute, Path, PathBuf},
     process::Command,
 };
 
@@ -346,10 +346,9 @@ impl Config {
 
     /// Converts a path relative to the root directory to an absolute path
     pub fn abspath(&self, path: &Path) -> Result<PathBuf> {
-        self.project_root()
-            .join(path)
-            .canonicalize()
-            .map_err(|e| TenxError::Internal(format!("Could not canonicalize: {}", e)))
+        let p = self.project_root().join(path);
+        absolute(p.clone())
+            .map_err(|e| TenxError::Internal(format!("could not absolute {}: {}", p.display(), e)))
     }
 
     /// Normalizes a path relative to the root directory.
@@ -374,15 +373,18 @@ impl Config {
         } else {
             path.to_path_buf()
         };
-        let canonicalized_path = absolute_path
-            .canonicalize()
-            .map_err(|e| TenxError::Internal(format!("Could not canonicalize: {}", e)))?;
-        let project_root = self.project_root().canonicalize().map_err(|e| {
-            TenxError::Internal(format!("Could not canonicalize project root: {}", e))
+        let abspath = absolute(absolute_path.clone()).map_err(|e| {
+            TenxError::Internal(format!(
+                "Could not absolute {}: {}",
+                absolute_path.display(),
+                e
+            ))
         })?;
-        Ok(canonicalized_path
+        let project_root = absolute(self.project_root())
+            .map_err(|e| TenxError::Internal(format!("Could not absolute project root: {}", e)))?;
+        Ok(abspath
             .strip_prefix(&project_root)
-            .unwrap_or(&canonicalized_path)
+            .unwrap_or(&abspath)
             .to_path_buf())
     }
 
@@ -600,10 +602,8 @@ mod tests {
         set_config!(config, default_dialect, ConfigDialect::Tags);
 
         let toml_str = config.to_toml().unwrap();
-        println!("Serialized TOML:\n{}", toml_str);
 
         let deserialized_config = Config::from_toml(&toml_str).unwrap();
-        println!("Deserialized Config:\n{:#?}", deserialized_config);
 
         assert_eq!(config.anthropic_key, deserialized_config.anthropic_key);
         assert_eq!(
@@ -619,7 +619,6 @@ mod tests {
         // Test default value serialization
         let default_config = Config::default();
         let default_toml_str = default_config.to_toml().unwrap();
-        println!("Default Config TOML:\n{}", default_toml_str);
 
         let parsed_toml: toml::Value = toml::from_str(&default_toml_str).unwrap();
         let table = parsed_toml.as_table().unwrap();
@@ -674,7 +673,6 @@ mod tests {
         );
 
         let toml_str = config.to_toml().unwrap();
-        println!("Serialized TOML:\n{}", toml_str);
 
         let deserialized_config = Config::from_toml(&toml_str).unwrap();
 
