@@ -58,7 +58,7 @@ impl Tenx {
     ) -> Result<usize> {
         let mut contexts = Vec::new();
         for file in glob {
-            contexts.push(ContextSpec::new_glob(&self.config, file.to_string())?);
+            contexts.push(ContextSpec::new_path(&self.config, file.to_string())?);
         }
         for ruskel_doc in ruskel {
             contexts.push(ContextSpec::new_ruskel(ruskel_doc.clone()));

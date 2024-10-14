@@ -7,11 +7,11 @@ use libruskel::Ruskel as LibRuskel;
 /// An individual context item.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct ContextItem {
-    /// The type of documentation.
+    /// The type of context.
     pub ty: String,
-    /// The name of the documentation.
+    /// The name of the context.
     pub name: String,
-    /// The contents of the help document.
+    /// The contents of the context.
     pub body: String,
 }
 
@@ -191,7 +191,7 @@ impl ContextSpec {
     }
 
     /// Creates a new Context for a glob pattern.
-    pub fn new_glob(config: &Config, pattern: String) -> Result<Self> {
+    pub fn new_path(config: &Config, pattern: String) -> Result<Self> {
         Ok(ContextSpec::Path(Path::new(config, pattern)?))
     }
 }
@@ -240,6 +240,81 @@ impl ContextProvider for ContextSpec {
         match self {
             ContextSpec::Ruskel(r) => r.refresh(),
             ContextSpec::Path(g) => g.refresh(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::Include;
+    use crate::testutils::test_project;
+
+    #[test]
+    fn test_glob_context_initialization() {
+        let test_project = test_project();
+        test_project.create_file_tree(&[
+            "src/main.rs",
+            "src/lib.rs",
+            "tests/test1.rs",
+            "README.md",
+            "Cargo.toml",
+        ]);
+
+        // Set the include to use glob instead of git
+        let mut config = test_project.config.clone();
+        config.include = Include::Glob(vec!["**/*.rs".to_string()]);
+
+        let context_spec = ContextSpec::new_path(&config, "**/*.rs".to_string()).unwrap();
+        assert!(matches!(context_spec, ContextSpec::Path(_)));
+
+        if let ContextSpec::Path(path) = context_spec {
+            let contexts = path.contexts(&config, &test_project.session).unwrap();
+
+            let mut expected_files = vec!["src/main.rs", "src/lib.rs", "tests/test1.rs"];
+            expected_files.sort();
+
+            let mut actual_files: Vec<_> = contexts.iter().map(|c| c.name.as_str()).collect();
+            actual_files.sort();
+
+            assert_eq!(actual_files, expected_files);
+
+            for context in contexts {
+                assert_eq!(context.ty, "file");
+                assert_eq!(test_project.read(&context.name), context.body);
+            }
+        } else {
+            panic!("Expected ContextSpec::Path");
+        }
+    }
+
+    #[test]
+    fn test_single_file_context_initialization() {
+        let test_project = test_project();
+        test_project.create_file_tree(&[
+            "src/main.rs",
+            "src/lib.rs",
+            "tests/test1.rs",
+            "README.md",
+            "Cargo.toml",
+        ]);
+
+        let config = test_project.config.clone();
+
+        let context_spec = ContextSpec::new_path(&config, "src/main.rs".to_string()).unwrap();
+        assert!(matches!(context_spec, ContextSpec::Path(_)));
+
+        if let ContextSpec::Path(path) = context_spec {
+            let contexts = path.contexts(&config, &test_project.session).unwrap();
+
+            assert_eq!(contexts.len(), 1);
+            let context = &contexts[0];
+
+            assert_eq!(context.name, "src/main.rs");
+            assert_eq!(context.ty, "file");
+            assert_eq!(test_project.read(&context.name), context.body);
+        } else {
+            panic!("Expected ContextSpec::Path");
         }
     }
 }
