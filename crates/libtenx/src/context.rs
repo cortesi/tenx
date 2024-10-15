@@ -1,8 +1,8 @@
 use fs_err as fs;
+use libruskel::Ruskel as LibRuskel;
 use serde::{Deserialize, Serialize};
 
 use crate::{config::Config, Result, Session, TenxError};
-use libruskel::Ruskel as LibRuskel;
 
 /// An individual context item.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
@@ -250,6 +250,7 @@ mod tests {
     use super::*;
     use crate::config::Include;
     use crate::testutils::test_project;
+    use tempfile::tempdir;
 
     #[test]
     fn test_glob_context_initialization() {
@@ -340,9 +341,6 @@ mod tests {
 
     #[test]
     fn test_file_context_outside_project_root() {
-        use std::path::PathBuf;
-        use tempfile::tempdir;
-
         let test_project = test_project();
         let outside_dir = tempdir().unwrap();
         let outside_file_path = outside_dir.path().join("outside.txt");

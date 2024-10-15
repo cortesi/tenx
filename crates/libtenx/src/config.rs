@@ -1,4 +1,4 @@
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     env, fs,
     path::{absolute, Path, PathBuf},
@@ -7,7 +7,7 @@ use std::{
 
 use globset::{Glob, GlobSetBuilder};
 use pathdiff::diff_paths;
-use serde::ser::{SerializeStruct, Serializer};
+use serde::ser::SerializeStruct;
 
 use toml;
 
@@ -278,12 +278,37 @@ impl Serialize for Config {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
-#[serde(rename_all = "snake_case")]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub enum ProjectRoot {
     #[default]
     Discover,
     Path(PathBuf),
+}
+
+impl Serialize for ProjectRoot {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            ProjectRoot::Discover => serializer.serialize_str(""),
+            ProjectRoot::Path(path) => path.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for ProjectRoot {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        if s.is_empty() {
+            Ok(ProjectRoot::Discover)
+        } else {
+            Ok(ProjectRoot::Path(PathBuf::from(s)))
+        }
+    }
 }
 
 impl Default for Config {
