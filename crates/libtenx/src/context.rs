@@ -19,6 +19,7 @@ pub struct ContextItem {
 pub enum ContextType {
     Ruskel,
     Path,
+    ProjectMap,
 }
 
 pub trait ContextProvider {
@@ -94,6 +95,52 @@ impl ContextProvider for Ruskel {
         self.content = ruskel
             .render(false, false, true)
             .map_err(|e| TenxError::Resolve(e.to_string()))?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub struct ProjectMap;
+
+impl ProjectMap {
+    pub(crate) fn new() -> Self {
+        Self
+    }
+}
+
+impl ContextProvider for ProjectMap {
+    fn typ(&self) -> &ContextType {
+        &ContextType::ProjectMap
+    }
+
+    fn name(&self) -> &str {
+        "project_map"
+    }
+
+    fn contexts(&self, config: &Config, _: &Session) -> Result<Vec<ContextItem>> {
+        let files = config.included_files()?;
+        let body = files
+            .iter()
+            .map(|p| p.to_string_lossy().to_string())
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        Ok(vec![ContextItem {
+            ty: "project_map".to_string(),
+            name: "project_map".to_string(),
+            body,
+        }])
+    }
+
+    fn human(&self) -> String {
+        "project_map".to_string()
+    }
+
+    fn count(&self, config: &Config, _: &Session) -> Result<usize> {
+        Ok(config.included_files()?.len())
+    }
+
+    fn refresh(&mut self) -> Result<()> {
         Ok(())
     }
 }
@@ -183,6 +230,7 @@ impl ContextProvider for Path {
 pub enum ContextSpec {
     Ruskel(Ruskel),
     Path(Path),
+    ProjectMap(ProjectMap),
 }
 
 impl ContextSpec {
@@ -195,6 +243,11 @@ impl ContextSpec {
     pub fn new_path(config: &Config, pattern: String) -> Result<Self> {
         Ok(ContextSpec::Path(Path::new(config, pattern)?))
     }
+
+    /// Creates a new Context for the project map.
+    pub fn new_project_map() -> Self {
+        ContextSpec::ProjectMap(ProjectMap::new())
+    }
 }
 
 impl ContextProvider for ContextSpec {
@@ -202,6 +255,7 @@ impl ContextProvider for ContextSpec {
         match self {
             ContextSpec::Ruskel(r) => r.typ(),
             ContextSpec::Path(g) => g.typ(),
+            ContextSpec::ProjectMap(p) => p.typ(),
         }
     }
 
@@ -209,6 +263,7 @@ impl ContextProvider for ContextSpec {
         match self {
             ContextSpec::Ruskel(r) => r.name(),
             ContextSpec::Path(g) => g.name(),
+            ContextSpec::ProjectMap(p) => p.name(),
         }
     }
 
@@ -220,6 +275,7 @@ impl ContextProvider for ContextSpec {
         match self {
             ContextSpec::Ruskel(r) => r.contexts(config, session),
             ContextSpec::Path(g) => g.contexts(config, session),
+            ContextSpec::ProjectMap(p) => p.contexts(config, session),
         }
     }
 
@@ -227,6 +283,7 @@ impl ContextProvider for ContextSpec {
         match self {
             ContextSpec::Ruskel(r) => r.human(),
             ContextSpec::Path(g) => g.human(),
+            ContextSpec::ProjectMap(p) => p.human(),
         }
     }
 
@@ -234,6 +291,7 @@ impl ContextProvider for ContextSpec {
         match self {
             ContextSpec::Ruskel(r) => r.count(config, session),
             ContextSpec::Path(g) => g.count(config, session),
+            ContextSpec::ProjectMap(p) => p.count(config, session),
         }
     }
 
@@ -241,6 +299,7 @@ impl ContextProvider for ContextSpec {
         match self {
             ContextSpec::Ruskel(r) => r.refresh(),
             ContextSpec::Path(g) => g.refresh(),
+            ContextSpec::ProjectMap(p) => p.refresh(),
         }
     }
 }
@@ -251,6 +310,40 @@ mod tests {
     use crate::config::Include;
     use crate::testutils::test_project;
     use tempfile::tempdir;
+
+    #[test]
+    fn test_project_map_context() {
+        let test_project = test_project();
+        test_project.create_file_tree(&[
+            "src/main.rs",
+            "src/lib.rs",
+            "tests/test1.rs",
+            "README.md",
+            "Cargo.toml",
+        ]);
+
+        let mut config = test_project.config.clone();
+        config.include = Include::Glob(vec!["**/*.rs".to_string(), "**/Cargo.toml".to_string()]);
+
+        let context_spec = ContextSpec::new_project_map();
+        let mut expected_files = vec!["src/main.rs", "src/lib.rs", "tests/test1.rs", "Cargo.toml"];
+        expected_files.sort();
+
+        if let ContextSpec::ProjectMap(map) = context_spec {
+            let contexts = map.contexts(&config, &test_project.session).unwrap();
+            assert_eq!(contexts.len(), 1);
+
+            let context = &contexts[0];
+            assert_eq!(context.ty, "project_map");
+            assert_eq!(context.name, "project_map");
+
+            let mut actual_files: Vec<_> = context.body.lines().collect();
+            actual_files.sort();
+            assert_eq!(actual_files, expected_files);
+        } else {
+            panic!("Expected ContextSpec::ProjectMap");
+        }
+    }
 
     #[test]
     fn test_glob_context_initialization() {

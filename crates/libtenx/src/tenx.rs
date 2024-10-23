@@ -44,6 +44,14 @@ impl Tenx {
             sender,
         )?;
 
+        // Add project map if configured
+        if self.config.default_context.project_map {
+            let context = ContextSpec::new_project_map();
+            send_event(sender, Event::ContextStart)?;
+            session.add_context(context);
+            send_event(sender, Event::ContextEnd)?;
+        }
+
         send_event(sender, Event::Finish)?;
         Ok(session)
     }

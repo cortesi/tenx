@@ -73,13 +73,29 @@ fn find_project_root(current_dir: &Path) -> PathBuf {
     current_dir.to_path_buf()
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub struct DefaultContext {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub ruskel: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub path: Vec<String>,
+    #[serde(default = "default_project_map")]
+    pub project_map: bool,
+}
+
+impl Default for DefaultContext {
+    fn default() -> Self {
+        Self {
+            ruskel: Vec::new(),
+            path: Vec::new(),
+            project_map: true,
+        }
+    }
+}
+
+fn default_project_map() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
