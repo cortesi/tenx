@@ -16,7 +16,7 @@ use crate::{
     patch, Result, Session, TenxError,
 };
 
-const DEFAULT_MODEL: &str = "claude-3-5-sonnet-20240620";
+const DEFAULT_MODEL: &str = "claude-3-5-sonnet-latest";
 const MAX_TOKENS: u32 = 8192;
 const CONTEXT_LEADIN: &str = "Here is some immutable context that you may not edit.\n";
 const EDITABLE_LEADIN: &str =
