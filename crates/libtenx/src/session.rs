@@ -9,12 +9,16 @@ use crate::{
 };
 use tokio::sync::mpsc;
 
-/// A single step in the session - basically a prompt and a patch.
+/// :A single step in the session - basically a prompt and a patch.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Step {
+    /// A prompt provided to the model
     pub prompt: Prompt,
+    /// A patch response from the model
     pub patch: Option<Patch>,
+    /// An error from the model
     pub err: Option<TenxError>,
+    /// Model-specific usage statistics
     pub usage: Option<Usage>,
 }
 
