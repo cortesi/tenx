@@ -9,7 +9,14 @@ use crate::{
 };
 use tokio::sync::mpsc;
 
-/// :A single step in the session - basically a prompt and a patch.
+/// Operations performed by the user before submitting a prompt.
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub enum Operation {
+    /// Edit a file
+    Edit(PathBuf),
+}
+
+/// A single step in the session - basically a prompt and a patch.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Step {
     /// A prompt provided to the model
@@ -20,6 +27,8 @@ pub struct Step {
     pub err: Option<TenxError>,
     /// Model-specific usage statistics
     pub usage: Option<Usage>,
+    /// Operations performed by the user before prompting
+    pub operations: Vec<Operation>,
 }
 
 /// Determines if a given string is a glob pattern or a rooted path.
@@ -121,6 +130,7 @@ impl Session {
             patch: None,
             err: None,
             usage: None,
+            operations: Vec::new(),
         });
         Ok(())
     }
@@ -134,10 +144,12 @@ impl Session {
                 patch: None,
                 err: None,
                 usage: None,
+                operations: Vec::new(),
             });
             Ok(())
         } else if let Some(last_step) = self.steps.last_mut() {
             last_step.prompt = prompt;
+            last_step.operations.clear();
             Ok(())
         } else {
             Err(TenxError::Internal("Failed to set prompt".into()))
@@ -266,12 +278,29 @@ impl Session {
         Ok(())
     }
 
-    /// Applies the final patch in the session.
-    pub fn apply_last_patch(&mut self, config: &config::Config) -> Result<()> {
+    /// Apply the last step in the session, applying the patch and operations.
+    pub fn apply_last_step(&mut self, config: &config::Config) -> Result<()> {
+        let operations = self
+            .steps
+            .last()
+            .ok_or_else(|| TenxError::Internal("No steps in session".into()))?
+            .operations
+            .clone();
+
+        for operation in operations {
+            match operation {
+                Operation::Edit(path) => {
+                    self.add_editable_path(config, path)?;
+                }
+            }
+        }
+
         let mut last_patch = self
             .steps
             .last()
-            .and_then(|step| step.patch.clone())
+            .ok_or_else(|| TenxError::Internal("No steps in session".into()))?
+            .patch
+            .clone()
             .ok_or_else(|| TenxError::Internal("No patch in the last step".into()))?;
         self.apply_patch(config, &mut last_patch)?;
         if let Some(last_step) = self.steps.last_mut() {
@@ -360,6 +389,46 @@ mod tests {
 
         assert_eq!(test_project.session.steps.len(), 1);
         assert_eq!(test_project.read("test.txt"), "Content 1");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_apply_last_step_with_editable() -> Result<()> {
+        let mut test_project = crate::testutils::test_project();
+        test_project.create_file_tree(&["test.txt", "new.txt"]);
+        test_project.write("test.txt", "content");
+        test_project.write("new.txt", "new content");
+
+        // Add a step with both a patch and an edit operation
+        test_project
+            .session
+            .add_prompt(Prompt::User("test prompt".into()))?;
+        let step = test_project.session.steps.last_mut().unwrap();
+        step.operations
+            .push(Operation::Edit(PathBuf::from("new.txt")));
+        let patch = Patch {
+            changes: vec![Change::Write(WriteFile {
+                path: PathBuf::from("test.txt"),
+                content: "modified content".into(),
+            })],
+            comment: None,
+            cache: [(PathBuf::from("test.txt"), "content".into())]
+                .into_iter()
+                .collect(),
+        };
+        step.patch = Some(patch);
+
+        // Apply the last step
+        test_project.session.apply_last_step(&test_project.config)?;
+
+        // Verify that both the patch was applied and the editable was added
+        assert_eq!(test_project.read("test.txt"), "modified content");
+        assert!(test_project
+            .session
+            .editable
+            .contains(&PathBuf::from("new.txt")));
+        assert_eq!(test_project.session.editable.len(), 1);
 
         Ok(())
     }

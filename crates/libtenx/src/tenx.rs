@@ -204,7 +204,7 @@ impl Tenx {
 
         let mut retry_count = 0;
         loop {
-            // Pull out the next step generation, so that both fix and resuming a sesison with an
+            // Pull out the next step generation, so that both fix and resuming a session with an
             // error works as expected.
             if let Some(e) = session.last_step_error() {
                 if let Some(model_message) = e.should_retry() {
@@ -253,7 +253,7 @@ impl Tenx {
         send_event(&sender, Event::ModelRequestEnd)?;
         prompt_result?;
         send_event(&sender, Event::ApplyPatch)?;
-        session.apply_last_patch(&self.config)?;
+        session.apply_last_step(&self.config)?;
         self.run_formatters(session, &sender)?;
         self.run_post_patch_validators(session, &sender)?;
         Ok(())

@@ -309,6 +309,7 @@ mod tests {
             patch: None,
             err: None,
             usage: None,
+            operations: Vec::new(),
         };
         let full_result = render_step_prompt(&step, 80, true);
         assert!(full_result.contains("Test prompt"));
