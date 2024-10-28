@@ -9,26 +9,44 @@ use crate::{
 };
 use tokio::sync::mpsc;
 
-/// Operations performed by the user before submitting a prompt.
+/// A parsed model response
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct ModelResponse {
+    /// The unified patch in the response
+    pub patch: Option<Patch>,
+    /// Operations requested by the model, other than patching.
+    pub operations: Vec<Operation>,
+    /// Model-specific usage statistics
+    pub usage: Option<Usage>,
+}
+
+impl ModelResponse {
+    fn rollback(&self, config: &config::Config) -> Result<()> {
+        if let Some(patch) = &self.patch {
+            for (path, content) in &patch.cache {
+                fs::write(config.abspath(path)?, content)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Operations requested by the model, other than patching.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub enum Operation {
-    /// Edit a file
+    /// Request to edit a file
     Edit(PathBuf),
 }
 
 /// A single step in the session - basically a prompt and a patch.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Step {
-    /// A prompt provided to the model
+    /// The prompt provided to the model
     pub prompt: Prompt,
-    /// A patch response from the model
-    pub patch: Option<Patch>,
+    /// The response from the model
+    pub model_response: Option<ModelResponse>,
     /// An error from the model
     pub err: Option<TenxError>,
-    /// Model-specific usage statistics
-    pub usage: Option<Usage>,
-    /// Operations performed by the user before prompting
-    pub operations: Vec<Operation>,
 }
 
 /// Determines if a given string is a glob pattern or a rooted path.
@@ -43,7 +61,7 @@ fn is_glob(s: &str) -> bool {
 #[derive(Debug, Deserialize, Serialize, Default)]
 pub struct Session {
     steps: Vec<Step>,
-    pub(crate) context: Vec<context::ContextSpec>,
+    pub(crate) contexts: Vec<context::ContextSpec>,
     editable: Vec<PathBuf>,
 }
 
@@ -68,8 +86,8 @@ impl Session {
         &self.steps
     }
 
-    pub fn context(&self) -> &Vec<context::ContextSpec> {
-        &self.context
+    pub fn contexts(&self) -> &Vec<context::ContextSpec> {
+        &self.contexts
     }
 
     /// Returns the relative paths of the editables for this session.
@@ -89,7 +107,7 @@ impl Session {
     /// Does this session have a pending prompt?
     pub fn pending_prompt(&self) -> bool {
         if let Some(step) = self.steps.last() {
-            step.patch.is_none()
+            step.model_response.is_none()
         } else {
             false
         }
@@ -100,17 +118,16 @@ impl Session {
         self.steps.last().and_then(|step| step.err.as_ref())
     }
 
-    /// Adds a patch to the final step
-    pub fn set_last_patch(&mut self, patch: &Patch) {
-        if let Some(step) = self.steps.last_mut() {
-            step.patch = Some(patch.clone());
-        }
-    }
-
     /// Adds an error to the final step
     pub fn set_last_error(&mut self, err: &TenxError) {
         if let Some(step) = self.steps.last_mut() {
             step.err = Some(err.clone());
+        }
+    }
+
+    pub fn set_last_response(&mut self, response: ModelResponse) {
+        if let Some(step) = self.steps.last_mut() {
+            step.model_response = Some(response);
         }
     }
 
@@ -119,18 +136,16 @@ impl Session {
     /// Returns an error if the last step doesn't have either a patch or an error.
     pub fn add_prompt(&mut self, prompt: Prompt) -> Result<()> {
         if let Some(last_step) = self.steps.last() {
-            if last_step.patch.is_none() && last_step.err.is_none() {
+            if last_step.model_response.is_none() && last_step.err.is_none() {
                 return Err(TenxError::Internal(
-                    "Cannot add a new prompt while the previous step is incomplete".into(),
+                    "Cannot add a new prompt while the previous step has no response".into(),
                 ));
             }
         }
         self.steps.push(Step {
             prompt,
-            patch: None,
+            model_response: None,
             err: None,
-            usage: None,
-            operations: Vec::new(),
         });
         Ok(())
     }
@@ -141,15 +156,12 @@ impl Session {
         if self.steps.is_empty() {
             self.steps.push(Step {
                 prompt,
-                patch: None,
+                model_response: None,
                 err: None,
-                usage: None,
-                operations: Vec::new(),
             });
             Ok(())
         } else if let Some(last_step) = self.steps.last_mut() {
-            last_step.prompt = prompt;
-            last_step.operations.clear();
+            last_step.model_response = None;
             Ok(())
         } else {
             Err(TenxError::Internal("Failed to set prompt".into()))
@@ -160,8 +172,8 @@ impl Session {
     ///
     /// If a context with the same name and type already exists, it will not be added again.
     pub fn add_context(&mut self, new_context: context::ContextSpec) {
-        if !self.context.contains(&new_context) {
-            self.context.push(new_context);
+        if !self.contexts.contains(&new_context) {
+            self.contexts.push(new_context);
         }
     }
 
@@ -227,14 +239,6 @@ impl Session {
         Ok(())
     }
 
-    /// Rolls back the changes made by a patch, using the cached file contents.
-    pub fn rollback(&self, config: &config::Config, patch: &Patch) -> Result<()> {
-        for (path, content) in &patch.cache {
-            fs::write(config.abspath(path)?, content)?;
-        }
-        Ok(())
-    }
-
     /// Resets the session to a specific step, removing and rolling back all subsequent steps.
     pub fn reset(&mut self, config: &config::Config, offset: usize) -> Result<()> {
         if offset >= self.steps.len() {
@@ -242,8 +246,8 @@ impl Session {
         }
 
         for step in self.steps.iter().rev().take(self.steps.len() - offset - 1) {
-            if let Some(patch) = &step.patch {
-                self.rollback(config, patch)?;
+            if let Some(resp) = &step.model_response {
+                resp.rollback(config)?;
             }
         }
 
@@ -253,11 +257,15 @@ impl Session {
 
     /// Rolls back the changes in the last step, if any, and sets the Patch and error to None.
     pub fn rollback_last(&mut self, config: &config::Config) -> Result<()> {
-        if let Some(patch) = self.steps.last().and_then(|step| step.patch.as_ref()) {
-            self.rollback(config, patch)?;
+        if let Some(resp) = self
+            .steps
+            .last()
+            .and_then(|step| step.model_response.as_ref())
+        {
+            resp.rollback(config)?;
         }
         if let Some(last_step) = self.steps.last_mut() {
-            last_step.patch = None;
+            last_step.model_response = None;
             last_step.err = None;
         }
         Ok(())
@@ -272,22 +280,26 @@ impl Session {
         let mut model = config.model()?;
         let (patch, usage) = model.send(config, self, sender).await?;
         if let Some(last_step) = self.steps.last_mut() {
-            last_step.patch = Some(patch);
-            last_step.usage = Some(usage);
+            last_step.model_response = Some(ModelResponse {
+                patch: Some(patch),
+                operations: vec![],
+                usage: Some(usage),
+            });
         }
         Ok(())
     }
 
     /// Apply the last step in the session, applying the patch and operations.
     pub fn apply_last_step(&mut self, config: &config::Config) -> Result<()> {
-        let operations = self
+        let mut resp = self
             .steps
             .last()
             .ok_or_else(|| TenxError::Internal("No steps in session".into()))?
-            .operations
-            .clone();
+            .model_response
+            .clone()
+            .ok_or_else(|| TenxError::Internal("No response in the last step".into()))?;
 
-        for operation in operations {
+        for operation in &resp.operations {
             match operation {
                 Operation::Edit(path) => {
                     self.add_editable_path(config, path)?;
@@ -295,17 +307,16 @@ impl Session {
             }
         }
 
-        let mut last_patch = self
-            .steps
-            .last()
-            .ok_or_else(|| TenxError::Internal("No steps in session".into()))?
-            .patch
-            .clone()
-            .ok_or_else(|| TenxError::Internal("No patch in the last step".into()))?;
-        self.apply_patch(config, &mut last_patch)?;
-        if let Some(last_step) = self.steps.last_mut() {
-            last_step.patch = Some(last_patch);
+        if let Some(patch) = &resp.patch {
+            self.apply_patch(config, &mut patch.clone())?;
+            resp.patch = Some(patch.clone());
         }
+
+        self.steps
+            .last_mut()
+            .ok_or_else(|| TenxError::Internal("No steps in session".into()))?
+            .model_response = Some(resp);
+
         Ok(())
     }
 }
@@ -337,13 +348,13 @@ mod tests {
         test_project.session.add_context(context1.clone());
         test_project.session.add_context(context2);
 
-        assert_eq!(test_project.session.context.len(), 1);
+        assert_eq!(test_project.session.contexts.len(), 1);
         assert!(matches!(
-            test_project.session.context[0],
+            test_project.session.contexts[0],
             context::ContextSpec::Path(_)
         ));
 
-        if let context::ContextSpec::Path(glob_context) = &test_project.session.context[0] {
+        if let context::ContextSpec::Path(glob_context) = &test_project.session.contexts[0] {
             let context_items = glob_context
                 .contexts(&test_project.config, &test_project.session)
                 .unwrap();
@@ -375,7 +386,13 @@ mod tests {
             test_project
                 .session
                 .add_prompt(Prompt::User(format!("Prompt {}", i)))?;
-            test_project.session.set_last_patch(&patch);
+
+            test_project.session.set_last_response(ModelResponse {
+                patch: Some(patch.clone()),
+                operations: vec![],
+                usage: None,
+            });
+
             test_project
                 .session
                 .apply_patch(&test_project.config, &mut patch.clone())?;
@@ -405,8 +422,6 @@ mod tests {
             .session
             .add_prompt(Prompt::User("test prompt".into()))?;
         let step = test_project.session.steps.last_mut().unwrap();
-        step.operations
-            .push(Operation::Edit(PathBuf::from("new.txt")));
         let patch = Patch {
             changes: vec![Change::Write(WriteFile {
                 path: PathBuf::from("test.txt"),
@@ -417,7 +432,11 @@ mod tests {
                 .into_iter()
                 .collect(),
         };
-        step.patch = Some(patch);
+        step.model_response = Some(ModelResponse {
+            patch: Some(patch),
+            operations: vec![Operation::Edit(PathBuf::from("new.txt"))],
+            usage: None,
+        });
 
         // Apply the last step
         test_project.session.apply_last_step(&test_project.config)?;

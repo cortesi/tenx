@@ -24,6 +24,8 @@ pub enum Change {
     UDiff(udiff::UDiff),
 }
 
+/// A unified patch operation requested by the model. This contains all changes, as well as a cache
+/// of file state before the patch is applied, so we can roll back.
 #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Patch {
     pub changes: Vec<Change>,

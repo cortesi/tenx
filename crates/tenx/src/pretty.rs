@@ -43,9 +43,9 @@ fn print_session_info(config: &Config, _: &Session) -> String {
 
 fn print_context_specs(session: &Session) -> String {
     let mut output = String::new();
-    if !session.context().is_empty() {
+    if !session.contexts().is_empty() {
         output.push_str(&format!("{}\n", "context:".blue().bold()));
-        for context in session.context() {
+        for context in session.contexts() {
             output.push_str(&format!("{}- {}\n", INDENT, context.human()));
         }
     }
@@ -79,8 +79,16 @@ fn print_steps(config: &Config, session: &Session, full: bool, width: usize) -> 
         output.push_str(&format!("{}\n", "=".repeat(width)));
         output.push_str(&render_step_prompt(step, width, full));
         output.push('\n');
-        if let Some(patch) = &step.patch {
-            output.push_str(&print_patch(config, patch, full, width));
+        if let Some(response) = &step.model_response {
+            if let Some(patch) = &response.patch {
+                output.push_str(&print_patch(config, patch, full, width));
+            }
+            if let Some(usage) = &response.usage {
+                output.push_str(&format!("{}{}\n", INDENT.repeat(2), "usage:".blue().bold()));
+                for line in format_usage(usage).lines() {
+                    output.push_str(&format!("{}{}\n", INDENT.repeat(3), line));
+                }
+            }
         }
         if let Some(err) = &step.err {
             output.push_str(&format!(
@@ -95,12 +103,6 @@ fn print_steps(config: &Config, session: &Session, full: bool, width: usize) -> 
             };
             output.push_str(&wrapped_block(&error_text, width, INDENT.len() * 3));
             output.push('\n');
-        }
-        if let Some(usage) = &step.usage {
-            output.push_str(&format!("{}{}\n", INDENT.repeat(2), "usage:".blue().bold()));
-            for line in format_usage(usage).lines() {
-                output.push_str(&format!("{}{}\n", INDENT.repeat(3), line));
-            }
         }
     }
     Ok(output)
@@ -274,11 +276,14 @@ mod tests {
     fn test_print_steps_with_patch() {
         let config = Config::default();
         let (_temp_dir, mut session) = create_test_session();
-        let patch = Patch {
-            comment: Some("Test comment".to_string()),
-            ..Default::default()
-        };
-        session.set_last_patch(&patch);
+        session.set_last_response(libtenx::ModelResponse {
+            patch: Some(Patch {
+                comment: Some("Test comment".to_string()),
+                ..Default::default()
+            }),
+            operations: vec![],
+            usage: None,
+        });
         let result = print_steps(&config, &session, false, 80);
         assert!(result.is_ok());
         let output = result.unwrap();
@@ -306,10 +311,8 @@ mod tests {
     fn test_render_step_editable() {
         let step = Step {
             prompt: Prompt::User("Test prompt\nwith multiple\nlines".to_string()),
-            patch: None,
+            model_response: None,
             err: None,
-            usage: None,
-            operations: Vec::new(),
         };
         let full_result = render_step_prompt(&step, 80, true);
         assert!(full_result.contains("Test prompt"));

@@ -138,8 +138,10 @@ impl Claude {
     ) -> (Vec<PathBuf>, Vec<PathBuf>) {
         let mut future_modified_files = HashSet::new();
         for step in session.steps().iter().skip(step_offset + 1) {
-            if let Some(patch) = &step.patch {
-                future_modified_files.extend(patch.changed_files());
+            if let Some(resp) = &step.model_response {
+                if let Some(patch) = &resp.patch {
+                    future_modified_files.extend(patch.changed_files());
+                }
             }
         }
         let (included, omitted): (Vec<_>, Vec<_>) = files
@@ -233,28 +235,30 @@ impl Claude {
                     dialect.render_step_request(config, session, i)?,
                 )],
             });
-            if let Some(patch) = &s.patch {
-                req.messages.push(misanthropy::Message {
-                    role: misanthropy::Role::Assistant,
-                    content: vec![misanthropy::Content::text(
-                        dialect.render_step_response(config, session, i)?,
-                    )],
-                });
-                let (included, omitted) = self.filter_files(&patch.changed_files(), session, i);
-                req.messages.push(misanthropy::Message {
-                    role: misanthropy::Role::User,
-                    content: vec![misanthropy::Content::text(format!(
-                        "{}\n{}",
-                        EDITABLE_UPDATE_LEADIN,
-                        self.render_editables_with_omitted(
-                            config, session, dialect, included, omitted
-                        )?
-                    ))],
-                });
-                req.messages.push(misanthropy::Message {
-                    role: misanthropy::Role::Assistant,
-                    content: vec![misanthropy::Content::text("Got it.")],
-                });
+            if let Some(resp) = &s.model_response {
+                if let Some(patch) = &resp.patch {
+                    req.messages.push(misanthropy::Message {
+                        role: misanthropy::Role::Assistant,
+                        content: vec![misanthropy::Content::text(
+                            dialect.render_step_response(config, session, i)?,
+                        )],
+                    });
+                    let (included, omitted) = self.filter_files(&patch.changed_files(), session, i);
+                    req.messages.push(misanthropy::Message {
+                        role: misanthropy::Role::User,
+                        content: vec![misanthropy::Content::text(format!(
+                            "{}\n{}",
+                            EDITABLE_UPDATE_LEADIN,
+                            self.render_editables_with_omitted(
+                                config, session, dialect, included, omitted
+                            )?
+                        ))],
+                    });
+                    req.messages.push(misanthropy::Message {
+                        role: misanthropy::Role::Assistant,
+                        content: vec![misanthropy::Content::text("Got it.")],
+                    });
+                }
             } else if i != session.steps().len() - 1 {
                 req.messages.push(misanthropy::Message {
                     role: misanthropy::Role::Assistant,

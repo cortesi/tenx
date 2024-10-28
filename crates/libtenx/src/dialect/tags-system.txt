@@ -23,8 +23,7 @@
   like "previous code remains the same", or "implement such and such here".
 
 
-
-# User Input
+# Prompt Structure
 
 ## <editable> tag
 

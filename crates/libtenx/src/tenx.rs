@@ -99,7 +99,7 @@ impl Tenx {
     ) -> Result<()> {
         send_event(sender, Event::ContextStart)?;
         {
-            for context in session.context.iter_mut() {
+            for context in session.contexts.iter_mut() {
                 send_event(
                     sender,
                     Event::ContextRefreshStart(context.name().to_string()),
@@ -303,7 +303,7 @@ impl Tenx {
         sender: &Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
         if let Some(last_step) = session.steps().last() {
-            if last_step.patch.is_some() {
+            if last_step.model_response.is_some() {
                 send_event(sender, Event::PostPatchStart)?;
                 let post_patch_validators =
                     crate::validators::relevant_validators(&self.config, session)?;
@@ -364,9 +364,16 @@ mod tests {
             .unwrap();
 
         assert_eq!(session.steps().len(), 1);
-        assert!(session.steps()[0].patch.is_some());
+        assert!(session.steps()[0].model_response.is_some());
         assert_eq!(
-            session.steps()[0].patch.as_ref().unwrap().comment,
+            session.steps()[0]
+                .model_response
+                .as_ref()
+                .unwrap()
+                .patch
+                .as_ref()
+                .unwrap()
+                .comment,
             Some("Test comment".to_string())
         );
 

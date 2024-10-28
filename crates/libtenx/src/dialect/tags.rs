@@ -60,12 +60,13 @@ impl DialectProvider for Tags {
 
         let mut rendered = String::new();
         rendered.push_str("<context>\n");
-        for cspec in s.context() {
+        for cspec in s.contexts() {
             for ctx in cspec.contexts(config, s)? {
-                rendered.push_str(&format!(
+                let txt = format!(
                     "<item name=\"{}\" type=\"{:?}\">\n{}\n</item>\n",
                     ctx.name, ctx.ty, ctx.body
-                ))
+                );
+                rendered.push_str(&txt)
             }
         }
         rendered.push_str("</context>");
@@ -227,37 +228,39 @@ impl DialectProvider for Tags {
             .steps()
             .get(offset)
             .ok_or_else(|| TenxError::Internal("Invalid step offset".into()))?;
-        if let Some(patch) = &step.patch {
+        if let Some(resp) = &step.model_response {
             let mut rendered = String::new();
-            if let Some(comment) = &patch.comment {
-                rendered.push_str(&format!("<comment>\n{}\n</comment>\n\n", comment));
-            }
-            for change in &patch.changes {
-                match change {
-                    Change::Write(write_file) => {
-                        rendered.push_str(&format!(
-                            "<write_file path=\"{}\">\n{}\n</write_file>\n\n",
-                            write_file.path.display(),
-                            write_file.content
-                        ));
-                    }
-                    Change::Replace(replace) => {
-                        rendered.push_str(&format!(
+            if let Some(patch) = &resp.patch {
+                if let Some(comment) = &patch.comment {
+                    rendered.push_str(&format!("<comment>\n{}\n</comment>\n\n", comment));
+                }
+                for change in &patch.changes {
+                    match change {
+                        Change::Write(write_file) => {
+                            rendered.push_str(&format!(
+                                "<write_file path=\"{}\">\n{}\n</write_file>\n\n",
+                                write_file.path.display(),
+                                write_file.content
+                            ));
+                        }
+                        Change::Replace(replace) => {
+                            rendered.push_str(&format!(
                             "<replace path=\"{}\">\n<old>\n{}\n</old>\n<new>\n{}\n</new>\n</replace>\n\n",
                             replace.path.display(),
                             replace.old,
                             replace.new
                         ));
-                    }
-                    Change::Smart(smart) => {
-                        rendered.push_str(&format!(
-                            "<smart path=\"{}\">\n{}\n</smart>\n\n",
-                            smart.path.display(),
-                            smart.text
-                        ));
-                    }
-                    Change::UDiff(udiff) => {
-                        rendered.push_str(&format!("<udiff>\n{}\n</udiff>\n\n", udiff.patch));
+                        }
+                        Change::Smart(smart) => {
+                            rendered.push_str(&format!(
+                                "<smart path=\"{}\">\n{}\n</smart>\n\n",
+                                smart.path.display(),
+                                smart.text
+                            ));
+                        }
+                        Change::UDiff(udiff) => {
+                            rendered.push_str(&format!("<udiff>\n{}\n</udiff>\n\n", udiff.patch));
+                        }
                     }
                 }
             }

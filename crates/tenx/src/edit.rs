@@ -3,7 +3,7 @@ use std::{fs, io::Write, process::Command};
 use tempfile::NamedTempFile;
 
 use libtenx::prompt::Prompt;
-use libtenx::Session;
+use libtenx::{patch::Patch, Session};
 
 /// Returns the user's preferred editor.
 fn get_editor() -> String {
@@ -22,11 +22,13 @@ fn render_step_commented(session: &libtenx::Session, step_offset: usize) -> Stri
     for line in step.prompt.text().lines() {
         text.push_str(&format!("# {}\n", line));
     }
-    if let Some(patch) = &step.patch {
-        if let Some(comment) = &patch.comment {
-            text.push_str("#\n# Response:\n# ---------\n");
-            for line in comment.lines() {
-                text.push_str(&format!("# {}\n", line));
+    if let Some(response) = &step.model_response {
+        if let Some(patch) = &response.patch {
+            if let Some(comment) = &patch.comment {
+                text.push_str("#\n# Response:\n# ---------\n");
+                for line in comment.lines() {
+                    text.push_str(&format!("# {}\n", line));
+                }
             }
         }
     }
@@ -132,10 +134,14 @@ mod tests {
                 "First prompt\nwith multiple lines".to_string(),
             ))
             .unwrap();
-        session.set_last_patch(&Patch {
-            changes: vec![],
-            comment: Some("First response\nalso with multiple lines".to_string()),
-            cache: Default::default(),
+        session.set_last_response(libtenx::ModelResponse {
+            patch: Some(Patch {
+                changes: vec![],
+                comment: Some("First response\nalso with multiple lines".to_string()),
+                cache: Default::default(),
+            }),
+            operations: vec![],
+            usage: None,
         });
 
         // Test editing first step (retry case)
@@ -159,10 +165,14 @@ mod tests {
                 "Second prompt\nstill multiple lines".to_string(),
             ))
             .unwrap();
-        session.set_last_patch(&Patch {
-            changes: vec![],
-            comment: Some("Second response\nyet more lines".to_string()),
-            cache: Default::default(),
+        session.set_last_response(libtenx::ModelResponse {
+            patch: Some(Patch {
+                changes: vec![],
+                comment: Some("Second response\nyet more lines".to_string()),
+                cache: Default::default(),
+            }),
+            operations: vec![],
+            usage: None,
         });
 
         // Test editing second step
