@@ -31,7 +31,6 @@ pub enum Change {
 pub struct Patch {
     pub changes: Vec<Change>,
     pub comment: Option<String>,
-    pub cache: HashMap<PathBuf, String>,
 }
 
 impl Patch {
@@ -59,19 +58,21 @@ impl Patch {
         }
     }
 
-    /// Applies all changes in the patch, updating both the cache and the filesystem.
-    pub fn apply(&mut self, config: &crate::config::Config) -> Result<()> {
-        // First, enter all the modified files into the patch cache
+    /// Takes a snapshot of the current state of all files that would be modified by this patch.
+    pub fn snapshot(&self, config: &crate::config::Config) -> Result<HashMap<PathBuf, String>> {
+        let mut snapshot = HashMap::new();
         for path in self.changed_files() {
             let abs_path = config.abspath(&path)?;
-            if let std::collections::hash_map::Entry::Vacant(e) = self.cache.entry(path) {
-                let content = fs_err::read_to_string(&abs_path)?;
-                e.insert(content);
-            }
+            let content = fs_err::read_to_string(&abs_path)?;
+            snapshot.insert(path, content);
         }
+        Ok(snapshot)
+    }
 
+    /// Applies all changes in the patch, updating both the cache and the filesystem.
+    pub fn apply(&self, config: &crate::config::Config) -> Result<()> {
         // Next, make a clone copy of the cache
-        let mut modified_cache = self.cache.clone();
+        let mut modified_cache = self.snapshot(config)?;
 
         // Apply all modifications to the cloned cache
         for change in &self.changes {

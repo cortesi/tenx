@@ -313,11 +313,9 @@ mod tests {
 
     #[test]
     fn test_render_step_editable() {
-        let step = Step {
-            prompt: Prompt::User("Test prompt\nwith multiple\nlines".to_string()),
-            model_response: None,
-            err: None,
-        };
+        let step = Step::new(Prompt::User(
+            "Test prompt\nwith multiple\nlines".to_string(),
+        ));
         let full_result = render_step_prompt(&step, 80, true);
         assert!(full_result.contains("Test prompt"));
         assert!(full_result.contains("with multiple"));

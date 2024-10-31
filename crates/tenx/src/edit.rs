@@ -139,7 +139,6 @@ mod tests {
                 patch: Some(Patch {
                     changes: vec![],
                     comment: Some("First response\nalso with multiple lines".to_string()),
-                    cache: Default::default(),
                 }),
                 operations: vec![],
                 usage: None,
@@ -172,7 +171,6 @@ mod tests {
                 patch: Some(Patch {
                     changes: vec![],
                     comment: Some("Second response\nyet more lines".to_string()),
-                    cache: Default::default(),
                 }),
                 operations: vec![],
                 usage: None,

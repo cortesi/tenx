@@ -1,13 +1,16 @@
-use std::path::{Path, PathBuf};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
 use fs_err as fs;
 use serde::{Deserialize, Serialize};
+use tokio::sync::mpsc;
 
 use crate::{
     config, context, events::Event, model::ModelProvider, model::Usage, patch::Patch,
     prompt::Prompt, Result, TenxError,
 };
-use tokio::sync::mpsc;
 
 /// A parsed model response
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -18,17 +21,6 @@ pub struct ModelResponse {
     pub operations: Vec<Operation>,
     /// Model-specific usage statistics
     pub usage: Option<Usage>,
-}
-
-impl ModelResponse {
-    fn rollback(&self, config: &config::Config) -> Result<()> {
-        if let Some(patch) = &self.patch {
-            for (path, content) in &patch.cache {
-                fs::write(config.abspath(path)?, content)?;
-            }
-        }
-        Ok(())
-    }
 }
 
 /// Operations requested by the model, other than patching.
@@ -47,13 +39,36 @@ pub struct Step {
     pub model_response: Option<ModelResponse>,
     /// An error from the model
     pub err: Option<TenxError>,
+    /// A cache of the file contents before the step was applied
+    pub rollback_cache: HashMap<PathBuf, String>,
 }
 
 impl Step {
+    /// Creates a new Step with the given prompt.
+    pub fn new(prompt: Prompt) -> Self {
+        Step {
+            prompt,
+            model_response: None,
+            err: None,
+            rollback_cache: HashMap::new(),
+        }
+    }
+
+    /// Applies the changes in this step, first caching the original file contents.
+    pub fn apply(&mut self, config: &config::Config) -> Result<()> {
+        if let Some(resp) = &self.model_response {
+            if let Some(patch) = &resp.patch {
+                self.rollback_cache = patch.snapshot(config)?;
+                patch.apply(config)?;
+            }
+        }
+        Ok(())
+    }
+
     /// Rolls back any changes made in this step.
     pub fn rollback(&mut self, config: &config::Config) -> Result<()> {
-        if let Some(resp) = &self.model_response {
-            resp.rollback(config)?;
+        for (path, content) in &self.rollback_cache {
+            fs::write(config.abspath(path)?, content)?;
         }
         self.model_response = None;
         self.err = None;
@@ -155,11 +170,7 @@ impl Session {
                 ));
             }
         }
-        self.steps.push(Step {
-            prompt,
-            model_response: None,
-            err: None,
-        });
+        self.steps.push(Step::new(prompt));
         Ok(())
     }
 
@@ -167,11 +178,7 @@ impl Session {
     /// If there are no steps, it creates a new one.
     pub fn set_last_prompt(&mut self, prompt: Prompt) -> Result<()> {
         if self.steps.is_empty() {
-            self.steps.push(Step {
-                prompt,
-                model_response: None,
-                err: None,
-            });
+            self.steps.push(Step::new(prompt));
             Ok(())
         } else if let Some(last_step) = self.steps.last_mut() {
             last_step.model_response = None;
@@ -231,10 +238,9 @@ impl Session {
             return Err(TenxError::Internal("Invalid rollback offset".into()));
         }
 
-        for step in self.steps.iter().rev().take(self.steps.len() - offset - 1) {
-            if let Some(resp) = &step.model_response {
-                resp.rollback(config)?;
-            }
+        let n = self.steps.len() - offset - 1;
+        for step in self.steps.iter_mut().rev().take(n) {
+            step.rollback(config)?;
         }
 
         self.steps.truncate(offset + 1);
@@ -261,14 +267,15 @@ impl Session {
 
     /// Apply the last step in the session, applying the patch and operations.
     pub fn apply_last_step(&mut self, config: &config::Config) -> Result<()> {
-        let mut resp = self
-            .steps
-            .last()
-            .ok_or_else(|| TenxError::Internal("No steps in session".into()))?
+        let step = self
+            .last_step_mut()
+            .ok_or_else(|| TenxError::Internal("No steps in session".into()))?;
+        let resp = step
             .model_response
             .clone()
             .ok_or_else(|| TenxError::Internal("No response in the last step".into()))?;
 
+        step.apply(config)?;
         for operation in &resp.operations {
             match operation {
                 Operation::Edit(path) => {
@@ -276,17 +283,6 @@ impl Session {
                 }
             }
         }
-
-        if let Some(patch) = &resp.patch {
-            patch.clone().apply(config)?;
-            resp.patch = Some(patch.clone());
-        }
-
-        self.steps
-            .last_mut()
-            .ok_or_else(|| TenxError::Internal("No steps in session".into()))?
-            .model_response = Some(resp);
-
         Ok(())
     }
 }
@@ -349,13 +345,14 @@ mod tests {
                     content: content.clone(),
                 })],
                 comment: Some(format!("Step {}", i)),
-                cache: [(PathBuf::from("test.txt"), test_project.read("test.txt"))]
-                    .into_iter()
-                    .collect(),
             };
             test_project
                 .session
                 .add_prompt(Prompt::User(format!("Prompt {}", i)))?;
+
+            let rollback_cache = [(PathBuf::from("test.txt"), test_project.read("test.txt"))]
+                .into_iter()
+                .collect();
 
             if let Some(step) = test_project.session.last_step_mut() {
                 step.model_response = Some(ModelResponse {
@@ -363,6 +360,7 @@ mod tests {
                     operations: vec![],
                     usage: None,
                 });
+                step.rollback_cache = rollback_cache;
             }
 
             patch.clone().apply(&test_project.config)?;
@@ -398,15 +396,15 @@ mod tests {
                 content: "modified content".into(),
             })],
             comment: None,
-            cache: [(PathBuf::from("test.txt"), "content".into())]
-                .into_iter()
-                .collect(),
         };
         step.model_response = Some(ModelResponse {
             patch: Some(patch),
             operations: vec![Operation::Edit(PathBuf::from("new.txt"))],
             usage: None,
         });
+        step.rollback_cache = [(PathBuf::from("test.txt"), "content".into())]
+            .into_iter()
+            .collect();
 
         // Apply the last step
         test_project.session.apply_last_step(&test_project.config)?;

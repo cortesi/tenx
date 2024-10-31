@@ -348,7 +348,6 @@ mod tests {
                     content: "Updated content".to_string(),
                 })],
                 comment: Some("Test comment".to_string()),
-                cache: Default::default(),
             }))
             .with_root(temp_dir.path());
         config.session_store_dir = temp_dir.path().join("sess");
