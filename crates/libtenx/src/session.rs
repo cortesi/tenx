@@ -55,7 +55,7 @@ impl Step {
     }
 
     /// Applies the changes in this step, first caching the original file contents.
-    pub fn apply(&mut self, config: &config::Config) -> Result<()> {
+    fn apply(&mut self, config: &config::Config) -> Result<()> {
         if let Some(resp) = &self.model_response {
             if let Some(patch) = &resp.patch {
                 self.rollback_cache = patch.snapshot(config)?;
@@ -88,7 +88,7 @@ fn is_glob(s: &str) -> bool {
 #[derive(Debug, Deserialize, Serialize, Default)]
 pub struct Session {
     steps: Vec<Step>,
-    pub(crate) contexts: Vec<context::ContextSpec>,
+    pub(crate) contexts: Vec<context::Context>,
     editable: Vec<PathBuf>,
 }
 
@@ -127,7 +127,7 @@ impl Session {
         self.steps.last_mut()
     }
 
-    pub fn contexts(&self) -> &Vec<context::ContextSpec> {
+    pub fn contexts(&self) -> &Vec<context::Context> {
         &self.contexts
     }
 
@@ -191,7 +191,7 @@ impl Session {
     /// Adds a new context to the session, ignoring duplicates.
     ///
     /// If a context with the same name and type already exists, it will not be added again.
-    pub fn add_context(&mut self, new_context: context::ContextSpec) {
+    pub fn add_context(&mut self, new_context: context::Context) {
         if !self.contexts.contains(&new_context) {
             self.contexts.push(new_context);
         }
@@ -304,10 +304,10 @@ mod tests {
 
         test_project.config.include = config::Include::Glob(vec!["**/*".to_string()]);
 
-        let context1 = context::ContextSpec::Path(
+        let context1 = context::Context::Path(
             context::Path::new(&test_project.config, "test.txt".to_string()).unwrap(),
         );
-        let context2 = context::ContextSpec::Path(
+        let context2 = context::Context::Path(
             context::Path::new(&test_project.config, "test.txt".to_string()).unwrap(),
         );
 
@@ -317,10 +317,10 @@ mod tests {
         assert_eq!(test_project.session.contexts.len(), 1);
         assert!(matches!(
             test_project.session.contexts[0],
-            context::ContextSpec::Path(_)
+            context::Context::Path(_)
         ));
 
-        if let context::ContextSpec::Path(glob_context) = &test_project.session.contexts[0] {
+        if let context::Context::Path(glob_context) = &test_project.session.contexts[0] {
             let context_items = glob_context
                 .contexts(&test_project.config, &test_project.session)
                 .unwrap();
@@ -361,9 +361,8 @@ mod tests {
                     usage: None,
                 });
                 step.rollback_cache = rollback_cache;
+                step.apply(&test_project.config)?;
             }
-
-            patch.clone().apply(&test_project.config)?;
         }
 
         assert_eq!(test_project.session.steps.len(), 3);

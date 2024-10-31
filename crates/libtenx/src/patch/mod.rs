@@ -14,7 +14,7 @@ use std::path::PathBuf;
 use fs_err;
 use serde::{Deserialize, Serialize};
 
-use crate::error::Result;
+use crate::{config::Config, error::Result};
 
 /// A change to be applied to a file.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -48,18 +48,8 @@ impl Patch {
         paths
     }
 
-    /// Returns a string representation of the change for display purposes.
-    pub fn change_description(change: &Change) -> String {
-        match change {
-            Change::Write(write_file) => format!("Write to {}", write_file.path.display()),
-            Change::Replace(replace) => format!("Replace in {}", replace.path.display()),
-            Change::Smart(block) => format!("Smart in {}", block.path.display()),
-            Change::UDiff(udiff) => format!("UDiff for {} files", udiff.modified_files.len()),
-        }
-    }
-
     /// Takes a snapshot of the current state of all files that would be modified by this patch.
-    pub fn snapshot(&self, config: &crate::config::Config) -> Result<HashMap<PathBuf, String>> {
+    pub fn snapshot(&self, config: &Config) -> Result<HashMap<PathBuf, String>> {
         let mut snapshot = HashMap::new();
         for path in self.changed_files() {
             let abs_path = config.abspath(&path)?;
@@ -70,7 +60,7 @@ impl Patch {
     }
 
     /// Applies all changes in the patch, updating both the cache and the filesystem.
-    pub fn apply(&self, config: &crate::config::Config) -> Result<()> {
+    pub(crate) fn apply(&self, config: &Config) -> Result<()> {
         // Next, make a clone copy of the cache
         let mut modified_cache = self.snapshot(config)?;
 

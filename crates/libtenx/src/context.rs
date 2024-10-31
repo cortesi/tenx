@@ -227,43 +227,43 @@ impl ContextProvider for Path {
 /// A specification for reference material included in the prompt. This may be turned into actual
 /// Context objects with the ContextProvider::contexts() method.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
-pub enum ContextSpec {
+pub enum Context {
     Ruskel(Ruskel),
     Path(Path),
     ProjectMap(ProjectMap),
 }
 
-impl ContextSpec {
+impl Context {
     /// Creates a new Context for a Ruskel document.
     pub fn new_ruskel(name: String) -> Self {
-        ContextSpec::Ruskel(Ruskel::new(name))
+        Context::Ruskel(Ruskel::new(name))
     }
 
     /// Creates a new Context for a glob pattern.
     pub fn new_path(config: &Config, pattern: String) -> Result<Self> {
-        Ok(ContextSpec::Path(Path::new(config, pattern)?))
+        Ok(Context::Path(Path::new(config, pattern)?))
     }
 
     /// Creates a new Context for the project map.
     pub fn new_project_map() -> Self {
-        ContextSpec::ProjectMap(ProjectMap::new())
+        Context::ProjectMap(ProjectMap::new())
     }
 }
 
-impl ContextProvider for ContextSpec {
+impl ContextProvider for Context {
     fn typ(&self) -> &ContextType {
         match self {
-            ContextSpec::Ruskel(r) => r.typ(),
-            ContextSpec::Path(g) => g.typ(),
-            ContextSpec::ProjectMap(p) => p.typ(),
+            Context::Ruskel(r) => r.typ(),
+            Context::Path(g) => g.typ(),
+            Context::ProjectMap(p) => p.typ(),
         }
     }
 
     fn name(&self) -> &str {
         match self {
-            ContextSpec::Ruskel(r) => r.name(),
-            ContextSpec::Path(g) => g.name(),
-            ContextSpec::ProjectMap(p) => p.name(),
+            Context::Ruskel(r) => r.name(),
+            Context::Path(g) => g.name(),
+            Context::ProjectMap(p) => p.name(),
         }
     }
 
@@ -273,33 +273,33 @@ impl ContextProvider for ContextSpec {
         session: &Session,
     ) -> Result<Vec<ContextItem>> {
         match self {
-            ContextSpec::Ruskel(r) => r.contexts(config, session),
-            ContextSpec::Path(g) => g.contexts(config, session),
-            ContextSpec::ProjectMap(p) => p.contexts(config, session),
+            Context::Ruskel(r) => r.contexts(config, session),
+            Context::Path(g) => g.contexts(config, session),
+            Context::ProjectMap(p) => p.contexts(config, session),
         }
     }
 
     fn human(&self) -> String {
         match self {
-            ContextSpec::Ruskel(r) => r.human(),
-            ContextSpec::Path(g) => g.human(),
-            ContextSpec::ProjectMap(p) => p.human(),
+            Context::Ruskel(r) => r.human(),
+            Context::Path(g) => g.human(),
+            Context::ProjectMap(p) => p.human(),
         }
     }
 
     fn count(&self, config: &crate::config::Config, session: &Session) -> Result<usize> {
         match self {
-            ContextSpec::Ruskel(r) => r.count(config, session),
-            ContextSpec::Path(g) => g.count(config, session),
-            ContextSpec::ProjectMap(p) => p.count(config, session),
+            Context::Ruskel(r) => r.count(config, session),
+            Context::Path(g) => g.count(config, session),
+            Context::ProjectMap(p) => p.count(config, session),
         }
     }
 
     fn refresh(&mut self) -> Result<()> {
         match self {
-            ContextSpec::Ruskel(r) => r.refresh(),
-            ContextSpec::Path(g) => g.refresh(),
-            ContextSpec::ProjectMap(p) => p.refresh(),
+            Context::Ruskel(r) => r.refresh(),
+            Context::Path(g) => g.refresh(),
+            Context::ProjectMap(p) => p.refresh(),
         }
     }
 }
@@ -325,11 +325,11 @@ mod tests {
         let mut config = test_project.config.clone();
         config.include = Include::Glob(vec!["**/*.rs".to_string(), "**/Cargo.toml".to_string()]);
 
-        let context_spec = ContextSpec::new_project_map();
+        let context_spec = Context::new_project_map();
         let mut expected_files = vec!["src/main.rs", "src/lib.rs", "tests/test1.rs", "Cargo.toml"];
         expected_files.sort();
 
-        if let ContextSpec::ProjectMap(map) = context_spec {
+        if let Context::ProjectMap(map) = context_spec {
             let contexts = map.contexts(&config, &test_project.session).unwrap();
             assert_eq!(contexts.len(), 1);
 
@@ -360,10 +360,10 @@ mod tests {
         let mut config = test_project.config.clone();
         config.include = Include::Glob(vec!["**/*.rs".to_string()]);
 
-        let context_spec = ContextSpec::new_path(&config, "**/*.rs".to_string()).unwrap();
-        assert!(matches!(context_spec, ContextSpec::Path(_)));
+        let context_spec = Context::new_path(&config, "**/*.rs".to_string()).unwrap();
+        assert!(matches!(context_spec, Context::Path(_)));
 
-        if let ContextSpec::Path(path) = context_spec {
+        if let Context::Path(path) = context_spec {
             let contexts = path.contexts(&config, &test_project.session).unwrap();
 
             let mut expected_files = vec!["src/main.rs", "src/lib.rs", "tests/test1.rs"];
@@ -396,10 +396,10 @@ mod tests {
 
         // Test with absolute path from project root
         let config = test_project.config.clone();
-        let context_spec = ContextSpec::new_path(&config, "src/main.rs".to_string()).unwrap();
-        assert!(matches!(context_spec, ContextSpec::Path(_)));
+        let context_spec = Context::new_path(&config, "src/main.rs".to_string()).unwrap();
+        assert!(matches!(context_spec, Context::Path(_)));
 
-        if let ContextSpec::Path(path) = context_spec {
+        if let Context::Path(path) = context_spec {
             let contexts = path.contexts(&config, &test_project.session).unwrap();
 
             assert_eq!(contexts.len(), 1);
@@ -414,10 +414,10 @@ mod tests {
         // Test with relative path from subdirectory
         let mut config_in_src = test_project.config.clone();
         config_in_src = config_in_src.with_test_cwd(test_project.tempdir.path().join("src"));
-        let context_spec = ContextSpec::new_path(&config_in_src, "lib.rs".to_string()).unwrap();
-        assert!(matches!(context_spec, ContextSpec::Path(_)));
+        let context_spec = Context::new_path(&config_in_src, "lib.rs".to_string()).unwrap();
+        assert!(matches!(context_spec, Context::Path(_)));
 
-        if let ContextSpec::Path(path) = context_spec {
+        if let Context::Path(path) = context_spec {
             let contexts = path
                 .contexts(&config_in_src, &test_project.session)
                 .unwrap();
@@ -442,11 +442,10 @@ mod tests {
         // Test with absolute path
         let config = test_project.config.clone();
         let context_spec =
-            ContextSpec::new_path(&config, outside_file_path.to_str().unwrap().to_string())
-                .unwrap();
-        assert!(matches!(context_spec, ContextSpec::Path(_)));
+            Context::new_path(&config, outside_file_path.to_str().unwrap().to_string()).unwrap();
+        assert!(matches!(context_spec, Context::Path(_)));
 
-        if let ContextSpec::Path(path) = context_spec {
+        if let Context::Path(path) = context_spec {
             let contexts = path.contexts(&config, &test_project.session).unwrap();
 
             assert_eq!(contexts.len(), 1);
@@ -463,10 +462,10 @@ mod tests {
         config_with_outside_cwd =
             config_with_outside_cwd.with_test_cwd(outside_dir.path().to_path_buf());
         let relative_context_spec =
-            ContextSpec::new_path(&config_with_outside_cwd, "outside.txt".to_string()).unwrap();
-        assert!(matches!(relative_context_spec, ContextSpec::Path(_)));
+            Context::new_path(&config_with_outside_cwd, "outside.txt".to_string()).unwrap();
+        assert!(matches!(relative_context_spec, Context::Path(_)));
 
-        if let ContextSpec::Path(path) = relative_context_spec {
+        if let Context::Path(path) = relative_context_spec {
             let contexts = path
                 .contexts(&config_with_outside_cwd, &test_project.session)
                 .unwrap();

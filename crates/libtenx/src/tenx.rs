@@ -3,7 +3,7 @@ use tracing::{debug, warn};
 
 use crate::{
     config::Config,
-    context::{ContextProvider, ContextSpec},
+    context::{Context, ContextProvider},
     events::Event,
     prompt::Prompt,
     session_store::normalize_path,
@@ -46,7 +46,7 @@ impl Tenx {
 
         // Add project map if configured
         if self.config.default_context.project_map {
-            let context = ContextSpec::new_project_map();
+            let context = Context::new_project_map();
             send_event(sender, Event::ContextStart)?;
             session.add_context(context);
             send_event(sender, Event::ContextEnd)?;
@@ -66,10 +66,10 @@ impl Tenx {
     ) -> Result<usize> {
         let mut contexts = Vec::new();
         for file in glob {
-            contexts.push(ContextSpec::new_path(&self.config, file.to_string())?);
+            contexts.push(Context::new_path(&self.config, file.to_string())?);
         }
         for ruskel_doc in ruskel {
-            contexts.push(ContextSpec::new_ruskel(ruskel_doc.clone()));
+            contexts.push(Context::new_ruskel(ruskel_doc.clone()));
         }
         let mut total_added = 0;
         if !contexts.is_empty() {
