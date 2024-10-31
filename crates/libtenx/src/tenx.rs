@@ -123,7 +123,9 @@ impl Tenx {
             session.add_prompt(Prompt::Auto(
                 "Running the preflight checks to find errors to fix.".to_string(),
             ))?;
-            session.set_last_error(&e);
+            if let Some(step) = session.last_step_mut() {
+                step.err = Some(e.clone());
+            }
             self.save_session(session)?;
         }
         send_event(&sender, Event::Finish)?;
@@ -157,7 +159,9 @@ impl Tenx {
         sender: Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
         let session_store = SessionStore::open(self.config.session_store_dir())?;
-        session.rollback_last(&self.config)?;
+        if let Some(step) = session.last_step_mut() {
+            step.rollback(&self.config)?;
+        }
         let result = self
             .process_prompt(session, sender.clone(), &session_store)
             .await;
@@ -196,7 +200,9 @@ impl Tenx {
         session_store.save(&self.config, session)?;
         if session.last_step_error().is_none() {
             if let Err(e) = self.run_preflight_validators(session, &sender) {
-                session.set_last_error(&e);
+                if let Some(step) = session.last_step_mut() {
+                    step.err = Some(e.clone());
+                }
                 session_store.save(&self.config, session)?;
                 return Err(e);
             }
@@ -237,7 +243,9 @@ impl Tenx {
                     return Ok(());
                 }
                 Err(e) => {
-                    session.set_last_error(&e);
+                    if let Some(step) = session.last_step_mut() {
+                        step.err = Some(e.clone());
+                    }
                 }
             }
         }

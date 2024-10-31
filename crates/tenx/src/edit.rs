@@ -3,7 +3,7 @@ use std::{fs, io::Write, process::Command};
 use tempfile::NamedTempFile;
 
 use libtenx::prompt::Prompt;
-use libtenx::{patch::Patch, Session};
+use libtenx::Session;
 
 /// Returns the user's preferred editor.
 fn get_editor() -> String {
@@ -134,15 +134,17 @@ mod tests {
                 "First prompt\nwith multiple lines".to_string(),
             ))
             .unwrap();
-        session.set_last_response(libtenx::ModelResponse {
-            patch: Some(Patch {
-                changes: vec![],
-                comment: Some("First response\nalso with multiple lines".to_string()),
-                cache: Default::default(),
-            }),
-            operations: vec![],
-            usage: None,
-        });
+        if let Some(step) = session.last_step_mut() {
+            step.model_response = Some(libtenx::ModelResponse {
+                patch: Some(Patch {
+                    changes: vec![],
+                    comment: Some("First response\nalso with multiple lines".to_string()),
+                    cache: Default::default(),
+                }),
+                operations: vec![],
+                usage: None,
+            });
+        }
 
         // Test editing first step (retry case)
         let rendered_step_0 = render_initial_text(&session);
@@ -165,15 +167,17 @@ mod tests {
                 "Second prompt\nstill multiple lines".to_string(),
             ))
             .unwrap();
-        session.set_last_response(libtenx::ModelResponse {
-            patch: Some(Patch {
-                changes: vec![],
-                comment: Some("Second response\nyet more lines".to_string()),
-                cache: Default::default(),
-            }),
-            operations: vec![],
-            usage: None,
-        });
+        if let Some(step) = session.last_step_mut() {
+            step.model_response = Some(libtenx::ModelResponse {
+                patch: Some(Patch {
+                    changes: vec![],
+                    comment: Some("Second response\nyet more lines".to_string()),
+                    cache: Default::default(),
+                }),
+                operations: vec![],
+                usage: None,
+            });
+        }
 
         // Test editing second step
         let rendered_step_1 = render_initial_text(&session);

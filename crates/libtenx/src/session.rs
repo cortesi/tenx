@@ -49,6 +49,18 @@ pub struct Step {
     pub err: Option<TenxError>,
 }
 
+impl Step {
+    /// Rolls back any changes made in this step.
+    pub fn rollback(&mut self, config: &config::Config) -> Result<()> {
+        if let Some(resp) = &self.model_response {
+            resp.rollback(config)?;
+        }
+        self.model_response = None;
+        self.err = None;
+        Ok(())
+    }
+}
+
 /// Determines if a given string is a glob pattern or a rooted path.
 ///
 /// Returns false if the string starts with "./", indicating a rooted path.
@@ -86,6 +98,20 @@ impl Session {
         &self.steps
     }
 
+    pub fn steps_mut(&mut self) -> &mut Vec<Step> {
+        &mut self.steps
+    }
+
+    /// Returns a reference to the last step in the session.
+    pub fn last_step(&self) -> Option<&Step> {
+        self.steps.last()
+    }
+
+    /// Returns a mutable reference to the last step in the session.
+    pub fn last_step_mut(&mut self) -> Option<&mut Step> {
+        self.steps.last_mut()
+    }
+
     pub fn contexts(&self) -> &Vec<context::ContextSpec> {
         &self.contexts
     }
@@ -115,20 +141,7 @@ impl Session {
 
     /// Return the error if the last step has one, else None.
     pub fn last_step_error(&self) -> Option<&TenxError> {
-        self.steps.last().and_then(|step| step.err.as_ref())
-    }
-
-    /// Adds an error to the final step
-    pub fn set_last_error(&mut self, err: &TenxError) {
-        if let Some(step) = self.steps.last_mut() {
-            step.err = Some(err.clone());
-        }
-    }
-
-    pub fn set_last_response(&mut self, response: ModelResponse) {
-        if let Some(step) = self.steps.last_mut() {
-            step.model_response = Some(response);
-        }
+        self.last_step().and_then(|step| step.err.as_ref())
     }
 
     /// Adds a new step to the session, and sets the step prompt.
@@ -212,33 +225,6 @@ impl Session {
         }
     }
 
-    /// Apply a patch, entering the modified files into the patch cache. It is the caller's
-    /// responsibility to save the patch back to the session if needed.
-    pub fn apply_patch(&mut self, config: &config::Config, patch: &mut Patch) -> Result<()> {
-        // First, enter all the modified files into the patch cache
-        for path in patch.changed_files() {
-            let abs_path = config.abspath(&path)?;
-            if let std::collections::hash_map::Entry::Vacant(e) = patch.cache.entry(path) {
-                let content = fs::read_to_string(&abs_path)?;
-                e.insert(content);
-            }
-        }
-
-        // Next, make a clone copy of the cache
-        let mut modified_cache = patch.cache.clone();
-
-        // Apply all modifications to the cloned cache
-        patch.apply(&mut modified_cache)?;
-
-        // Finally, write all files to disk
-        for (path, content) in modified_cache {
-            let abs_path = config.abspath(&path)?;
-            fs::write(&abs_path, content)?;
-        }
-
-        Ok(())
-    }
-
     /// Resets the session to a specific step, removing and rolling back all subsequent steps.
     pub fn reset(&mut self, config: &config::Config, offset: usize) -> Result<()> {
         if offset >= self.steps.len() {
@@ -255,22 +241,6 @@ impl Session {
         Ok(())
     }
 
-    /// Rolls back the changes in the last step, if any, and sets the Patch and error to None.
-    pub fn rollback_last(&mut self, config: &config::Config) -> Result<()> {
-        if let Some(resp) = self
-            .steps
-            .last()
-            .and_then(|step| step.model_response.as_ref())
-        {
-            resp.rollback(config)?;
-        }
-        if let Some(last_step) = self.steps.last_mut() {
-            last_step.model_response = None;
-            last_step.err = None;
-        }
-        Ok(())
-    }
-
     /// Prompts the current model with the session's state and sets the resulting patch and usage.
     pub async fn prompt(
         &mut self,
@@ -279,7 +249,7 @@ impl Session {
     ) -> Result<()> {
         let mut model = config.model()?;
         let (patch, usage) = model.send(config, self, sender).await?;
-        if let Some(last_step) = self.steps.last_mut() {
+        if let Some(last_step) = self.last_step_mut() {
             last_step.model_response = Some(ModelResponse {
                 patch: Some(patch),
                 operations: vec![],
@@ -308,7 +278,7 @@ impl Session {
         }
 
         if let Some(patch) = &resp.patch {
-            self.apply_patch(config, &mut patch.clone())?;
+            patch.clone().apply(config)?;
             resp.patch = Some(patch.clone());
         }
 
@@ -387,15 +357,15 @@ mod tests {
                 .session
                 .add_prompt(Prompt::User(format!("Prompt {}", i)))?;
 
-            test_project.session.set_last_response(ModelResponse {
-                patch: Some(patch.clone()),
-                operations: vec![],
-                usage: None,
-            });
+            if let Some(step) = test_project.session.last_step_mut() {
+                step.model_response = Some(ModelResponse {
+                    patch: Some(patch.clone()),
+                    operations: vec![],
+                    usage: None,
+                });
+            }
 
-            test_project
-                .session
-                .apply_patch(&test_project.config, &mut patch.clone())?;
+            patch.clone().apply(&test_project.config)?;
         }
 
         assert_eq!(test_project.session.steps.len(), 3);

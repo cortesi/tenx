@@ -276,14 +276,16 @@ mod tests {
     fn test_print_steps_with_patch() {
         let config = Config::default();
         let (_temp_dir, mut session) = create_test_session();
-        session.set_last_response(libtenx::ModelResponse {
-            patch: Some(Patch {
-                comment: Some("Test comment".to_string()),
-                ..Default::default()
-            }),
-            operations: vec![],
-            usage: None,
-        });
+        if let Some(step) = session.last_step_mut() {
+            step.model_response = Some(libtenx::ModelResponse {
+                patch: Some(Patch {
+                    comment: Some("Test comment".to_string()),
+                    ..Default::default()
+                }),
+                operations: vec![],
+                usage: None,
+            });
+        }
         let result = print_steps(&config, &session, false, 80);
         assert!(result.is_ok());
         let output = result.unwrap();
@@ -297,7 +299,9 @@ mod tests {
     fn test_print_steps_with_error() {
         let config = Config::default();
         let (_temp_dir, mut session) = create_test_session();
-        session.set_last_error(&TenxError::Internal("Test error".to_string()));
+        if let Some(step) = session.last_step_mut() {
+            step.err = Some(TenxError::Internal("Test error".to_string()));
+        }
         let result = print_steps(&config, &session, false, 80);
         assert!(result.is_ok());
         let output = result.unwrap();
