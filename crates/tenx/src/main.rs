@@ -142,7 +142,10 @@ enum DialectCommands {
 #[derive(Subcommand)]
 enum TrialCommands {
     /// Run a trial
-    Run,
+    Run {
+        /// Name of the trial to run
+        name: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -338,12 +341,12 @@ fn load_config(cli: &Cli) -> Result<config::Config> {
     }
 
     macro_rules! set_config {
-    ($config:expr, $($field:ident).+, $value:expr) => {
-        if let Some(val) = $value {
-            $config.$($field).+ = val;
-        }
-    };
-}
+        ($config:expr, $($field:ident).+, $value:expr) => {
+            if let Some(val) = $value {
+                $config.$($field).+ = val;
+            }
+        };
+    }
 
     // Apply CLI arguments
     config = config.load_env();
@@ -824,8 +827,14 @@ async fn main() -> anyhow::Result<()> {
                 }
 
                 match command {
-                    TrialCommands::Run => {
-                        println!("Running trials from: {}", trials_path.display());
+                    TrialCommands::Run { name } => {
+                        let mut trial = libtenx::trial::Trial::load(&trials_path, name)?;
+                        let mut conf = trial.tenx_conf.load_env();
+                        if let Some(key) = cli.anthropic_key.clone() {
+                            conf.anthropic_key = key;
+                        }
+                        trial.tenx_conf = conf;
+                        trial.execute()?;
                         Ok(())
                     }
                 }
