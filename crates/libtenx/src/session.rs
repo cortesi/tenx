@@ -15,6 +15,8 @@ use crate::{
 /// A parsed model response
 #[derive(Debug, Deserialize, Serialize, Clone, Default, PartialEq, Eq)]
 pub struct ModelResponse {
+    /// Model's comment on changes
+    pub comment: Option<String>,
     /// The unified patch in the response
     pub patch: Option<Patch>,
     /// Operations requested by the model, other than patching.
@@ -340,7 +342,6 @@ mod tests {
                     path: PathBuf::from("test.txt"),
                     content: content.clone(),
                 })],
-                comment: Some(format!("Step {}", i)),
             };
             test_project
                 .session
@@ -355,6 +356,7 @@ mod tests {
                     patch: Some(patch.clone()),
                     operations: vec![],
                     usage: None,
+                    comment: Some(format!("Step {}", i)),
                 });
                 step.rollback_cache = rollback_cache;
                 step.apply(&test_project.config)?;
@@ -390,12 +392,12 @@ mod tests {
                 path: PathBuf::from("test.txt"),
                 content: "modified content".into(),
             })],
-            comment: None,
         };
         step.model_response = Some(ModelResponse {
             patch: Some(patch),
             operations: vec![Operation::Edit(PathBuf::from("new.txt"))],
             usage: None,
+            comment: None,
         });
         step.rollback_cache = [(PathBuf::from("test.txt"), "content".into())]
             .into_iter()

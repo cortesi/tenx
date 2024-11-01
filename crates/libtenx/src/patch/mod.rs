@@ -30,7 +30,6 @@ pub enum Change {
 #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Patch {
     pub changes: Vec<Change>,
-    pub comment: Option<String>,
 }
 
 impl Patch {

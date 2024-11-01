@@ -135,6 +135,7 @@ impl DialectProvider for Tags {
     fn parse(&self, response: &str) -> Result<ModelResponse> {
         let mut patch = Patch::default();
         let mut lines = response.lines().map(String::from).peekable();
+        let mut comment = None;
 
         while let Some(line) = lines.peek() {
             if let Some(tag) = xmlish::parse_open(line) {
@@ -205,7 +206,7 @@ impl DialectProvider for Tags {
                     }
                     "comment" => {
                         let (_, content) = xmlish::parse_block("comment", &mut lines)?;
-                        patch.comment = Some(content.join("\n"));
+                        comment = Some(content.join("\n"));
                     }
                     _ => {
                         lines.next();
@@ -219,6 +220,7 @@ impl DialectProvider for Tags {
             patch: Some(patch),
             operations: vec![],
             usage: None,
+            comment,
         })
     }
 
@@ -234,10 +236,10 @@ impl DialectProvider for Tags {
             .ok_or_else(|| TenxError::Internal("Invalid step offset".into()))?;
         if let Some(resp) = &step.model_response {
             let mut rendered = String::new();
+            if let Some(comment) = &resp.comment {
+                rendered.push_str(&format!("<comment>\n{}\n</comment>\n\n", comment));
+            }
             if let Some(patch) = &resp.patch {
-                if let Some(comment) = &patch.comment {
-                    rendered.push_str(&format!("<comment>\n{}\n</comment>\n\n", comment));
-                }
                 for change in &patch.changes {
                     match change {
                         Change::Write(write_file) => {
@@ -319,10 +321,10 @@ mod tests {
                         new: "New content".to_string(),
                     }),
                 ],
-                comment: Some("This is a comment.".to_string()),
             }),
             operations: vec![],
             usage: None,
+            comment: Some("This is a comment.".to_string()),
         };
 
         let result = d.parse(input).unwrap();

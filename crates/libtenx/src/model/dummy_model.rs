@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
 use super::ModelProvider;
-use crate::{config::Config, events::Event, patch::Patch, ModelResponse, Result, Session};
+use crate::{config::Config, events::Event, ModelResponse, Result, Session};
 
 use std::collections::HashMap;
 
@@ -24,14 +24,14 @@ impl DummyUsage {
 /// A dummy model for testing purposes.
 #[derive(Debug, Clone)]
 pub struct DummyModel {
-    change_set: Result<Patch>,
+    model_response: Result<ModelResponse>,
 }
 
 impl DummyModel {
     /// Creates a new Dummy model with predefined operations.
-    pub fn from_patch(change_set: Patch) -> Self {
+    pub fn from_model_response(mr: ModelResponse) -> Self {
         Self {
-            change_set: Ok(change_set),
+            model_response: Ok(mr),
         }
     }
 }
@@ -39,7 +39,7 @@ impl DummyModel {
 impl Default for DummyModel {
     fn default() -> Self {
         Self {
-            change_set: Ok(Patch::default()),
+            model_response: Ok(ModelResponse::default()),
         }
     }
 }
@@ -56,13 +56,9 @@ impl ModelProvider for DummyModel {
         _state: &Session,
         _sender: Option<mpsc::Sender<Event>>,
     ) -> Result<ModelResponse> {
-        let patch = self.change_set.clone()?;
-        let usage = super::Usage::Dummy(DummyUsage { dummy_counter: 1 });
-        Ok(ModelResponse {
-            patch: Some(patch),
-            operations: vec![],
-            usage: Some(usage),
-        })
+        let mut resp = self.model_response.clone()?;
+        resp.usage = Some(super::Usage::Dummy(DummyUsage { dummy_counter: 1 }));
+        Ok(resp)
     }
 
     fn render(&self, _conf: &Config, _session: &Session) -> Result<String> {

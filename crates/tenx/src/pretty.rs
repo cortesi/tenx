@@ -80,6 +80,21 @@ fn print_steps(config: &Config, session: &Session, full: bool, width: usize) -> 
         output.push_str(&render_step_prompt(step, width, full));
         output.push('\n');
         if let Some(response) = &step.model_response {
+            if let Some(comment) = &response.comment {
+                output.push_str(&format!(
+                    "{}{}\n",
+                    INDENT.repeat(2),
+                    "comment:".blue().bold()
+                ));
+                let comment_text = if full {
+                    comment.clone()
+                } else {
+                    comment.lines().next().unwrap_or("").to_string()
+                };
+                output.push_str(&wrapped_block(&comment_text, width, INDENT.len() * 3));
+                output.push('\n');
+            }
+
             if let Some(patch) = &response.patch {
                 output.push_str(&print_patch(config, patch, full, width));
             }
@@ -141,20 +156,6 @@ fn render_step_prompt(step: &libtenx::Step, width: usize, full: bool) -> String 
 
 fn print_patch(config: &Config, patch: &libtenx::patch::Patch, full: bool, width: usize) -> String {
     let mut output = String::new();
-    if let Some(comment) = &patch.comment {
-        output.push_str(&format!(
-            "{}{}\n",
-            INDENT.repeat(2),
-            "comment:".blue().bold()
-        ));
-        let comment_text = if full {
-            comment.clone()
-        } else {
-            comment.lines().next().unwrap_or("").to_string()
-        };
-        output.push_str(&wrapped_block(&comment_text, width, INDENT.len() * 3));
-        output.push('\n');
-    }
     output.push_str(&format!(
         "{}{}\n",
         INDENT.repeat(2),
@@ -279,11 +280,11 @@ mod tests {
         if let Some(step) = session.last_step_mut() {
             step.model_response = Some(libtenx::ModelResponse {
                 patch: Some(Patch {
-                    comment: Some("Test comment".to_string()),
                     ..Default::default()
                 }),
                 operations: vec![],
                 usage: None,
+                comment: Some("Test comment".to_string()),
             });
         }
         let result = print_steps(&config, &session, false, 80);

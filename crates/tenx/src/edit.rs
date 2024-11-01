@@ -23,12 +23,10 @@ fn render_step_commented(session: &libtenx::Session, step_offset: usize) -> Stri
         text.push_str(&format!("# {}\n", line));
     }
     if let Some(response) = &step.model_response {
-        if let Some(patch) = &response.patch {
-            if let Some(comment) = &patch.comment {
-                text.push_str("#\n# Response:\n# ---------\n");
-                for line in comment.lines() {
-                    text.push_str(&format!("# {}\n", line));
-                }
+        if let Some(comment) = &response.comment {
+            text.push_str("#\n# Response:\n# ---------\n");
+            for line in comment.lines() {
+                text.push_str(&format!("# {}\n", line));
             }
         }
     }
@@ -136,12 +134,10 @@ mod tests {
             .unwrap();
         if let Some(step) = session.last_step_mut() {
             step.model_response = Some(libtenx::ModelResponse {
-                patch: Some(Patch {
-                    changes: vec![],
-                    comment: Some("First response\nalso with multiple lines".to_string()),
-                }),
+                patch: Some(Patch { changes: vec![] }),
                 operations: vec![],
                 usage: None,
+                comment: Some("First response\nalso with multiple lines".to_string()),
             });
         }
 
@@ -168,12 +164,10 @@ mod tests {
             .unwrap();
         if let Some(step) = session.last_step_mut() {
             step.model_response = Some(libtenx::ModelResponse {
-                patch: Some(Patch {
-                    changes: vec![],
-                    comment: Some("Second response\nyet more lines".to_string()),
-                }),
+                patch: Some(Patch { changes: vec![] }),
                 operations: vec![],
                 usage: None,
+                comment: Some("Second response\nyet more lines".to_string()),
             });
         }
 

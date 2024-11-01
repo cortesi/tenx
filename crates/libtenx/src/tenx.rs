@@ -332,6 +332,7 @@ mod tests {
     use super::*;
 
     use crate::patch::{Change, Patch, WriteFile};
+    use crate::ModelResponse;
 
     use fs_err as fs;
     use std::path::PathBuf;
@@ -342,13 +343,19 @@ mod tests {
     async fn test_tenx_process_prompt() {
         let temp_dir = tempdir().unwrap();
         let mut config = Config::default()
-            .with_dummy_model(crate::model::DummyModel::from_patch(Patch {
-                changes: vec![Change::Write(WriteFile {
-                    path: PathBuf::from("test.txt"),
-                    content: "Updated content".to_string(),
-                })],
-                comment: Some("Test comment".to_string()),
-            }))
+            .with_dummy_model(crate::model::DummyModel::from_model_response(
+                ModelResponse {
+                    comment: Some("Test comment".to_string()),
+                    patch: Some(Patch {
+                        changes: vec![Change::Write(WriteFile {
+                            path: PathBuf::from("test.txt"),
+                            content: "Updated content".to_string(),
+                        })],
+                    }),
+                    operations: vec![],
+                    usage: None,
+                },
+            ))
             .with_root(temp_dir.path());
         config.session_store_dir = temp_dir.path().join("sess");
         config.retry_limit = 1;
@@ -373,14 +380,7 @@ mod tests {
         assert_eq!(session.steps().len(), 1);
         assert!(session.steps()[0].model_response.is_some());
         assert_eq!(
-            session.steps()[0]
-                .model_response
-                .as_ref()
-                .unwrap()
-                .patch
-                .as_ref()
-                .unwrap()
-                .comment,
+            session.steps()[0].model_response.as_ref().unwrap().comment,
             Some("Test comment".to_string())
         );
 
