@@ -4,7 +4,7 @@ mod dummy_dialect;
 mod tags;
 mod xmlish;
 
-use crate::{config::Config, patch::Patch, Result, Session};
+use crate::{config::Config, ModelResponse, Result, Session};
 
 pub use dummy_dialect::*;
 pub use tags::*;
@@ -47,7 +47,7 @@ pub trait DialectProvider {
     ) -> Result<String>;
 
     /// Parse a model's response into concrete operations
-    fn parse(&self, txt: &str) -> Result<Patch>;
+    fn parse(&self, txt: &str) -> Result<ModelResponse>;
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -102,7 +102,7 @@ impl DialectProvider for Dialect {
         }
     }
 
-    fn parse(&self, txt: &str) -> Result<Patch> {
+    fn parse(&self, txt: &str) -> Result<ModelResponse> {
         match self {
             Dialect::Tags(t) => t.parse(txt),
             Dialect::Dummy(d) => d.parse(txt),

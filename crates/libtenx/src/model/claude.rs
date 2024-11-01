@@ -13,7 +13,8 @@ use crate::{
     dialect::{Dialect, DialectProvider},
     events::Event,
     model::ModelProvider,
-    patch, Result, Session, TenxError,
+    session::ModelResponse,
+    Result, Session, TenxError,
 };
 
 const DEFAULT_MODEL: &str = "claude-3-5-sonnet-latest";
@@ -37,7 +38,7 @@ pub struct Claude {}
 use std::collections::HashMap;
 
 /// Mirrors the Usage struct from misanthropy to track token usage statistics.
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
 pub struct ClaudeUsage {
     pub input_tokens: Option<u32>,
     pub output_tokens: Option<u32>,
@@ -114,7 +115,7 @@ impl Claude {
         &self,
         dialect: &Dialect,
         req: &misanthropy::MessagesRequest,
-    ) -> Result<patch::Patch> {
+    ) -> Result<ModelResponse> {
         if let Some(message) = &req.messages.last() {
             if message.role == Role::Assistant {
                 for content in &message.content {
@@ -281,7 +282,7 @@ impl ModelProvider for Claude {
         config: &Config,
         session: &Session,
         sender: Option<mpsc::Sender<Event>>,
-    ) -> Result<(patch::Patch, super::Usage)> {
+    ) -> Result<ModelResponse> {
         if config.anthropic_key.is_empty() {
             return Err(TenxError::Internal(
                 "No Anthropic key configured for Claude model.".into(),
@@ -299,14 +300,14 @@ impl ModelProvider for Claude {
             .await?;
         trace!("Got response: {}", serde_json::to_string_pretty(&resp)?);
         req.merge_response(&resp);
-        let patch = self.extract_changes(&dialect, &req)?;
-        let usage = super::Usage::Claude(ClaudeUsage {
+        let mut modresp = self.extract_changes(&dialect, &req)?;
+        modresp.usage = Some(super::Usage::Claude(ClaudeUsage {
             input_tokens: resp.usage.input_tokens,
             output_tokens: resp.usage.output_tokens,
             cache_creation_input_tokens: resp.usage.cache_creation_input_tokens,
             cache_read_input_tokens: resp.usage.cache_read_input_tokens,
-        });
-        Ok((patch, usage))
+        }));
+        Ok(modresp)
     }
 
     fn render(&self, config: &Config, session: &Session) -> Result<String> {

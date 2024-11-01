@@ -8,7 +8,7 @@ use crate::{
     config::Config,
     context::ContextProvider,
     patch::{Change, Patch, Replace, Smart, UDiff, WriteFile},
-    Result, Session, TenxError,
+    ModelResponse, Result, Session, TenxError,
 };
 use fs_err as fs;
 
@@ -132,8 +132,8 @@ impl DialectProvider for Tags {
     /// `WriteFile` entries for `<write_file>` tags and `Replace` entries for `<replace>` tags.
     /// Whitespace is trimmed from the content of all tags. Any text outside of recognized tags is
     /// ignored.
-    fn parse(&self, response: &str) -> Result<Patch> {
-        let mut change_set = Patch::default();
+    fn parse(&self, response: &str) -> Result<ModelResponse> {
+        let mut patch = Patch::default();
         let mut lines = response.lines().map(String::from).peekable();
 
         while let Some(line) = lines.peek() {
@@ -152,7 +152,7 @@ impl DialectProvider for Tags {
                             })?
                             .clone();
                         let (_, content) = xmlish::parse_block("smart", &mut lines)?;
-                        change_set.changes.push(Change::Smart(Smart {
+                        patch.changes.push(Change::Smart(Smart {
                             path: path.into(),
                             text: content.join("\n"),
                         }));
@@ -170,7 +170,7 @@ impl DialectProvider for Tags {
                             })?
                             .clone();
                         let (_, content) = xmlish::parse_block("write_file", &mut lines)?;
-                        change_set.changes.push(Change::Write(WriteFile {
+                        patch.changes.push(Change::Write(WriteFile {
                             path: path.into(),
                             content: content.join("\n"),
                         }));
@@ -191,7 +191,7 @@ impl DialectProvider for Tags {
                         let mut replace_lines = replace_content.into_iter().peekable();
                         let (_, old) = xmlish::parse_block("old", &mut replace_lines)?;
                         let (_, new) = xmlish::parse_block("new", &mut replace_lines)?;
-                        change_set.changes.push(Change::Replace(Replace {
+                        patch.changes.push(Change::Replace(Replace {
                             path: path.into(),
                             old: old.join("\n"),
                             new: new.join("\n"),
@@ -199,13 +199,13 @@ impl DialectProvider for Tags {
                     }
                     "udiff" => {
                         let (_, content) = xmlish::parse_block("udiff", &mut lines)?;
-                        change_set
+                        patch
                             .changes
                             .push(Change::UDiff(UDiff::new(content.join("\n"))?));
                     }
                     "comment" => {
                         let (_, content) = xmlish::parse_block("comment", &mut lines)?;
-                        change_set.comment = Some(content.join("\n"));
+                        patch.comment = Some(content.join("\n"));
                     }
                     _ => {
                         lines.next();
@@ -215,7 +215,11 @@ impl DialectProvider for Tags {
                 lines.next();
             }
         }
-        Ok(change_set)
+        Ok(ModelResponse {
+            patch: Some(patch),
+            operations: vec![],
+            usage: None,
+        })
     }
 
     fn render_step_response(
@@ -274,6 +278,7 @@ impl DialectProvider for Tags {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use indoc::indoc;
     use pretty_assertions::assert_eq;
 
     #[test]
@@ -284,52 +289,44 @@ mod tests {
             udiff: false,
         };
 
-        let input = r#"
+        let input = indoc! {r#"
             <comment>
-                This is a comment.
+            This is a comment.
             </comment>
-           ignored
             <write_file path="/path/to/file2.txt">
-                This is the content of the file.
+            This is the content of the file.
             </write_file>
-            ignored
             <replace path="/path/to/file.txt">
-                <old>
-                Old content
-                </old>
-                <new>
-                New content
-                </new>
+            <old>
+            Old content
+            </old>
+            <new>
+            New content
+            </new>
             </replace>
-            ignored
-        "#;
+        "#};
+
+        let expected = ModelResponse {
+            patch: Some(Patch {
+                changes: vec![
+                    Change::Write(WriteFile {
+                        path: PathBuf::from("/path/to/file2.txt"),
+                        content: "This is the content of the file.".to_string(),
+                    }),
+                    Change::Replace(Replace {
+                        path: PathBuf::from("/path/to/file.txt"),
+                        old: "Old content".to_string(),
+                        new: "New content".to_string(),
+                    }),
+                ],
+                comment: Some("This is a comment.".to_string()),
+            }),
+            operations: vec![],
+            usage: None,
+        };
 
         let result = d.parse(input).unwrap();
-        assert_eq!(result.changes.len(), 2);
-        assert_eq!(
-            result.comment.unwrap().trim(),
-            "This is a comment.".to_string()
-        );
-
-        match &result.changes[0] {
-            Change::Write(write_file) => {
-                assert_eq!(write_file.path.as_os_str(), "/path/to/file2.txt");
-                assert_eq!(
-                    write_file.content.trim(),
-                    "This is the content of the file."
-                );
-            }
-            _ => panic!("Expected WriteFile for /path/to/file2.txt"),
-        }
-
-        match &result.changes[1] {
-            Change::Replace(replace) => {
-                assert_eq!(replace.path.as_os_str(), "/path/to/file.txt");
-                assert_eq!(replace.old.trim(), "Old content");
-                assert_eq!(replace.new.trim(), "New content");
-            }
-            _ => panic!("Expected Replace for /path/to/file.txt"),
-        }
+        assert_eq!(result, expected);
     }
 
     #[test]

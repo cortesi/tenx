@@ -3,12 +3,12 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
 use super::ModelProvider;
-use crate::{config::Config, events::Event, patch::Patch, Result, Session};
+use crate::{config::Config, events::Event, patch::Patch, ModelResponse, Result, Session};
 
 use std::collections::HashMap;
 
 /// A dummy usage struct for testing purposes.
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
 pub struct DummyUsage {
     pub dummy_counter: u32,
 }
@@ -55,10 +55,14 @@ impl ModelProvider for DummyModel {
         _config: &Config,
         _state: &Session,
         _sender: Option<mpsc::Sender<Event>>,
-    ) -> Result<(Patch, super::Usage)> {
+    ) -> Result<ModelResponse> {
         let patch = self.change_set.clone()?;
         let usage = super::Usage::Dummy(DummyUsage { dummy_counter: 1 });
-        Ok((patch, usage))
+        Ok(ModelResponse {
+            patch: Some(patch),
+            operations: vec![],
+            usage: Some(usage),
+        })
     }
 
     fn render(&self, _conf: &Config, _session: &Session) -> Result<String> {

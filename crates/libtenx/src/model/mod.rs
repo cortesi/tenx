@@ -8,12 +8,12 @@ use tokio::sync::mpsc;
 pub use claude::{Claude, ClaudeUsage};
 pub use dummy_model::{DummyModel, DummyUsage};
 
-use crate::{config::Config, events::Event, patch::Patch, Result, Session};
+use crate::{config::Config, events::Event, session::ModelResponse, Result, Session};
 
 use std::collections::HashMap;
 
 /// Represents usage statistics for different model types.
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub enum Usage {
     Claude(ClaudeUsage),
     Dummy(DummyUsage),
@@ -41,7 +41,7 @@ pub trait ModelProvider {
         config: &Config,
         session: &Session,
         sender: Option<mpsc::Sender<Event>>,
-    ) -> Result<(Patch, Usage)>;
+    ) -> Result<ModelResponse>;
 
     /// Render a session for display to the user.
     fn render(&self, config: &Config, session: &Session) -> Result<String>;
@@ -67,7 +67,7 @@ impl ModelProvider for Model {
         config: &Config,
         session: &Session,
         sender: Option<mpsc::Sender<Event>>,
-    ) -> Result<(Patch, Usage)> {
+    ) -> Result<ModelResponse> {
         match self {
             Model::Claude(c) => c.send(config, session, sender).await,
             Model::Dummy(d) => d.send(config, session, sender).await,

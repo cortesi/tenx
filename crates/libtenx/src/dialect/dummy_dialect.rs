@@ -1,16 +1,16 @@
-use crate::{config::Config, dialect::DialectProvider, patch::Patch, Result, Session};
+use crate::{config::Config, dialect::DialectProvider, ModelResponse, Result, Session};
 use std::path::PathBuf;
 
 /// A dummy dialect for testing purposes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DummyDialect {
-    parse_results: Vec<Result<Patch>>,
+    parse_results: Vec<Result<ModelResponse>>,
     current_index: usize,
 }
 
 impl DummyDialect {
     /// Creates a new DummyDialect with specified parse results.
-    pub fn new(parse_results: Vec<Result<Patch>>) -> Self {
+    pub fn new(parse_results: Vec<Result<ModelResponse>>) -> Self {
         Self {
             parse_results,
             current_index: 0,
@@ -21,7 +21,7 @@ impl DummyDialect {
 impl Default for DummyDialect {
     fn default() -> Self {
         Self {
-            parse_results: vec![Ok(Patch::default())],
+            parse_results: vec![Ok(ModelResponse::default())],
             current_index: 0,
         }
     }
@@ -67,7 +67,7 @@ impl DialectProvider for DummyDialect {
         Ok(String::new())
     }
 
-    fn parse(&self, _txt: &str) -> Result<Patch> {
+    fn parse(&self, _txt: &str) -> Result<ModelResponse> {
         if self.current_index < self.parse_results.len() {
             let result = self.parse_results[self.current_index].clone();
             Ok(result?)

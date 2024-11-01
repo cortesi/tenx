@@ -13,7 +13,7 @@ use crate::{
 };
 
 /// A parsed model response
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, Default, PartialEq, Eq)]
 pub struct ModelResponse {
     /// The unified patch in the response
     pub patch: Option<Patch>,
@@ -24,7 +24,7 @@ pub struct ModelResponse {
 }
 
 /// Operations requested by the model, other than patching.
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
 pub enum Operation {
     /// Request to edit a file
     Edit(PathBuf),
@@ -254,13 +254,9 @@ impl Session {
         sender: Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
         let mut model = config.model()?;
-        let (patch, usage) = model.send(config, self, sender).await?;
+        let resp = model.send(config, self, sender).await?;
         if let Some(last_step) = self.last_step_mut() {
-            last_step.model_response = Some(ModelResponse {
-                patch: Some(patch),
-                operations: vec![],
-                usage: Some(usage),
-            });
+            last_step.model_response = Some(resp);
         }
         Ok(())
     }
