@@ -140,7 +140,22 @@ enum DialectCommands {
 }
 
 #[derive(Subcommand)]
+enum TrialCommands {
+    /// Run a trial
+    Run,
+}
+
+#[derive(Subcommand)]
 enum Commands {
+    /// Trial and experiment commands
+    Trial {
+        /// Path to trials directory
+        #[clap(long)]
+        trials: Option<PathBuf>,
+
+        #[clap(subcommand)]
+        command: TrialCommands,
+    },
     /// Add context or editable files to a session
     Add {
         /// Specifies files to add (as editable by default)
@@ -786,6 +801,34 @@ async fn main() -> anyhow::Result<()> {
                 tx.refresh_context(&mut session, &Some(sender.clone()))?;
                 tx.save_session(&session)?;
                 Ok(())
+            }
+            Commands::Trial { trials, command } => {
+                let trials_path = if let Some(p) = trials {
+                    p.clone()
+                } else {
+                    let project_root = config.project_root();
+                    if project_root.join(".git").exists() {
+                        project_root.join("trials")
+                    } else {
+                        return Err(anyhow::anyhow!(
+                            "No trials directory specified and not in tenx repository"
+                        ));
+                    }
+                };
+
+                if !trials_path.exists() {
+                    return Err(anyhow::anyhow!(
+                        "Trials directory does not exist: {}",
+                        trials_path.display()
+                    ));
+                }
+
+                match command {
+                    TrialCommands::Run => {
+                        println!("Running trials from: {}", trials_path.display());
+                        Ok(())
+                    }
+                }
             }
         },
         None => {

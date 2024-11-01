@@ -10,7 +10,7 @@ keywords = ["ai"]
 
 [workspace]
 resolver = "2"
-members = ["crates/*", "samples/simple"]
+members = ["crates/*", "trials/projects/simple"]
 
 [workspace.dependencies]
 libtenx = { version = "0.0.1", path = "crates/libtenx" }

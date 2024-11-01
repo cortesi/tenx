@@ -13,6 +13,7 @@ pub mod dialect;
 pub mod model;
 pub mod patch;
 pub mod prompt;
+pub mod trial;
 
 pub use error::{Result, TenxError};
 pub use events::*;
