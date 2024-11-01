@@ -95,6 +95,24 @@ fn print_steps(config: &Config, session: &Session, full: bool, width: usize) -> 
                 output.push('\n');
             }
 
+            if !response.operations.is_empty() {
+                output.push_str(&format!(
+                    "{}{}\n",
+                    INDENT.repeat(2),
+                    "operations:".blue().bold()
+                ));
+                for op in &response.operations {
+                    match op {
+                        libtenx::Operation::Edit(path) => {
+                            output.push_str(&format!(
+                                "{}- edit: {}\n",
+                                INDENT.repeat(3),
+                                config.relpath(path).display()
+                            ));
+                        }
+                    }
+                }
+            }
             if let Some(patch) = &response.patch {
                 output.push_str(&print_patch(config, patch, full, width));
             }
