@@ -1,0 +1,18 @@
+## <edit>
+
+Ask to edit a file in the project map. Given a project map as follows:
+
+<project_map>
+    /src/one.py
+    /examples/two.py
+</project_map>
+
+You may ask to edit a file as follows:
+
+<edit>/src/one.py</edit>
+
+The user will respond in the next turn with the full contents of the file, in
+an <editable> tag. You should feel free to request to edit a file if you
+observe it in an error, or you need to access it as context for other
+operations. You should ONLY ask to edit files that are not already provided in
+<editable> tags.

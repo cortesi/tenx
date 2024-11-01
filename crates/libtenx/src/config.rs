@@ -113,6 +113,18 @@ pub enum ConfigDialect {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Ops {
+    /// Allow the model to request to edit files in the project map
+    pub edit: bool,
+}
+
+impl Default for Ops {
+    fn default() -> Self {
+        Self { edit: true }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Tags {
     /// EXPERIMENTAL: enable smart change type
     pub smart: bool,
@@ -237,6 +249,10 @@ pub struct Config {
     #[serde(default)]
     pub tags: Tags,
 
+    /// Operations that can be executed by the model.
+    #[serde(default)]
+    pub ops: Ops,
+
     /// The default context configuration.
     #[serde(default)]
     pub default_context: DefaultContext,
@@ -340,6 +356,7 @@ impl Default for Config {
             dummy_model: None,
             dummy_dialect: None,
             tags: Tags::default(),
+            ops: Ops::default(),
             default_context: DefaultContext::default(),
             full: false,
             validators: Validators::default(),
@@ -559,6 +576,9 @@ impl Config {
         if other.tags != dflt.tags {
             self.tags = other.tags.clone();
         }
+        if other.ops != dflt.ops {
+            self.ops = other.ops.clone();
+        }
         if other.default_context != dflt.default_context {
             self.default_context = other.default_context.clone();
         }
@@ -613,6 +633,7 @@ impl Config {
                 self.tags.smart,
                 self.tags.replace,
                 self.tags.udiff,
+                self.ops.edit,
             ))),
         }
     }

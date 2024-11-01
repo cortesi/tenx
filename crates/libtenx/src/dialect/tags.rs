@@ -8,8 +8,7 @@ use crate::{
     config::Config,
     context::ContextProvider,
     patch::{Change, Patch, Replace, Smart, UDiff, WriteFile},
-    prompt::Prompt,
-    ModelResponse, Operation, Result, Session, Step, TenxError,
+    ModelResponse, Operation, Result, Session, TenxError,
 };
 use fs_err as fs;
 
@@ -17,20 +16,23 @@ const SYSTEM: &str = include_str!("./tags-system.txt");
 const SMART: &str = include_str!("./tags-smart.txt");
 const REPLACE: &str = include_str!("./tags-replace.txt");
 const UDIFF: &str = include_str!("./tags-udiff.txt");
+const EDIT: &str = include_str!("./tags-edit.txt");
 
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct Tags {
     pub smart: bool,
     pub replace: bool,
     pub udiff: bool,
+    pub edit: bool,
 }
 
 impl Tags {
-    pub fn new(smart: bool, replace: bool, udiff: bool) -> Self {
+    pub fn new(smart: bool, replace: bool, udiff: bool, edit: bool) -> Self {
         Self {
             smart,
             replace,
             udiff,
+            edit,
         }
     }
 }
@@ -50,6 +52,9 @@ impl DialectProvider for Tags {
         }
         if self.udiff {
             out.push_str(UDIFF);
+        }
+        if self.edit {
+            out.push_str(EDIT);
         }
         out
     }
@@ -297,6 +302,8 @@ impl DialectProvider for Tags {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{prompt::Prompt, Step};
+
     use indoc::indoc;
     use pretty_assertions::assert_eq;
 
@@ -306,6 +313,7 @@ mod tests {
             smart: true,
             replace: true,
             udiff: false,
+            edit: false,
         };
 
         let input = indoc! {r#"
@@ -441,11 +449,13 @@ mod tests {
             smart: true,
             replace: true,
             udiff: false,
+            edit: false,
         };
         let tags_without_smart = Tags {
             smart: false,
             replace: true,
             udiff: false,
+            edit: false,
         };
 
         // Test with smart enabled
