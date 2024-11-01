@@ -73,8 +73,8 @@ User prompt
 
 # Assistant Output
 
-You will emit a series of operations on the editable files. You will change
-editable files only, never touching files only provided as context. 
+You will emit a series of operations on the editable files. If the file you 
+need to edit is not provided, you must request it with an <edit> tag.
 
 - Opening tags may have trailing data: e.g. "<open> first line".
 - Closing tags may have leading data: e.g. "last line </close>".

@@ -9,10 +9,53 @@ Ask to edit a file in the project map. Given a project map as follows:
 
 You may ask to edit a file as follows:
 
-<edit>/src/one.py</edit>
+    <edit>/src/one.py</edit>
 
 The user will respond in the next turn with the full contents of the file, in
-an <editable> tag. You should feel free to request to edit a file if you
-observe it in an error, or you need to access it as context for other
-operations. You should ONLY ask to edit files that are not already provided in
-<editable> tags.
+an <editable> tag. You should request to edit a file if it is not already
+provided in an <editable> tag, and you need to view its content for any reason.
+Never make blind edits to files not provided in an <editable> tag - always
+request them with <edit> first. If no <editable> files are provided you should
+always request files to view. You may issue more than one <edit> tag in a
+single response.
+
+
+<example>
+    User:
+    <project_map>
+        /src/one.py
+        /examples/two.py
+    </project_map>
+    <prompt>
+    Please fix the fibonacci generator in one.py.
+    </prompt>
+
+    Assistant:
+    <comment>
+        Ok. Let's view the contents of one.py.
+    </comment>
+    <edit>/src/one.py</edit>
+
+    User:
+    <editable>
+    def fib(n):
+        if n == 0:
+            return 0
+        elif n == 1:
+            return 1
+        else:
+            return fib(n - 1) + fib(n - 2)
+    </editable>
+
+    Assistant:
+    <write path="/src/one.py">
+    def fib(n):
+        if n == 0:
+            return 0
+        elif n == 1:
+            return 1
+        else:
+            return fib(n - 1) + fib(n - 2)
+    </write>
+</example>
+

@@ -302,6 +302,7 @@ impl Serialize for Config {
         serialize_if_different!(state, self, default, default_model);
         serialize_if_different!(state, self, default, default_dialect);
         serialize_if_different!(state, self, default, tags);
+        serialize_if_different!(state, self, default, ops);
         serialize_if_different!(state, self, default, default_context);
         serialize_if_different!(state, self, default, validators);
         serialize_if_different!(state, self, default, formatters);
@@ -660,6 +661,7 @@ mod tests {
         set_config!(config, retry_limit, 5);
         set_config!(config, no_preflight, true);
         set_config!(config, tags.smart, false);
+        set_config!(config, ops.edit, false);
         set_config!(config, default_model, ConfigModel::Claude);
         set_config!(config, default_dialect, ConfigDialect::Tags);
 
@@ -677,6 +679,7 @@ mod tests {
         assert_eq!(config.default_model, deserialized_config.default_model);
         assert_eq!(config.default_dialect, deserialized_config.default_dialect);
         assert_eq!(config.tags.smart, deserialized_config.tags.smart);
+        assert_eq!(config.ops.edit, deserialized_config.ops.edit);
 
         // Test default value serialization
         let default_config = Config::default();
@@ -692,6 +695,7 @@ mod tests {
         assert!(!table.contains_key("default_model"));
         assert!(!table.contains_key("default_dialect"));
         assert!(!table.contains_key("tags"));
+        assert!(!table.contains_key("ops"));
     }
 
     #[test]
