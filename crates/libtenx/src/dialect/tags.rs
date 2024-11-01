@@ -8,7 +8,8 @@ use crate::{
     config::Config,
     context::ContextProvider,
     patch::{Change, Patch, Replace, Smart, UDiff, WriteFile},
-    ModelResponse, Result, Session, TenxError,
+    prompt::Prompt,
+    ModelResponse, Operation, Result, Session, Step, TenxError,
 };
 use fs_err as fs;
 
@@ -134,6 +135,7 @@ impl DialectProvider for Tags {
     /// ignored.
     fn parse(&self, response: &str) -> Result<ModelResponse> {
         let mut patch = Patch::default();
+        let mut operations = vec![];
         let mut lines = response.lines().map(String::from).peekable();
         let mut comment = None;
 
@@ -208,6 +210,17 @@ impl DialectProvider for Tags {
                         let (_, content) = xmlish::parse_block("comment", &mut lines)?;
                         comment = Some(content.join("\n"));
                     }
+                    "edit" => {
+                        let (_, content) = xmlish::parse_block("edit", &mut lines)?;
+                        if content.len() > 1 {
+                            return Err(TenxError::ResponseParse {
+                                user: "Failed to parse model response".into(),
+                                model: "<edit> tag content must be a single line".into(),
+                            });
+                        }
+                        let path = content.first().unwrap_or(&String::new()).trim().to_string();
+                        operations.push(Operation::Edit(PathBuf::from(path)));
+                    }
                     _ => {
                         lines.next();
                     }
@@ -218,7 +231,7 @@ impl DialectProvider for Tags {
         }
         Ok(ModelResponse {
             patch: Some(patch),
-            operations: vec![],
+            operations,
             usage: None,
             comment,
         })
@@ -238,6 +251,10 @@ impl DialectProvider for Tags {
             let mut rendered = String::new();
             if let Some(comment) = &resp.comment {
                 rendered.push_str(&format!("<comment>\n{}\n</comment>\n\n", comment));
+            }
+            for op in &resp.operations {
+                let Operation::Edit(path) = op;
+                rendered.push_str(&format!("<edit>\n{}\n</edit>\n\n", path.display()));
             }
             if let Some(patch) = &resp.patch {
                 for change in &patch.changes {
@@ -329,6 +346,93 @@ mod tests {
 
         let result = d.parse(input).unwrap();
         assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_parse_edit() {
+        let d = Tags::default();
+
+        let input = indoc! {r#"
+            <comment>
+            Testing edit tag
+            </comment>
+            <edit>
+            src/main.rs
+            </edit>
+            <edit>
+                with/leading/spaces.rs
+            </edit>
+        "#};
+
+        let result = d.parse(input).unwrap();
+        assert_eq!(
+            result.operations,
+            vec![
+                Operation::Edit(PathBuf::from("src/main.rs")),
+                Operation::Edit(PathBuf::from("with/leading/spaces.rs")),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_render_edit() {
+        let d = Tags::default();
+        let mut session = Session::default();
+
+        let response = ModelResponse {
+            comment: Some("A comment".into()),
+            patch: None,
+            operations: vec![
+                Operation::Edit(PathBuf::from("src/main.rs")),
+                Operation::Edit(PathBuf::from("src/lib.rs")),
+            ],
+            usage: None,
+        };
+
+        session
+            .steps_mut()
+            .push(Step::new(Prompt::User("test".into())));
+        if let Some(step) = session.steps_mut().last_mut() {
+            step.model_response = Some(response);
+        }
+
+        let result = d
+            .render_step_response(&Config::default(), &session, 0)
+            .unwrap();
+        assert_eq!(
+            result,
+            indoc! {r#"
+                <comment>
+                A comment
+                </comment>
+
+                <edit>
+                src/main.rs
+                </edit>
+
+                <edit>
+                src/lib.rs
+                </edit>
+
+            "#}
+        );
+    }
+
+    #[test]
+    fn test_parse_edit_multiline_error() {
+        let d = Tags::default();
+
+        let input = indoc! {r#"
+            <edit>
+            first line
+            second line
+            </edit>
+        "#};
+
+        assert!(matches!(
+            d.parse(input),
+            Err(TenxError::ResponseParse { .. })
+        ));
     }
 
     #[test]
