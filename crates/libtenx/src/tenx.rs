@@ -209,7 +209,13 @@ impl Tenx {
             // error works as expected.
             if let Some(e) = session.last_step_error() {
                 if let Some(model_message) = e.should_retry() {
-                    send_event(&sender, Event::Retry(format!("{}", e)))?;
+                    send_event(
+                        &sender,
+                        Event::Retry {
+                            user: format!("{}", e),
+                            model: model_message.to_string(),
+                        },
+                    )?;
                     retry_count += 1;
                     if retry_count >= self.config.retry_limit {
                         warn!("Retry limit reached. Last error: {}", e);

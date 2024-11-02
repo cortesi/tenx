@@ -69,7 +69,12 @@ pub enum Event {
     /// A log message with a specified log level
     Log(LogLevel, String),
     /// A retryable error has occurred
-    Retry(String),
+    Retry {
+        /// An error to display to the user
+        user: String,
+        /// An error to the model, often the full tool output
+        model: String,
+    },
     /// A fatal error has occurred
     Fatal(String),
 }

@@ -75,6 +75,10 @@ struct Cli {
     #[clap(short, long)]
     quiet: bool,
 
+    /// Show raw log output instead of progress indicators
+    #[clap(long)]
+    logs: bool,
+
     /// Anthropic API key [env: ANTHROPIC_API_KEY]
     #[clap(long)]
     anthropic_key: Option<String>,
@@ -375,8 +379,12 @@ fn load_config(cli: &Cli) -> Result<config::Config> {
     Ok(config)
 }
 
-/// Prints events from the event channel
-async fn print_events(mut receiver: mpsc::Receiver<Event>, mut kill_signal: mpsc::Receiver<()>) {
+/// Output events in a text log format
+async fn output_logs(
+    mut receiver: mpsc::Receiver<Event>,
+    mut kill_signal: mpsc::Receiver<()>,
+    _verbosity: u8,
+) {
     loop {
         tokio::select! {
             Some(event) = receiver.recv() => {
@@ -408,8 +416,12 @@ async fn print_events(mut receiver: mpsc::Receiver<Event>, mut kill_signal: mpsc
     }
 }
 
-/// Handles events with improved progress output
-async fn progress_events(mut receiver: mpsc::Receiver<Event>, mut kill_signal: mpsc::Receiver<()>) {
+/// Fancy event output, with progress bars
+async fn output_progress(
+    mut receiver: mpsc::Receiver<Event>,
+    mut kill_signal: mpsc::Receiver<()>,
+    verbosity: u8,
+) {
     let validator_spinner_style = ProgressStyle::with_template("    {spinner:.green.bold} {msg}")
         .unwrap()
         .tick_strings(&["▹▹▹▹▹", "▸▹▹▹▹", "▹▸▹▹▹", "▹▹▸▹▹", "▹▹▹▸▹", "▹▹▹▹▸"]);
@@ -454,9 +466,12 @@ async fn progress_events(mut receiver: mpsc::Receiver<Event>, mut kill_signal: m
                 }
 
                 match event {
-                    Event::Retry(ref message) => {
+                    Event::Retry{ref user, ref model} => {
                         manage_spinner(&mut current_spinner, |s| s.finish());
-                        println!("{}", format!("Retrying: {}", message).yellow());
+                        println!("{}", format!("Retrying: {}", user).yellow());
+                        if verbosity > 0 {
+                            println!("{}", format!("Model message: {}", model).yellow());
+                        }
                     }
                     Event::Fatal(ref message) => {
                         manage_spinner(&mut current_spinner, |s| s.finish());
@@ -503,10 +518,10 @@ async fn main() -> anyhow::Result<()> {
     let (event_kill_tx, event_kill_rx) = mpsc::channel(1);
     let subscriber = create_subscriber(verbosity, sender.clone());
     subscriber.init();
-    let event_task = if verbosity > 0 {
-        tokio::spawn(print_events(receiver, event_kill_rx))
+    let event_task = if cli.logs {
+        tokio::spawn(output_logs(receiver, event_kill_rx, verbosity))
     } else {
-        tokio::spawn(progress_events(receiver, event_kill_rx))
+        tokio::spawn(output_progress(receiver, event_kill_rx, verbosity))
     };
 
     let result = match &cli.command {
