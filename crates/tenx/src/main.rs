@@ -641,7 +641,6 @@ async fn main() -> anyhow::Result<()> {
                         fs::read_to_string(file_path).context("Failed to read prompt file")?;
                     Prompt::User(prompt_content)
                 } else {
-                    session.add_prompt(Prompt::User(String::new()))?;
                     match edit::edit_prompt(&session)? {
                         Some(p) => p,
                         None => return Ok(()),
