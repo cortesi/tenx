@@ -274,12 +274,17 @@ impl Session {
             .ok_or_else(|| TenxError::Internal("No response in the last step".into()))?;
 
         step.apply(config)?;
+        let mut had_edit = false;
         for operation in &resp.operations {
             match operation {
                 Operation::Edit(path) => {
                     self.add_editable_path(config, path)?;
+                    had_edit = true;
                 }
             }
+        }
+        if had_edit {
+            self.add_prompt(Prompt::Auto("OK".into()))?;
         }
         Ok(())
     }

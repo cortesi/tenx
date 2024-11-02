@@ -229,7 +229,9 @@ impl Tenx {
                 Ok(()) => {
                     session_store.save(&self.config, session)?;
                     send_event(&sender, Event::Finish)?;
-                    return Ok(());
+                    if !session.should_continue() {
+                        return Ok(());
+                    }
                 }
                 Err(e) => {
                     if let Some(step) = session.last_step_mut() {
@@ -251,8 +253,12 @@ impl Tenx {
         prompt_result?;
         send_event(&sender, Event::ApplyPatch)?;
         session.apply_last_step(&self.config)?;
-        self.run_formatters(session, &sender)?;
-        self.run_post_patch_validators(session, &sender)?;
+        if !session.should_continue() {
+            // We're done, now we check if formatter or validators return an error we need to
+            // process
+            self.run_formatters(session, &sender)?;
+            self.run_post_patch_validators(session, &sender)?;
+        }
         Ok(())
     }
 
