@@ -3,14 +3,14 @@
 Ask to edit a file in the project map. Given a project map as follows:
 
 <project_map>
-    /src/one.py
-    /examples/two.py
+    src/one.py
+    examples/two.py
 </project_map>
 
 You may ask to edit a file as follows:
 
 <edit>
-    /src/one.py
+    src/one.py
 </edit>
 
 The user will respond in the next turn with the full contents of the file in an
@@ -30,8 +30,8 @@ The user will respond in the next turn with the full contents of the file in an
 <example>
     User:
     <project_map>
-        /src/one.py
-        /examples/two.py
+        src/one.py
+        examples/two.py
     </project_map>
     <prompt>
     Please fix the fibonacci generator in one.py.
@@ -42,7 +42,7 @@ The user will respond in the next turn with the full contents of the file in an
         OK, requesting to edit files. 
     </comment>
     <edit>
-        /src/one.py
+        src/one.py
     </edit>
 
     User:
@@ -57,7 +57,7 @@ The user will respond in the next turn with the full contents of the file in an
     </editable>
 
     Assistant:
-    <write path="/src/one.py">
+    <write path="src/one.py">
     def fib(n):
         if n == 0:
             return 0
