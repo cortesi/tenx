@@ -1,6 +1,9 @@
 use heck::ToSnakeCase;
 use serde::{Deserialize, Serialize};
 use serde_variant::to_variant_name;
+use tokio::sync::mpsc;
+
+use crate::{Result, TenxError};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum LogLevel {
@@ -9,6 +12,16 @@ pub enum LogLevel {
     Info,
     Debug,
     Trace,
+}
+
+/// Helper function to send an event and handle potential errors.
+pub fn send_event(sender: &Option<mpsc::Sender<Event>>, event: Event) -> Result<()> {
+    if let Some(sender) = sender {
+        sender
+            .try_send(event)
+            .map_err(|e| TenxError::EventSend(e.to_string()))?;
+    }
+    Ok(())
 }
 
 // The events are listed below roughly in the order they are expected to occur

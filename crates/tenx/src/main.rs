@@ -788,7 +788,7 @@ async fn main() -> anyhow::Result<()> {
                 tx.add_contexts(&mut session, ctx, ruskel, &Some(sender.clone()))?;
 
                 tx.fix(&mut session, Some(sender.clone())).await?;
-                if session.pending_prompt() {
+                if session.should_continue() {
                     tx.prompt(&mut session, Some(sender.clone())).await?;
                 } else {
                     println!("No issues to fix");

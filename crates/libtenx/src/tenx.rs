@@ -4,21 +4,11 @@ use tracing::{debug, warn};
 use crate::{
     config::Config,
     context::{Context, ContextProvider},
-    events::Event,
+    events::*,
     prompt::Prompt,
     session_store::normalize_path,
-    Result, Session, SessionStore, TenxError,
+    Result, Session, SessionStore,
 };
-
-/// Helper function to send an event and handle potential errors.
-fn send_event(sender: &Option<mpsc::Sender<Event>>, event: Event) -> Result<()> {
-    if let Some(sender) = sender {
-        sender
-            .try_send(event)
-            .map_err(|e| TenxError::EventSend(e.to_string()))?;
-    }
-    Ok(())
-}
 
 /// Tenx is an AI-driven coding assistant.
 pub struct Tenx {
@@ -205,8 +195,6 @@ impl Tenx {
 
         let mut retry_count = 0;
         loop {
-            // Pull out the next step generation, so that both fix and resuming a session with an
-            // error works as expected.
             if let Some(e) = session.last_step_error() {
                 if let Some(model_message) = e.should_retry() {
                     send_event(

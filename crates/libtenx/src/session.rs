@@ -8,8 +8,8 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
 use crate::{
-    config, context, events::Event, model::ModelProvider, model::Usage, patch::Patch,
-    prompt::Prompt, Result, TenxError,
+    config, context, events::*, model::ModelProvider, model::Usage, patch::Patch, prompt::Prompt,
+    Result, TenxError,
 };
 
 /// A parsed model response
@@ -148,9 +148,9 @@ impl Session {
     }
 
     /// Does this session have a pending prompt?
-    pub fn pending_prompt(&self) -> bool {
+    pub fn should_continue(&self) -> bool {
         if let Some(step) = self.steps.last() {
-            step.model_response.is_none()
+            step.model_response.is_none() && step.err.is_none()
         } else {
             false
         }

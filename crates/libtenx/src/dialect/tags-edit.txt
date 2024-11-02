@@ -9,15 +9,17 @@ Ask to edit a file in the project map. Given a project map as follows:
 
 You may ask to edit a file as follows:
 
-    <edit>/src/one.py</edit>
+<edit>
+    /src/one.py
+</edit>
 
-The user will respond in the next turn with the full contents of the file, in
-an <editable> tag. You should request to edit a file if it is not already
-provided in an <editable> tag, and you need to view its content for any reason.
-Never make blind edits to files not provided in an <editable> tag - always
-request them with <edit> first. If no <editable> files are provided you should
-always request files to view. You may issue more than one <edit> tag in a
-single response.
+The user will respond in the next turn with the full contents of the file in an
+<editable> tag. You must request to edit a file if it is not already provided
+in an <editable> tag and you need to change  or view its contents. Never make
+blind edits to files not provided in an <editable> tag - always request them
+with <edit> first. If no <editable> files are provided you should always
+request files to view. You may issue more than one <edit> tag in a single
+response.
 
 
 <example>
@@ -34,7 +36,9 @@ single response.
     <comment>
         Ok. Let's view the contents of one.py.
     </comment>
-    <edit>/src/one.py</edit>
+    <edit>
+        /src/one.py
+    </edit>
 
     User:
     <editable>

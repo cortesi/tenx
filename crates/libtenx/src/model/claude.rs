@@ -11,7 +11,7 @@ use tokio::sync::mpsc;
 use crate::{
     config::Config,
     dialect::{Dialect, DialectProvider},
-    events::Event,
+    events::*,
     model::ModelProvider,
     session::ModelResponse,
     Result, Session, TenxError,
@@ -93,11 +93,7 @@ impl Claude {
                     delta: ContentBlockDelta::TextDelta { text },
                     ..
                 } => {
-                    if let Some(sender) = &sender {
-                        if let Err(e) = sender.send(Event::Snippet(text)).await {
-                            warn!("Error sending message to channel: {:?}", e);
-                        }
-                    }
+                    send_event(&sender, Event::Snippet(text))?;
                 }
                 StreamEvent::Error { error } => {
                     warn!("Error in stream: {:?}", error);
@@ -289,8 +285,8 @@ impl ModelProvider for Claude {
             ));
         }
 
-        if !session.pending_prompt() {
-            return Err(TenxError::Internal("No pending prompt to process.".into()));
+        if !session.should_continue() {
+            return Err(TenxError::Internal("No prompt to process.".into()));
         }
         let dialect = config.dialect()?;
         let mut req = self.request(config, session, &dialect)?;
