@@ -414,7 +414,7 @@ mod tests {
         // Test with relative path from subdirectory
         let mut config_in_src = test_project.config.clone();
         config_in_src = config_in_src.with_test_cwd(test_project.tempdir.path().join("src"));
-        let context_spec = Context::new_path(&config_in_src, "lib.rs".to_string()).unwrap();
+        let context_spec = Context::new_path(&config_in_src, "./lib.rs".to_string()).unwrap();
         assert!(matches!(context_spec, Context::Path(_)));
 
         if let Context::Path(path) = context_spec {
@@ -462,7 +462,7 @@ mod tests {
         config_with_outside_cwd =
             config_with_outside_cwd.with_test_cwd(outside_dir.path().to_path_buf());
         let relative_context_spec =
-            Context::new_path(&config_with_outside_cwd, "outside.txt".to_string()).unwrap();
+            Context::new_path(&config_with_outside_cwd, "./outside.txt".to_string()).unwrap();
         assert!(matches!(relative_context_spec, Context::Path(_)));
 
         if let Context::Path(path) = relative_context_spec {

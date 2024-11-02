@@ -644,7 +644,7 @@ async fn main() -> anyhow::Result<()> {
                 ruskel,
                 ctx,
             } => {
-                let mut session = tx.load_session_cwd()?;
+                let mut session = tx.load_session()?;
 
                 session.add_prompt(Prompt::default())?;
                 let user_prompt = if let Some(p) = prompt {
@@ -671,7 +671,7 @@ async fn main() -> anyhow::Result<()> {
             }
             Commands::Session { raw, render, full } => {
                 let model = config.model()?;
-                let session = tx.load_session_cwd()?;
+                let session = tx.load_session()?;
                 if *raw {
                     println!("{:#?}", session);
                 } else if *render {
@@ -686,7 +686,7 @@ async fn main() -> anyhow::Result<()> {
                 context,
                 ruskel,
             } => {
-                let mut session = tx.load_session_cwd()?;
+                let mut session = tx.load_session()?;
                 let mut total = 0;
 
                 if *context {
@@ -717,7 +717,7 @@ async fn main() -> anyhow::Result<()> {
                 Ok(())
             }
             Commands::Reset { step_offset } => {
-                let mut session = tx.load_session_cwd()?;
+                let mut session = tx.load_session()?;
                 tx.reset(&mut session, *step_offset)?;
                 println!("Session reset to step {}", step_offset);
                 Ok(())
@@ -728,7 +728,7 @@ async fn main() -> anyhow::Result<()> {
                 ctx,
                 ruskel,
             } => {
-                let mut session = tx.load_session_cwd()?;
+                let mut session = tx.load_session()?;
 
                 let offset = step_offset.unwrap_or(session.steps().len() - 1);
                 tx.reset(&mut session, offset)?;
@@ -759,7 +759,7 @@ async fn main() -> anyhow::Result<()> {
                 clear,
             } => {
                 let mut session = if *clear {
-                    let mut current_session = tx.load_session_cwd()?;
+                    let mut current_session = tx.load_session()?;
                     current_session.clear();
                     current_session
                 } else {
@@ -782,25 +782,25 @@ async fn main() -> anyhow::Result<()> {
                 Ok(())
             }
             Commands::Clear => {
-                let mut session = tx.load_session_cwd()?;
+                let mut session = tx.load_session()?;
                 session.clear();
                 tx.save_session(&session)?;
                 println!("Session cleared");
                 Ok(())
             }
             Commands::Format => {
-                let mut session = tx.load_session_cwd()?;
+                let mut session = tx.load_session()?;
                 tx.run_formatters(&mut session, &Some(sender.clone()))?;
                 tx.save_session(&session)?;
                 Ok(())
             }
             Commands::Preflight => {
-                let mut session = tx.load_session_cwd()?;
+                let mut session = tx.load_session()?;
                 tx.run_preflight_validators(&mut session, &Some(sender.clone()))?;
                 Ok(())
             }
             Commands::Refresh => {
-                let mut session = tx.load_session_cwd()?;
+                let mut session = tx.load_session()?;
                 tx.refresh_context(&mut session, &Some(sender.clone()))?;
                 tx.save_session(&session)?;
                 Ok(())
@@ -834,7 +834,7 @@ async fn main() -> anyhow::Result<()> {
                             conf.anthropic_key = key;
                         }
                         trial.tenx_conf = conf;
-                        trial.execute()?;
+                        trial.execute(Some(sender.clone())).await?;
                         Ok(())
                     }
                 }

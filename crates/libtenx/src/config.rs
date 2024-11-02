@@ -6,6 +6,7 @@ use std::{
 };
 
 use globset::{Glob, GlobSetBuilder};
+use normalize_path::NormalizePath;
 use pathdiff::diff_paths;
 use serde::ser::SerializeStruct;
 
@@ -28,6 +29,11 @@ const DEFAULT_RETRY_LIMIT: usize = 16;
 
 fn default_retry_limit() -> usize {
     DEFAULT_RETRY_LIMIT
+}
+
+fn is_relative<P: AsRef<Path>>(path: P) -> bool {
+    let path_str = path.as_ref().to_str().unwrap_or("");
+    path_str.starts_with("./") || path_str.starts_with("../")
 }
 
 /// Returns the path to the configuration directory.
@@ -410,28 +416,42 @@ impl Config {
             .map_err(|e| TenxError::Internal(format!("could not absolute {}: {}", p.display(), e)))
     }
 
-    /// Normalizes a path relative to the root directory.
-    /// If the path contains glob patterns ("*" or "**"), it will be returned as-is.
+    /// Normalizes a path specification.
+    ///
+    /// - If the path is a glob, it will be returned as-is.
+    /// - If the path is relative (i.e. starts with ./ or ../), it will be resolved relative to the
+    ///   current directory.
+    /// - If the path is absolute, it will be returned as-is.
+    /// - Otherwise, it will be resolved relative to the project root.
     pub fn normalize_path<P: AsRef<Path>>(&self, path: P) -> Result<PathBuf> {
         self.normalize_path_with_cwd(path, self.cwd()?)
     }
 
-    /// Normalizes a path relative to the root directory with a given current working directory.
-    /// If the path contains glob patterns ("*" or "**"), it will be returned as-is.
-    pub fn normalize_path_with_cwd<P: AsRef<Path>>(
+    /// Normalizes a path specification.
+    ///
+    /// - If the path is a glob, it will be returned as-is.
+    /// - If the path is relative (i.e. starts with ./ or ../), it will be resolved relative to the
+    ///   current directory.
+    /// - If the path is absolute, it will be returned as-is.
+    /// - Otherwise, it will be resolved relative to the project root.
+    pub fn normalize_path_with_cwd<P: AsRef<Path>, Q: AsRef<Path>>(
         &self,
         path: P,
-        current_dir: PathBuf,
+        current_dir: Q,
     ) -> Result<PathBuf> {
         let path = path.as_ref();
         if path.to_str().map_or(false, |s| s.contains('*')) {
             return Ok(path.to_path_buf());
         }
-        let absolute_path = if path.is_relative() {
-            current_dir.join(path)
-        } else {
+
+        let absolute_path = if is_relative(path) {
+            current_dir.as_ref().join(path)
+        } else if path.is_absolute() {
             path.to_path_buf()
+        } else {
+            self.project_root().join(path)
         };
+
         let abspath = absolute(absolute_path.clone()).map_err(|e| {
             TenxError::Internal(format!(
                 "Could not absolute {}: {}",
@@ -444,7 +464,8 @@ impl Config {
         Ok(abspath
             .strip_prefix(&project_root)
             .unwrap_or(&abspath)
-            .to_path_buf())
+            .to_path_buf()
+            .normalize())
     }
 
     /// Traverse the included files and return a list of files that match the given glob pattern.
@@ -944,42 +965,51 @@ mod tests {
             "abs_file.txt",
         ]);
 
-        let root = project.tempdir.path().to_path_buf();
+        let root = project.tempdir.path();
         let sub_dir = root.join("subdir");
         let outside_dir = root.parent().unwrap().join("outside");
+        let cnf = project.config.clone();
 
         // Test 1: Current dir is the root directory
-        let result = project
-            .config
-            .normalize_path_with_cwd("file.txt", root.clone())?;
-        assert_eq!(result, PathBuf::from("file.txt"));
+        assert_eq!(
+            cnf.normalize_path_with_cwd("file.txt", root)?,
+            PathBuf::from("file.txt")
+        );
+        assert_eq!(
+            cnf.normalize_path_with_cwd("./file.txt", root)?,
+            PathBuf::from("file.txt")
+        );
 
         // Test 2: Current dir is under the root directory
-        let result = project
-            .config
-            .normalize_path_with_cwd("subfile.txt", sub_dir.clone())?;
-        assert_eq!(result, PathBuf::from("subdir/subfile.txt"));
+        assert_eq!(
+            cnf.normalize_path_with_cwd("./subfile.txt", &sub_dir)?,
+            PathBuf::from("subdir/subfile.txt")
+        );
+        assert_eq!(
+            cnf.normalize_path_with_cwd("../file.txt", &sub_dir)?,
+            PathBuf::from("file.txt")
+        );
+        assert_eq!(
+            cnf.normalize_path_with_cwd("file.txt", &sub_dir)?,
+            PathBuf::from("file.txt")
+        );
 
         // Test 3: Current dir is outside the root directory
-        let result = project
-            .config
-            .normalize_path_with_cwd("outsidefile.txt", outside_dir.clone())?;
-        let expected = outside_dir
-            .join("outsidefile.txt")
-            .strip_prefix(&root)
-            .unwrap_or(&outside_dir.join("outsidefile.txt"))
-            .to_path_buf();
         assert_eq!(
-            result.canonicalize().unwrap(),
-            expected.canonicalize().unwrap()
+            cnf.normalize_path_with_cwd("file.txt", &outside_dir)?,
+            PathBuf::from("file.txt")
+        );
+        assert_eq!(
+            cnf.normalize_path_with_cwd("./outside_file.txt", &outside_dir)?,
+            outside_dir.join("outside_file.txt")
         );
 
         // Test 4: Absolute path
         let abs_path = root.join("abs_file.txt");
-        let result = project
-            .config
-            .normalize_path_with_cwd(&abs_path, root.clone())?;
-        assert_eq!(result, PathBuf::from("abs_file.txt"));
+        assert_eq!(
+            cnf.normalize_path_with_cwd(&abs_path, root)?,
+            PathBuf::from("abs_file.txt")
+        );
 
         Ok(())
     }

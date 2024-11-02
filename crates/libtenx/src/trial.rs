@@ -3,22 +3,27 @@
 //! A trial consists of a TrialConf at NAME.toml which specifies the operations to perform,
 //! and an optional Tenx Config at NAME.conf.toml which overrides the default configuration.
 
+use crate::Event;
 use std::{
     fs,
     path::{Path, PathBuf},
 };
+use tokio::sync::mpsc;
 
 use fs_extra;
 use serde::Deserialize;
 use tempfile::TempDir;
 use tracing::info;
 
-use crate::{config::Config, Result, TenxError};
+use crate::{
+    config::{Config, ProjectRoot},
+    Result, Tenx, TenxError,
+};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Edit {
     pub prompt: String,
-    pub edit: Vec<PathBuf>,
+    pub editable: Vec<PathBuf>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -82,6 +87,11 @@ impl Trial {
 
         let dst_path = temp_dir.path().to_path_buf();
 
+        let session_path = dst_path.join("session");
+        fs::create_dir_all(&session_path).map_err(|e| {
+            TenxError::Internal(format!("Failed to create session directory: {}", e))
+        })?;
+
         fs_extra::dir::copy(&src_path, &dst_path, &fs_extra::dir::CopyOptions::new())
             .map_err(|e| TenxError::Internal(format!("Failed to copy project directory: {}", e)))?;
 
@@ -89,9 +99,26 @@ impl Trial {
     }
 
     /// Executes the trial in a temporary directory
-    pub fn execute(&self) -> Result<()> {
-        let _temp_dir = self.setup_temp_project()?;
+    pub async fn execute(&self, sender: Option<mpsc::Sender<Event>>) -> Result<()> {
+        let temp_dir = self.setup_temp_project()?;
+        let mut conf = self.tenx_conf.clone();
+        conf.session_store_dir = temp_dir.path().join("session");
+        conf.project_root = ProjectRoot::Path(temp_dir.path().join(&self.trial_conf.project));
+        let tenx = Tenx::new(conf);
+
+        let mut session = tenx.session_from_cwd(&sender)?;
+
+        match &self.trial_conf.op {
+            TrialOp::Edit(edit) => {
+                session.add_prompt(crate::prompt::Prompt::User(edit.prompt.clone()))?;
+                for path in &edit.editable {
+                    session.add_editable(&tenx.config, &path.to_string_lossy())?;
+                }
+            }
+        }
+
         info!("trial setup complete");
+        tenx.prompt(&mut session, sender).await?;
         Ok(())
     }
 
@@ -139,7 +166,7 @@ mod tests {
             project = "test_project"
             [op.edit]
             prompt = "test prompt"
-            edit = ["file1.rs", "file2.rs"]
+            editable = ["file1.rs", "file2.rs"]
         "#;
 
         let conf = TrialConf::from_str(toml)?;
@@ -149,7 +176,7 @@ mod tests {
             TrialOp::Edit(edit) => {
                 assert_eq!(edit.prompt, "test prompt");
                 assert_eq!(
-                    edit.edit,
+                    edit.editable,
                     vec![PathBuf::from("file1.rs"), PathBuf::from("file2.rs")]
                 );
             }

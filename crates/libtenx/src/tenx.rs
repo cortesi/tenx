@@ -139,17 +139,12 @@ impl Tenx {
         Ok(())
     }
 
-    /// Loads a session from the store based on the given path.
+    /// Loads a session from the store.
     pub fn load_session(&self) -> Result<Session> {
         let root = self.config.project_root();
         let session_store = SessionStore::open(self.config.session_store_dir())?;
         let name = normalize_path(&root);
         session_store.load(name)
-    }
-
-    /// Loads a session from the store based on the current working directory.
-    pub fn load_session_cwd(&self) -> Result<Session> {
-        self.load_session()
     }
 
     /// Retries the last prompt by rolling it back and sending it off for prompting..
