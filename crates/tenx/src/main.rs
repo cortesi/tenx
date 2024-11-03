@@ -13,11 +13,27 @@ use tracing_subscriber::{fmt, EnvFilter};
 
 use libtenx::{
     self, config, dialect::DialectProvider, model::ModelProvider, prompt::Prompt, Event, LogLevel,
-    Tenx,
+    Session, Tenx,
 };
 
 mod edit;
 mod pretty;
+
+/// Gets the user's prompt from arguments or editor
+fn get_prompt(
+    prompt: &Option<String>,
+    prompt_file: &Option<PathBuf>,
+    session: &Session,
+) -> Result<Option<Prompt>> {
+    if let Some(p) = prompt {
+        Ok(Some(Prompt::User(p.clone())))
+    } else if let Some(file_path) = prompt_file {
+        let prompt_content = fs::read_to_string(file_path).context("Failed to read prompt file")?;
+        Ok(Some(Prompt::User(prompt_content)))
+    } else {
+        Ok(edit::edit_prompt(session)?)
+    }
+}
 
 /// Creates a subscriber that sends events to an mpsc channel.
 fn create_subscriber(verbosity: u8, sender: mpsc::Sender<Event>) -> impl Subscriber {
@@ -634,17 +650,9 @@ async fn main() -> anyhow::Result<()> {
                     session.add_editable(&config, file)?;
                 }
 
-                let user_prompt = if let Some(p) = prompt {
-                    Prompt::User(p.clone())
-                } else if let Some(file_path) = prompt_file {
-                    let prompt_content =
-                        fs::read_to_string(file_path).context("Failed to read prompt file")?;
-                    Prompt::User(prompt_content)
-                } else {
-                    match edit::edit_prompt(&session)? {
-                        Some(p) => p,
-                        None => return Ok(()),
-                    }
+                let user_prompt = match get_prompt(prompt, prompt_file, &session)? {
+                    Some(p) => p,
+                    None => return Ok(()),
                 };
                 session.add_prompt(user_prompt)?;
 
@@ -661,17 +669,9 @@ async fn main() -> anyhow::Result<()> {
                 let mut session = tx.load_session()?;
 
                 session.add_prompt(Prompt::default())?;
-                let user_prompt = if let Some(p) = prompt {
-                    Prompt::User(p.clone())
-                } else if let Some(file_path) = prompt_file {
-                    let prompt_content =
-                        fs::read_to_string(file_path).context("Failed to read prompt file")?;
-                    Prompt::User(prompt_content)
-                } else {
-                    match edit::edit_prompt(&session)? {
-                        Some(p) => p,
-                        None => return Ok(()),
-                    }
+                let user_prompt = match get_prompt(prompt, prompt_file, &session)? {
+                    Some(p) => p,
+                    None => return Ok(()),
                 };
                 session.add_prompt(user_prompt)?;
 
