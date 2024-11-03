@@ -646,7 +646,7 @@ async fn main() -> anyhow::Result<()> {
                         None => return Ok(()),
                     }
                 };
-                session.set_last_prompt(user_prompt)?;
+                session.add_prompt(user_prompt)?;
 
                 tx.prompt(&mut session, Some(sender.clone())).await?;
                 Ok(())
@@ -673,7 +673,8 @@ async fn main() -> anyhow::Result<()> {
                         None => return Ok(()),
                     }
                 };
-                session.set_last_prompt(user_prompt)?;
+                session.add_prompt(user_prompt)?;
+
                 for f in files.clone().unwrap_or_default() {
                     session.add_editable(&config, &f)?;
                 }

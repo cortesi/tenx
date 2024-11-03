@@ -154,7 +154,7 @@ impl Tenx {
         result
     }
 
-    /// Sends a session off to the model for prompting.
+    /// Sends a prompt off to the model.
     pub async fn prompt(
         &self,
         session: &mut Session,

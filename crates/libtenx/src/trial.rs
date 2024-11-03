@@ -36,6 +36,7 @@ pub enum TrialOp {
 pub struct TrialConf {
     pub project: String,
     pub op: TrialOp,
+    pub config: Option<Config>,
 }
 
 impl TrialConf {
@@ -137,14 +138,21 @@ impl Trial {
         let trial_conf = TrialConf::read(&path)?;
         trial_conf.validate(&base_dir)?;
 
-        path.set_file_name(format!("{}.conf.toml", name));
-        let tenx_conf = if path.exists() {
-            let contents = fs::read_to_string(&path)
-                .map_err(|e| TenxError::Internal(format!("Failed to read config file: {}", e)))?;
-            toml::from_str(&contents)
-                .map_err(|e| TenxError::Internal(format!("Failed to parse config TOML: {}", e)))?
-        } else {
-            Self::default_config()?
+        let tenx_conf = match &trial_conf.config {
+            Some(config) => config.clone(),
+            None => {
+                path.set_file_name(format!("{}.conf.toml", name));
+                if path.exists() {
+                    let contents = fs::read_to_string(&path).map_err(|e| {
+                        TenxError::Internal(format!("Failed to read config file: {}", e))
+                    })?;
+                    toml::from_str(&contents).map_err(|e| {
+                        TenxError::Internal(format!("Failed to parse config TOML: {}", e))
+                    })?
+                } else {
+                    Self::default_config()?
+                }
+            }
         };
 
         Ok(Trial {
@@ -167,6 +175,9 @@ mod tests {
             [op.edit]
             prompt = "test prompt"
             editable = ["file1.rs", "file2.rs"]
+            [config]
+            anthropic_key = "test_key"
+            no_preflight = true
         "#;
 
         let conf = TrialConf::from_str(toml)?;
