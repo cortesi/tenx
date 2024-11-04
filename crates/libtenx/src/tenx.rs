@@ -7,7 +7,7 @@ use crate::{
     events::*,
     prompt::Prompt,
     session_store::normalize_path,
-    Result, Session, SessionStore,
+    Result, Session, SessionStore, TenxError,
 };
 
 /// Tenx is an AI-driven coding assistant.
@@ -108,18 +108,21 @@ impl Tenx {
         session: &mut Session,
         sender: Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
+        let session_store = SessionStore::open(self.config.session_store_dir())?;
         let preflight_result = self.run_preflight_validators(session, &sender);
-        if let Err(e) = preflight_result {
-            session.add_prompt(Prompt::Auto(
-                "Running the preflight checks to find errors to fix.".to_string(),
-            ))?;
+        let result = if let Err(e) = preflight_result {
+            session.add_prompt(Prompt::Auto("Please fix the following errors.".to_string()))?;
             if let Some(step) = session.last_step_mut() {
                 step.err = Some(e.clone());
             }
             self.save_session(session)?;
-        }
+            self.process_prompt(session, sender.clone(), &session_store)
+                .await
+        } else {
+            Err(TenxError::Internal("No errors found".to_string()))
+        };
         send_event(&sender, Event::Finish)?;
-        Ok(())
+        result
     }
 
     /// Saves a session to the store.

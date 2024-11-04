@@ -792,15 +792,9 @@ async fn main() -> anyhow::Result<()> {
                 for file in files {
                     session.add_editable(&config, file)?;
                 }
-
                 tx.add_contexts(&mut session, ctx, ruskel, &Some(sender.clone()))?;
 
                 tx.fix(&mut session, Some(sender.clone())).await?;
-                if session.should_continue() {
-                    tx.prompt(&mut session, Some(sender.clone())).await?;
-                } else {
-                    println!("No issues to fix");
-                }
                 tx.save_session(&session)?;
                 Ok(())
             }
