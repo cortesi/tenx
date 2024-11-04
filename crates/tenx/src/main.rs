@@ -24,14 +24,15 @@ fn get_prompt(
     prompt: &Option<String>,
     prompt_file: &Option<PathBuf>,
     session: &Session,
-) -> Result<Option<Prompt>> {
+    retry: bool,
+) -> Result<Option<String>> {
     if let Some(p) = prompt {
-        Ok(Some(Prompt::User(p.clone())))
+        Ok(Some(p.clone()))
     } else if let Some(file_path) = prompt_file {
         let prompt_content = fs::read_to_string(file_path).context("Failed to read prompt file")?;
-        Ok(Some(Prompt::User(prompt_content)))
+        Ok(Some(prompt_content))
     } else {
-        Ok(edit::edit_prompt(session)?)
+        Ok(edit::edit_prompt(session, retry)?)
     }
 }
 
@@ -315,6 +316,12 @@ enum Commands {
         /// Add ruskel documentation as context
         #[clap(long)]
         ruskel: Vec<String>,
+        /// User prompt for the edit operation
+        #[clap(long)]
+        prompt: Option<String>,
+        /// Path to a file containing the prompt
+        #[clap(long)]
+        prompt_file: Option<PathBuf>,
     },
     /// Show the current session (alias: sess)
     #[clap(alias = "sess")]
@@ -650,11 +657,11 @@ async fn main() -> anyhow::Result<()> {
                     session.add_editable(&config, file)?;
                 }
 
-                let user_prompt = match get_prompt(prompt, prompt_file, &session)? {
+                let user_prompt = match get_prompt(prompt, prompt_file, &session, false)? {
                     Some(p) => p,
                     None => return Ok(()),
                 };
-                session.add_prompt(user_prompt)?;
+                session.add_prompt(Prompt::User(user_prompt))?;
 
                 tx.prompt(&mut session, Some(sender.clone())).await?;
                 Ok(())
@@ -668,12 +675,11 @@ async fn main() -> anyhow::Result<()> {
             } => {
                 let mut session = tx.load_session()?;
 
-                session.add_prompt(Prompt::default())?;
-                let user_prompt = match get_prompt(prompt, prompt_file, &session)? {
+                let user_prompt = match get_prompt(prompt, prompt_file, &session, false)? {
                     Some(p) => p,
                     None => return Ok(()),
                 };
-                session.add_prompt(user_prompt)?;
+                session.set_last_prompt(Prompt::User(user_prompt))?;
 
                 for f in files.clone().unwrap_or_default() {
                     session.add_editable(&config, &f)?;
@@ -742,6 +748,8 @@ async fn main() -> anyhow::Result<()> {
                 edit,
                 ctx,
                 ruskel,
+                prompt,
+                prompt_file,
             } => {
                 let mut session = tx.load_session()?;
 
@@ -750,9 +758,9 @@ async fn main() -> anyhow::Result<()> {
 
                 tx.add_contexts(&mut session, ctx, ruskel, &Some(sender.clone()))?;
 
-                if *edit {
-                    match edit::edit_prompt(&session)? {
-                        Some(prompt) => session.set_last_prompt(prompt)?,
+                if *edit || prompt.is_some() || prompt_file.is_some() {
+                    match get_prompt(prompt, prompt_file, &session, true)? {
+                        Some(p) => session.set_last_prompt(Prompt::User(p))?,
                         None => return Ok(()),
                     }
                 }

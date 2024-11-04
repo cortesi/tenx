@@ -2,7 +2,6 @@ use anyhow::{Context as AnyhowContext, Result};
 use std::{fs, io::Write, process::Command};
 use tempfile::NamedTempFile;
 
-use libtenx::prompt::Prompt;
 use libtenx::Session;
 
 /// Returns the user's preferred editor.
@@ -34,30 +33,46 @@ fn render_step_commented(session: &libtenx::Session, step_offset: usize) -> Stri
     text
 }
 
-/// Renders the initial text for the user to edit.
-fn render_initial_text(session: &libtenx::Session) -> String {
+/// Renders all steps as comments.
+fn comment_all_steps(session: &Session) -> String {
     let mut text = String::new();
-    let steps = session.steps();
-
-    if let Some(last_step) = steps.last() {
-        // Render the most recent prompt as editable
-        text.push_str(last_step.prompt.text());
-        text.push_str("\n\n");
-    }
-
-    // Add previous steps as comments
-    for i in (0..steps.len().saturating_sub(1)).rev() {
+    for i in (0..session.steps().len()).rev() {
         text.push_str(&render_step_commented(session, i));
         if i == 0 {
             text.push('\n');
         }
     }
-
     text
 }
 
+/// Renders the initial text for the user to edit.
+fn render_initial_text(session: &libtenx::Session, retry: bool) -> Result<String> {
+    let mut text = String::new();
+    let steps = session.steps();
+
+    if retry {
+        if steps.is_empty() {
+            anyhow::bail!("Cannot retry without at least one step");
+        }
+        let last = steps.last().unwrap();
+        text.push_str(last.prompt.text());
+        text.push_str("\n\n");
+        // Add all but the last step as comments
+        for i in (0..steps.len() - 1).rev() {
+            text.push_str(&render_step_commented(session, i));
+            if i == 0 {
+                text.push('\n');
+            }
+        }
+    } else {
+        text.push_str(&comment_all_steps(session));
+    }
+
+    Ok(text)
+}
+
 /// Parses the edited text into a Prompt.
-fn parse_edited_text(input: &str) -> Prompt {
+fn parse_edited_text(input: &str) -> String {
     let mut user_prompt = String::new();
 
     for line in input.lines() {
@@ -67,13 +82,13 @@ fn parse_edited_text(input: &str) -> Prompt {
         }
     }
 
-    Prompt::User(user_prompt.trim().to_string())
+    user_prompt.trim().to_string()
 }
 
 /// Opens an editor for the user to input their prompt.
-pub fn edit_prompt(session: &Session) -> Result<Option<Prompt>> {
+pub fn edit_prompt(session: &Session, retry: bool) -> Result<Option<String>> {
     let mut temp_file = NamedTempFile::new()?;
-    let initial_text = render_initial_text(session);
+    let initial_text = render_initial_text(session, retry)?;
     temp_file.write_all(initial_text.as_bytes())?;
     temp_file.flush()?;
     let initial_metadata = temp_file.as_file().metadata()?;
@@ -96,8 +111,9 @@ pub fn edit_prompt(session: &Session) -> Result<Option<Prompt>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use libtenx::{patch::Patch, prompt::Prompt};
+
     use indoc::indoc;
-    use libtenx::patch::Patch;
     use pretty_assertions::assert_eq;
 
     #[test]
@@ -121,7 +137,7 @@ mod tests {
             # First response
         "};
         let prompt = parse_edited_text(input);
-        assert_eq!(prompt.text(), "New prompt here\nwith multiple lines");
+        assert_eq!(prompt, "New prompt here\nwith multiple lines");
     }
 
     #[test]
@@ -141,20 +157,13 @@ mod tests {
             });
         }
 
-        // Test editing first step (retry case)
-        let rendered_step_0 = render_initial_text(&session);
-        assert_eq!(rendered_step_0, "First prompt\nwith multiple lines\n\n");
+        // Test rendering with retry on first step
+        let rendered_text = render_initial_text(&session, true).unwrap();
+        assert_eq!(rendered_text, "First prompt\nwith multiple lines\n\n");
 
-        // Test adding new step (edit case)
-        let rendered_new_step = render_initial_text(&session);
-        assert_eq!(
-            rendered_new_step,
-            indoc! {"
-            First prompt
-            with multiple lines
-
-        "}
-        );
+        // Test rendering with retry on empty session should error
+        let empty_session = Session::default();
+        assert!(render_initial_text(&empty_session, true).is_err());
 
         // Add second step
         session
@@ -171,10 +180,45 @@ mod tests {
             });
         }
 
-        // Test editing second step
-        let rendered_step_1 = render_initial_text(&session);
+        // Test rendering with retry=false should comment all steps
+        let rendered_no_retry = render_initial_text(&session, false).unwrap();
         assert_eq!(
-            rendered_step_1,
+            rendered_no_retry,
+            indoc! {"
+            # Step 1
+            # ====
+            #
+            # Prompt:
+            # -------
+            # Second prompt
+            # still multiple lines
+            #
+            # Response:
+            # ---------
+            # Second response
+            # yet more lines
+
+            # Step 0
+            # ====
+            #
+            # Prompt:
+            # -------
+            # First prompt
+            # with multiple lines
+            #
+            # Response:
+            # ---------
+            # First response
+            # also with multiple lines
+
+
+        "}
+        );
+
+        // Test rendering with retry=true should show last step uncommented
+        let rendered_retry = render_initial_text(&session, true).unwrap();
+        assert_eq!(
+            rendered_retry,
             indoc! {"
             Second prompt
             still multiple lines
