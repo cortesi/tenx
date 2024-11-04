@@ -23,7 +23,7 @@ impl Tenx {
 
     /// Creates a new Session, discovering the root from the current working directory and
     /// adding the default context from the config.
-    pub fn session_from_cwd(&self, sender: &Option<mpsc::Sender<Event>>) -> Result<Session> {
+    pub fn new_session_from_cwd(&self, sender: &Option<mpsc::Sender<Event>>) -> Result<Session> {
         let mut session = Session::default();
 
         // Add default context
@@ -140,15 +140,19 @@ impl Tenx {
         session_store.load(name)
     }
 
-    /// Retries the last prompt by rolling it back and sending it off for prompting..
+    /// Retries the last prompt, optionally replacing it with a new one.
     pub async fn retry(
         &self,
         session: &mut Session,
+        prompt: Option<String>,
         sender: Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
         let session_store = SessionStore::open(self.config.session_store_dir())?;
         if let Some(step) = session.last_step_mut() {
             step.rollback(&self.config)?;
+            if let Some(p) = prompt {
+                step.prompt = Prompt::User(p);
+            }
         }
         let result = self
             .process_prompt(session, sender.clone(), &session_store)

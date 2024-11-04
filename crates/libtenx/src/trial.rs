@@ -107,7 +107,7 @@ impl Trial {
         conf.project_root = ProjectRoot::Path(temp_dir.path().join(&self.trial_conf.project));
         let tenx = Tenx::new(conf);
 
-        let mut session = tenx.session_from_cwd(&sender)?;
+        let mut session = tenx.new_session_from_cwd(&sender)?;
 
         info!("trial setup complete");
         match &self.trial_conf.op {

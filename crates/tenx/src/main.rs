@@ -12,8 +12,7 @@ use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{fmt, EnvFilter};
 
 use libtenx::{
-    self, config, dialect::DialectProvider, model::ModelProvider, prompt::Prompt, Event, LogLevel,
-    Session, Tenx,
+    self, config, dialect::DialectProvider, model::ModelProvider, Event, LogLevel, Session, Tenx,
 };
 
 mod edit;
@@ -651,7 +650,7 @@ async fn main() -> anyhow::Result<()> {
                 prompt,
                 prompt_file,
             } => {
-                let mut session = tx.session_from_cwd(&Some(sender.clone()))?;
+                let mut session = tx.new_session_from_cwd(&Some(sender.clone()))?;
                 tx.add_contexts(&mut session, ctx, ruskel, &Some(sender.clone()))?;
                 for file in files {
                     session.add_editable(&config, file)?;
@@ -754,18 +753,17 @@ async fn main() -> anyhow::Result<()> {
 
                 tx.add_contexts(&mut session, ctx, ruskel, &Some(sender.clone()))?;
 
-                if *edit || prompt.is_some() || prompt_file.is_some() {
-                    match get_prompt(prompt, prompt_file, &session, true)? {
-                        Some(p) => session.set_last_prompt(Prompt::User(p))?,
-                        None => return Ok(()),
-                    }
-                }
+                let prompt = if *edit || prompt.is_some() || prompt_file.is_some() {
+                    get_prompt(prompt, prompt_file, &session, true)?
+                } else {
+                    None
+                };
 
-                tx.retry(&mut session, Some(sender.clone())).await?;
+                tx.retry(&mut session, prompt, Some(sender.clone())).await?;
                 Ok(())
             }
             Commands::New { files, ruskel } => {
-                let mut session = tx.session_from_cwd(&Some(sender.clone()))?;
+                let mut session = tx.new_session_from_cwd(&Some(sender.clone()))?;
                 tx.add_contexts(&mut session, files, ruskel, &Some(sender.clone()))?;
                 tx.save_session(&session)?;
                 println!("new session: {}", config.project_root().display());
@@ -782,7 +780,7 @@ async fn main() -> anyhow::Result<()> {
                     current_session.clear();
                     current_session
                 } else {
-                    tx.session_from_cwd(&Some(sender.clone()))?
+                    tx.new_session_from_cwd(&Some(sender.clone()))?
                 };
 
                 for file in files {
