@@ -661,9 +661,8 @@ async fn main() -> anyhow::Result<()> {
                     Some(p) => p,
                     None => return Ok(()),
                 };
-                session.add_prompt(Prompt::User(user_prompt))?;
-
-                tx.prompt(&mut session, Some(sender.clone())).await?;
+                tx.prompt(&mut session, user_prompt, Some(sender.clone()))
+                    .await?;
                 Ok(())
             }
             Commands::Edit {
@@ -675,19 +674,16 @@ async fn main() -> anyhow::Result<()> {
             } => {
                 let mut session = tx.load_session()?;
 
+                for f in files.clone().unwrap_or_default() {
+                    session.add_editable(&config, &f)?;
+                }
+                tx.add_contexts(&mut session, ctx, ruskel, &Some(sender.clone()))?;
+
                 let user_prompt = match get_prompt(prompt, prompt_file, &session, false)? {
                     Some(p) => p,
                     None => return Ok(()),
                 };
-                session.set_last_prompt(Prompt::User(user_prompt))?;
-
-                for f in files.clone().unwrap_or_default() {
-                    session.add_editable(&config, &f)?;
-                }
-
-                tx.add_contexts(&mut session, ctx, ruskel, &Some(sender.clone()))?;
-
-                tx.prompt(&mut session, Some(sender)).await?;
+                tx.prompt(&mut session, user_prompt, Some(sender)).await?;
                 Ok(())
             }
             Commands::Session { raw, render, full } => {

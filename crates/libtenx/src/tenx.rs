@@ -157,12 +157,14 @@ impl Tenx {
         result
     }
 
-    /// Sends a prompt off to the model.
+    /// Adds a user prompt to the session and sends it to the model.
     pub async fn prompt(
         &self,
         session: &mut Session,
+        prompt: String,
         sender: Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
+        session.add_prompt(Prompt::User(prompt))?;
         let session_store = SessionStore::open(self.config.session_store_dir())?;
         let result = self
             .process_prompt(session, sender.clone(), &session_store)

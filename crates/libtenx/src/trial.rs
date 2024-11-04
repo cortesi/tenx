@@ -109,17 +109,16 @@ impl Trial {
 
         let mut session = tenx.session_from_cwd(&sender)?;
 
+        info!("trial setup complete");
         match &self.trial_conf.op {
             TrialOp::Edit(edit) => {
-                session.add_prompt(crate::prompt::Prompt::User(edit.prompt.clone()))?;
                 for path in &edit.editable {
                     session.add_editable(&tenx.config, &path.to_string_lossy())?;
                 }
+                tenx.prompt(&mut session, edit.prompt.clone(), sender)
             }
         }
-
-        info!("trial setup complete");
-        tenx.prompt(&mut session, sender).await?;
+        .await?;
         Ok(())
     }
 
