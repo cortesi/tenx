@@ -213,8 +213,8 @@ enum Commands {
         #[clap(subcommand)]
         command: DialectCommands,
     },
-    /// Perform an AI-assisted edit with the current session
-    Edit {
+    /// Ask the model to perform an AI-assisted edit with the current session
+    Ask {
         /// Specifies files to edit
         #[clap(value_parser)]
         files: Option<Vec<String>>,
@@ -282,7 +282,7 @@ enum Commands {
         ruskel: Vec<String>,
     },
     /// Start a new session, edit the prompt, and run it
-    Oneshot {
+    Quick {
         /// Specifies files to edit
         #[clap(value_parser)]
         files: Vec<String>,
@@ -655,7 +655,7 @@ async fn main() -> anyhow::Result<()> {
                 }
                 Ok(())
             }
-            Commands::Oneshot {
+            Commands::Quick {
                 files,
                 ruskel,
                 ctx,
@@ -672,11 +672,11 @@ async fn main() -> anyhow::Result<()> {
                     Some(p) => p,
                     None => return Ok(()),
                 };
-                tx.prompt(&mut session, user_prompt, Some(sender.clone()))
+                tx.ask(&mut session, user_prompt, Some(sender.clone()))
                     .await?;
                 Ok(())
             }
-            Commands::Edit {
+            Commands::Ask {
                 files,
                 prompt,
                 prompt_file,
@@ -694,7 +694,7 @@ async fn main() -> anyhow::Result<()> {
                     Some(p) => p,
                     None => return Ok(()),
                 };
-                tx.prompt(&mut session, user_prompt, Some(sender)).await?;
+                tx.ask(&mut session, user_prompt, Some(sender)).await?;
                 Ok(())
             }
             Commands::Session { raw, render, full } => {

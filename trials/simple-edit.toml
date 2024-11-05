@@ -1,4 +1,4 @@
 project = "simple"
-[op.edit]
+[op.ask]
 prompt = "Complete the fibonacci function."
 editable = []

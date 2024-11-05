@@ -164,7 +164,7 @@ impl Tenx {
     }
 
     /// Adds a user prompt to the session and sends it to the model.
-    pub async fn prompt(
+    pub async fn ask(
         &self,
         session: &mut Session,
         prompt: String,

@@ -21,7 +21,7 @@ use crate::{
 };
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct Edit {
+pub struct Ask {
     pub prompt: String,
     pub editable: Vec<PathBuf>,
 }
@@ -29,7 +29,7 @@ pub struct Edit {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TrialOp {
-    Edit(Edit),
+    Ask(Ask),
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -111,11 +111,11 @@ impl Trial {
 
         info!("trial setup complete");
         match &self.trial_conf.op {
-            TrialOp::Edit(edit) => {
+            TrialOp::Ask(edit) => {
                 for path in &edit.editable {
                     session.add_editable(&tenx.config, &path.to_string_lossy())?;
                 }
-                tenx.prompt(&mut session, edit.prompt.clone(), sender)
+                tenx.ask(&mut session, edit.prompt.clone(), sender)
             }
         }
         .await?;
@@ -183,7 +183,7 @@ mod tests {
         assert_eq!(conf.project, "test_project");
 
         match conf.op {
-            TrialOp::Edit(edit) => {
+            TrialOp::Ask(edit) => {
                 assert_eq!(edit.prompt, "test prompt");
                 assert_eq!(
                     edit.editable,
