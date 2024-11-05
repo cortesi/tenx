@@ -1,7 +1,7 @@
 //! Trial module for defining and running test trials.
 //!
-//! A trial consists of a TrialConf at NAME.toml which specifies the operations to perform,
-//! and an optional Tenx Config at NAME.conf.toml which overrides the default configuration.
+//! A trial consists of a TrialConf at NAME.toml which specifies the operations to perform, as well
+//! as an embedded tenx configuration.
 
 use crate::Event;
 use std::{

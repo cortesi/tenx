@@ -254,6 +254,18 @@ enum Commands {
         /// Clear the current session, and use it to fix
         #[clap(long)]
         clear: bool,
+
+        /// User prompt for the fix operation
+        #[clap(long)]
+        prompt: Option<String>,
+
+        /// Path to a file containing the prompt
+        #[clap(long)]
+        prompt_file: Option<PathBuf>,
+
+        /// Edit the prompt before fixing
+        #[clap(long)]
+        edit: bool,
     },
     /// Run formatters on the current session
     Format,
@@ -774,6 +786,9 @@ async fn main() -> anyhow::Result<()> {
                 ruskel,
                 ctx,
                 clear,
+                prompt,
+                prompt_file,
+                edit,
             } => {
                 let mut session = if *clear {
                     let mut current_session = tx.load_session()?;
@@ -788,8 +803,12 @@ async fn main() -> anyhow::Result<()> {
                 }
                 tx.add_contexts(&mut session, ctx, ruskel, &Some(sender.clone()))?;
 
-                tx.fix(&mut session, Some(sender.clone())).await?;
-                tx.save_session(&session)?;
+                let prompt = if prompt.is_some() || prompt_file.is_some() || *edit {
+                    get_prompt(&prompt, &prompt_file, &session, false)?
+                } else {
+                    None
+                };
+                tx.fix(&mut session, Some(sender.clone()), prompt).await?;
                 Ok(())
             }
             Commands::Clear => {

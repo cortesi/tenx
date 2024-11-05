@@ -107,11 +107,13 @@ impl Tenx {
         &self,
         session: &mut Session,
         sender: Option<mpsc::Sender<Event>>,
+        prompt: Option<String>,
     ) -> Result<()> {
         let session_store = SessionStore::open(self.config.session_store_dir())?;
         let preflight_result = self.run_preflight_validators(session, &sender);
         let result = if let Err(e) = preflight_result {
-            session.add_prompt(Prompt::Auto("Please fix the following errors.".to_string()))?;
+            let prompt = prompt.unwrap_or_else(|| "Please fix the following errors.".to_string());
+            session.add_prompt(Prompt::Auto(prompt))?;
             if let Some(step) = session.last_step_mut() {
                 step.err = Some(e.clone());
             }
