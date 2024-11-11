@@ -1,6 +1,0 @@
-project = "rust/simple"
-desc = "ask: ask of a Rust project, with defined editables"
-
-[op.ask]
-prompt = "Complete the fibonacci function."
-editable = ["**.rs"]

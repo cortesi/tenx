@@ -21,7 +21,9 @@ pub trait Validator {
     /// Performs a check on the given PromptInput and State.
     fn validate(&self, config: &Config, state: &Session) -> Result<()>;
 
-    /// Determines if the validator should run for the given session.
+    /// Determines if the validator should run for the given session. If editables are specified in
+    /// the session, the validator will only run if the session's editables contain a relevant
+    /// file. Otherwise, the validator will run if any of the project included files are relevant.
     fn is_relevant(&self, config: &Config, state: &Session) -> Result<bool>;
 
     /// Checks if the validator is configured to run.

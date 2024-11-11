@@ -23,10 +23,7 @@ impl Validator for PythonRuffCheck {
     }
 
     fn is_relevant(&self, config: &Config, state: &Session) -> Result<bool> {
-        Ok(state
-            .abs_editables(config)?
-            .iter()
-            .any(|path| path.extension().map_or(false, |ext| ext == "py")))
+        should_run_python_validator(config, state)
     }
 
     fn is_configured(&self, config: &Config) -> bool {
@@ -57,10 +54,7 @@ impl Formatter for PythonRuffFormatter {
     }
 
     fn is_relevant(&self, config: &Config, state: &Session) -> Result<bool> {
-        Ok(state
-            .abs_editables(config)?
-            .iter()
-            .any(|path| path.extension().map_or(false, |ext| ext == "py")))
+        should_run_python_validator(config, state)
     }
 
     fn is_configured(&self, config: &Config) -> bool {
@@ -82,6 +76,20 @@ fn is_ruff_installed() -> bool {
         .output()
         .map(|output| output.status.success())
         .unwrap_or(false)
+}
+
+fn should_run_python_validator(config: &Config, state: &Session) -> Result<bool> {
+    let editables = state.abs_editables(config)?;
+    if !editables.is_empty() {
+        Ok(editables
+            .iter()
+            .any(|path| path.extension().map_or(false, |ext| ext == "py")))
+    } else {
+        Ok(config
+            .included_files()?
+            .iter()
+            .any(|path| path.extension().map_or(false, |ext| ext == "py")))
+    }
 }
 
 fn run_ruff_check(file_path: &Path) -> Result<()> {

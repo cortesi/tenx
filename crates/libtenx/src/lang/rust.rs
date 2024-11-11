@@ -112,10 +112,17 @@ impl Formatter for CargoFormatter {
 }
 
 fn should_run_rust_validator(config: &Config, state: &Session) -> Result<bool> {
-    Ok(state
-        .abs_editables(config)?
-        .iter()
-        .any(|path| path.extension().map_or(false, |ext| ext == "rs")))
+    let editables = state.abs_editables(config)?;
+    if !editables.is_empty() {
+        Ok(editables
+            .iter()
+            .any(|path| path.extension().map_or(false, |ext| ext == "rs")))
+    } else {
+        Ok(config
+            .included_files()?
+            .iter()
+            .any(|path| path.extension().map_or(false, |ext| ext == "rs")))
+    }
 }
 
 fn is_cargo_installed() -> bool {
@@ -167,8 +174,25 @@ pub struct RustWorkspace {
 
 impl RustWorkspace {
     pub fn discover(config: &Config, session: &Session) -> Result<Self> {
-        let common_ancestor = Self::find_common_ancestor(&session.abs_editables(config)?)?;
-        let root_path = Self::find_workspace_root(&common_ancestor)?;
+        let editables = session.abs_editables(config)?;
+        let paths = if editables.is_empty() {
+            let included = config.included_files()?;
+            if included.is_empty() {
+                return Err(TenxError::Workspace("No files to check".to_string()));
+            }
+            included
+        } else {
+            editables.clone()
+        };
+
+        let common_ancestor = Self::find_common_ancestor(&paths)?;
+        let root_path = if editables.is_empty() {
+            // With included files, find the outermost workspace
+            Self::find_outermost_workspace(config)?
+        } else {
+            // With editables, find the innermost workspace
+            Self::find_workspace_root(&common_ancestor)?
+        };
 
         Ok(RustWorkspace { root_path })
     }
@@ -202,6 +226,31 @@ impl RustWorkspace {
             }
         }
         Err(TenxError::Workspace("Workspace root not found".to_string()))
+    }
+
+    fn find_outermost_workspace(config: &Config) -> Result<PathBuf> {
+        let mut last_workspace: Option<PathBuf> = None;
+        for path in config.included_files()? {
+            let abs_path = config.abspath(&path)?;
+            let mut current = abs_path;
+            while let Some(parent) = current.parent() {
+                let cargo_toml = parent.join("Cargo.toml");
+                if cargo_toml.exists() {
+                    match &last_workspace {
+                        Some(last) => {
+                            // Keep the workspace that's higher up in the tree
+                            if parent.components().count() < last.components().count() {
+                                last_workspace = Some(parent.to_path_buf());
+                            }
+                        }
+                        None => last_workspace = Some(parent.to_path_buf()),
+                    }
+                }
+                current = parent.to_path_buf();
+            }
+        }
+
+        last_workspace.ok_or_else(|| TenxError::Workspace("Workspace root not found".to_string()))
     }
 }
 
@@ -311,7 +360,11 @@ mod tests {
     #[test]
     fn test_no_paths_provided() -> Result<()> {
         let temp_dir = TempDir::new().unwrap();
-        let config = Config::default().with_root(temp_dir.path());
+        let mut config = Config::default().with_root(temp_dir.path());
+
+        // Make sure we don't try to use git
+        use crate::config::Include;
+        config.include = Include::Glob(vec![]);
 
         let prompt = Prompt::default();
 
@@ -321,10 +374,9 @@ mod tests {
         let result = RustWorkspace::discover(&config, &session);
 
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .ends_with("No paths provided"));
+        let err = result.unwrap_err().to_string();
+        println!("Error message: {}", err);
+        assert!(err.ends_with("No files to check"));
 
         Ok(())
     }

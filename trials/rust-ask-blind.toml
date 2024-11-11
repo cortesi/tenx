@@ -1,0 +1,6 @@
+project = "rust/simple"
+desc = "ask: simple ask of a Rust project, without provided editable"
+
+[op.ask]
+prompt = "Complete the fibonacci function in lib.rs."
+editable = []
