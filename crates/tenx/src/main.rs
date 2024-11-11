@@ -166,6 +166,9 @@ enum TrialCommands {
         /// Name of the trial to run
         name: String,
     },
+    /// List all available trials (alias: ls)
+    #[clap(alias = "ls")]
+    List,
 }
 
 #[derive(Subcommand)]
@@ -213,7 +216,7 @@ enum Commands {
         #[clap(subcommand)]
         command: DialectCommands,
     },
-    /// Ask the model to perform an AI-assisted edit with the current session
+    /// Make an AI-assisted change using the current session
     Ask {
         /// Specifies files to edit
         #[clap(value_parser)]
@@ -865,6 +868,19 @@ async fn main() -> anyhow::Result<()> {
                         }
                         trial.tenx_conf = conf;
                         trial.execute(Some(sender.clone())).await?;
+                        Ok(())
+                    }
+                    TrialCommands::List => {
+                        let trials = libtenx::trial::list(&trials_path)?;
+                        for trial in trials {
+                            println!("{}", trial.name.blue().bold());
+                            if !trial.desc.is_empty() {
+                                let desc = textwrap::fill(&trial.desc, 72);
+                                for line in desc.lines() {
+                                    println!("    {}", line);
+                                }
+                            }
+                        }
                         Ok(())
                     }
                 }

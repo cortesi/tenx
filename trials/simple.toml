@@ -1,4 +1,0 @@
-project = "simple"
-[op.ask]
-prompt = "Complete the fibonacci function."
-editable = ["**.rs"]

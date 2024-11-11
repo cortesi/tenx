@@ -4,6 +4,7 @@
 //! as an embedded tenx configuration.
 
 use crate::Event;
+use glob::glob;
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -27,9 +28,16 @@ pub struct Ask {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+pub struct Fix {
+    pub prompt: Option<String>,
+    pub editable: Vec<PathBuf>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TrialOp {
     Ask(Ask),
+    Fix(Fix),
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -37,6 +45,7 @@ pub struct TrialConf {
     pub project: String,
     pub op: TrialOp,
     pub config: Option<Config>,
+    pub desc: Option<String>,
 }
 
 impl TrialConf {
@@ -71,6 +80,7 @@ impl TrialConf {
 
 pub struct Trial {
     pub name: String,
+    pub desc: String,
     pub base_dir: PathBuf,
     pub trial_conf: TrialConf,
     pub tenx_conf: Config,
@@ -86,7 +96,8 @@ impl Trial {
         src_path.push("projects");
         src_path.push(&self.trial_conf.project);
 
-        let dst_path = temp_dir.path().to_path_buf();
+        let mut dst_path = temp_dir.path().to_path_buf();
+        dst_path.push(&self.trial_conf.project);
 
         let session_path = dst_path.join("session");
         fs::create_dir_all(&session_path).map_err(|e| {
@@ -115,10 +126,15 @@ impl Trial {
                 for path in &edit.editable {
                     session.add_editable(&tenx.config, &path.to_string_lossy())?;
                 }
-                tenx.ask(&mut session, edit.prompt.clone(), sender)
+                tenx.ask(&mut session, edit.prompt.clone(), sender).await?;
             }
-        }
-        .await?;
+            TrialOp::Fix(fix) => {
+                for path in &fix.editable {
+                    session.add_editable(&tenx.config, &path.to_string_lossy())?;
+                }
+                tenx.fix(&mut session, sender, fix.prompt.clone()).await?;
+            }
+        };
         Ok(())
     }
 
@@ -156,6 +172,7 @@ impl Trial {
 
         Ok(Trial {
             name: name.to_string(),
+            desc: trial_conf.desc.clone().unwrap_or_default(),
             base_dir: base_dir.as_ref().to_path_buf(),
             trial_conf,
             tenx_conf,
@@ -163,15 +180,71 @@ impl Trial {
     }
 }
 
+/// Lists all trials in a directory by finding .toml files and loading them as Trial objects.
+pub fn list<P: AsRef<Path>>(base_dir: P) -> Result<Vec<Trial>> {
+    let mut trials = Vec::new();
+    let pattern = base_dir.as_ref().join("*.toml");
+    let pattern = pattern.to_string_lossy();
+
+    for entry in
+        glob(&pattern).map_err(|e| TenxError::Internal(format!("Invalid glob pattern: {}", e)))?
+    {
+        let path =
+            entry.map_err(|e| TenxError::Internal(format!("Failed to read glob entry: {}", e)))?;
+        let name = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .ok_or_else(|| TenxError::Internal("Invalid trial file name".to_string()))?;
+
+        // Skip files that end with .conf.toml
+        if !name.ends_with(".conf") {
+            if let Ok(trial) = Trial::load(&base_dir, name) {
+                trials.push(trial);
+            }
+        }
+    }
+
+    Ok(trials)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
+    fn test_list_trials() -> Result<()> {
+        use std::fs;
+        use tempfile::tempdir;
+
+        let dir = tempdir()?;
+        let test_project_dir = dir.path().join("projects").join("test_project");
+        fs::create_dir_all(&test_project_dir)?;
+
+        let test_toml = r#"
+            project = "test_project"
+            [op.ask]
+            prompt = "test prompt"
+            editable = ["file1.rs"]
+        "#;
+
+        fs::write(dir.path().join("test1.toml"), test_toml)?;
+        fs::write(dir.path().join("test2.toml"), test_toml)?;
+        fs::write(dir.path().join("test3.conf.toml"), "config file")?;
+
+        let trials = list(dir.path())?;
+        assert_eq!(trials.len(), 2);
+        assert!(trials.iter().any(|t| t.name == "test1"));
+        assert!(trials.iter().any(|t| t.name == "test2"));
+
+        Ok(())
+    }
+
+    #[test]
     fn test_trial_conf_from_str() -> Result<()> {
         let toml = r#"
             project = "test_project"
-            [op.edit]
+            desc = "Test trial description"
+            [op.ask]
             prompt = "test prompt"
             editable = ["file1.rs", "file2.rs"]
             [config]
@@ -190,6 +263,7 @@ mod tests {
                     vec![PathBuf::from("file1.rs"), PathBuf::from("file2.rs")]
                 );
             }
+            TrialOp::Fix(_) => panic!("Expected Ask variant"),
         }
 
         Ok(())
