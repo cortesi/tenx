@@ -14,6 +14,9 @@ use toml;
 
 use crate::{dialect, model, Result, TenxError};
 
+const DEFAULT_CLAUDE_SONNET: &str = "claude-3-5-sonnet-latest";
+const DEFAULT_CLAUDE_HAIKU: &str = "claude-3-5-haiku-latest";
+
 macro_rules! serialize_if_different {
     ($state:expr, $self:expr, $default:expr, $field:ident) => {
         if $self.full || $self.$field != $default.$field {
@@ -104,11 +107,36 @@ fn default_project_map() -> bool {
     true
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ClaudeConf {
+    name: String,
+    api_model: String,
+    anthropic_key: Option<String>,
+}
+
+impl Default for ClaudeConf {
+    fn default() -> Self {
+        Self {
+            name: "claude".to_string(),
+            api_model: DEFAULT_CLAUDE_SONNET.to_string(),
+            anthropic_key: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
-pub enum ConfigModel {
-    #[default]
-    Claude,
+pub enum ModelConfig {
+    Claude(ClaudeConf),
+}
+
+impl ModelConfig {
+    /// Returns the name of the configured model.
+    pub fn name(&self) -> &str {
+        match self {
+            ModelConfig::Claude(conf) => &conf.name,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
@@ -218,13 +246,13 @@ pub struct Config {
     #[serde(default)]
     pub anthropic_key: String,
 
+    /// Available model configurations
+    #[serde(default)]
+    pub models: Vec<ModelConfig>,
+
     /// The default dialect.
     #[serde(default)]
     pub default_dialect: ConfigDialect,
-
-    /// The default model.
-    #[serde(default)]
-    pub default_model: ConfigModel,
 
     /// Which files are included by default
     ///
@@ -299,13 +327,13 @@ impl Serialize for Config {
         S: Serializer,
     {
         let default = Config::default();
-        let mut state = serializer.serialize_struct("Config", 10)?;
+        let mut state = serializer.serialize_struct("Config", 11)?;
         serialize_if_different!(state, self, default, include);
         serialize_if_different!(state, self, default, anthropic_key);
+        serialize_if_different!(state, self, default, models);
         serialize_if_different!(state, self, default, session_store_dir);
         serialize_if_different!(state, self, default, retry_limit);
         serialize_if_different!(state, self, default, no_preflight);
-        serialize_if_different!(state, self, default, default_model);
         serialize_if_different!(state, self, default, default_dialect);
         serialize_if_different!(state, self, default, tags);
         serialize_if_different!(state, self, default, ops);
@@ -355,10 +383,21 @@ impl Default for Config {
         Self {
             include: Include::Git,
             anthropic_key: String::new(),
+            models: vec![
+                ModelConfig::Claude(ClaudeConf {
+                    name: "sonnet".to_string(),
+                    api_model: DEFAULT_CLAUDE_SONNET.to_string(),
+                    anthropic_key: None,
+                }),
+                ModelConfig::Claude(ClaudeConf {
+                    name: "haiku".to_string(),
+                    api_model: DEFAULT_CLAUDE_HAIKU.to_string(),
+                    anthropic_key: None,
+                }),
+            ],
             session_store_dir: PathBuf::new(),
             retry_limit: DEFAULT_RETRY_LIMIT,
             no_preflight: false,
-            default_model: ConfigModel::default(),
             default_dialect: ConfigDialect::default(),
             dummy_model: None,
             dummy_dialect: None,
@@ -589,8 +628,8 @@ impl Config {
         if other.no_preflight != dflt.no_preflight {
             self.no_preflight = other.no_preflight;
         }
-        if other.default_model != dflt.default_model {
-            self.default_model = other.default_model.clone();
+        if !other.models.is_empty() && other.models != dflt.models {
+            self.models = other.models.clone();
         }
         if other.default_dialect != dflt.default_dialect {
             self.default_dialect = other.default_dialect.clone();
@@ -640,8 +679,9 @@ impl Config {
         if let Some(dummy_model) = &self.dummy_model {
             return Ok(model::Model::Dummy(dummy_model.clone()));
         }
-        match self.default_model {
-            ConfigModel::Claude => Ok(model::Model::Claude(model::Claude {})),
+        match self.models.first() {
+            Some(ModelConfig::Claude(_)) => Ok(model::Model::Claude(model::Claude {})),
+            None => Err(TenxError::Internal("No model configured".to_string())),
         }
     }
 
@@ -683,7 +723,6 @@ mod tests {
         set_config!(config, no_preflight, true);
         set_config!(config, tags.smart, false);
         set_config!(config, ops.edit, false);
-        set_config!(config, default_model, ConfigModel::Claude);
         set_config!(config, default_dialect, ConfigDialect::Tags);
 
         let toml_str = config.to_toml().unwrap();
@@ -697,7 +736,6 @@ mod tests {
         );
         assert_eq!(config.retry_limit, deserialized_config.retry_limit);
         assert_eq!(config.no_preflight, deserialized_config.no_preflight);
-        assert_eq!(config.default_model, deserialized_config.default_model);
         assert_eq!(config.default_dialect, deserialized_config.default_dialect);
         assert_eq!(config.tags.smart, deserialized_config.tags.smart);
         assert_eq!(config.ops.edit, deserialized_config.ops.edit);
@@ -741,7 +779,6 @@ mod tests {
         assert_eq!(base_config.session_store_dir, PathBuf::from("/tmp/other"));
         assert_eq!(base_config.retry_limit, 5);
         assert!(base_config.no_preflight);
-        assert_eq!(base_config.default_model, ConfigModel::Claude);
         assert_eq!(base_config.default_dialect, ConfigDialect::Tags);
         assert!(!base_config.tags.smart);
         assert!(matches!(base_config.include, Include::Glob(_)));
@@ -823,13 +860,15 @@ mod tests {
     #[test]
     fn test_single_value_deserialization() {
         let toml_str = "retry_limit = 42";
-        let config = Config::from_toml(toml_str).unwrap();
+        let mut config = Config::from_toml(toml_str).unwrap();
+        config.models = vec![ModelConfig::Claude(ClaudeConf::default())];
 
         assert_eq!(config.retry_limit, 42);
         assert_eq!(config.anthropic_key, "");
         assert_eq!(config.session_store_dir, PathBuf::new());
         assert!(!config.no_preflight);
-        assert_eq!(config.default_model, ConfigModel::Claude);
+        let default_model = &config.models[0];
+        assert!(matches!(default_model, ModelConfig::Claude(_)));
         assert_eq!(config.default_dialect, ConfigDialect::Tags);
         assert!(!config.tags.smart);
     }

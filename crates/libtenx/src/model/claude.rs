@@ -1,9 +1,5 @@
 //! This module implements the Claude model provider for the tenx system.
-use std::{
-    collections::{HashMap, HashSet},
-    convert::From,
-    path::PathBuf,
-};
+use std::{collections::HashMap, convert::From, path::PathBuf};
 
 use misanthropy::{Anthropic, Content, ContentBlockDelta, Role, StreamEvent};
 use serde::{Deserialize, Serialize};
@@ -29,7 +25,7 @@ const EDITABLE_UPDATE_LEADIN: &str = "Here are the updated files.";
 const OMITTED_FILES_LEADIN: &str =
     "These files have been omitted since they were updated later in the conversation:";
 
-/// A model that interacts with the Anthropic API. This general design of the model is to:
+/// A model that interacts with the Anthropic API. The general design of the model is to:
 ///
 /// - Have a large, cached system prompt with many examples.
 /// - Emit both the non-editable context and the editable context as pre-primed messages in the
