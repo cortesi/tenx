@@ -155,19 +155,7 @@ impl Trial {
 
         let tenx_conf = match &trial_conf.config {
             Some(config) => config.clone(),
-            None => {
-                path.set_file_name(format!("{}.conf.toml", name));
-                if path.exists() {
-                    let contents = fs::read_to_string(&path).map_err(|e| {
-                        TenxError::Internal(format!("Failed to read config file: {}", e))
-                    })?;
-                    toml::from_str(&contents).map_err(|e| {
-                        TenxError::Internal(format!("Failed to parse config TOML: {}", e))
-                    })?
-                } else {
-                    Self::default_config()?
-                }
-            }
+            None => Self::default_config()?,
         };
 
         Ok(Trial {
@@ -196,7 +184,6 @@ pub fn list<P: AsRef<Path>>(base_dir: P) -> Result<Vec<Trial>> {
             .and_then(|s| s.to_str())
             .ok_or_else(|| TenxError::Internal("Invalid trial file name".to_string()))?;
 
-        // Skip files that end with .conf.toml
         if !name.ends_with(".conf") {
             if let Ok(trial) = Trial::load(&base_dir, name) {
                 trials.push(trial);
@@ -229,8 +216,6 @@ mod tests {
 
         fs::write(dir.path().join("test1.toml"), test_toml)?;
         fs::write(dir.path().join("test2.toml"), test_toml)?;
-        fs::write(dir.path().join("test3.conf.toml"), "config file")?;
-
         let trials = list(dir.path())?;
         assert_eq!(trials.len(), 2);
         assert!(trials.iter().any(|t| t.name == "test1"));

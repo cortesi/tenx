@@ -26,6 +26,8 @@ trials/
 Projects might be shared between multiple trials, so be careful whe modifying
 them.
 
+
+
 ## Configuration Format
 
 Trial configurations are TOML files with the following structure:
@@ -64,6 +66,24 @@ prompt = "Fix the compiler errors"  # Optional
 editable = ["src/lib.rs"]
 ```
 
+
+## How Trials Work
+
+When a trial is executed, tenx:
+
+1. Creates a temporary directory
+2. Copies the target project directory into the temp dir
+3. Creates a session subdirectory for storing conversation state
+4. Loads or creates a tenx configuration:
+   - Uses embedded config from trial TOML if present
+   - Falls back to defaults if neither exists
+5. Initializes tenx with the project root set to the temp copy
+6. Creates a new session and executes the specified operation:
+   - For `ask`: sets up editable files and sends prompt
+   - For `fix`: sets up editable files and runs validation/fixes
+
+This isolation ensures trials can modify project files without affecting the original source, and prevents trials from interfering with each other.
+
 ## Best Practices
 
 1. Keep projects minimal
@@ -84,11 +104,17 @@ editable = ["src/lib.rs"]
     - Verify validation and retry behavior
 
 
+
 ## Running Trials
 
-The trial command runner is built into the `tenx` binary. To run a trial:
+The trial command runner is built into the `tenx` binary.
 
 Run a specific trial:
-```bash
+```bash 
 cargo run --bin tenx -- trial run NAME
+```
+
+List available trials:
+```bash
+cargo run --bin tenx -- trial list
 ```
