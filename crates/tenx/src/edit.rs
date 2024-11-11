@@ -35,7 +35,7 @@ fn render_step_commented(session: &libtenx::Session, step_offset: usize) -> Stri
 
 /// Renders all steps as comments.
 fn comment_all_steps(session: &Session) -> String {
-    let mut text = String::new();
+    let mut text = "\n\n".to_string();
     for i in (0..session.steps().len()).rev() {
         text.push_str(&render_step_commented(session, i));
         if i == 0 {
@@ -185,6 +185,8 @@ mod tests {
         assert_eq!(
             rendered_no_retry,
             indoc! {"
+
+
             # Step 1
             # ====
             #
