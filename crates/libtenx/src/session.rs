@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     path::{Path, PathBuf},
 };
 
@@ -287,6 +287,33 @@ impl Session {
             self.add_prompt(Prompt::Auto("OK".into()))?;
         }
         Ok(())
+    }
+
+    /// Partitions the given files based on whether they will be modified in future steps. This is
+    /// most useful when writing dialects that want to use conversation rewriting to omit contents
+    /// of files that will be modified in future steps.
+    ///
+    /// Returns a (past, future) tuple, with each element beign a subset of the input file list.
+    pub fn partition_modified(
+        &self,
+        files: &[PathBuf],
+        step_offset: usize,
+    ) -> (Vec<PathBuf>, Vec<PathBuf>) {
+        let mut future_modified_files = HashSet::new();
+        for step in self.steps().iter().skip(step_offset + 1) {
+            if let Some(resp) = &step.model_response {
+                if let Some(patch) = &resp.patch {
+                    future_modified_files.extend(patch.changed_files());
+                }
+            }
+        }
+        let (past, future): (Vec<_>, Vec<_>) = files
+            .iter()
+            .partition(|file| !future_modified_files.contains(*file));
+        (
+            past.into_iter().cloned().collect(),
+            future.into_iter().cloned().collect(),
+        )
     }
 }
 

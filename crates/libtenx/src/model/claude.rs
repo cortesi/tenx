@@ -1,12 +1,15 @@
 //! This module implements the Claude model provider for the tenx system.
-use std::{collections::HashSet, convert::From, path::PathBuf};
-
-use tracing::{trace, warn};
+use std::{
+    collections::{HashMap, HashSet},
+    convert::From,
+    path::PathBuf,
+};
 
 use misanthropy::{Anthropic, Content, ContentBlockDelta, Role, StreamEvent};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use tokio::sync::mpsc;
+use tracing::{trace, warn};
 
 use crate::{
     config::Config,
@@ -34,8 +37,6 @@ const OMITTED_FILES_LEADIN: &str =
 /// - Edit the conversation to keep the most up-to-date editable files frontmost.
 #[derive(Default, Debug, Clone)]
 pub struct Claude {}
-
-use std::collections::HashMap;
 
 /// Mirrors the Usage struct from misanthropy to track token usage statistics.
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
@@ -124,32 +125,6 @@ impl Claude {
         Err(TenxError::Internal("No patch to parse.".into()))
     }
 
-    /// Filters the given files based on whether they will be modified in future steps.
-    ///
-    /// Returns a tuple of (included, omitted) files.
-    fn filter_files(
-        &self,
-        files: &[PathBuf],
-        session: &Session,
-        step_offset: usize,
-    ) -> (Vec<PathBuf>, Vec<PathBuf>) {
-        let mut future_modified_files = HashSet::new();
-        for step in session.steps().iter().skip(step_offset + 1) {
-            if let Some(resp) = &step.model_response {
-                if let Some(patch) = &resp.patch {
-                    future_modified_files.extend(patch.changed_files());
-                }
-            }
-        }
-        let (included, omitted): (Vec<_>, Vec<_>) = files
-            .iter()
-            .partition(|file| !future_modified_files.contains(*file));
-        (
-            included.into_iter().cloned().collect(),
-            omitted.into_iter().cloned().collect(),
-        )
-    }
-
     /// Renders the editable files and appends a list of omitted files if any.
     ///
     /// Returns a formatted string containing the rendered editables and omitted files.
@@ -203,7 +178,7 @@ impl Claude {
                         EDITABLE_LEADIN,
                         {
                             let (included, omitted) =
-                                self.filter_files(session.editable(), session, 0);
+                                session.partition_modified(session.editable(), 0);
                             self.render_editables_with_omitted(
                                 config, session, dialect, included, omitted,
                             )?
@@ -240,7 +215,7 @@ impl Claude {
                             dialect.render_step_response(config, session, i)?,
                         )],
                     });
-                    let (included, omitted) = self.filter_files(&patch.changed_files(), session, i);
+                    let (included, omitted) = session.partition_modified(&patch.changed_files(), i);
                     req.messages.push(misanthropy::Message {
                         role: misanthropy::Role::User,
                         content: vec![misanthropy::Content::text(format!(
