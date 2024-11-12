@@ -1,5 +1,6 @@
 mod claude;
 mod dummy_model;
+mod openai;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};

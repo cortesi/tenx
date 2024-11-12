@@ -1,13 +1,14 @@
+use std::path::PathBuf;
+
 use clap::{Parser, Subcommand};
 use colored::*;
-use std::path::PathBuf;
 use tokio::sync::mpsc;
+use tracing_subscriber::util::SubscriberInitExt;
 
 use libtenx::{
     self,
     event_consumers::{self, output_logs, output_progress},
 };
-use tracing_subscriber::util::SubscriberInitExt;
 
 #[derive(Parser)]
 #[clap(name = "ttrial")]

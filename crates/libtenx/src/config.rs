@@ -125,9 +125,27 @@ impl Default for ClaudeConf {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct OpenAiConf {
+    pub name: String,
+    pub api_model: String,
+    pub openai_key: String,
+}
+
+impl Default for OpenAiConf {
+    fn default() -> Self {
+        Self {
+            name: "gpt4".to_string(),
+            api_model: "gpt-4-turbo-preview".to_string(),
+            openai_key: "".to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum ModelConfig {
     Claude(ClaudeConf),
+    OpenAi(OpenAiConf),
 }
 
 impl ModelConfig {
@@ -135,6 +153,7 @@ impl ModelConfig {
     pub fn name(&self) -> &str {
         match self {
             ModelConfig::Claude(conf) => &conf.name,
+            ModelConfig::OpenAi(conf) => &conf.name,
         }
     }
 
@@ -142,6 +161,7 @@ impl ModelConfig {
     pub fn kind(&self) -> &'static str {
         match self {
             ModelConfig::Claude(_) => "claude",
+            ModelConfig::OpenAi(_) => "openai",
         }
     }
 
@@ -151,6 +171,10 @@ impl ModelConfig {
             ModelConfig::Claude(conf) => format!(
                 "name = \"{}\"\napi_model = \"{}\"anthropic_key={}",
                 conf.name, conf.api_model, conf.anthropic_key
+            ),
+            ModelConfig::OpenAi(conf) => format!(
+                "name = \"{}\"\napi_model = \"{}\"openai_key={}",
+                conf.name, conf.api_model, conf.openai_key
             ),
         }
     }
@@ -683,9 +707,10 @@ impl Config {
     pub fn load_env(mut self) -> Self {
         if let Ok(key) = env::var("ANTHROPIC_API_KEY") {
             for model in &mut self.models {
-                let ModelConfig::Claude(conf) = model;
-                if conf.anthropic_key.is_empty() {
-                    conf.anthropic_key = key.clone();
+                if let ModelConfig::Claude(conf) = model {
+                    if conf.anthropic_key.is_empty() {
+                        conf.anthropic_key = key.clone();
+                    }
                 }
             }
         }
@@ -714,6 +739,9 @@ impl Config {
                 conf.api_model.clone(),
                 conf.anthropic_key.clone(),
             )?)),
+            ModelConfig::OpenAi(_) => Err(TenxError::Internal(
+                "OpenAI model not yet implemented".to_string(),
+            )),
         }
     }
 
@@ -749,8 +777,9 @@ mod tests {
     #[test]
     fn test_toml_serialization() {
         let mut config = Config::default();
-        let ModelConfig::Claude(conf) = &mut config.models[0];
-        conf.anthropic_key = "test_key".to_string();
+        if let ModelConfig::Claude(conf) = &mut config.models[0] {
+            conf.anthropic_key = "test_key".to_string();
+        }
         set_config!(config, session_store_dir, PathBuf::from("/tmp/test"));
         set_config!(config, retry_limit, 5);
         set_config!(config, no_preflight, true);
@@ -762,18 +791,20 @@ mod tests {
 
         let deserialized_config = Config::from_toml(&toml_str).unwrap();
 
-        let ModelConfig::Claude(conf) = &config.models[0];
-        let ModelConfig::Claude(deserial_conf) = &deserialized_config.models[0];
-        assert_eq!(conf.anthropic_key, deserial_conf.anthropic_key);
-        assert_eq!(
-            config.session_store_dir,
-            deserialized_config.session_store_dir
-        );
-        assert_eq!(config.retry_limit, deserialized_config.retry_limit);
-        assert_eq!(config.no_preflight, deserialized_config.no_preflight);
-        assert_eq!(config.default_dialect, deserialized_config.default_dialect);
-        assert_eq!(config.tags.smart, deserialized_config.tags.smart);
-        assert_eq!(config.ops.edit, deserialized_config.ops.edit);
+        if let (ModelConfig::Claude(conf), ModelConfig::Claude(deserial_conf)) =
+            (&config.models[0], &deserialized_config.models[0])
+        {
+            assert_eq!(conf.anthropic_key, deserial_conf.anthropic_key);
+            assert_eq!(
+                config.session_store_dir,
+                deserialized_config.session_store_dir
+            );
+            assert_eq!(config.retry_limit, deserialized_config.retry_limit);
+            assert_eq!(config.no_preflight, deserialized_config.no_preflight);
+            assert_eq!(config.default_dialect, deserialized_config.default_dialect);
+            assert_eq!(config.tags.smart, deserialized_config.tags.smart);
+            assert_eq!(config.ops.edit, deserialized_config.ops.edit);
+        }
 
         // Test default value serialization
         let default_config = Config::default();
@@ -790,39 +821,6 @@ mod tests {
         assert!(!table.contains_key("default_dialect"));
         assert!(!table.contains_key("tags"));
         assert!(!table.contains_key("ops"));
-    }
-
-    #[test]
-    fn test_config_merge() {
-        let mut base_config = Config::default();
-        let ModelConfig::Claude(conf) = &mut base_config.models[0];
-        conf.anthropic_key = "base_key".to_string();
-        set_config!(base_config, retry_limit, 5);
-
-        let mut other_config = Config::default();
-        let ModelConfig::Claude(conf) = &mut other_config.models[0];
-        conf.anthropic_key = "other_key".to_string();
-        set_config!(other_config, session_store_dir, PathBuf::from("/tmp/other"));
-        set_config!(other_config, no_preflight, true);
-        set_config!(
-            other_config,
-            include,
-            Include::Glob(vec!["*.rs".to_string()])
-        );
-
-        base_config.merge(&other_config);
-
-        let ModelConfig::Claude(conf) = &base_config.models[0];
-        assert_eq!(conf.anthropic_key, "other_key".to_string());
-        assert_eq!(base_config.session_store_dir, PathBuf::from("/tmp/other"));
-        assert_eq!(base_config.retry_limit, 5);
-        assert!(base_config.no_preflight);
-        assert_eq!(base_config.default_dialect, ConfigDialect::Tags);
-        assert!(!base_config.tags.smart);
-        assert!(matches!(base_config.include, Include::Glob(_)));
-        if let Include::Glob(patterns) = &base_config.include {
-            assert_eq!(patterns, &vec!["*.rs".to_string()]);
-        }
     }
 
     #[test]
@@ -849,6 +847,42 @@ mod tests {
         let parsed_toml: toml::Value = toml::from_str(&default_toml_str).unwrap();
         let table = parsed_toml.as_table().unwrap();
         assert!(!table.contains_key("include"));
+    }
+
+    #[test]
+    fn test_config_merge() {
+        let mut base_config = Config::default();
+        if let ModelConfig::Claude(conf) = &mut base_config.models[0] {
+            conf.anthropic_key = "base_key".to_string();
+        }
+        set_config!(base_config, retry_limit, 5);
+
+        let mut other_config = Config::default();
+        if let ModelConfig::Claude(conf) = &mut other_config.models[0] {
+            conf.anthropic_key = "other_key".to_string();
+        }
+        set_config!(other_config, session_store_dir, PathBuf::from("/tmp/other"));
+        set_config!(other_config, no_preflight, true);
+        set_config!(
+            other_config,
+            include,
+            Include::Glob(vec!["*.rs".to_string()])
+        );
+
+        base_config.merge(&other_config);
+
+        if let ModelConfig::Claude(conf) = &base_config.models[0] {
+            assert_eq!(conf.anthropic_key, "other_key".to_string());
+            assert_eq!(base_config.session_store_dir, PathBuf::from("/tmp/other"));
+            assert_eq!(base_config.retry_limit, 5);
+            assert!(base_config.no_preflight);
+            assert_eq!(base_config.default_dialect, ConfigDialect::Tags);
+            assert!(!base_config.tags.smart);
+            assert!(matches!(base_config.include, Include::Glob(_)));
+            if let Include::Glob(patterns) = &base_config.include {
+                assert_eq!(patterns, &vec!["*.rs".to_string()]);
+            }
+        }
     }
 
     #[test]
@@ -902,14 +936,15 @@ mod tests {
         config.models = vec![ModelConfig::Claude(ClaudeConf::default())];
 
         assert_eq!(config.retry_limit, 42);
-        let ModelConfig::Claude(conf) = &config.models[0];
-        assert_eq!(conf.anthropic_key, "");
-        assert_eq!(config.session_store_dir, PathBuf::new());
-        assert!(!config.no_preflight);
-        let default_model = &config.models[0];
-        assert!(matches!(default_model, ModelConfig::Claude(_)));
-        assert_eq!(config.default_dialect, ConfigDialect::Tags);
-        assert!(!config.tags.smart);
+        if let ModelConfig::Claude(conf) = &config.models[0] {
+            assert_eq!(conf.anthropic_key, "");
+            assert_eq!(config.session_store_dir, PathBuf::new());
+            assert!(!config.no_preflight);
+            let default_model = &config.models[0];
+            assert!(matches!(default_model, ModelConfig::Claude(_)));
+            assert_eq!(config.default_dialect, ConfigDialect::Tags);
+            assert!(!config.tags.smart);
+        }
     }
 
     #[test]
