@@ -2600,7 +2600,6 @@ dependencies = [
  "serde_json",
  "serde_variant",
  "tempfile",
- "textwrap",
  "thiserror 2.0.3",
  "tokio",
  "toml",
@@ -3913,7 +3912,6 @@ dependencies = [
  "anyhow",
  "clap",
  "colored",
- "indicatif",
  "indoc",
  "libtenx",
  "pretty_assertions",
@@ -3922,7 +3920,6 @@ dependencies = [
  "terminal_size",
  "textwrap",
  "tokio",
- "tracing",
  "tracing-subscriber",
 ]
 
@@ -4247,7 +4244,6 @@ dependencies = [
  "libtenx",
  "textwrap",
  "tokio",
- "tracing",
  "tracing-subscriber",
 ]
 
