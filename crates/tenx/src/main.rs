@@ -171,32 +171,11 @@ enum DialectCommands {
 }
 
 #[derive(Subcommand)]
-enum TrialCommands {
-    /// Run a trial
-    Run {
-        /// Name of the trial to run
-        name: String,
-    },
-    /// List all available trials (alias: ls)
-    #[clap(alias = "ls")]
-    List,
-}
-
-#[derive(Subcommand)]
 enum Commands {
     /// Model commands
     Model {
         #[clap(subcommand)]
         command: ModelCommands,
-    },
-    /// Trial and experiment commands
-    Trial {
-        /// Path to trials directory
-        #[clap(long)]
-        trials: Option<PathBuf>,
-
-        #[clap(subcommand)]
-        command: TrialCommands,
     },
     /// Add context or editable files to a session
     Add {
@@ -873,53 +852,6 @@ async fn main() -> anyhow::Result<()> {
                 tx.refresh_context(&mut session, &Some(sender.clone()))?;
                 tx.save_session(&session)?;
                 Ok(())
-            }
-            Commands::Trial { trials, command } => {
-                let trials_path = if let Some(p) = trials {
-                    p.clone()
-                } else {
-                    let project_root = config.project_root();
-                    if project_root.join(".git").exists() {
-                        project_root.join("trials")
-                    } else {
-                        return Err(anyhow::anyhow!(
-                            "No trials directory specified and not in tenx repository"
-                        ));
-                    }
-                };
-
-                if !trials_path.exists() {
-                    return Err(anyhow::anyhow!(
-                        "Trials directory does not exist: {}",
-                        trials_path.display()
-                    ));
-                }
-
-                match command {
-                    TrialCommands::Run { name } => {
-                        let mut trial = libtenx::trial::Trial::load(&trials_path, name)?;
-                        let mut conf = trial.tenx_conf.load_env();
-                        if let Some(key) = cli.anthropic_key.clone() {
-                            conf.anthropic_key = key;
-                        }
-                        trial.tenx_conf = conf;
-                        trial.execute(Some(sender.clone())).await?;
-                        Ok(())
-                    }
-                    TrialCommands::List => {
-                        let trials = libtenx::trial::list(&trials_path)?;
-                        for trial in trials {
-                            println!("{}", trial.name.blue().bold());
-                            if !trial.desc.is_empty() {
-                                let desc = textwrap::fill(&trial.desc, 72);
-                                for line in desc.lines() {
-                                    println!("    {}", line);
-                                }
-                            }
-                        }
-                        Ok(())
-                    }
-                }
             }
         },
         None => {
