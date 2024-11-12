@@ -34,6 +34,8 @@ const OMITTED_FILES_LEADIN: &str =
 pub struct Claude {
     /// Upstream model name to use
     pub api_model: String,
+    /// The Anthropic API key
+    pub anthropic_key: String,
 }
 
 /// Mirrors the Usage struct from misanthropy to track token usage statistics.
@@ -77,13 +79,27 @@ impl From<serde_json::Error> for TenxError {
 }
 
 impl Claude {
+    /// Creates a new Claude model instance
+    pub fn new(api_model: String, anthropic_key: String) -> Result<Self> {
+        if api_model.is_empty() {
+            return Err(TenxError::Model("Empty API model name".into()));
+        }
+        if anthropic_key.is_empty() {
+            return Err(TenxError::Model("Empty Anthropic API key".into()));
+        }
+        Ok(Self {
+            api_model,
+            anthropic_key,
+        })
+    }
+
     async fn stream_response(
         &mut self,
-        api_key: &str,
+        api_key: String,
         req: &misanthropy::MessagesRequest,
         sender: Option<mpsc::Sender<Event>>,
     ) -> Result<misanthropy::MessagesResponse> {
-        let anthropic = Anthropic::new(api_key);
+        let anthropic = Anthropic::new(&api_key);
         let mut streamed_response = anthropic.messages_stream(req)?;
         while let Some(event) = streamed_response.next().await {
             let event = event?;
@@ -252,8 +268,8 @@ impl ModelProvider for Claude {
         session: &Session,
         sender: Option<mpsc::Sender<Event>>,
     ) -> Result<ModelResponse> {
-        if config.anthropic_key.is_empty() {
-            return Err(TenxError::Internal(
+        if self.anthropic_key.is_empty() {
+            return Err(TenxError::Model(
                 "No Anthropic key configured for Claude model.".into(),
             ));
         }
@@ -265,7 +281,7 @@ impl ModelProvider for Claude {
         let mut req = self.request(config, session, &dialect)?;
         trace!("Sending request: {}", serde_json::to_string_pretty(&req)?);
         let resp = self
-            .stream_response(&config.anthropic_key, &req, sender)
+            .stream_response(self.anthropic_key.clone(), &req, sender)
             .await?;
         trace!("Got response: {}", serde_json::to_string_pretty(&resp)?);
         req.merge_response(&resp);

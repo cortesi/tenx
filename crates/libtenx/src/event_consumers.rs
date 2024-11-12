@@ -50,11 +50,7 @@ pub fn create_tracing_subscriber(verbosity: u8, sender: mpsc::Sender<Event>) -> 
 }
 
 /// Output events in a text log format
-pub async fn output_logs(
-    mut receiver: mpsc::Receiver<Event>,
-    mut kill_signal: mpsc::Receiver<()>,
-    _verbosity: u8,
-) {
+pub async fn output_logs(mut receiver: mpsc::Receiver<Event>, mut kill_signal: mpsc::Receiver<()>) {
     loop {
         tokio::select! {
             Some(event) = receiver.recv() => {

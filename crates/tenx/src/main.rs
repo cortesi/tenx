@@ -4,7 +4,8 @@ use anyhow::{Context as AnyhowContext, Result};
 use clap::{CommandFactory, Parser, Subcommand};
 use colored::*;
 use libtenx::{
-    self, config,
+    self,
+    config::{self},
     dialect::DialectProvider,
     event_consumers::{self, output_logs, output_progress},
     model::ModelProvider,
@@ -52,10 +53,6 @@ struct Cli {
     /// Show raw log output instead of progress indicators
     #[clap(long)]
     logs: bool,
-
-    /// Anthropic API key [env: ANTHROPIC_API_KEY]
-    #[clap(long)]
-    anthropic_key: Option<String>,
 
     /// Model to use (overrides default_model in config)
     #[clap(long)]
@@ -348,7 +345,6 @@ fn load_config(cli: &Cli) -> Result<config::Config> {
     // Apply CLI arguments
     config = config.load_env();
     set_config!(config, session_store_dir, cli.session_store_dir.clone());
-    set_config!(config, anthropic_key, cli.anthropic_key.clone());
     set_config!(config, retry_limit, cli.retry_limit);
     set_config!(config, tags.smart, cli.tags_smart);
     set_config!(config, tags.replace, cli.tags_replace);
@@ -395,7 +391,7 @@ async fn main() -> anyhow::Result<()> {
     let subscriber = event_consumers::create_tracing_subscriber(verbosity, sender.clone());
     subscriber.init();
     let event_task = if cli.logs {
-        tokio::spawn(output_logs(receiver, event_kill_rx, verbosity))
+        tokio::spawn(output_logs(receiver, event_kill_rx))
     } else {
         tokio::spawn(output_progress(receiver, event_kill_rx, verbosity))
     };

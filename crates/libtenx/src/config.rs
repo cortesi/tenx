@@ -109,9 +109,9 @@ fn default_project_map() -> bool {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ClaudeConf {
-    name: String,
-    api_model: String,
-    anthropic_key: Option<String>,
+    pub name: String,
+    pub api_model: String,
+    pub anthropic_key: String,
 }
 
 impl Default for ClaudeConf {
@@ -119,7 +119,7 @@ impl Default for ClaudeConf {
         Self {
             name: "claude".to_string(),
             api_model: DEFAULT_CLAUDE_SONNET.to_string(),
-            anthropic_key: None,
+            anthropic_key: "".to_string(),
         }
     }
 }
@@ -149,13 +149,8 @@ impl ModelConfig {
     pub fn config(&self) -> String {
         match self {
             ModelConfig::Claude(conf) => format!(
-                "name = \"{}\"\napi_model = \"{}\"{}",
-                conf.name,
-                conf.api_model,
-                conf.anthropic_key
-                    .as_ref()
-                    .map(|k| format!("\nanthropic_key = \"{}\"", k))
-                    .unwrap_or_default()
+                "name = \"{}\"\napi_model = \"{}\"anthropic_key={}",
+                conf.name, conf.api_model, conf.anthropic_key
             ),
         }
     }
@@ -264,10 +259,6 @@ impl Default for Formatters {
 #[derive(Debug, Clone, Deserialize)]
 /// Configuration for the Tenx application.
 pub struct Config {
-    /// The Anthropic API key.
-    #[serde(default)]
-    pub anthropic_key: String,
-
     /// Available model configurations
     #[serde(default)]
     pub models: Vec<ModelConfig>,
@@ -355,7 +346,6 @@ impl Serialize for Config {
         let default = Config::default();
         let mut state = serializer.serialize_struct("Config", 11)?;
         serialize_if_different!(state, self, default, include);
-        serialize_if_different!(state, self, default, anthropic_key);
         serialize_if_different!(state, self, default, models);
         serialize_if_different!(state, self, default, session_store_dir);
         serialize_if_different!(state, self, default, retry_limit);
@@ -408,17 +398,16 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             include: Include::Git,
-            anthropic_key: String::new(),
             models: vec![
                 ModelConfig::Claude(ClaudeConf {
                     name: "sonnet".to_string(),
                     api_model: DEFAULT_CLAUDE_SONNET.to_string(),
-                    anthropic_key: None,
+                    anthropic_key: "".to_string(),
                 }),
                 ModelConfig::Claude(ClaudeConf {
                     name: "haiku".to_string(),
                     api_model: DEFAULT_CLAUDE_HAIKU.to_string(),
-                    anthropic_key: None,
+                    anthropic_key: "".to_string(),
                 }),
             ],
             session_store_dir: PathBuf::new(),
@@ -643,9 +632,6 @@ impl Config {
         if other.include != dflt.include {
             self.include = other.include.clone();
         }
-        if other.anthropic_key != dflt.anthropic_key {
-            self.anthropic_key = other.anthropic_key.clone();
-        }
         if other.session_store_dir != dflt.session_store_dir {
             self.session_store_dir = other.session_store_dir.clone();
         }
@@ -696,7 +682,12 @@ impl Config {
     /// Loads the Anthropic API key from the ANTHROPIC_API_KEY environment variable, if it exists.
     pub fn load_env(mut self) -> Self {
         if let Ok(key) = env::var("ANTHROPIC_API_KEY") {
-            self.anthropic_key = key;
+            for model in &mut self.models {
+                let ModelConfig::Claude(conf) = model;
+                if conf.anthropic_key.is_empty() {
+                    conf.anthropic_key = key.clone();
+                }
+            }
         }
         self
     }
@@ -719,9 +710,10 @@ impl Config {
         };
 
         match model_config {
-            ModelConfig::Claude(conf) => Ok(model::Model::Claude(model::Claude {
-                api_model: conf.api_model.clone(),
-            })),
+            ModelConfig::Claude(conf) => Ok(model::Model::Claude(model::Claude::new(
+                conf.api_model.clone(),
+                conf.anthropic_key.clone(),
+            )?)),
         }
     }
 
@@ -757,7 +749,8 @@ mod tests {
     #[test]
     fn test_toml_serialization() {
         let mut config = Config::default();
-        set_config!(config, anthropic_key, "test_key".to_string());
+        let ModelConfig::Claude(conf) = &mut config.models[0];
+        conf.anthropic_key = "test_key".to_string();
         set_config!(config, session_store_dir, PathBuf::from("/tmp/test"));
         set_config!(config, retry_limit, 5);
         set_config!(config, no_preflight, true);
@@ -769,7 +762,9 @@ mod tests {
 
         let deserialized_config = Config::from_toml(&toml_str).unwrap();
 
-        assert_eq!(config.anthropic_key, deserialized_config.anthropic_key);
+        let ModelConfig::Claude(conf) = &config.models[0];
+        let ModelConfig::Claude(deserial_conf) = &deserialized_config.models[0];
+        assert_eq!(conf.anthropic_key, deserial_conf.anthropic_key);
         assert_eq!(
             config.session_store_dir,
             deserialized_config.session_store_dir
@@ -800,11 +795,13 @@ mod tests {
     #[test]
     fn test_config_merge() {
         let mut base_config = Config::default();
-        set_config!(base_config, anthropic_key, "base_key".to_string());
+        let ModelConfig::Claude(conf) = &mut base_config.models[0];
+        conf.anthropic_key = "base_key".to_string();
         set_config!(base_config, retry_limit, 5);
 
         let mut other_config = Config::default();
-        set_config!(other_config, anthropic_key, "other_key".to_string());
+        let ModelConfig::Claude(conf) = &mut other_config.models[0];
+        conf.anthropic_key = "other_key".to_string();
         set_config!(other_config, session_store_dir, PathBuf::from("/tmp/other"));
         set_config!(other_config, no_preflight, true);
         set_config!(
@@ -815,7 +812,8 @@ mod tests {
 
         base_config.merge(&other_config);
 
-        assert_eq!(base_config.anthropic_key, "other_key".to_string());
+        let ModelConfig::Claude(conf) = &base_config.models[0];
+        assert_eq!(conf.anthropic_key, "other_key".to_string());
         assert_eq!(base_config.session_store_dir, PathBuf::from("/tmp/other"));
         assert_eq!(base_config.retry_limit, 5);
         assert!(base_config.no_preflight);
@@ -904,7 +902,8 @@ mod tests {
         config.models = vec![ModelConfig::Claude(ClaudeConf::default())];
 
         assert_eq!(config.retry_limit, 42);
-        assert_eq!(config.anthropic_key, "");
+        let ModelConfig::Claude(conf) = &config.models[0];
+        assert_eq!(conf.anthropic_key, "");
         assert_eq!(config.session_store_dir, PathBuf::new());
         assert!(!config.no_preflight);
         let default_model = &config.models[0];

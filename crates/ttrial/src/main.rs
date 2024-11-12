@@ -28,10 +28,6 @@ struct Cli {
     #[clap(long)]
     logs: bool,
 
-    /// Anthropic API key [env: ANTHROPIC_API_KEY]
-    #[clap(long)]
-    anthropic_key: Option<String>,
-
     /// Path to trials directory
     #[clap(long)]
     trials: Option<PathBuf>,
@@ -68,7 +64,7 @@ async fn main() -> anyhow::Result<()> {
     subscriber.init();
 
     let event_task = if cli.logs {
-        tokio::spawn(output_logs(receiver, event_kill_rx, verbosity))
+        tokio::spawn(output_logs(receiver, event_kill_rx))
     } else {
         tokio::spawn(output_progress(receiver, event_kill_rx, verbosity))
     };
@@ -96,10 +92,7 @@ async fn main() -> anyhow::Result<()> {
     let result = match cli.command {
         Commands::Run { name, model } => {
             let mut trial = libtenx::trial::Trial::load(&trials_path, &name)?;
-            let mut conf = trial.tenx_conf.load_env();
-            if let Some(key) = cli.anthropic_key {
-                conf.anthropic_key = key;
-            }
+            let conf = trial.tenx_conf.load_env();
             trial.tenx_conf = conf;
             trial.execute(Some(sender.clone()), model.clone()).await?;
             Ok(())
