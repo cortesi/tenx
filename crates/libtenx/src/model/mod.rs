@@ -8,6 +8,7 @@ use tokio::sync::mpsc;
 
 pub use claude::{Claude, ClaudeUsage};
 pub use dummy_model::{DummyModel, DummyUsage};
+pub use openai::{OpenAi, OpenAiUsage};
 
 use crate::{config::Config, events::Event, session::ModelResponse, Result, Session};
 
@@ -17,6 +18,7 @@ use std::collections::HashMap;
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub enum Usage {
     Claude(ClaudeUsage),
+    OpenAi(OpenAiUsage),
     Dummy(DummyUsage),
 }
 
@@ -25,6 +27,7 @@ impl Usage {
     pub fn values(&self) -> HashMap<String, u64> {
         match self {
             Usage::Claude(usage) => usage.values(),
+            Usage::OpenAi(usage) => usage.values(),
             Usage::Dummy(usage) => usage.values(),
         }
     }
@@ -51,6 +54,7 @@ pub trait ModelProvider {
 #[derive(Debug, Clone)]
 pub enum Model {
     Claude(Claude),
+    OpenAi(OpenAi),
     Dummy(DummyModel),
 }
 
@@ -59,6 +63,7 @@ impl ModelProvider for Model {
     fn name(&self) -> &'static str {
         match self {
             Model::Claude(c) => c.name(),
+            Model::OpenAi(o) => o.name(),
             Model::Dummy(d) => d.name(),
         }
     }
@@ -71,6 +76,7 @@ impl ModelProvider for Model {
     ) -> Result<ModelResponse> {
         match self {
             Model::Claude(c) => c.send(config, session, sender).await,
+            Model::OpenAi(o) => o.send(config, session, sender).await,
             Model::Dummy(d) => d.send(config, session, sender).await,
         }
     }
@@ -78,6 +84,7 @@ impl ModelProvider for Model {
     fn render(&self, config: &Config, session: &Session) -> Result<String> {
         match self {
             Model::Claude(c) => c.render(config, session),
+            Model::OpenAi(o) => o.render(config, session),
             Model::Dummy(d) => d.render(config, session),
         }
     }
