@@ -137,6 +137,28 @@ impl ModelConfig {
             ModelConfig::Claude(conf) => &conf.name,
         }
     }
+
+    /// Returns the kind of model (e.g. "claude").
+    pub fn kind(&self) -> &'static str {
+        match self {
+            ModelConfig::Claude(_) => "claude",
+        }
+    }
+
+    /// Returns a rendered config string
+    pub fn config(&self) -> String {
+        match self {
+            ModelConfig::Claude(conf) => format!(
+                "name = \"{}\"\napi_model = \"{}\"{}",
+                conf.name,
+                conf.api_model,
+                conf.anthropic_key
+                    .as_ref()
+                    .map(|k| format!("\nanthropic_key = \"{}\"", k))
+                    .unwrap_or_default()
+            ),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]

@@ -152,6 +152,13 @@ struct Cli {
 }
 
 #[derive(Subcommand)]
+enum ModelCommands {
+    /// List all configured models (alias: ls)
+    #[clap(alias = "ls")]
+    List,
+}
+
+#[derive(Subcommand)]
 enum DialectCommands {
     /// Print the current dialect and its settings
     Info,
@@ -173,6 +180,11 @@ enum TrialCommands {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Model commands
+    Model {
+        #[clap(subcommand)]
+        command: ModelCommands,
+    },
     /// Trial and experiment commands
     Trial {
         /// Path to trials directory
@@ -563,6 +575,23 @@ async fn main() -> anyhow::Result<()> {
 
     let result = match &cli.command {
         Some(cmd) => match cmd {
+            Commands::Model { command } => match command {
+                ModelCommands::List => {
+                    for model in &config.models {
+                        match model {
+                            libtenx::config::ModelConfig::Claude(_) => {
+                                println!("{} ({})", model.name().blue().bold(), model.kind());
+                                println!("config:");
+                                for line in model.config().lines() {
+                                    println!("    {}", line);
+                                }
+                                println!();
+                            }
+                        }
+                    }
+                    Ok(())
+                }
+            },
             Commands::Conf {
                 json,
                 full,
