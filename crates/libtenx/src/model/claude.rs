@@ -16,7 +16,6 @@ use crate::{
     Result, Session, TenxError,
 };
 
-const DEFAULT_MODEL: &str = "claude-3-5-sonnet-latest";
 const MAX_TOKENS: u32 = 8192;
 const CONTEXT_LEADIN: &str = "Here is some immutable context that you may not edit.\n";
 const EDITABLE_LEADIN: &str =
@@ -32,7 +31,10 @@ const OMITTED_FILES_LEADIN: &str =
 ///   prompt.
 /// - Edit the conversation to keep the most up-to-date editable files frontmost.
 #[derive(Default, Debug, Clone)]
-pub struct Claude {}
+pub struct Claude {
+    /// Upstream model name to use
+    pub api_model: String,
+}
 
 /// Mirrors the Usage struct from misanthropy to track token usage statistics.
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
@@ -149,7 +151,7 @@ impl Claude {
         dialect: &Dialect,
     ) -> Result<misanthropy::MessagesRequest> {
         let mut req = misanthropy::MessagesRequest {
-            model: DEFAULT_MODEL.to_string(),
+            model: self.api_model.clone(),
             max_tokens: MAX_TOKENS,
             messages: vec![
                 misanthropy::Message {

@@ -99,6 +99,10 @@ struct Cli {
     #[clap(long)]
     anthropic_key: Option<String>,
 
+    /// Model to use (overrides default_model in config)
+    #[clap(long)]
+    model: Option<String>,
+
     /// Session storage directory (~/.config/tenx/state by default)
     #[clap(long)]
     session_store_dir: Option<PathBuf>,
@@ -409,6 +413,9 @@ fn load_config(cli: &Cli) -> Result<config::Config> {
     set_config!(config, tags.smart, cli.tags_smart);
     set_config!(config, tags.replace, cli.tags_replace);
     set_config!(config, tags.udiff, cli.tags_udiff);
+    if let Some(model) = &cli.model {
+        config.default_model = Some(model.clone());
+    }
     config.no_preflight = cli.no_preflight;
 
     // Override validator configurations

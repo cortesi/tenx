@@ -313,6 +313,10 @@ pub struct Config {
     #[serde(default)]
     pub default_context: DefaultContext,
 
+    /// The name of the default model to use
+    #[serde(default)]
+    pub default_model: Option<String>,
+
     /// Validation configuration.
     #[serde(default)]
     pub validators: Validators,
@@ -426,6 +430,7 @@ impl Default for Config {
             tags: Tags::default(),
             ops: Ops::default(),
             default_context: DefaultContext::default(),
+            default_model: None,
             full: false,
             validators: Validators::default(),
             formatters: Formatters::default(),
@@ -701,9 +706,22 @@ impl Config {
         if let Some(dummy_model) = &self.dummy_model {
             return Ok(model::Model::Dummy(dummy_model.clone()));
         }
-        match self.models.first() {
-            Some(ModelConfig::Claude(_)) => Ok(model::Model::Claude(model::Claude {})),
-            None => Err(TenxError::Internal("No model configured".to_string())),
+
+        let model_config = if let Some(name) = &self.default_model {
+            self.models
+                .iter()
+                .find(|m| m.name() == name)
+                .ok_or_else(|| TenxError::Internal(format!("Model {} not found", name)))?
+        } else {
+            self.models
+                .first()
+                .ok_or_else(|| TenxError::Internal("No model configured".to_string()))?
+        };
+
+        match model_config {
+            ModelConfig::Claude(conf) => Ok(model::Model::Claude(model::Claude {
+                api_model: conf.api_model.clone(),
+            })),
         }
     }
 
