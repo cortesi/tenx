@@ -2581,6 +2581,7 @@ name = "libtenx"
 version = "0.0.1"
 dependencies = [
  "async-trait",
+ "colored",
  "diffy",
  "dirs",
  "fs-err",
@@ -2588,6 +2589,7 @@ dependencies = [
  "glob",
  "globset",
  "heck",
+ "indicatif",
  "indoc",
  "libruskel",
  "misanthropy",
@@ -2603,6 +2605,7 @@ dependencies = [
  "tokio",
  "toml",
  "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

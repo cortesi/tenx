@@ -10,6 +10,7 @@ mod validators;
 pub mod config;
 pub mod context;
 pub mod dialect;
+pub mod event_consumers;
 pub mod model;
 pub mod patch;
 pub mod prompt;
