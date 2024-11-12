@@ -88,6 +88,10 @@ enum Commands {
     Run {
         /// Name of the trial to run
         name: String,
+
+        /// Override the model to use
+        #[clap(long)]
+        model: Option<String>,
     },
     /// List all available trials (alias: ls)
     #[clap(alias = "ls")]
@@ -158,7 +162,6 @@ fn load_config(cli: &Cli) -> Result<config::Config> {
 async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     let verbosity = if cli.quiet { 0 } else { cli.verbose };
-    let config = load_config(&cli)?;
 
     let (sender, receiver) = mpsc::channel(100);
     let (event_kill_tx, event_kill_rx) = mpsc::channel(1);
@@ -169,9 +172,9 @@ async fn main() -> anyhow::Result<()> {
     let trials_path = if let Some(p) = cli.trials {
         p
     } else {
-        let project_root = config.project_root();
-        if project_root.join(".git").exists() {
-            project_root.join("trials")
+        let current_dir = std::env::current_dir()?;
+        if current_dir.join(".git").exists() {
+            current_dir.join("trials")
         } else {
             return Err(anyhow::anyhow!(
                 "No trials directory specified and not in tenx repository"
@@ -187,14 +190,14 @@ async fn main() -> anyhow::Result<()> {
     }
 
     let result = match cli.command {
-        Commands::Run { name } => {
+        Commands::Run { name, model } => {
             let mut trial = libtenx::trial::Trial::load(&trials_path, &name)?;
             let mut conf = trial.tenx_conf.load_env();
             if let Some(key) = cli.anthropic_key {
                 conf.anthropic_key = key;
             }
             trial.tenx_conf = conf;
-            trial.execute(Some(sender.clone())).await?;
+            trial.execute(Some(sender.clone()), model.clone()).await?;
             Ok(())
         }
         Commands::List => {

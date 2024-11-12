@@ -111,11 +111,21 @@ impl Trial {
     }
 
     /// Executes the trial in a temporary directory
-    pub async fn execute(&self, sender: Option<mpsc::Sender<Event>>) -> Result<()> {
+    /// Execute the trial in a temporary directory
+    ///
+    /// If `model` is provided, it will override the default model in the config.
+    pub async fn execute(
+        &self,
+        sender: Option<mpsc::Sender<Event>>,
+        model: Option<String>,
+    ) -> Result<()> {
         let temp_dir = self.setup_temp_project()?;
         let mut conf = self.tenx_conf.clone();
         conf.session_store_dir = temp_dir.path().join("session");
         conf.project_root = ProjectRoot::Path(temp_dir.path().join(&self.trial_conf.project));
+        if let Some(m) = model {
+            conf.default_model = Some(m);
+        }
         let tenx = Tenx::new(conf);
 
         let mut session = tenx.new_session_from_cwd(&sender)?;
