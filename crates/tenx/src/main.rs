@@ -234,7 +234,10 @@ enum Commands {
         ctx: Vec<String>,
     },
     /// List files included in the project
-    Files,
+    Files {
+        /// Optional glob pattern to filter files
+        pattern: Option<String>,
+    },
     /// Start a new session and attempt to fix any preflight failures
     Fix {
         /// Specifies files to edit
@@ -608,8 +611,12 @@ async fn main() -> anyhow::Result<()> {
                 println!("{} {}", "include strategy:".blue().bold(), config.include);
                 Ok(())
             }
-            Commands::Files => {
-                let files = config.included_files()?;
+            Commands::Files { pattern } => {
+                let files = if let Some(p) = pattern {
+                    config.match_files_with_glob(&p)?
+                } else {
+                    config.included_files()?
+                };
                 for file in files {
                     println!("{}", file.display());
                 }
