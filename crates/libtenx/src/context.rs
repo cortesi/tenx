@@ -20,6 +20,7 @@ pub enum ContextType {
     Ruskel,
     Path,
     ProjectMap,
+    Url,
 }
 
 pub trait ContextProvider {
@@ -227,10 +228,80 @@ impl ContextProvider for Path {
 /// A specification for reference material included in the prompt. This may be turned into actual
 /// Context objects with the ContextProvider::contexts() method.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub struct Url {
+    name: String,
+    url: String,
+    content: String,
+}
+
+impl Url {
+    pub(crate) fn new(url: String) -> Self {
+        let name = if url.len() > 40 {
+            format!("{}...", &url[..37])
+        } else {
+            url.clone()
+        };
+
+        Self {
+            name,
+            url,
+            content: String::new(),
+        }
+    }
+}
+
+impl ContextProvider for Url {
+    fn typ(&self) -> &ContextType {
+        &ContextType::Url
+    }
+
+    fn name(&self) -> &str {
+        &self.name
+    }
+
+    fn contexts(
+        &self,
+        _config: &crate::config::Config,
+        _session: &Session,
+    ) -> Result<Vec<ContextItem>> {
+        Ok(vec![ContextItem {
+            ty: "url".to_string(),
+            name: self.name.clone(),
+            body: self.content.clone(),
+        }])
+    }
+
+    fn human(&self) -> String {
+        format!("url: {}", self.name)
+    }
+
+    fn count(&self, _config: &crate::config::Config, _session: &Session) -> Result<usize> {
+        Ok(1)
+    }
+
+    fn refresh(&mut self) -> Result<()> {
+        let rt = tokio::runtime::Runtime::new().map_err(|e| TenxError::Resolve(e.to_string()))?;
+        let client = reqwest::Client::new();
+        self.content = rt.block_on(async {
+            client
+                .get(&self.url)
+                .send()
+                .await
+                .map_err(|e| TenxError::Resolve(e.to_string()))?
+                .text()
+                .await
+                .map_err(|e| TenxError::Resolve(e.to_string()))
+        })?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub enum Context {
     Ruskel(Ruskel),
     Path(Path),
     ProjectMap(ProjectMap),
+    Url(Url),
 }
 
 impl Context {
@@ -248,6 +319,11 @@ impl Context {
     pub fn new_project_map() -> Self {
         Context::ProjectMap(ProjectMap::new())
     }
+
+    /// Creates a new Context for a URL.
+    pub fn new_url(url: String) -> Self {
+        Context::Url(Url::new(url))
+    }
 }
 
 impl ContextProvider for Context {
@@ -256,6 +332,7 @@ impl ContextProvider for Context {
             Context::Ruskel(r) => r.typ(),
             Context::Path(g) => g.typ(),
             Context::ProjectMap(p) => p.typ(),
+            Context::Url(u) => u.typ(),
         }
     }
 
@@ -264,6 +341,7 @@ impl ContextProvider for Context {
             Context::Ruskel(r) => r.name(),
             Context::Path(g) => g.name(),
             Context::ProjectMap(p) => p.name(),
+            Context::Url(u) => u.name(),
         }
     }
 
@@ -276,6 +354,7 @@ impl ContextProvider for Context {
             Context::Ruskel(r) => r.contexts(config, session),
             Context::Path(g) => g.contexts(config, session),
             Context::ProjectMap(p) => p.contexts(config, session),
+            Context::Url(u) => u.contexts(config, session),
         }
     }
 
@@ -284,6 +363,7 @@ impl ContextProvider for Context {
             Context::Ruskel(r) => r.human(),
             Context::Path(g) => g.human(),
             Context::ProjectMap(p) => p.human(),
+            Context::Url(u) => u.human(),
         }
     }
 
@@ -292,6 +372,7 @@ impl ContextProvider for Context {
             Context::Ruskel(r) => r.count(config, session),
             Context::Path(g) => g.count(config, session),
             Context::ProjectMap(p) => p.count(config, session),
+            Context::Url(u) => u.count(config, session),
         }
     }
 
@@ -300,6 +381,7 @@ impl ContextProvider for Context {
             Context::Ruskel(r) => r.refresh(),
             Context::Path(g) => g.refresh(),
             Context::ProjectMap(p) => p.refresh(),
+            Context::Url(u) => u.refresh(),
         }
     }
 }

@@ -2753,6 +2753,7 @@ dependencies = [
  "normalize-path",
  "pathdiff",
  "pretty_assertions",
+ "reqwest",
  "serde",
  "serde_json",
  "serde_variant",
