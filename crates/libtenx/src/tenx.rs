@@ -23,7 +23,10 @@ impl Tenx {
 
     /// Creates a new Session, discovering the root from the current working directory and
     /// adding the default context from the config.
-    pub fn new_session_from_cwd(&self, sender: &Option<mpsc::Sender<Event>>) -> Result<Session> {
+    pub async fn new_session_from_cwd(
+        &self,
+        sender: &Option<mpsc::Sender<Event>>,
+    ) -> Result<Session> {
         let mut session = Session::default();
 
         // Add default context
@@ -32,7 +35,8 @@ impl Tenx {
             &self.config.default_context.path,
             &self.config.default_context.ruskel,
             sender,
-        )?;
+        )
+        .await?;
 
         // Add project map if configured
         if self.config.default_context.project_map {
@@ -47,7 +51,7 @@ impl Tenx {
     }
 
     /// Adds contexts to a session in a batch. Returns the total count of items added.
-    pub fn add_contexts(
+    pub async fn add_contexts(
         &self,
         session: &mut Session,
         glob: &[String],
@@ -69,7 +73,7 @@ impl Tenx {
                     sender,
                     Event::ContextRefreshStart(context.name().to_string()),
                 )?;
-                context.refresh()?;
+                context.refresh().await?;
                 send_event(sender, Event::ContextRefreshEnd(context.name().to_string()))?;
                 total_added += context.count(&self.config, session)?;
                 session.add_context(context);
@@ -82,7 +86,7 @@ impl Tenx {
     }
 
     /// Refreshes all contexts in the specified session.
-    pub fn refresh_context(
+    pub async fn refresh_context(
         &self,
         session: &mut Session,
         sender: &Option<mpsc::Sender<Event>>,
@@ -94,7 +98,7 @@ impl Tenx {
                     sender,
                     Event::ContextRefreshStart(context.name().to_string()),
                 )?;
-                context.refresh()?;
+                context.refresh().await?;
                 send_event(sender, Event::ContextRefreshEnd(context.name().to_string()))?;
             }
         }

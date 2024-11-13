@@ -128,7 +128,7 @@ impl Trial {
         }
         let tenx = Tenx::new(conf);
 
-        let mut session = tenx.new_session_from_cwd(&sender)?;
+        let mut session = tenx.new_session_from_cwd(&sender).await?;
 
         info!("trial setup complete");
         match &self.trial_conf.op {

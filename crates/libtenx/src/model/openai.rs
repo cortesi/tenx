@@ -41,7 +41,10 @@ impl OpenAiUsage {
 impl OpenAi {
     /// Creates a new OpenAi model instance
     pub fn new(api_model: String, openai_key: String) -> Result<Self> {
-        unimplemented!()
+        Ok(Self {
+            api_model,
+            openai_key,
+        })
     }
 }
 

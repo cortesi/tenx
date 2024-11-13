@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use fs_err as fs;
 use libruskel::Ruskel as LibRuskel;
 use serde::{Deserialize, Serialize};
@@ -23,6 +24,7 @@ pub enum ContextType {
     Url,
 }
 
+#[async_trait]
 pub trait ContextProvider {
     /// Returns the type of the context provider.
     fn typ(&self) -> &ContextType;
@@ -44,7 +46,7 @@ pub trait ContextProvider {
     fn count(&self, config: &crate::config::Config, session: &Session) -> Result<usize>;
 
     /// Refreshes the content of the context provider.
-    fn refresh(&mut self) -> Result<()>;
+    async fn refresh(&mut self) -> Result<()>;
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
@@ -62,6 +64,7 @@ impl Ruskel {
     }
 }
 
+#[async_trait]
 impl ContextProvider for Ruskel {
     fn typ(&self) -> &ContextType {
         &ContextType::Ruskel
@@ -91,7 +94,7 @@ impl ContextProvider for Ruskel {
         Ok(1)
     }
 
-    fn refresh(&mut self) -> Result<()> {
+    async fn refresh(&mut self) -> Result<()> {
         let ruskel = LibRuskel::new(&self.name);
         self.content = ruskel
             .render(false, false, true)
@@ -109,6 +112,7 @@ impl ProjectMap {
     }
 }
 
+#[async_trait]
 impl ContextProvider for ProjectMap {
     fn typ(&self) -> &ContextType {
         &ContextType::ProjectMap
@@ -141,7 +145,7 @@ impl ContextProvider for ProjectMap {
         Ok(config.included_files()?.len())
     }
 
-    fn refresh(&mut self) -> Result<()> {
+    async fn refresh(&mut self) -> Result<()> {
         Ok(())
     }
 }
@@ -169,6 +173,7 @@ impl Path {
     }
 }
 
+#[async_trait]
 impl ContextProvider for Path {
     fn typ(&self) -> &ContextType {
         &ContextType::Path
@@ -220,7 +225,7 @@ impl ContextProvider for Path {
         }
     }
 
-    fn refresh(&mut self) -> Result<()> {
+    async fn refresh(&mut self) -> Result<()> {
         Ok(())
     }
 }
@@ -250,6 +255,7 @@ impl Url {
     }
 }
 
+#[async_trait]
 impl ContextProvider for Url {
     fn typ(&self) -> &ContextType {
         &ContextType::Url
@@ -279,19 +285,16 @@ impl ContextProvider for Url {
         Ok(1)
     }
 
-    fn refresh(&mut self) -> Result<()> {
-        let rt = tokio::runtime::Runtime::new().map_err(|e| TenxError::Resolve(e.to_string()))?;
+    async fn refresh(&mut self) -> Result<()> {
         let client = reqwest::Client::new();
-        self.content = rt.block_on(async {
-            client
-                .get(&self.url)
-                .send()
-                .await
-                .map_err(|e| TenxError::Resolve(e.to_string()))?
-                .text()
-                .await
-                .map_err(|e| TenxError::Resolve(e.to_string()))
-        })?;
+        self.content = client
+            .get(&self.url)
+            .send()
+            .await
+            .map_err(|e| TenxError::Resolve(e.to_string()))?
+            .text()
+            .await
+            .map_err(|e| TenxError::Resolve(e.to_string()))?;
         Ok(())
     }
 }
@@ -326,6 +329,7 @@ impl Context {
     }
 }
 
+#[async_trait]
 impl ContextProvider for Context {
     fn typ(&self) -> &ContextType {
         match self {
@@ -376,12 +380,12 @@ impl ContextProvider for Context {
         }
     }
 
-    fn refresh(&mut self) -> Result<()> {
+    async fn refresh(&mut self) -> Result<()> {
         match self {
-            Context::Ruskel(r) => r.refresh(),
-            Context::Path(g) => g.refresh(),
-            Context::ProjectMap(p) => p.refresh(),
-            Context::Url(u) => u.refresh(),
+            Context::Ruskel(r) => r.refresh().await,
+            Context::Path(g) => g.refresh().await,
+            Context::ProjectMap(p) => p.refresh().await,
+            Context::Url(u) => u.refresh().await,
         }
     }
 }
@@ -438,7 +442,6 @@ mod tests {
             "Cargo.toml",
         ]);
 
-        // Set the include to use glob instead of git
         let mut config = test_project.config.clone();
         config.include = Include::Glob(vec!["**/*.rs".to_string()]);
 
@@ -476,7 +479,6 @@ mod tests {
             "Cargo.toml",
         ]);
 
-        // Test with absolute path from project root
         let config = test_project.config.clone();
         let context_spec = Context::new_path(&config, "src/main.rs".to_string()).unwrap();
         assert!(matches!(context_spec, Context::Path(_)));
@@ -493,7 +495,6 @@ mod tests {
             panic!("Expected ContextSpec::Path");
         }
 
-        // Test with relative path from subdirectory
         let mut config_in_src = test_project.config.clone();
         config_in_src = config_in_src.with_test_cwd(test_project.tempdir.path().join("src"));
         let context_spec = Context::new_path(&config_in_src, "./lib.rs".to_string()).unwrap();
@@ -521,7 +522,6 @@ mod tests {
         let outside_file_path = outside_dir.path().join("outside.txt");
         std::fs::write(&outside_file_path, "Outside content").unwrap();
 
-        // Test with absolute path
         let config = test_project.config.clone();
         let context_spec =
             Context::new_path(&config, outside_file_path.to_str().unwrap().to_string()).unwrap();
@@ -539,7 +539,6 @@ mod tests {
             panic!("Expected ContextSpec::Path");
         }
 
-        // Test with relative path
         let mut config_with_outside_cwd = config.clone();
         config_with_outside_cwd =
             config_with_outside_cwd.with_test_cwd(outside_dir.path().to_path_buf());
