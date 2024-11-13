@@ -16,10 +16,10 @@ use crate::{dialect, model, Result, TenxError};
 
 const DEFAULT_CLAUDE_SONNET: &str = "claude-3-5-sonnet-latest";
 const DEFAULT_CLAUDE_HAIKU: &str = "claude-3-5-haiku-latest";
-const DEFAULT_GPT_O1_PREVIEW: &str = "gpt-4-1106-preview";
-const DEFAULT_GPT_O1_MINI: &str = "gpt-4-1106-mini";
-const DEFAULT_GPT4O: &str = "gpt-4-0125-preview";
-const DEFAULT_GPT4O_MINI: &str = "gpt-4-0125-mini";
+const DEFAULT_GPT_O1_PREVIEW: &str = "o1-preview";
+const DEFAULT_GPT_O1_MINI: &str = "o1-mini";
+const DEFAULT_GPT4O: &str = "gpt-4o";
+const DEFAULT_GPT4O_MINI: &str = "gpt-4o-mini";
 const ANTHROPIC_API_KEY: &str = "ANTHROPIC_API_KEY";
 const OPENAI_API_KEY: &str = "OPENAI_API_KEY";
 
