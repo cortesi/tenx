@@ -2743,6 +2743,7 @@ dependencies = [
  "dirs",
  "fs-err",
  "fs_extra",
+ "futures-util",
  "glob",
  "globset",
  "heck",
