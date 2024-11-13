@@ -34,6 +34,7 @@ impl Tenx {
             &mut session,
             &self.config.default_context.path,
             &self.config.default_context.ruskel,
+            &[],
             sender,
         )
         .await?;
@@ -56,14 +57,18 @@ impl Tenx {
         session: &mut Session,
         glob: &[String],
         ruskel: &[String],
+        url: &[String],
         sender: &Option<mpsc::Sender<Event>>,
     ) -> Result<usize> {
         let mut contexts = Vec::new();
         for file in glob {
-            contexts.push(Context::new_path(&self.config, file.to_string())?);
+            contexts.push(Context::new_path(&self.config, file)?);
         }
         for ruskel_doc in ruskel {
-            contexts.push(Context::new_ruskel(ruskel_doc.clone()));
+            contexts.push(Context::new_ruskel(ruskel_doc));
+        }
+        for url_str in url {
+            contexts.push(Context::new_url(url_str));
         }
         let mut total_added = 0;
         if !contexts.is_empty() {

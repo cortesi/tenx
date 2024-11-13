@@ -309,13 +309,13 @@ pub enum Context {
 
 impl Context {
     /// Creates a new Context for a Ruskel document.
-    pub fn new_ruskel(name: String) -> Self {
-        Context::Ruskel(Ruskel::new(name))
+    pub fn new_ruskel(name: &str) -> Self {
+        Context::Ruskel(Ruskel::new(name.to_string()))
     }
 
     /// Creates a new Context for a glob pattern.
-    pub fn new_path(config: &Config, pattern: String) -> Result<Self> {
-        Ok(Context::Path(Path::new(config, pattern)?))
+    pub fn new_path(config: &Config, pattern: &str) -> Result<Self> {
+        Ok(Context::Path(Path::new(config, pattern.to_string())?))
     }
 
     /// Creates a new Context for the project map.
@@ -324,8 +324,8 @@ impl Context {
     }
 
     /// Creates a new Context for a URL.
-    pub fn new_url(url: String) -> Self {
-        Context::Url(Url::new(url))
+    pub fn new_url(url: &str) -> Self {
+        Context::Url(Url::new(url.to_string()))
     }
 }
 
@@ -445,7 +445,7 @@ mod tests {
         let mut config = test_project.config.clone();
         config.include = Include::Glob(vec!["**/*.rs".to_string()]);
 
-        let context_spec = Context::new_path(&config, "**/*.rs".to_string()).unwrap();
+        let context_spec = Context::new_path(&config, "**/*.rs").unwrap();
         assert!(matches!(context_spec, Context::Path(_)));
 
         if let Context::Path(path) = context_spec {
@@ -480,7 +480,7 @@ mod tests {
         ]);
 
         let config = test_project.config.clone();
-        let context_spec = Context::new_path(&config, "src/main.rs".to_string()).unwrap();
+        let context_spec = Context::new_path(&config, "src/main.rs").unwrap();
         assert!(matches!(context_spec, Context::Path(_)));
 
         if let Context::Path(path) = context_spec {
@@ -497,7 +497,7 @@ mod tests {
 
         let mut config_in_src = test_project.config.clone();
         config_in_src = config_in_src.with_test_cwd(test_project.tempdir.path().join("src"));
-        let context_spec = Context::new_path(&config_in_src, "./lib.rs".to_string()).unwrap();
+        let context_spec = Context::new_path(&config_in_src, "./lib.rs").unwrap();
         assert!(matches!(context_spec, Context::Path(_)));
 
         if let Context::Path(path) = context_spec {
@@ -523,8 +523,7 @@ mod tests {
         std::fs::write(&outside_file_path, "Outside content").unwrap();
 
         let config = test_project.config.clone();
-        let context_spec =
-            Context::new_path(&config, outside_file_path.to_str().unwrap().to_string()).unwrap();
+        let context_spec = Context::new_path(&config, outside_file_path.to_str().unwrap()).unwrap();
         assert!(matches!(context_spec, Context::Path(_)));
 
         if let Context::Path(path) = context_spec {
@@ -543,7 +542,7 @@ mod tests {
         config_with_outside_cwd =
             config_with_outside_cwd.with_test_cwd(outside_dir.path().to_path_buf());
         let relative_context_spec =
-            Context::new_path(&config_with_outside_cwd, "./outside.txt".to_string()).unwrap();
+            Context::new_path(&config_with_outside_cwd, "./outside.txt").unwrap();
         assert!(matches!(relative_context_spec, Context::Path(_)));
 
         if let Context::Path(path) = relative_context_spec {
