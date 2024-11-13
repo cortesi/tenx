@@ -16,6 +16,12 @@ use crate::{dialect, model, Result, TenxError};
 
 const DEFAULT_CLAUDE_SONNET: &str = "claude-3-5-sonnet-latest";
 const DEFAULT_CLAUDE_HAIKU: &str = "claude-3-5-haiku-latest";
+const DEFAULT_GPT_O1_PREVIEW: &str = "gpt-4-1106-preview";
+const DEFAULT_GPT_O1_MINI: &str = "gpt-4-1106-mini";
+const DEFAULT_GPT4O: &str = "gpt-4-0125-preview";
+const DEFAULT_GPT4O_MINI: &str = "gpt-4-0125-mini";
+const ANTHROPIC_API_KEY: &str = "ANTHROPIC_API_KEY";
+const OPENAI_API_KEY: &str = "OPENAI_API_KEY";
 
 macro_rules! serialize_if_different {
     ($state:expr, $self:expr, $default:expr, $field:ident) => {
@@ -420,9 +426,51 @@ impl<'de> Deserialize<'de> for ProjectRoot {
 
 impl Default for Config {
     fn default() -> Self {
-        Self {
-            include: Include::Git,
-            models: vec![
+        let mut models = Vec::new();
+
+        if let Ok(anthropic_key) = env::var(ANTHROPIC_API_KEY) {
+            models.extend_from_slice(&[
+                ModelConfig::Claude(ClaudeConf {
+                    name: "sonnet".to_string(),
+                    api_model: DEFAULT_CLAUDE_SONNET.to_string(),
+                    anthropic_key: anthropic_key.clone(),
+                }),
+                ModelConfig::Claude(ClaudeConf {
+                    name: "haiku".to_string(),
+                    api_model: DEFAULT_CLAUDE_HAIKU.to_string(),
+                    anthropic_key,
+                }),
+            ]);
+        }
+
+        if let Ok(openai_key) = env::var(OPENAI_API_KEY) {
+            models.extend_from_slice(&[
+                ModelConfig::OpenAi(OpenAiConf {
+                    name: "o1".to_string(),
+                    api_model: DEFAULT_GPT_O1_PREVIEW.to_string(),
+                    openai_key: openai_key.clone(),
+                }),
+                ModelConfig::OpenAi(OpenAiConf {
+                    name: "o1-mini".to_string(),
+                    api_model: DEFAULT_GPT_O1_MINI.to_string(),
+                    openai_key: openai_key.clone(),
+                }),
+                ModelConfig::OpenAi(OpenAiConf {
+                    name: "gpt4o".to_string(),
+                    api_model: DEFAULT_GPT4O.to_string(),
+                    openai_key: openai_key.clone(),
+                }),
+                ModelConfig::OpenAi(OpenAiConf {
+                    name: "gpt4o-mini".to_string(),
+                    api_model: DEFAULT_GPT4O_MINI.to_string(),
+                    openai_key,
+                }),
+            ]);
+        }
+
+        // If no API keys are available, add default models with empty keys
+        if models.is_empty() {
+            models.extend_from_slice(&[
                 ModelConfig::Claude(ClaudeConf {
                     name: "sonnet".to_string(),
                     api_model: DEFAULT_CLAUDE_SONNET.to_string(),
@@ -433,7 +481,12 @@ impl Default for Config {
                     api_model: DEFAULT_CLAUDE_HAIKU.to_string(),
                     anthropic_key: "".to_string(),
                 }),
-            ],
+            ]);
+        }
+
+        Self {
+            include: Include::Git,
+            models,
             session_store_dir: PathBuf::new(),
             retry_limit: DEFAULT_RETRY_LIMIT,
             no_preflight: false,
@@ -703,13 +756,22 @@ impl Config {
         self
     }
 
-    /// Loads the Anthropic API key from the ANTHROPIC_API_KEY environment variable, if it exists.
+    /// Loads API keys from environment variables if they exist.
     pub fn load_env(mut self) -> Self {
-        if let Ok(key) = env::var("ANTHROPIC_API_KEY") {
+        if let Ok(key) = env::var(ANTHROPIC_API_KEY) {
             for model in &mut self.models {
                 if let ModelConfig::Claude(conf) = model {
                     if conf.anthropic_key.is_empty() {
                         conf.anthropic_key = key.clone();
+                    }
+                }
+            }
+        }
+        if let Ok(key) = env::var(OPENAI_API_KEY) {
+            for model in &mut self.models {
+                if let ModelConfig::OpenAi(conf) = model {
+                    if conf.openai_key.is_empty() {
+                        conf.openai_key = key.clone();
                     }
                 }
             }
@@ -739,9 +801,10 @@ impl Config {
                 conf.api_model.clone(),
                 conf.anthropic_key.clone(),
             )?)),
-            ModelConfig::OpenAi(_) => Err(TenxError::Internal(
-                "OpenAI model not yet implemented".to_string(),
-            )),
+            ModelConfig::OpenAi(conf) => Ok(model::Model::OpenAi(model::OpenAi::new(
+                conf.api_model.clone(),
+                conf.openai_key.clone(),
+            )?)),
         }
     }
 
