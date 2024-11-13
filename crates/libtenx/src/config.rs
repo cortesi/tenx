@@ -120,31 +120,11 @@ pub struct ClaudeConf {
     pub anthropic_key: String,
 }
 
-impl Default for ClaudeConf {
-    fn default() -> Self {
-        Self {
-            name: "claude".to_string(),
-            api_model: DEFAULT_CLAUDE_SONNET.to_string(),
-            anthropic_key: "".to_string(),
-        }
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct OpenAiConf {
     pub name: String,
     pub api_model: String,
     pub openai_key: String,
-}
-
-impl Default for OpenAiConf {
-    fn default() -> Self {
-        Self {
-            name: "gpt4".to_string(),
-            api_model: "gpt-4-turbo-preview".to_string(),
-            openai_key: "".to_string(),
-        }
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -996,7 +976,11 @@ mod tests {
     fn test_single_value_deserialization() {
         let toml_str = "retry_limit = 42";
         let mut config = Config::from_toml(toml_str).unwrap();
-        config.models = vec![ModelConfig::Claude(ClaudeConf::default())];
+        config.models = vec![ModelConfig::Claude(ClaudeConf {
+            name: "sonnet".to_string(),
+            api_model: "test".to_string(),
+            anthropic_key: "".to_string(),
+        })];
 
         assert_eq!(config.retry_limit, 42);
         if let ModelConfig::Claude(conf) = &config.models[0] {

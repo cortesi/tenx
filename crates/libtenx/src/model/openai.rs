@@ -121,7 +121,9 @@ impl OpenAi {
                         }
                     }
                 }
-                Err(err) => return Err(err.into()),
+                Err(err) => {
+                    return Err(err.into());
+                }
             }
         }
 

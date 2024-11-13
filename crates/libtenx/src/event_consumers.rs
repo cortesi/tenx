@@ -15,7 +15,7 @@ pub fn create_tracing_subscriber(verbosity: u8, sender: mpsc::Sender<Event>) -> 
         1 => EnvFilter::new("info"),
         2 => EnvFilter::new("debug"),
         3 => EnvFilter::new("trace"),
-        _ => EnvFilter::new("warn"),
+        _ => EnvFilter::new("trace"),
     };
 
     struct Writer {
