@@ -145,6 +145,10 @@ enum Commands {
         /// Add ruskel documentation
         #[clap(long)]
         ruskel: Vec<String>,
+
+        /// Add URLs as context
+        #[clap(long)]
+        url: Vec<String>,
     },
     /// Clear the current session without resetting changes
     Clear,
@@ -187,6 +191,10 @@ enum Commands {
         /// Add files as context
         #[clap(long)]
         ctx: Vec<String>,
+
+        /// Add URLs as context
+        #[clap(long)]
+        url: Vec<String>,
     },
     /// List files included in the project
     Files {
@@ -206,6 +214,10 @@ enum Commands {
         /// Add files as context
         #[clap(long)]
         ctx: Vec<String>,
+
+        /// Add URLs as context
+        #[clap(long)]
+        url: Vec<String>,
 
         /// Clear the current session, and use it to fix
         #[clap(long)]
@@ -236,6 +248,10 @@ enum Commands {
         /// Add ruskel documentation
         #[clap(long)]
         ruskel: Vec<String>,
+
+        /// Add URLs as context
+        #[clap(long)]
+        url: Vec<String>,
     },
     /// Start a new session, edit the prompt, and run it
     Quick {
@@ -250,6 +266,10 @@ enum Commands {
         /// Add files as context
         #[clap(long)]
         ctx: Vec<String>,
+
+        /// Add URLs as context
+        #[clap(long)]
+        url: Vec<String>,
 
         /// User prompt for the edit operation
         #[clap(long)]
@@ -283,6 +303,9 @@ enum Commands {
         /// Add ruskel documentation as context
         #[clap(long)]
         ruskel: Vec<String>,
+        /// Add URLs as context
+        #[clap(long)]
+        url: Vec<String>,
         /// User prompt for the edit operation
         #[clap(long)]
         prompt: Option<String>,
@@ -519,11 +542,12 @@ async fn main() -> anyhow::Result<()> {
                 files,
                 ruskel,
                 ctx,
+                url,
                 prompt,
                 prompt_file,
             } => {
                 let mut session = tx.new_session_from_cwd(&Some(sender.clone())).await?;
-                tx.add_contexts(&mut session, ctx, ruskel, &[], &Some(sender.clone()))
+                tx.add_contexts(&mut session, ctx, ruskel, url, &Some(sender.clone()))
                     .await?;
                 for file in files {
                     session.add_editable(&config, file)?;
@@ -543,13 +567,14 @@ async fn main() -> anyhow::Result<()> {
                 prompt_file,
                 ruskel,
                 ctx,
+                url,
             } => {
                 let mut session = tx.load_session()?;
 
                 for f in files.clone().unwrap_or_default() {
                     session.add_editable(&config, &f)?;
                 }
-                tx.add_contexts(&mut session, ctx, ruskel, &[], &Some(sender.clone()))
+                tx.add_contexts(&mut session, ctx, ruskel, url, &Some(sender.clone()))
                     .await?;
 
                 let user_prompt = match get_prompt(prompt, prompt_file, &session, false)? {
@@ -575,17 +600,15 @@ async fn main() -> anyhow::Result<()> {
                 files,
                 context,
                 ruskel,
+                url,
             } => {
                 let mut session = tx.load_session()?;
                 let mut total = 0;
 
                 if *context {
                     let added = tx
-                        .add_contexts(&mut session, files, &[], &[], &Some(sender.clone()))
+                        .add_contexts(&mut session, files, ruskel, url, &Some(sender.clone()))
                         .await?;
-                    if added == 0 {
-                        return Err(anyhow::anyhow!("glob did not match any files"));
-                    }
                     total += added;
                 } else {
                     for file in files {
@@ -595,13 +618,9 @@ async fn main() -> anyhow::Result<()> {
                         }
                         total += added;
                     }
-                }
-
-                if !ruskel.is_empty() && !*context {
                     let added = tx
-                        .add_contexts(&mut session, &[], ruskel, &[], &Some(sender.clone()))
+                        .add_contexts(&mut session, &[], ruskel, url, &Some(sender.clone()))
                         .await?;
-                    println!("{} new ruskel context item(s) added", added);
                     total += added;
                 }
 
@@ -620,6 +639,7 @@ async fn main() -> anyhow::Result<()> {
                 edit,
                 ctx,
                 ruskel,
+                url,
                 prompt,
                 prompt_file,
             } => {
@@ -628,7 +648,7 @@ async fn main() -> anyhow::Result<()> {
                 let offset = step_offset.unwrap_or(session.steps().len() - 1);
                 tx.reset(&mut session, offset)?;
 
-                tx.add_contexts(&mut session, ctx, ruskel, &[], &Some(sender.clone()))
+                tx.add_contexts(&mut session, ctx, ruskel, url, &Some(sender.clone()))
                     .await?;
 
                 let prompt = if *edit || prompt.is_some() || prompt_file.is_some() {
@@ -640,9 +660,9 @@ async fn main() -> anyhow::Result<()> {
                 tx.retry(&mut session, prompt, Some(sender.clone())).await?;
                 Ok(())
             }
-            Commands::New { files, ruskel } => {
+            Commands::New { files, ruskel, url } => {
                 let mut session = tx.new_session_from_cwd(&Some(sender.clone())).await?;
-                tx.add_contexts(&mut session, files, ruskel, &[], &Some(sender.clone()))
+                tx.add_contexts(&mut session, files, ruskel, url, &Some(sender.clone()))
                     .await?;
                 tx.save_session(&session)?;
                 println!("new session: {}", config.project_root().display());
@@ -652,6 +672,7 @@ async fn main() -> anyhow::Result<()> {
                 files,
                 ruskel,
                 ctx,
+                url,
                 clear,
                 prompt,
                 prompt_file,
@@ -668,7 +689,7 @@ async fn main() -> anyhow::Result<()> {
                 for file in files {
                     session.add_editable(&config, file)?;
                 }
-                tx.add_contexts(&mut session, ctx, ruskel, &[], &Some(sender.clone()))
+                tx.add_contexts(&mut session, ctx, ruskel, url, &Some(sender.clone()))
                     .await?;
 
                 let prompt = if prompt.is_some() || prompt_file.is_some() || *edit {
