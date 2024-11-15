@@ -96,8 +96,8 @@ Also refactored the Foo trait to include a parameter in the bar() method.
 
 ## <write_file>
 
-Replaces the entire contents of the file or creates a new file. Should ALWAYS
-be used for changes to more than a third of a file.
+Replaces the entire contents of the file or creates a new file. Only use full
+file writes when absolutely necessary.
 
 Example:
 

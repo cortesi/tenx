@@ -17,7 +17,7 @@ use tempfile::TempDir;
 use tracing::info;
 
 use crate::{
-    config::{Config, ProjectRoot},
+    config::{Config, Include, ProjectRoot},
     Result, Tenx, TenxError,
 };
 
@@ -87,7 +87,8 @@ pub struct Trial {
 }
 
 impl Trial {
-    /// Creates a temporary directory and copies the project into it
+    /// Creates a temporary directory and copies the project into it. The project will be placed at
+    /// "$tempdir/project" regardless of source directory name.
     fn setup_temp_project(&self) -> Result<TempDir> {
         let temp_dir = TempDir::new()
             .map_err(|e| TenxError::Internal(format!("Failed to create temp directory: {}", e)))?;
@@ -96,16 +97,27 @@ impl Trial {
         src_path.push("projects");
         src_path.push(&self.trial_conf.project);
 
-        let mut dst_path = temp_dir.path().to_path_buf();
-        dst_path.push(&self.trial_conf.project);
-
-        let session_path = dst_path.join("session");
-        fs::create_dir_all(&session_path).map_err(|e| {
-            TenxError::Internal(format!("Failed to create session directory: {}", e))
-        })?;
+        let dst_path = temp_dir.path().to_path_buf();
 
         fs_extra::dir::copy(&src_path, &dst_path, &fs_extra::dir::CopyOptions::new())
             .map_err(|e| TenxError::Internal(format!("Failed to copy project directory: {}", e)))?;
+
+        // For a project path like "foo/bar", we want to rename "bar" to "project"
+        let path_buf = PathBuf::from(&self.trial_conf.project);
+        let project_name = path_buf
+            .components()
+            .last()
+            .and_then(|c| c.as_os_str().to_str())
+            .ok_or_else(|| TenxError::Internal("Invalid project name".to_string()))?;
+
+        let copied_dir = dst_path.join(project_name);
+        fs::rename(&copied_dir, dst_path.join("project")).map_err(|e| {
+            TenxError::Internal(format!("Failed to rename project directory: {}", e))
+        })?;
+
+        fs::create_dir_all(dst_path.join("session")).map_err(|e| {
+            TenxError::Internal(format!("Failed to create session directory: {}", e))
+        })?;
 
         Ok(temp_dir)
     }
@@ -122,7 +134,7 @@ impl Trial {
         let temp_dir = self.setup_temp_project()?;
         let mut conf = self.tenx_conf.clone();
         conf.session_store_dir = temp_dir.path().join("session");
-        conf.project_root = ProjectRoot::Path(temp_dir.path().join(&self.trial_conf.project));
+        conf.project_root = ProjectRoot::Path(temp_dir.path().join("project"));
         if let Some(m) = model {
             conf.default_model = Some(m);
         }
@@ -151,7 +163,8 @@ impl Trial {
     /// Returns a default configuration for trials
     fn default_config() -> Result<Config> {
         let mut config = Config::default();
-        config.include = crate::config::Include::Glob(vec!["**/*".to_string()]);
+        config.include = Include::Glob(vec!["**/*".to_string()]);
+        config.exclude = vec!["target/**".to_string()];
         Ok(config)
     }
 
@@ -230,6 +243,106 @@ mod tests {
         assert_eq!(trials.len(), 2);
         assert!(trials.iter().any(|t| t.name == "test1"));
         assert!(trials.iter().any(|t| t.name == "test2"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_setup_temp_project_nested() -> Result<()> {
+        use std::fs;
+        use tempfile::tempdir;
+
+        // Create a temporary directory to act as our base directory
+        let base_dir = tempdir()?;
+
+        // Create a nested test project structure
+        let test_project = base_dir
+            .path()
+            .join("projects")
+            .join("nested")
+            .join("test_proj");
+        fs::create_dir_all(&test_project)?;
+        fs::write(test_project.join("test.txt"), "test content")?;
+
+        // Create a trial configuration with nested project path
+        let trial = Trial {
+            name: "test".to_string(),
+            desc: "test description".to_string(),
+            base_dir: base_dir.path().to_path_buf(),
+            trial_conf: TrialConf {
+                project: "nested/test_proj".to_string(),
+                op: TrialOp::Ask(Ask {
+                    prompt: "test".to_string(),
+                    editable: vec![],
+                }),
+                config: None,
+                desc: None,
+            },
+            tenx_conf: Config::default(),
+        };
+
+        // Run setup_temp_project
+        let temp_dir = trial.setup_temp_project()?;
+
+        // Verify the directory structure
+        let project_dir = temp_dir.path().join("project");
+        assert!(project_dir.exists());
+        assert!(project_dir.is_dir());
+
+        // Verify the content was copied
+        let test_file = project_dir.join("test.txt");
+        assert!(test_file.exists());
+        assert_eq!(fs::read_to_string(test_file)?, "test content");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_setup_temp_project() -> Result<()> {
+        use std::fs;
+        use tempfile::tempdir;
+
+        // Create a temporary directory to act as our base directory
+        let base_dir = tempdir()?;
+
+        // Create a test project structure
+        let test_project = base_dir.path().join("projects").join("test_proj");
+        fs::create_dir_all(&test_project)?;
+        fs::write(test_project.join("test.txt"), "test content")?;
+
+        // Create a trial configuration
+        let trial = Trial {
+            name: "test".to_string(),
+            desc: "test description".to_string(),
+            base_dir: base_dir.path().to_path_buf(),
+            trial_conf: TrialConf {
+                project: "test_proj".to_string(),
+                op: TrialOp::Ask(Ask {
+                    prompt: "test".to_string(),
+                    editable: vec![],
+                }),
+                config: None,
+                desc: None,
+            },
+            tenx_conf: Config::default(),
+        };
+
+        // Run setup_temp_project
+        let temp_dir = trial.setup_temp_project()?;
+
+        // Verify the directory structure
+        let project_dir = temp_dir.path().join("project");
+        let session_dir = temp_dir.path().join("session");
+
+        assert!(project_dir.exists());
+        assert!(project_dir.is_dir());
+        assert!(session_dir.exists());
+        assert!(session_dir.is_dir());
+
+        // Verify the content was copied
+        let test_file = project_dir.join("test.txt");
+        assert!(test_file.exists());
+        assert_eq!(fs::read_to_string(test_file)?, "test content");
 
         Ok(())
     }

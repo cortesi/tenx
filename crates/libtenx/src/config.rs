@@ -53,6 +53,8 @@ pub fn home_config_dir() -> PathBuf {
         .join("tenx")
 }
 
+/// Recursively walk a directory and collect files that match a glob pattern.
+/// Returns paths relative to the root directory.
 fn walk_directory(
     root: &Path,
     current_dir: &Path,
@@ -64,7 +66,10 @@ fn walk_directory(
         let path = entry.path();
         if path.is_dir() {
             walk_directory(root, &path, globset, files)?;
-        } else if let Ok(relative_path) = path.strip_prefix(root) {
+        } else {
+            let relative_path = path
+                .strip_prefix(root)
+                .map_err(|e| TenxError::Internal(format!("Path not under root: {}", e)))?;
             if globset.is_match(relative_path) {
                 files.push(relative_path.to_path_buf());
             }
@@ -290,6 +295,10 @@ pub struct Config {
     #[serde(default)]
     pub include: Include,
 
+    /// Glob patterns to exclude from the file list
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub exclude: Vec<String>,
+
     /// Skip the preflight check.
     #[serde(default)]
     pub no_preflight: bool,
@@ -466,6 +475,7 @@ impl Default for Config {
 
         Self {
             include: Include::Git,
+            exclude: Vec::new(),
             models,
             session_store_dir: PathBuf::new(),
             retry_limit: DEFAULT_RETRY_LIMIT,
@@ -629,7 +639,19 @@ impl Config {
 
     pub fn included_files(&self) -> Result<Vec<PathBuf>> {
         let project_root = self.project_root();
-        match &self.include {
+
+        // Build exclude globset
+        let mut exclude_builder = GlobSetBuilder::new();
+        for pattern in &self.exclude {
+            exclude_builder
+                .add(Glob::new(pattern).map_err(|e| TenxError::Internal(e.to_string()))?);
+        }
+        let exclude_globset = exclude_builder
+            .build()
+            .map_err(|e| TenxError::Internal(e.to_string()))?;
+
+        // Get initial file list
+        let initial_files = match &self.include {
             Include::Git => {
                 let output = Command::new("git")
                     .arg("ls-files")
@@ -649,10 +671,10 @@ impl Config {
                     TenxError::Internal(format!("Failed to parse git ls-files output: {}", e))
                 })?;
 
-                Ok(files
+                files
                     .lines()
                     .map(|line| PathBuf::from(line.trim()))
-                    .collect())
+                    .collect::<Vec<_>>()
             }
             Include::Glob(patterns) => {
                 let mut builder = GlobSetBuilder::new();
@@ -666,9 +688,15 @@ impl Config {
 
                 let mut included_files = Vec::new();
                 walk_directory(&project_root, &project_root, &globset, &mut included_files)?;
-                Ok(included_files)
+                included_files
             }
-        }
+        };
+
+        // Filter out excluded files
+        Ok(initial_files
+            .into_iter()
+            .filter(|path| !exclude_globset.is_match(path))
+            .collect())
     }
 
     /// Sets the full serialization flag.
@@ -1006,11 +1034,13 @@ mod tests {
                 "file2.txt",
                 "subdir/file3.rs",
                 "subdir/file4.txt",
+                "subdir/ignore.rs",
             ],
         )?;
 
         let config = Config {
             include: Include::Glob(vec!["*.rs".to_string(), "subdir/*.txt".to_string()]),
+            exclude: vec!["**/ignore.rs".to_string()],
             project_root: ProjectRoot::Path(root_path.to_path_buf()),
             ..Default::default()
         };
@@ -1022,6 +1052,26 @@ mod tests {
             PathBuf::from("file1.rs"),
             PathBuf::from("subdir/file3.rs"),
             PathBuf::from("subdir/file4.txt"),
+        ];
+        expected_files.sort();
+
+        assert_eq!(included_files, expected_files);
+
+        // Test with multiple exclude patterns
+        let config_multi_exclude = Config {
+            include: Include::Glob(vec!["**/*.rs".to_string(), "**/*.txt".to_string()]),
+            exclude: vec!["**/ignore.rs".to_string(), "subdir/*.txt".to_string()],
+            project_root: ProjectRoot::Path(root_path.to_path_buf()),
+            ..Default::default()
+        };
+
+        let mut included_files = config_multi_exclude.included_files()?;
+        included_files.sort();
+
+        let mut expected_files = vec![
+            PathBuf::from("file1.rs"),
+            PathBuf::from("file2.txt"),
+            PathBuf::from("subdir/file3.rs"),
         ];
         expected_files.sort();
 
