@@ -127,23 +127,30 @@ enum Commands {
         #[clap(short, long)]
         full: bool,
     },
-    /// Add context or editable files to a session
-    Add {
-        /// Specifies files to add (as editable by default)
+    /// Add editable files to a session
+    Edit {
+        /// Specifies files to edit
         #[clap(value_parser)]
         files: Vec<String>,
+    },
 
-        /// Add files as context instead of editable
-        #[clap(long)]
-        context: bool,
+    /// Add items to context (alias: ctx)
+    #[clap(alias = "ctx")]
+    Context {
+        /// Add items as ruskel documentation modules
+        #[clap(long, group = "type")]
+        ruskel: bool,
 
-        /// Add ruskel documentation
-        #[clap(long)]
-        ruskel: Vec<String>,
+        /// Add items as files
+        #[clap(long, group = "type")]
+        file: bool,
 
-        /// Add URLs as context
-        #[clap(long)]
-        url: Vec<String>,
+        /// Add items as URLs
+        #[clap(long, group = "type")]
+        url: bool,
+
+        /// Items to add to context
+        items: Vec<String>,
     },
     /// Clear the current session without resetting changes
     Clear,
@@ -589,35 +596,39 @@ async fn main() -> anyhow::Result<()> {
                 }
                 Ok(())
             }
-            Commands::Add {
-                files,
-                context,
-                ruskel,
-                url,
-            } => {
+            Commands::Edit { files } => {
                 let mut session = tx.load_session()?;
                 let mut total = 0;
 
-                if *context {
-                    let added = tx
-                        .add_contexts(&mut session, files, ruskel, url, &Some(sender.clone()))
-                        .await?;
-                    total += added;
-                } else {
-                    for file in files {
-                        let added = session.add_editable(&config, file)?;
-                        if added == 0 {
-                            return Err(anyhow::anyhow!("glob did not match any files"));
-                        }
-                        total += added;
+                for file in files {
+                    let added = session.add_editable(&config, &file)?;
+                    if added == 0 {
+                        return Err(anyhow::anyhow!("glob did not match any files"));
                     }
-                    let added = tx
-                        .add_contexts(&mut session, &[], ruskel, url, &Some(sender.clone()))
-                        .await?;
                     total += added;
                 }
 
-                println!("{} items added", total);
+                println!("{} files added for editing", total);
+                tx.save_session(&session)?;
+                Ok(())
+            }
+            Commands::Context {
+                ruskel,
+                file,
+                url,
+                items,
+            } => {
+                let mut session = tx.load_session()?;
+                let added = tx
+                    .add_contexts(
+                        &mut session,
+                        if *file { &items } else { &[] },
+                        if *ruskel { &items } else { &[] },
+                        if *url { &items } else { &[] },
+                        &Some(sender.clone()),
+                    )
+                    .await?;
+                println!("{} context items added", added);
                 tx.save_session(&session)?;
                 Ok(())
             }
