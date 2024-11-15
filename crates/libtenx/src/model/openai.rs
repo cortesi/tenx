@@ -57,6 +57,7 @@ pub struct OpenAi {
     pub api_model: String,
     pub openai_key: String,
     pub streaming: bool,
+    pub no_system_prompt: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
@@ -101,6 +102,7 @@ impl OpenAi {
             api_model,
             openai_key,
             streaming: stream,
+            no_system_prompt: false,
         })
     }
 
@@ -167,23 +169,37 @@ impl OpenAi {
     ) -> Result<CreateChatCompletionRequest> {
         let mut messages: Vec<ChatCompletionRequestMessage> = Vec::new();
 
-        messages.push(
-            ChatCompletionRequestSystemMessageArgs::default()
-                .content(dialect.system())
-                .build()?
-                .into(),
-        );
+        if self.no_system_prompt {
+            messages.push(
+                ChatCompletionRequestUserMessageArgs::default()
+                    .content(format!(
+                        "{}\n{}\n{}",
+                        dialect.system(),
+                        CONTEXT_LEADIN,
+                        dialect.render_context(config, session)?
+                    ))
+                    .build()?
+                    .into(),
+            );
+        } else {
+            messages.push(
+                ChatCompletionRequestSystemMessageArgs::default()
+                    .content(dialect.system())
+                    .build()?
+                    .into(),
+            );
 
-        messages.push(
-            ChatCompletionRequestUserMessageArgs::default()
-                .content(format!(
-                    "{}\n{}",
-                    CONTEXT_LEADIN,
-                    dialect.render_context(config, session)?
-                ))
-                .build()?
-                .into(),
-        );
+            messages.push(
+                ChatCompletionRequestUserMessageArgs::default()
+                    .content(format!(
+                        "{}\n{}",
+                        CONTEXT_LEADIN,
+                        dialect.render_context(config, session)?
+                    ))
+                    .build()?
+                    .into(),
+            );
+        }
 
         messages.push(
             ChatCompletionRequestAssistantMessageArgs::default()
