@@ -131,6 +131,7 @@ pub struct OpenAiConf {
     pub api_model: String,
     pub openai_key: String,
     pub stream: bool,
+    pub no_system_prompt: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -465,24 +466,28 @@ impl Default for Config {
                     api_model: DEFAULT_GPT_O1_PREVIEW.to_string(),
                     openai_key: openai_key.clone(),
                     stream: false,
+                    no_system_prompt: true,
                 }),
                 ModelConfig::OpenAi(OpenAiConf {
                     name: "o1-mini".to_string(),
                     api_model: DEFAULT_GPT_O1_MINI.to_string(),
                     openai_key: openai_key.clone(),
                     stream: false,
+                    no_system_prompt: true,
                 }),
                 ModelConfig::OpenAi(OpenAiConf {
                     name: "gpt4o".to_string(),
                     api_model: DEFAULT_GPT4O.to_string(),
                     openai_key: openai_key.clone(),
                     stream: true,
+                    no_system_prompt: false,
                 }),
                 ModelConfig::OpenAi(OpenAiConf {
                     name: "gpt4o-mini".to_string(),
                     api_model: DEFAULT_GPT4O_MINI.to_string(),
                     openai_key,
                     stream: true,
+                    no_system_prompt: false,
                 }),
             ]);
         }
@@ -839,11 +844,12 @@ impl Config {
                 conf.api_model.clone(),
                 conf.anthropic_key.clone(),
             )?)),
-            ModelConfig::OpenAi(conf) => Ok(model::Model::OpenAi(model::OpenAi::new(
-                conf.api_model.clone(),
-                conf.openai_key.clone(),
-                conf.stream,
-            )?)),
+            ModelConfig::OpenAi(conf) => Ok(model::Model::OpenAi(model::OpenAi {
+                api_model: conf.api_model.clone(),
+                openai_key: conf.openai_key.clone(),
+                streaming: conf.stream,
+                no_system_prompt: conf.no_system_prompt,
+            })),
         }
     }
 

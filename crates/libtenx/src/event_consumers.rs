@@ -147,6 +147,10 @@ pub async fn output_progress(
                         manage_spinner(&mut current_spinner, |s| s.finish());
                         print!("{}", chunk);
                     }
+                    Event::ModelResponse(ref text) => {
+                        manage_spinner(&mut current_spinner, |s| s.finish());
+                        print!("{}", text);
+                    }
                     Event::Finish => {
                         manage_spinner(&mut current_spinner, |s| s.finish());
                     }

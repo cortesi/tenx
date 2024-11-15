@@ -32,7 +32,6 @@ const EDITABLE_LEADIN: &str =
 const EDITABLE_UPDATE_LEADIN: &str = "Here are the updated files.";
 const OMITTED_FILES_LEADIN: &str =
     "These files have been omitted since they were updated later in the conversation:";
-const MAX_TOKENS: u32 = 8192;
 
 fn render_editables_with_omitted(
     config: &Config,
@@ -51,7 +50,7 @@ fn render_editables_with_omitted(
     Ok(result)
 }
 
-/// Model wrapper for OpenAI API
+/// OpenAI model implementation
 #[derive(Default, Debug, Clone)]
 pub struct OpenAi {
     pub api_model: String,
@@ -90,22 +89,6 @@ impl OpenAiUsage {
 }
 
 impl OpenAi {
-    /// Creates a new OpenAi model instance
-    pub fn new(api_model: String, openai_key: String, stream: bool) -> Result<Self> {
-        if api_model.is_empty() {
-            return Err(TenxError::Model("Empty API model name".into()));
-        }
-        if openai_key.is_empty() {
-            return Err(TenxError::Model("Empty OpenAI API key".into()));
-        }
-        Ok(Self {
-            api_model,
-            openai_key,
-            streaming: stream,
-            no_system_prompt: false,
-        })
-    }
-
     async fn stream_response(
         &self,
         client: &Client<OpenAIConfig>,
@@ -268,7 +251,6 @@ impl OpenAi {
         Ok(CreateChatCompletionRequestArgs::default()
             .model(&self.api_model)
             .messages(messages)
-            .max_tokens(MAX_TOKENS)
             .stream(true)
             .build()?)
     }
@@ -289,6 +271,9 @@ impl ModelProvider for OpenAi {
         if self.openai_key.is_empty() {
             return Err(TenxError::Model("No OpenAI key configured.".into()));
         }
+        if self.api_model.is_empty() {
+            return Err(TenxError::Model("Empty API model name".into()));
+        }
 
         if !session.should_continue() {
             return Err(TenxError::Internal("No prompt to process.".into()));
@@ -299,14 +284,18 @@ impl ModelProvider for OpenAi {
         let client = Client::with_config(openai_config);
         let mut req = self.request(config, session, &dialect)?;
 
-        trace!("Sending request: {:?}", req);
+        trace!("Sending request: {:#?}", req);
         let resp = if self.streaming {
             self.stream_response(&client, req, sender).await?
         } else {
             req.stream = Some(false);
-            client.chat().create(req).await?
+            let resp = client.chat().create(req).await?;
+            if let Some(content) = resp.choices[0].message.content.as_ref() {
+                send_event(&sender, Event::Snippet(content.to_string()))?;
+            }
+            resp
         };
-        trace!("Got response: {:?}", resp);
+        trace!("Got response: {:#?}", resp);
 
         let mut modresp = if let Some(content) = resp.choices[0].message.content.as_ref() {
             dialect.parse(content)?

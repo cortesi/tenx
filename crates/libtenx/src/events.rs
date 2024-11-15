@@ -64,6 +64,8 @@ pub enum Event {
 
     /// A snippet of output text received from a model
     Snippet(String),
+    /// A a complete, non-streamed response was received from a model
+    ModelResponse(String),
     /// Patch application has started
     ApplyPatch,
 
