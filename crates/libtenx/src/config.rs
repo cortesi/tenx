@@ -130,6 +130,7 @@ pub struct OpenAiConf {
     pub name: String,
     pub api_model: String,
     pub openai_key: String,
+    pub stream: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -164,8 +165,8 @@ impl ModelConfig {
                 conf.name, conf.api_model, conf.anthropic_key
             ),
             ModelConfig::OpenAi(conf) => format!(
-                "name = \"{}\"\napi_model = \"{}\"openai_key={}",
-                conf.name, conf.api_model, conf.openai_key
+                "name = \"{}\"\napi_model = \"{}\"\nstream = {}\nopenai_key={}",
+                conf.name, conf.api_model, conf.stream, conf.openai_key
             ),
         }
     }
@@ -438,21 +439,25 @@ impl Default for Config {
                     name: "o1".to_string(),
                     api_model: DEFAULT_GPT_O1_PREVIEW.to_string(),
                     openai_key: openai_key.clone(),
+                    stream: false,
                 }),
                 ModelConfig::OpenAi(OpenAiConf {
                     name: "o1-mini".to_string(),
                     api_model: DEFAULT_GPT_O1_MINI.to_string(),
                     openai_key: openai_key.clone(),
+                    stream: false,
                 }),
                 ModelConfig::OpenAi(OpenAiConf {
                     name: "gpt4o".to_string(),
                     api_model: DEFAULT_GPT4O.to_string(),
                     openai_key: openai_key.clone(),
+                    stream: true,
                 }),
                 ModelConfig::OpenAi(OpenAiConf {
                     name: "gpt4o-mini".to_string(),
                     api_model: DEFAULT_GPT4O_MINI.to_string(),
                     openai_key,
+                    stream: true,
                 }),
             ]);
         }
@@ -812,6 +817,7 @@ impl Config {
             ModelConfig::OpenAi(conf) => Ok(model::Model::OpenAi(model::OpenAi::new(
                 conf.api_model.clone(),
                 conf.openai_key.clone(),
+                conf.stream,
             )?)),
         }
     }

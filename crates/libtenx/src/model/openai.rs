@@ -90,7 +90,7 @@ impl OpenAiUsage {
 
 impl OpenAi {
     /// Creates a new OpenAi model instance
-    pub fn new(api_model: String, openai_key: String) -> Result<Self> {
+    pub fn new(api_model: String, openai_key: String, stream: bool) -> Result<Self> {
         if api_model.is_empty() {
             return Err(TenxError::Model("Empty API model name".into()));
         }
@@ -100,7 +100,7 @@ impl OpenAi {
         Ok(Self {
             api_model,
             openai_key,
-            streaming: true,
+            streaming: stream,
         })
     }
 
