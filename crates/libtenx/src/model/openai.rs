@@ -56,6 +56,7 @@ fn render_editables_with_omitted(
 pub struct OpenAi {
     pub api_model: String,
     pub openai_key: String,
+    pub streaming: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
@@ -99,6 +100,7 @@ impl OpenAi {
         Ok(Self {
             api_model,
             openai_key,
+            streaming: true,
         })
     }
 
@@ -279,10 +281,15 @@ impl ModelProvider for OpenAi {
         let dialect = config.dialect()?;
         let openai_config = OpenAIConfig::new().with_api_key(self.openai_key.clone());
         let client = Client::with_config(openai_config);
-        let req = self.request(config, session, &dialect)?;
+        let mut req = self.request(config, session, &dialect)?;
 
         trace!("Sending request: {:?}", req);
-        let resp = self.stream_response(&client, req, sender).await?;
+        let resp = if self.streaming {
+            self.stream_response(&client, req, sender).await?
+        } else {
+            req.stream = Some(false);
+            client.chat().create(req).await?
+        };
         trace!("Got response: {:?}", resp);
 
         let mut modresp = if let Some(content) = resp.choices[0].message.content.as_ref() {
