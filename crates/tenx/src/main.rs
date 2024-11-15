@@ -111,13 +111,6 @@ struct Cli {
 }
 
 #[derive(Subcommand)]
-enum ModelCommands {
-    /// List all configured models (alias: ls)
-    #[clap(alias = "ls")]
-    List,
-}
-
-#[derive(Subcommand)]
 enum DialectCommands {
     /// Print the current dialect and its settings
     Info,
@@ -127,10 +120,12 @@ enum DialectCommands {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Model commands
-    Model {
-        #[clap(subcommand)]
-        command: ModelCommands,
+    /// List configured models (alias: ls)
+    #[clap(alias = "ls")]
+    Models {
+        /// Show full configuration details
+        #[clap(short, long)]
+        full: bool,
     },
     /// Add context or editable files to a session
     Add {
@@ -421,24 +416,22 @@ async fn main() -> anyhow::Result<()> {
 
     let result = match &cli.command {
         Some(cmd) => match cmd {
-            Commands::Model { command } => match command {
-                ModelCommands::List => {
-                    for model in &config.models {
-                        match model {
-                            libtenx::config::ModelConfig::Claude(_)
-                            | libtenx::config::ModelConfig::OpenAi(_) => {
-                                println!("{} ({})", model.name().blue().bold(), model.kind());
-                                println!("config:");
-                                for line in model.config().lines() {
-                                    println!("    {}", line);
-                                }
-                                println!();
+            Commands::Models { full } => {
+                for model in &config.models {
+                    match model {
+                        libtenx::config::ModelConfig::Claude(_)
+                        | libtenx::config::ModelConfig::OpenAi(_) => {
+                            println!("{}", model.name().blue().bold());
+                            println!("    kind: {}", model.kind());
+                            for line in model.config(*full).lines() {
+                                println!("    {}", line);
                             }
+                            println!();
                         }
                     }
-                    Ok(())
                 }
-            },
+                Ok(())
+            }
             Commands::Conf {
                 json,
                 full,

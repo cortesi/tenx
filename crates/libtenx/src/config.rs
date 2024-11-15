@@ -157,17 +157,42 @@ impl ModelConfig {
         }
     }
 
+    fn abbreviate_key(key: &str) -> String {
+        if key.len() < 8 {
+            key.to_string()
+        } else {
+            format!("{}...{}", &key[..4], &key[key.len() - 4..])
+        }
+    }
+
     /// Returns a rendered config string
-    pub fn config(&self) -> String {
+    pub fn config(&self, verbose: bool) -> String {
         match self {
-            ModelConfig::Claude(conf) => format!(
-                "name = \"{}\"\napi_model = \"{}\"anthropic_key={}",
-                conf.name, conf.api_model, conf.anthropic_key
-            ),
-            ModelConfig::OpenAi(conf) => format!(
-                "name = \"{}\"\napi_model = \"{}\"\nstream = {}\nopenai_key={}",
-                conf.name, conf.api_model, conf.stream, conf.openai_key
-            ),
+            ModelConfig::Claude(conf) => {
+                let key = if verbose {
+                    conf.anthropic_key.clone()
+                } else {
+                    Self::abbreviate_key(&conf.anthropic_key)
+                };
+                [
+                    format!("api_model = \"{}\"", conf.api_model),
+                    format!("anthropic_key = {}", key),
+                ]
+                .join("\n")
+            }
+            ModelConfig::OpenAi(conf) => {
+                let key = if verbose {
+                    conf.openai_key.clone()
+                } else {
+                    Self::abbreviate_key(&conf.openai_key)
+                };
+                [
+                    format!("api_model = \"{}\"", conf.api_model),
+                    format!("stream = {}", conf.stream),
+                    format!("openai_key = {}", key),
+                ]
+                .join("\n")
+            }
         }
     }
 }
