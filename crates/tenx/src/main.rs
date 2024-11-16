@@ -430,7 +430,7 @@ async fn main() -> anyhow::Result<()> {
                         | libtenx::config::ModelConfig::OpenAi(_) => {
                             println!("{}", model.name().blue().bold());
                             println!("    kind: {}", model.kind());
-                            for line in model.config(*full).lines() {
+                            for line in model.text_config(*full).lines() {
                                 println!("    {}", line);
                             }
                             println!();
@@ -601,7 +601,7 @@ async fn main() -> anyhow::Result<()> {
                 let mut total = 0;
 
                 for file in files {
-                    let added = session.add_editable(&config, &file)?;
+                    let added = session.add_editable(&config, file)?;
                     if added == 0 {
                         return Err(anyhow::anyhow!("glob did not match any files"));
                     }
@@ -622,9 +622,9 @@ async fn main() -> anyhow::Result<()> {
                 let added = tx
                     .add_contexts(
                         &mut session,
-                        if *file { &items } else { &[] },
-                        if *ruskel { &items } else { &[] },
-                        if *url { &items } else { &[] },
+                        if *file { items } else { &[] },
+                        if *ruskel { items } else { &[] },
+                        if *url { items } else { &[] },
                         &Some(sender.clone()),
                     )
                     .await?;

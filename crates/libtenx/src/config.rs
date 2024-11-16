@@ -14,6 +14,9 @@ use toml;
 
 use crate::{dialect, model, Result, TenxError};
 
+pub const HOME_CONFIG_FILE: &str = "tenx.toml";
+pub const LOCAL_CONFIG_FILE: &str = ".tenx.toml";
+
 const DEFAULT_CLAUDE_SONNET: &str = "claude-3-5-sonnet-latest";
 const DEFAULT_CLAUDE_HAIKU: &str = "claude-3-5-haiku-latest";
 const DEFAULT_GPT_O1_PREVIEW: &str = "o1-preview";
@@ -22,6 +25,7 @@ const DEFAULT_GPT4O: &str = "gpt-4o";
 const DEFAULT_GPT4O_MINI: &str = "gpt-4o-mini";
 const ANTHROPIC_API_KEY: &str = "ANTHROPIC_API_KEY";
 const OPENAI_API_KEY: &str = "OPENAI_API_KEY";
+const DEFAULT_RETRY_LIMIT: usize = 16;
 
 macro_rules! serialize_if_different {
     ($state:expr, $self:expr, $default:expr, $field:ident) => {
@@ -31,10 +35,54 @@ macro_rules! serialize_if_different {
     };
 }
 
-pub const HOME_CONFIG_FILE: &str = "tenx.toml";
-pub const LOCAL_CONFIG_FILE: &str = ".tenx.toml";
+impl ClaudeConf {
+    /// Returns a string representation of the model configuration.
+    pub fn text_config(&self, verbose: bool) -> String {
+        let key = if verbose {
+            self.key.clone()
+        } else {
+            ModelConfig::abbreviate_key(&self.key)
+        };
+        [
+            format!("api_model = \"{}\"", self.api_model),
+            format!("key = {}", key),
+        ]
+        .join("\n")
+    }
 
-const DEFAULT_RETRY_LIMIT: usize = 16;
+    /// Converts ClaudeConf to a Claude model.
+    pub fn to_model(&self) -> Result<model::Claude> {
+        model::Claude::new(self.api_model.clone(), self.key.clone())
+    }
+}
+
+impl OpenAiConf {
+    /// Returns a string representation of the model configuration.
+    pub fn text_config(&self, verbose: bool) -> String {
+        let key = if verbose {
+            self.key.clone()
+        } else {
+            ModelConfig::abbreviate_key(&self.key)
+        };
+        [
+            format!("api_model = \"{}\"", self.api_model),
+            format!("stream = {}", self.stream),
+            format!("key = {}", key),
+        ]
+        .join("\n")
+    }
+
+    /// Converts OpenAiConf to an OpenAi model.
+    pub fn to_model(&self) -> model::OpenAi {
+        model::OpenAi {
+            api_model: self.api_model.clone(),
+            openai_key: self.key.clone(),
+            api_base: self.api_base.clone(),
+            streaming: self.stream,
+            no_system_prompt: self.no_system_prompt,
+        }
+    }
+}
 
 fn default_retry_limit() -> usize {
     DEFAULT_RETRY_LIMIT
@@ -123,7 +171,7 @@ fn default_project_map() -> bool {
 pub struct ClaudeConf {
     pub name: String,
     pub api_model: String,
-    pub anthropic_key: String,
+    pub key: String,
 }
 
 /// Configuration for an OpenAI model.
@@ -131,7 +179,7 @@ pub struct ClaudeConf {
 pub struct OpenAiConf {
     pub name: String,
     pub api_model: String,
-    pub openai_key: String,
+    pub key: String,
     pub api_base: String,
     pub stream: bool,
     pub no_system_prompt: bool,
@@ -169,34 +217,11 @@ impl ModelConfig {
         }
     }
 
-    /// Returns a rendered config string
-    pub fn config(&self, verbose: bool) -> String {
+    /// Returns a string representation of the model configuration.
+    pub fn text_config(&self, verbose: bool) -> String {
         match self {
-            ModelConfig::Claude(conf) => {
-                let key = if verbose {
-                    conf.anthropic_key.clone()
-                } else {
-                    Self::abbreviate_key(&conf.anthropic_key)
-                };
-                [
-                    format!("api_model = \"{}\"", conf.api_model),
-                    format!("anthropic_key = {}", key),
-                ]
-                .join("\n")
-            }
-            ModelConfig::OpenAi(conf) => {
-                let key = if verbose {
-                    conf.openai_key.clone()
-                } else {
-                    Self::abbreviate_key(&conf.openai_key)
-                };
-                [
-                    format!("api_model = \"{}\"", conf.api_model),
-                    format!("stream = {}", conf.stream),
-                    format!("openai_key = {}", key),
-                ]
-                .join("\n")
-            }
+            ModelConfig::Claude(conf) => conf.text_config(verbose),
+            ModelConfig::OpenAi(conf) => conf.text_config(verbose),
         }
     }
 }
@@ -452,12 +477,12 @@ impl Default for Config {
                 ModelConfig::Claude(ClaudeConf {
                     name: "sonnet".to_string(),
                     api_model: DEFAULT_CLAUDE_SONNET.to_string(),
-                    anthropic_key: anthropic_key.clone(),
+                    key: anthropic_key.clone(),
                 }),
                 ModelConfig::Claude(ClaudeConf {
                     name: "haiku".to_string(),
                     api_model: DEFAULT_CLAUDE_HAIKU.to_string(),
-                    anthropic_key,
+                    key: anthropic_key,
                 }),
             ]);
         }
@@ -467,7 +492,7 @@ impl Default for Config {
                 ModelConfig::OpenAi(OpenAiConf {
                     name: "o1".to_string(),
                     api_model: DEFAULT_GPT_O1_PREVIEW.to_string(),
-                    openai_key: openai_key.clone(),
+                    key: openai_key.clone(),
                     api_base: crate::model::OPENAI_API_BASE.to_string(),
                     stream: false,
                     no_system_prompt: true,
@@ -475,7 +500,7 @@ impl Default for Config {
                 ModelConfig::OpenAi(OpenAiConf {
                     name: "o1-mini".to_string(),
                     api_model: DEFAULT_GPT_O1_MINI.to_string(),
-                    openai_key: openai_key.clone(),
+                    key: openai_key.clone(),
                     api_base: crate::model::openai::OPENAI_API_BASE.to_string(),
                     stream: false,
                     no_system_prompt: true,
@@ -483,7 +508,7 @@ impl Default for Config {
                 ModelConfig::OpenAi(OpenAiConf {
                     name: "gpt4o".to_string(),
                     api_model: DEFAULT_GPT4O.to_string(),
-                    openai_key: openai_key.clone(),
+                    key: openai_key.clone(),
                     api_base: crate::model::openai::OPENAI_API_BASE.to_string(),
                     stream: true,
                     no_system_prompt: false,
@@ -491,7 +516,7 @@ impl Default for Config {
                 ModelConfig::OpenAi(OpenAiConf {
                     name: "gpt4o-mini".to_string(),
                     api_model: DEFAULT_GPT4O_MINI.to_string(),
-                    openai_key,
+                    key: openai_key,
                     api_base: crate::model::openai::OPENAI_API_BASE.to_string(),
                     stream: true,
                     no_system_prompt: false,
@@ -505,12 +530,12 @@ impl Default for Config {
                 ModelConfig::Claude(ClaudeConf {
                     name: "sonnet".to_string(),
                     api_model: DEFAULT_CLAUDE_SONNET.to_string(),
-                    anthropic_key: "".to_string(),
+                    key: "".to_string(),
                 }),
                 ModelConfig::Claude(ClaudeConf {
                     name: "haiku".to_string(),
                     api_model: DEFAULT_CLAUDE_HAIKU.to_string(),
-                    anthropic_key: "".to_string(),
+                    key: "".to_string(),
                 }),
             ]);
         }
@@ -811,8 +836,8 @@ impl Config {
         if let Ok(key) = env::var(ANTHROPIC_API_KEY) {
             for model in &mut self.models {
                 if let ModelConfig::Claude(conf) = model {
-                    if conf.anthropic_key.is_empty() {
-                        conf.anthropic_key = key.clone();
+                    if conf.key.is_empty() {
+                        conf.key = key.clone();
                     }
                 }
             }
@@ -820,8 +845,8 @@ impl Config {
         if let Ok(key) = env::var(OPENAI_API_KEY) {
             for model in &mut self.models {
                 if let ModelConfig::OpenAi(conf) = model {
-                    if conf.openai_key.is_empty() {
-                        conf.openai_key = key.clone();
+                    if conf.key.is_empty() {
+                        conf.key = key.clone();
                     }
                 }
             }
@@ -847,17 +872,8 @@ impl Config {
         };
 
         match model_config {
-            ModelConfig::Claude(conf) => Ok(model::Model::Claude(model::Claude::new(
-                conf.api_model.clone(),
-                conf.anthropic_key.clone(),
-            )?)),
-            ModelConfig::OpenAi(conf) => Ok(model::Model::OpenAi(model::OpenAi {
-                api_model: conf.api_model.clone(),
-                openai_key: conf.openai_key.clone(),
-                api_base: conf.api_base.clone(),
-                streaming: conf.stream,
-                no_system_prompt: conf.no_system_prompt,
-            })),
+            ModelConfig::Claude(conf) => Ok(model::Model::Claude(conf.to_model()?)),
+            ModelConfig::OpenAi(conf) => Ok(model::Model::OpenAi(conf.to_model())),
         }
     }
 
@@ -894,7 +910,7 @@ mod tests {
     fn test_toml_serialization() {
         let mut config = Config::default();
         if let ModelConfig::Claude(conf) = &mut config.models[0] {
-            conf.anthropic_key = "test_key".to_string();
+            conf.key = "test_key".to_string();
         }
         set_config!(config, session_store_dir, PathBuf::from("/tmp/test"));
         set_config!(config, retry_limit, 5);
@@ -910,7 +926,7 @@ mod tests {
         if let (ModelConfig::Claude(conf), ModelConfig::Claude(deserial_conf)) =
             (&config.models[0], &deserialized_config.models[0])
         {
-            assert_eq!(conf.anthropic_key, deserial_conf.anthropic_key);
+            assert_eq!(conf.key, deserial_conf.key);
             assert_eq!(
                 config.session_store_dir,
                 deserialized_config.session_store_dir
@@ -969,13 +985,13 @@ mod tests {
     fn test_config_merge() {
         let mut base_config = Config::default();
         if let ModelConfig::Claude(conf) = &mut base_config.models[0] {
-            conf.anthropic_key = "base_key".to_string();
+            conf.key = "base_key".to_string();
         }
         set_config!(base_config, retry_limit, 5);
 
         let mut other_config = Config::default();
         if let ModelConfig::Claude(conf) = &mut other_config.models[0] {
-            conf.anthropic_key = "other_key".to_string();
+            conf.key = "other_key".to_string();
         }
         set_config!(other_config, session_store_dir, PathBuf::from("/tmp/other"));
         set_config!(other_config, no_preflight, true);
@@ -988,7 +1004,7 @@ mod tests {
         base_config.merge(&other_config);
 
         if let ModelConfig::Claude(conf) = &base_config.models[0] {
-            assert_eq!(conf.anthropic_key, "other_key".to_string());
+            assert_eq!(conf.key, "other_key".to_string());
             assert_eq!(base_config.session_store_dir, PathBuf::from("/tmp/other"));
             assert_eq!(base_config.retry_limit, 5);
             assert!(base_config.no_preflight);
@@ -1052,12 +1068,12 @@ mod tests {
         config.models = vec![ModelConfig::Claude(ClaudeConf {
             name: "sonnet".to_string(),
             api_model: "test".to_string(),
-            anthropic_key: "".to_string(),
+            key: "".to_string(),
         })];
 
         assert_eq!(config.retry_limit, 42);
         if let ModelConfig::Claude(conf) = &config.models[0] {
-            assert_eq!(conf.anthropic_key, "");
+            assert_eq!(conf.key, "");
             assert_eq!(config.session_store_dir, PathBuf::new());
             assert!(!config.no_preflight);
             let default_model = &config.models[0];
