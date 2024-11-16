@@ -23,9 +23,10 @@ const DEFAULT_GPT_O1_PREVIEW: &str = "o1-preview";
 const DEFAULT_GPT_O1_MINI: &str = "o1-mini";
 const DEFAULT_GPT4O: &str = "gpt-4o";
 const DEFAULT_GPT4O_MINI: &str = "gpt-4o-mini";
+const DEFAULT_RETRY_LIMIT: usize = 16;
+
 const ANTHROPIC_API_KEY: &str = "ANTHROPIC_API_KEY";
 const OPENAI_API_KEY: &str = "OPENAI_API_KEY";
-const DEFAULT_RETRY_LIMIT: usize = 16;
 
 macro_rules! serialize_if_different {
     ($state:expr, $self:expr, $default:expr, $field:ident) => {
@@ -33,55 +34,6 @@ macro_rules! serialize_if_different {
             $state.serialize_field(stringify!($field), &$self.$field)?;
         }
     };
-}
-
-impl ClaudeConf {
-    /// Returns a string representation of the model configuration.
-    pub fn text_config(&self, verbose: bool) -> String {
-        let key = if verbose {
-            self.key.clone()
-        } else {
-            ModelConfig::abbreviate_key(&self.key)
-        };
-        [
-            format!("api_model = \"{}\"", self.api_model),
-            format!("key = {}", key),
-        ]
-        .join("\n")
-    }
-
-    /// Converts ClaudeConf to a Claude model.
-    pub fn to_model(&self) -> Result<model::Claude> {
-        model::Claude::new(self.api_model.clone(), self.key.clone())
-    }
-}
-
-impl OpenAiConf {
-    /// Returns a string representation of the model configuration.
-    pub fn text_config(&self, verbose: bool) -> String {
-        let key = if verbose {
-            self.key.clone()
-        } else {
-            ModelConfig::abbreviate_key(&self.key)
-        };
-        [
-            format!("api_model = \"{}\"", self.api_model),
-            format!("stream = {}", self.stream),
-            format!("key = {}", key),
-        ]
-        .join("\n")
-    }
-
-    /// Converts OpenAiConf to an OpenAi model.
-    pub fn to_model(&self) -> model::OpenAi {
-        model::OpenAi {
-            api_model: self.api_model.clone(),
-            openai_key: self.key.clone(),
-            api_base: self.api_base.clone(),
-            streaming: self.stream,
-            no_system_prompt: self.no_system_prompt,
-        }
-    }
 }
 
 fn default_retry_limit() -> usize {
@@ -172,6 +124,39 @@ pub struct ClaudeConf {
     pub name: String,
     pub api_model: String,
     pub key: String,
+    pub key_env: String,
+}
+
+impl ClaudeConf {
+    /// Loads API key from environment if key is empty and key_env is specified
+    pub fn load_env(mut self) -> Self {
+        if self.key.is_empty() && !self.key_env.is_empty() {
+            if let Ok(key) = env::var(&self.key_env) {
+                self.key = key;
+            }
+        }
+        self
+    }
+
+    /// Returns a string representation of the model configuration.
+    pub fn text_config(&self, verbose: bool) -> String {
+        let key = if verbose {
+            self.key.clone()
+        } else {
+            ModelConfig::abbreviate_key(&self.key)
+        };
+        [
+            format!("api_model = {}", self.api_model),
+            format!("key = {}", key),
+            format!("key_env = {}", self.key_env),
+        ]
+        .join("\n")
+    }
+
+    /// Converts ClaudeConf to a Claude model.
+    pub fn to_model(&self) -> Result<model::Claude> {
+        model::Claude::new(self.api_model.clone(), self.key.clone())
+    }
 }
 
 /// Configuration for an OpenAI model.
@@ -180,9 +165,49 @@ pub struct OpenAiConf {
     pub name: String,
     pub api_model: String,
     pub key: String,
+    pub key_env: String,
     pub api_base: String,
     pub stream: bool,
     pub no_system_prompt: bool,
+}
+
+impl OpenAiConf {
+    /// Loads API key from environment if key is empty and key_env is specified
+    pub fn load_env(mut self) -> Self {
+        if self.key.is_empty() && !self.key_env.is_empty() {
+            if let Ok(key) = env::var(&self.key_env) {
+                self.key = key;
+            }
+        }
+        self
+    }
+
+    /// Returns a string representation of the model configuration.
+    pub fn text_config(&self, verbose: bool) -> String {
+        let key = if verbose {
+            self.key.clone()
+        } else {
+            ModelConfig::abbreviate_key(&self.key)
+        };
+        [
+            format!("api_model = {}", self.api_model),
+            format!("stream = {}", self.stream),
+            format!("key = {}", key),
+            format!("key_env = {}", self.key_env),
+        ]
+        .join("\n")
+    }
+
+    /// Converts OpenAiConf to an OpenAi model.
+    pub fn to_model(&self) -> model::OpenAi {
+        model::OpenAi {
+            api_model: self.api_model.clone(),
+            openai_key: self.key.clone(),
+            api_base: self.api_base.clone(),
+            streaming: self.stream,
+            no_system_prompt: self.no_system_prompt,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -193,6 +218,14 @@ pub enum ModelConfig {
 }
 
 impl ModelConfig {
+    /// Loads API key from environment if key is empty and key_env is specified
+    pub fn load_env(self) -> Self {
+        match self {
+            ModelConfig::Claude(conf) => ModelConfig::Claude(conf.load_env()),
+            ModelConfig::OpenAi(conf) => ModelConfig::OpenAi(conf.load_env()),
+        }
+    }
+
     /// Returns the name of the configured model.
     pub fn name(&self) -> &str {
         match self {
@@ -472,27 +505,30 @@ impl Default for Config {
     fn default() -> Self {
         let mut models = Vec::new();
 
-        if let Ok(anthropic_key) = env::var(ANTHROPIC_API_KEY) {
+        if env::var(ANTHROPIC_API_KEY).is_ok() {
             models.extend_from_slice(&[
                 ModelConfig::Claude(ClaudeConf {
                     name: "sonnet".to_string(),
                     api_model: DEFAULT_CLAUDE_SONNET.to_string(),
-                    key: anthropic_key.clone(),
+                    key: "".to_string(),
+                    key_env: ANTHROPIC_API_KEY.to_string(),
                 }),
                 ModelConfig::Claude(ClaudeConf {
                     name: "haiku".to_string(),
                     api_model: DEFAULT_CLAUDE_HAIKU.to_string(),
-                    key: anthropic_key,
+                    key: "".to_string(),
+                    key_env: ANTHROPIC_API_KEY.to_string(),
                 }),
             ]);
         }
 
-        if let Ok(openai_key) = env::var(OPENAI_API_KEY) {
+        if env::var(OPENAI_API_KEY).is_ok() {
             models.extend_from_slice(&[
                 ModelConfig::OpenAi(OpenAiConf {
                     name: "o1".to_string(),
                     api_model: DEFAULT_GPT_O1_PREVIEW.to_string(),
-                    key: openai_key.clone(),
+                    key: "".to_string(),
+                    key_env: OPENAI_API_KEY.to_string(),
                     api_base: crate::model::OPENAI_API_BASE.to_string(),
                     stream: false,
                     no_system_prompt: true,
@@ -500,7 +536,8 @@ impl Default for Config {
                 ModelConfig::OpenAi(OpenAiConf {
                     name: "o1-mini".to_string(),
                     api_model: DEFAULT_GPT_O1_MINI.to_string(),
-                    key: openai_key.clone(),
+                    key: "".to_string(),
+                    key_env: OPENAI_API_KEY.to_string(),
                     api_base: crate::model::openai::OPENAI_API_BASE.to_string(),
                     stream: false,
                     no_system_prompt: true,
@@ -508,7 +545,8 @@ impl Default for Config {
                 ModelConfig::OpenAi(OpenAiConf {
                     name: "gpt4o".to_string(),
                     api_model: DEFAULT_GPT4O.to_string(),
-                    key: openai_key.clone(),
+                    key: "".to_string(),
+                    key_env: OPENAI_API_KEY.to_string(),
                     api_base: crate::model::openai::OPENAI_API_BASE.to_string(),
                     stream: true,
                     no_system_prompt: false,
@@ -516,7 +554,8 @@ impl Default for Config {
                 ModelConfig::OpenAi(OpenAiConf {
                     name: "gpt4o-mini".to_string(),
                     api_model: DEFAULT_GPT4O_MINI.to_string(),
-                    key: openai_key,
+                    key: "".to_string(),
+                    key_env: OPENAI_API_KEY.to_string(),
                     api_base: crate::model::openai::OPENAI_API_BASE.to_string(),
                     stream: true,
                     no_system_prompt: false,
@@ -531,11 +570,13 @@ impl Default for Config {
                     name: "sonnet".to_string(),
                     api_model: DEFAULT_CLAUDE_SONNET.to_string(),
                     key: "".to_string(),
+                    key_env: ANTHROPIC_API_KEY.to_string(),
                 }),
                 ModelConfig::Claude(ClaudeConf {
                     name: "haiku".to_string(),
                     api_model: DEFAULT_CLAUDE_HAIKU.to_string(),
                     key: "".to_string(),
+                    key_env: ANTHROPIC_API_KEY.to_string(),
                 }),
             ]);
         }
@@ -833,24 +874,7 @@ impl Config {
 
     /// Loads API keys from environment variables if they exist.
     pub fn load_env(mut self) -> Self {
-        if let Ok(key) = env::var(ANTHROPIC_API_KEY) {
-            for model in &mut self.models {
-                if let ModelConfig::Claude(conf) = model {
-                    if conf.key.is_empty() {
-                        conf.key = key.clone();
-                    }
-                }
-            }
-        }
-        if let Ok(key) = env::var(OPENAI_API_KEY) {
-            for model in &mut self.models {
-                if let ModelConfig::OpenAi(conf) = model {
-                    if conf.key.is_empty() {
-                        conf.key = key.clone();
-                    }
-                }
-            }
-        }
+        self.models = self.models.into_iter().map(|m| m.load_env()).collect();
         self
     }
 
@@ -1069,6 +1093,7 @@ mod tests {
             name: "sonnet".to_string(),
             api_model: "test".to_string(),
             key: "".to_string(),
+            key_env: ANTHROPIC_API_KEY.to_string(),
         })];
 
         assert_eq!(config.retry_limit, 42);
