@@ -27,6 +27,8 @@ const DEFAULT_RETRY_LIMIT: usize = 16;
 
 const ANTHROPIC_API_KEY: &str = "ANTHROPIC_API_KEY";
 const OPENAI_API_KEY: &str = "OPENAI_API_KEY";
+const DEEPINFRA_API_KEY: &str = "DEEPINFRA_API_KEY";
+const DEEPINFRA_API_BASE: &str = "https://api.deepinfra.com/v1/openai";
 
 macro_rules! serialize_if_different {
     ($state:expr, $self:expr, $default:expr, $field:ident) => {
@@ -520,6 +522,18 @@ impl Default for Config {
                     key_env: ANTHROPIC_API_KEY.to_string(),
                 }),
             ]);
+        }
+
+        if env::var(DEEPINFRA_API_KEY).is_ok() {
+            models.push(ModelConfig::OpenAi(OpenAiConf {
+                name: "qwen-coder".to_string(),
+                api_model: "Qwen/Qwen2.5-Coder-32B-Instruct".to_string(),
+                key: "".to_string(),
+                key_env: DEEPINFRA_API_KEY.to_string(),
+                api_base: DEEPINFRA_API_BASE.to_string(),
+                stream: true,
+                no_system_prompt: false,
+            }));
         }
 
         if env::var(OPENAI_API_KEY).is_ok() {

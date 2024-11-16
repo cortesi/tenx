@@ -1,4 +1,5 @@
 [package]
 name = "broken"
+edition = "2021"
 
 [workspace]

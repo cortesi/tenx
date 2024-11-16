@@ -1,6 +1,5 @@
 [package]
 name = "simple"
+edition = "2021"
 
 [workspace]
-
-[dependencies]
