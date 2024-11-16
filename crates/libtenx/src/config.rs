@@ -16,22 +16,28 @@ use crate::{dialect, model, Result, TenxError};
 
 pub const HOME_CONFIG_FILE: &str = "tenx.toml";
 pub const LOCAL_CONFIG_FILE: &str = ".tenx.toml";
-
-const DEFAULT_CLAUDE_SONNET: &str = "claude-3-5-sonnet-latest";
-const DEFAULT_CLAUDE_HAIKU: &str = "claude-3-5-haiku-latest";
-const DEFAULT_GPT_O1_PREVIEW: &str = "o1-preview";
-const DEFAULT_GPT_O1_MINI: &str = "o1-mini";
-const DEFAULT_GPT4O: &str = "gpt-4o";
-const DEFAULT_GPT4O_MINI: &str = "gpt-4o-mini";
 const DEFAULT_RETRY_LIMIT: usize = 16;
 
 const ANTHROPIC_API_KEY: &str = "ANTHROPIC_API_KEY";
+const ANTHROPIC_CLAUDE_SONNET: &str = "claude-3-5-sonnet-latest";
+const ANTHROPIC_CLAUDE_HAIKU: &str = "claude-3-5-haiku-latest";
+
 const OPENAI_API_KEY: &str = "OPENAI_API_KEY";
+const OPENAI_GPT_O1_PREVIEW: &str = "o1-preview";
+const OPENAI_GPT_O1_MINI: &str = "o1-mini";
+const OPENAI_GPT4O: &str = "gpt-4o";
+const OPENAI_GPT4O_MINI: &str = "gpt-4o-mini";
+
 const DEEPINFRA_API_KEY: &str = "DEEPINFRA_API_KEY";
 const DEEPINFRA_API_BASE: &str = "https://api.deepinfra.com/v1/openai";
+
 const XAI_API_KEY: &str = "XAI_API_KEY";
 const XAI_API_BASE: &str = "https://api.x.ai/v1";
 const XAI_DEFAULT_GROK: &str = "grok-beta";
+
+const GOOGLEAI_API_KEY: &str = "GOOGLEAI_API_KEY";
+const GOOGLEAI_API_BASE: &str = "https://generativelanguage.googleapis.com/v1beta/openai";
+const GOOGLEAI_GEMINI_EXP: &str = "gemini-exp-1114";
 
 macro_rules! serialize_if_different {
     ($state:expr, $self:expr, $default:expr, $field:ident) => {
@@ -516,13 +522,13 @@ impl Default for Config {
             models.extend_from_slice(&[
                 ModelConfig::Claude(ClaudeConf {
                     name: "sonnet".to_string(),
-                    api_model: DEFAULT_CLAUDE_SONNET.to_string(),
+                    api_model: ANTHROPIC_CLAUDE_SONNET.to_string(),
                     key: "".to_string(),
                     key_env: ANTHROPIC_API_KEY.to_string(),
                 }),
                 ModelConfig::Claude(ClaudeConf {
                     name: "haiku".to_string(),
-                    api_model: DEFAULT_CLAUDE_HAIKU.to_string(),
+                    api_model: ANTHROPIC_CLAUDE_HAIKU.to_string(),
                     key: "".to_string(),
                     key_env: ANTHROPIC_API_KEY.to_string(),
                 }),
@@ -545,7 +551,7 @@ impl Default for Config {
             models.extend_from_slice(&[
                 ModelConfig::OpenAi(OpenAiConf {
                     name: "o1".to_string(),
-                    api_model: DEFAULT_GPT_O1_PREVIEW.to_string(),
+                    api_model: OPENAI_GPT_O1_PREVIEW.to_string(),
                     key: "".to_string(),
                     key_env: OPENAI_API_KEY.to_string(),
                     api_base: crate::model::OPENAI_API_BASE.to_string(),
@@ -554,7 +560,7 @@ impl Default for Config {
                 }),
                 ModelConfig::OpenAi(OpenAiConf {
                     name: "o1-mini".to_string(),
-                    api_model: DEFAULT_GPT_O1_MINI.to_string(),
+                    api_model: OPENAI_GPT_O1_MINI.to_string(),
                     key: "".to_string(),
                     key_env: OPENAI_API_KEY.to_string(),
                     api_base: crate::model::openai::OPENAI_API_BASE.to_string(),
@@ -563,7 +569,7 @@ impl Default for Config {
                 }),
                 ModelConfig::OpenAi(OpenAiConf {
                     name: "gpt4o".to_string(),
-                    api_model: DEFAULT_GPT4O.to_string(),
+                    api_model: OPENAI_GPT4O.to_string(),
                     key: "".to_string(),
                     key_env: OPENAI_API_KEY.to_string(),
                     api_base: crate::model::openai::OPENAI_API_BASE.to_string(),
@@ -572,7 +578,7 @@ impl Default for Config {
                 }),
                 ModelConfig::OpenAi(OpenAiConf {
                     name: "gpt4o-mini".to_string(),
-                    api_model: DEFAULT_GPT4O_MINI.to_string(),
+                    api_model: OPENAI_GPT4O_MINI.to_string(),
                     key: "".to_string(),
                     key_env: OPENAI_API_KEY.to_string(),
                     api_base: crate::model::openai::OPENAI_API_BASE.to_string(),
@@ -594,18 +600,30 @@ impl Default for Config {
             }));
         }
 
+        if env::var(GOOGLEAI_API_KEY).is_ok() {
+            models.push(ModelConfig::OpenAi(OpenAiConf {
+                name: "gemini".to_string(),
+                api_model: GOOGLEAI_GEMINI_EXP.to_string(),
+                key: "".to_string(),
+                key_env: GOOGLEAI_API_KEY.to_string(),
+                api_base: GOOGLEAI_API_BASE.to_string(),
+                stream: false,
+                no_system_prompt: false,
+            }));
+        }
+
         // If no API keys are available, add default models with empty keys
         if models.is_empty() {
             models.extend_from_slice(&[
                 ModelConfig::Claude(ClaudeConf {
                     name: "sonnet".to_string(),
-                    api_model: DEFAULT_CLAUDE_SONNET.to_string(),
+                    api_model: ANTHROPIC_CLAUDE_SONNET.to_string(),
                     key: "".to_string(),
                     key_env: ANTHROPIC_API_KEY.to_string(),
                 }),
                 ModelConfig::Claude(ClaudeConf {
                     name: "haiku".to_string(),
-                    api_model: DEFAULT_CLAUDE_HAIKU.to_string(),
+                    api_model: ANTHROPIC_CLAUDE_HAIKU.to_string(),
                     key: "".to_string(),
                     key_env: ANTHROPIC_API_KEY.to_string(),
                 }),

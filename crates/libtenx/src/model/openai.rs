@@ -254,7 +254,6 @@ impl OpenAi {
         Ok(CreateChatCompletionRequestArgs::default()
             .model(&self.api_model)
             .messages(messages)
-            .stream(true)
             .build()?)
     }
 }
@@ -291,12 +290,12 @@ impl ModelProvider for OpenAi {
 
         trace!("Sending request: {:#?}", req);
         let resp = if self.streaming {
+            req.stream = Some(true);
             self.stream_response(&client, req, sender).await?
         } else {
-            req.stream = Some(false);
             let resp = client.chat().create(req).await?;
             if let Some(content) = resp.choices[0].message.content.as_ref() {
-                send_event(&sender, Event::Snippet(content.to_string()))?;
+                send_event(&sender, Event::ModelResponse(content.to_string()))?;
             }
             resp
         };
