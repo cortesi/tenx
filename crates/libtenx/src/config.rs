@@ -29,6 +29,9 @@ const ANTHROPIC_API_KEY: &str = "ANTHROPIC_API_KEY";
 const OPENAI_API_KEY: &str = "OPENAI_API_KEY";
 const DEEPINFRA_API_KEY: &str = "DEEPINFRA_API_KEY";
 const DEEPINFRA_API_BASE: &str = "https://api.deepinfra.com/v1/openai";
+const XAI_API_KEY: &str = "XAI_API_KEY";
+const XAI_API_BASE: &str = "https://api.x.ai/v1";
+const XAI_DEFAULT_GROK: &str = "grok-beta";
 
 macro_rules! serialize_if_different {
     ($state:expr, $self:expr, $default:expr, $field:ident) => {
@@ -192,10 +195,12 @@ impl OpenAiConf {
             ModelConfig::abbreviate_key(&self.key)
         };
         [
+            format!("api_base = {}", self.api_base),
             format!("api_model = {}", self.api_model),
-            format!("stream = {}", self.stream),
             format!("key = {}", key),
             format!("key_env = {}", self.key_env),
+            format!("no_system_prompt = {}", self.no_system_prompt),
+            format!("stream = {}", self.stream),
         ]
         .join("\n")
     }
@@ -575,6 +580,18 @@ impl Default for Config {
                     no_system_prompt: false,
                 }),
             ]);
+        }
+
+        if env::var(XAI_API_KEY).is_ok() {
+            models.push(ModelConfig::OpenAi(OpenAiConf {
+                name: "grok".to_string(),
+                api_model: XAI_DEFAULT_GROK.to_string(),
+                key: "".to_string(),
+                key_env: XAI_API_KEY.to_string(),
+                api_base: XAI_API_BASE.to_string(),
+                stream: true,
+                no_system_prompt: false,
+            }));
         }
 
         // If no API keys are available, add default models with empty keys
