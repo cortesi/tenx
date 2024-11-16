@@ -50,11 +50,14 @@ fn render_editables_with_omitted(
     Ok(result)
 }
 
+pub const OPENAI_API_BASE: &str = "https://api.openai.com/v1";
+
 /// OpenAI model implementation
 #[derive(Default, Debug, Clone)]
 pub struct OpenAi {
     pub api_model: String,
     pub openai_key: String,
+    pub api_base: String,
     pub streaming: bool,
     pub no_system_prompt: bool,
 }
@@ -280,7 +283,9 @@ impl ModelProvider for OpenAi {
         }
 
         let dialect = config.dialect()?;
-        let openai_config = OpenAIConfig::new().with_api_key(self.openai_key.clone());
+        let openai_config = OpenAIConfig::new()
+            .with_api_key(self.openai_key.clone())
+            .with_api_base(&self.api_base);
         let client = Client::with_config(openai_config);
         let mut req = self.request(config, session, &dialect)?;
 

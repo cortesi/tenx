@@ -1,6 +1,8 @@
 mod claude;
 mod dummy_model;
-mod openai;
+pub mod openai;
+
+pub use openai::OPENAI_API_BASE;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};

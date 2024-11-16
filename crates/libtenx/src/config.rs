@@ -118,6 +118,7 @@ fn default_project_map() -> bool {
     true
 }
 
+/// Configuration for an Anthropic model.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ClaudeConf {
     pub name: String,
@@ -125,11 +126,13 @@ pub struct ClaudeConf {
     pub anthropic_key: String,
 }
 
+/// Configuration for an OpenAI model.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct OpenAiConf {
     pub name: String,
     pub api_model: String,
     pub openai_key: String,
+    pub api_base: String,
     pub stream: bool,
     pub no_system_prompt: bool,
 }
@@ -465,6 +468,7 @@ impl Default for Config {
                     name: "o1".to_string(),
                     api_model: DEFAULT_GPT_O1_PREVIEW.to_string(),
                     openai_key: openai_key.clone(),
+                    api_base: crate::model::OPENAI_API_BASE.to_string(),
                     stream: false,
                     no_system_prompt: true,
                 }),
@@ -472,6 +476,7 @@ impl Default for Config {
                     name: "o1-mini".to_string(),
                     api_model: DEFAULT_GPT_O1_MINI.to_string(),
                     openai_key: openai_key.clone(),
+                    api_base: crate::model::openai::OPENAI_API_BASE.to_string(),
                     stream: false,
                     no_system_prompt: true,
                 }),
@@ -479,6 +484,7 @@ impl Default for Config {
                     name: "gpt4o".to_string(),
                     api_model: DEFAULT_GPT4O.to_string(),
                     openai_key: openai_key.clone(),
+                    api_base: crate::model::openai::OPENAI_API_BASE.to_string(),
                     stream: true,
                     no_system_prompt: false,
                 }),
@@ -486,6 +492,7 @@ impl Default for Config {
                     name: "gpt4o-mini".to_string(),
                     api_model: DEFAULT_GPT4O_MINI.to_string(),
                     openai_key,
+                    api_base: crate::model::openai::OPENAI_API_BASE.to_string(),
                     stream: true,
                     no_system_prompt: false,
                 }),
@@ -847,6 +854,7 @@ impl Config {
             ModelConfig::OpenAi(conf) => Ok(model::Model::OpenAi(model::OpenAi {
                 api_model: conf.api_model.clone(),
                 openai_key: conf.openai_key.clone(),
+                api_base: conf.api_base.clone(),
                 streaming: conf.stream,
                 no_system_prompt: conf.no_system_prompt,
             })),
