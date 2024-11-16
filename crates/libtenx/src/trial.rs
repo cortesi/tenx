@@ -176,10 +176,10 @@ impl Trial {
         let trial_conf = TrialConf::read(&path)?;
         trial_conf.validate(&base_dir)?;
 
-        let tenx_conf = match &trial_conf.config {
-            Some(config) => config.clone(),
-            None => Self::default_config()?,
-        };
+        let mut tenx_conf = Self::default_config()?;
+        if let Some(config) = &trial_conf.config {
+            tenx_conf.merge(config);
+        }
 
         Ok(Trial {
             name: name.to_string(),

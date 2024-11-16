@@ -1,3 +1,4 @@
+
 # Writing Tenx Trials
 
 Trials are automated tests for tenx commands - they help ensure the tool
@@ -82,7 +83,8 @@ When a trial is executed, tenx:
    - For `ask`: sets up editable files and sends prompt
    - For `fix`: sets up editable files and runs validation/fixes
 
-This isolation ensures trials can modify project files without affecting the original source, and prevents trials from interfering with each other.
+This isolation ensures trials can modify project files without affecting the
+original source, and prevents trials from interfering with each other.
 
 ## Best Practices
 

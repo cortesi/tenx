@@ -1,0 +1,7 @@
+project = "rust/evenmedian"
+desc = "Blindly fix a simple problem based on unit test failure."
+
+[op.fix]
+primpt = "Fix the test failure, but don't touch the unit tests."
+editable = []
+
