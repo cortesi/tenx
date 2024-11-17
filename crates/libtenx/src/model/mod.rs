@@ -48,7 +48,7 @@ impl Usage {
 #[async_trait]
 pub trait ModelProvider {
     /// Returns the name of the model provider.
-    fn name(&self) -> &'static str;
+    fn name(&self) -> String;
 
     /// Render and send a session to the model.
     async fn send(
@@ -71,7 +71,7 @@ pub enum Model {
 
 #[async_trait]
 impl ModelProvider for Model {
-    fn name(&self) -> &'static str {
+    fn name(&self) -> String {
         match self {
             Model::Claude(c) => c.name(),
             Model::OpenAi(o) => o.name(),

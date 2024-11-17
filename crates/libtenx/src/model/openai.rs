@@ -267,8 +267,8 @@ impl OpenAi {
 
 #[async_trait]
 impl ModelProvider for OpenAi {
-    fn name(&self) -> &'static str {
-        "openai"
+    fn name(&self) -> String {
+        self.api_model.clone()
     }
 
     async fn send(

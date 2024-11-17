@@ -254,8 +254,8 @@ impl Claude {
 
 #[async_trait::async_trait]
 impl ModelProvider for Claude {
-    fn name(&self) -> &'static str {
-        "claude"
+    fn name(&self) -> String {
+        "claude".to_string()
     }
 
     async fn send(

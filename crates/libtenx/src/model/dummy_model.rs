@@ -50,8 +50,8 @@ impl Default for DummyModel {
 
 #[async_trait]
 impl ModelProvider for DummyModel {
-    fn name(&self) -> &'static str {
-        "dummy"
+    fn name(&self) -> String {
+        "dummy".to_string()
     }
 
     async fn send(
