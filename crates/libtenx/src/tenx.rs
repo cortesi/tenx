@@ -27,27 +27,33 @@ impl Tenx {
         &self,
         sender: &Option<mpsc::Sender<Event>>,
     ) -> Result<Session> {
+        let _block = EventBlock::new(sender, Event::Start, Event::Finish)?;
         let mut session = Session::default();
 
-        // Add default context
-        self.add_contexts(
-            &mut session,
-            &self.config.default_context.path,
-            &self.config.default_context.ruskel,
-            &[],
-            sender,
-        )
-        .await?;
+        let has_contexts = !self.config.default_context.path.is_empty()
+            || !self.config.default_context.ruskel.is_empty()
+            || self.config.default_context.project_map;
 
-        // Add project map if configured
-        if self.config.default_context.project_map {
-            let context = Context::new_project_map();
-            send_event(sender, Event::ContextStart)?;
-            session.add_context(context);
-            send_event(sender, Event::ContextEnd)?;
+        if has_contexts {
+            let _block = EventBlock::new(sender, Event::ContextStart, Event::ContextEnd)?;
+
+            // Add default context
+            self.add_contexts(
+                &mut session,
+                &self.config.default_context.path,
+                &self.config.default_context.ruskel,
+                &[],
+                sender,
+            )
+            .await?;
+
+            // Add project map if configured
+            if self.config.default_context.project_map {
+                let context = Context::new_project_map();
+                session.add_context(context);
+            }
         }
 
-        send_event(sender, Event::Finish)?;
         Ok(session)
     }
 

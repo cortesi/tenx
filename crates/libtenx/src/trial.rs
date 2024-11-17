@@ -255,6 +255,8 @@ impl Trial {
         config.include = Include::Glob(vec!["**/*".to_string()]);
         config.exclude = vec!["target/**".to_string()];
         config.retry_limit = 1;
+        // We disable streaming for trials by default, because streaming messes up token counts in
+        // complicated ways.
         config.no_stream = true;
         Ok(config)
     }

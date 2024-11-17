@@ -78,6 +78,8 @@ pub enum Event {
     /// The formatting suite has ended
     FormattingEnd,
 
+    /// The command has started
+    Start,
     /// The command has finished successfully
     Finish,
 
@@ -146,5 +148,32 @@ impl Event {
             Event::ApplyPatch => Some("Applying patch...".to_string()),
             _ => None,
         }
+    }
+}
+
+/// Helper struct to manage event sequencing
+pub struct EventBlock {
+    sender: Option<mpsc::Sender<Event>>,
+    end_event: Event,
+}
+
+impl EventBlock {
+    /// Creates a new EventBlock, emitting the start event immediately
+    pub fn new(
+        sender: &Option<mpsc::Sender<Event>>,
+        start_event: Event,
+        end_event: Event,
+    ) -> Result<Self> {
+        send_event(sender, start_event)?;
+        Ok(Self {
+            sender: sender.clone(),
+            end_event,
+        })
+    }
+}
+
+impl Drop for EventBlock {
+    fn drop(&mut self) {
+        let _ = send_event(&self.sender, self.end_event.clone());
     }
 }
