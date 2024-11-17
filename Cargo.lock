@@ -4512,6 +4512,7 @@ dependencies = [
  "anyhow",
  "clap",
  "colored",
+ "indicatif",
  "libtenx",
  "textwrap",
  "tokio",

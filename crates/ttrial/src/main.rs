@@ -1,15 +1,25 @@
+use std::io::Write;
 use std::path::PathBuf;
 
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use colored::*;
 use tokio::sync::mpsc;
 use tracing_subscriber::util::SubscriberInitExt;
 
+use indicatif::{ProgressBar, ProgressStyle};
 use libtenx::{
     self,
-    event_consumers::{self, output_logs, output_progress},
+    event_consumers::{self, discard_events, output_logs, output_progress},
+    model::ModelProvider,
     trial::TrialReport,
 };
+
+#[derive(ValueEnum, Clone, Debug)]
+enum OutputMode {
+    Logs,
+    Progress,
+    Sum,
+}
 
 /// Prints a trial execution report in a single-line format
 fn print_trial_report(report: &TrialReport) {
@@ -60,9 +70,9 @@ struct Cli {
     #[clap(short, long)]
     quiet: bool,
 
-    /// Show raw log output instead of progress indicators
-    #[clap(long)]
-    logs: bool,
+    /// Output mode (progress, logs, or sum)
+    #[clap(long, value_enum, default_value = "sum")]
+    output: OutputMode,
 
     /// Path to trials directory
     #[clap(long)]
@@ -94,15 +104,14 @@ async fn main() -> anyhow::Result<()> {
     let verbosity = if cli.quiet { 0 } else { cli.verbose };
 
     let (event_kill_tx, event_kill_rx) = mpsc::channel(1);
-
     let (sender, receiver) = mpsc::channel(100);
     let subscriber = event_consumers::create_tracing_subscriber(verbosity, sender.clone());
     subscriber.init();
 
-    let event_task = if cli.logs {
-        tokio::spawn(output_logs(receiver, event_kill_rx))
-    } else {
-        tokio::spawn(output_progress(receiver, event_kill_rx, verbosity))
+    let event_task = match cli.output {
+        OutputMode::Logs => tokio::spawn(output_logs(receiver, event_kill_rx)),
+        OutputMode::Progress => tokio::spawn(output_progress(receiver, event_kill_rx, verbosity)),
+        OutputMode::Sum => tokio::spawn(discard_events(receiver, event_kill_rx)),
     };
 
     let trials_path = if let Some(p) = cli.trials {
@@ -130,8 +139,38 @@ async fn main() -> anyhow::Result<()> {
             let mut trial = libtenx::trial::Trial::load(&trials_path, &name)?;
             let conf = trial.tenx_conf.load_env();
             trial.tenx_conf = conf;
+
+            let progress = if matches!(cli.output, OutputMode::Sum) {
+                let pb = ProgressBar::new_spinner();
+                pb.set_style(
+                    ProgressStyle::default_spinner()
+                        .template("{msg} {spinner:.blue} ")
+                        .unwrap(),
+                );
+                let display_name = match &model {
+                    Some(m) => format!("{}: {}", m, name),
+                    None => format!("{}: {}", trial.tenx_conf.model()?.name(), name),
+                };
+                pb.set_message(display_name);
+                pb.enable_steady_tick(std::time::Duration::from_millis(100));
+                Some(pb)
+            } else {
+                None
+            };
+
             let report = trial.execute(Some(sender.clone()), model.clone()).await?;
-            print_trial_report(&report);
+
+            if let Some(pb) = progress {
+                pb.finish();
+                let status = if report.failed {
+                    "fail".red()
+                } else {
+                    "pass".green()
+                };
+                println!("    {}", status);
+            } else {
+                print_trial_report(&report);
+            }
             Ok(())
         }
         Commands::List => {

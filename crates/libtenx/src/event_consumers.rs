@@ -8,6 +8,20 @@ use tracing_subscriber::{fmt, EnvFilter};
 
 use crate::{Event, LogLevel};
 
+/// Discards all events without processing them
+pub async fn discard_events(
+    mut receiver: mpsc::Receiver<Event>,
+    mut kill_signal: mpsc::Receiver<()>,
+) {
+    loop {
+        tokio::select! {
+            _ = receiver.recv() => {}
+            _ = kill_signal.recv() => break,
+            else => break,
+        }
+    }
+}
+
 /// Creates a subscriber that sends all tracing events to an mpsc channel for processing.
 pub fn create_tracing_subscriber(verbosity: u8, sender: mpsc::Sender<Event>) -> impl Subscriber {
     let filter = match verbosity {
