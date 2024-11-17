@@ -29,31 +29,15 @@ impl Tenx {
     ) -> Result<Session> {
         let _block = EventBlock::new(sender, Event::Start, Event::Finish)?;
         let mut session = Session::default();
-
-        let has_contexts = !self.config.default_context.path.is_empty()
-            || !self.config.default_context.ruskel.is_empty()
-            || self.config.default_context.project_map;
-
-        if has_contexts {
-            let _block = EventBlock::new(sender, Event::ContextStart, Event::ContextEnd)?;
-
-            // Add default context
-            self.add_contexts(
-                &mut session,
-                &self.config.default_context.path,
-                &self.config.default_context.ruskel,
-                &[],
-                sender,
-            )
-            .await?;
-
-            // Add project map if configured
-            if self.config.default_context.project_map {
-                let context = Context::new_project_map();
-                session.add_context(context);
-            }
-        }
-
+        self.add_contexts(
+            &mut session,
+            &self.config.default_context.path,
+            &self.config.default_context.ruskel,
+            &[],
+            self.config.default_context.project_map,
+            sender,
+        )
+        .await?;
         Ok(session)
     }
 
@@ -64,6 +48,7 @@ impl Tenx {
         glob: &[String],
         ruskel: &[String],
         url: &[String],
+        project_map: bool,
         sender: &Option<mpsc::Sender<Event>>,
     ) -> Result<usize> {
         let mut contexts = Vec::new();
@@ -76,20 +61,22 @@ impl Tenx {
         for url_str in url {
             contexts.push(Context::new_url(url_str));
         }
+        if project_map {
+            contexts.push(Context::new_project_map());
+        }
         let mut total_added = 0;
         if !contexts.is_empty() {
-            send_event(sender, Event::ContextStart)?;
+            let _ = EventBlock::new(sender, Event::ContextStart, Event::ContextEnd)?;
             for mut context in contexts {
-                send_event(
+                let _ = EventBlock::new(
                     sender,
                     Event::ContextRefreshStart(context.name().to_string()),
+                    Event::ContextRefreshEnd(context.name().to_string()),
                 )?;
                 context.refresh().await?;
-                send_event(sender, Event::ContextRefreshEnd(context.name().to_string()))?;
                 total_added += context.count(&self.config, session)?;
                 session.add_context(context);
             }
-            send_event(sender, Event::ContextEnd)?;
         }
 
         send_event(sender, Event::Finish)?;
