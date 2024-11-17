@@ -154,7 +154,7 @@ pub async fn output_progress(
                     Event::Finish => {
                         manage_spinner(&mut current_spinner, |s| s.finish());
                     }
-                    Event::ModelRequestEnd => {
+                    Event::PromptEnd(_) => {
                         manage_spinner(&mut current_spinner, |s| s.finish());
                         println!("\n");
                     }

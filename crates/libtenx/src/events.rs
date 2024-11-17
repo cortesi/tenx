@@ -53,14 +53,10 @@ pub enum Event {
     /// A a preflight or post-patch check has passed
     ValidatorOk(String),
 
-    /// A model prompt has started
-    PromptStart,
-    /// Prompt has completed successfully
-    PromptEnd,
     /// A model request has started
-    ModelRequestStart,
+    PromptStart(String),
     /// A model request has completed
-    ModelRequestEnd,
+    PromptEnd(String),
 
     /// A snippet of output text received from a model
     Snippet(String),
@@ -120,7 +116,7 @@ impl Event {
             Event::FormattingStart => Some("formatting".to_string()),
             Event::PreflightStart => Some("preflight validation".to_string()),
             Event::PostPatchStart => Some("post-patch validation".to_string()),
-            Event::PromptStart => Some("prompting".to_string()),
+            Event::PromptStart(n) => Some(format!("prompting {}", n)),
             _ => None,
         }
     }
@@ -144,7 +140,7 @@ impl Event {
             Event::FormattingStart => Some("Formatting...".to_string()),
             Event::PostPatchStart => Some("Post-patch validation...".to_string()),
             Event::ValidatorStart(name) => Some(format!("Validator {}...", name)),
-            Event::PromptStart => Some("Prompting...".to_string()),
+            Event::PromptStart(model) => Some(format!("Prompting {}...", model)),
             Event::ApplyPatch => Some("Applying patch...".to_string()),
             _ => None,
         }
@@ -169,6 +165,67 @@ impl EventBlock {
             sender: sender.clone(),
             end_event,
         })
+    }
+
+    /// Creates a new EventBlock for start/finish operations
+    pub fn start(sender: &Option<mpsc::Sender<Event>>) -> Result<Self> {
+        Self::new(sender, Event::Start, Event::Finish)
+    }
+
+    /// Creates a new EventBlock for context operations
+    pub fn context(sender: &Option<mpsc::Sender<Event>>) -> Result<Self> {
+        Self::new(sender, Event::ContextStart, Event::ContextEnd)
+    }
+
+    /// Creates a new EventBlock for context refresh operations
+    pub fn context_refresh(sender: &Option<mpsc::Sender<Event>>, name: &str) -> Result<Self> {
+        Self::new(
+            sender,
+            Event::ContextRefreshStart(name.to_string()),
+            Event::ContextRefreshEnd(name.to_string()),
+        )
+    }
+
+    /// Creates a new EventBlock for formatting operations
+    pub fn format(sender: &Option<mpsc::Sender<Event>>) -> Result<Self> {
+        Self::new(sender, Event::FormattingStart, Event::FormattingEnd)
+    }
+
+    /// Creates a new EventBlock for preflight validation operations
+    pub fn preflight(sender: &Option<mpsc::Sender<Event>>) -> Result<Self> {
+        Self::new(sender, Event::PreflightStart, Event::PreflightEnd)
+    }
+
+    /// Creates a new EventBlock for validator operations
+    pub fn validator(sender: &Option<mpsc::Sender<Event>>, name: &str) -> Result<Self> {
+        Self::new(
+            sender,
+            Event::ValidatorStart(name.to_string()),
+            Event::ValidatorOk(name.to_string()),
+        )
+    }
+
+    /// Creates a new EventBlock for post-patch validation operations
+    pub fn post_patch(sender: &Option<mpsc::Sender<Event>>) -> Result<Self> {
+        Self::new(sender, Event::PostPatchStart, Event::PostPatchEnd)
+    }
+
+    /// Creates a new EventBlock for formatter operations
+    pub fn formatter(sender: &Option<mpsc::Sender<Event>>, name: &str) -> Result<Self> {
+        Self::new(
+            sender,
+            Event::FormatterStart(name.to_string()),
+            Event::FormatterEnd(name.to_string()),
+        )
+    }
+
+    /// Creates a new EventBlock for model request operations
+    pub fn prompt(sender: &Option<mpsc::Sender<Event>>, model: &str) -> Result<Self> {
+        Self::new(
+            sender,
+            Event::PromptStart(model.to_string()),
+            Event::PromptEnd(model.to_string()),
+        )
     }
 }
 

@@ -27,7 +27,7 @@ impl Tenx {
         &self,
         sender: &Option<mpsc::Sender<Event>>,
     ) -> Result<Session> {
-        let _block = EventBlock::new(sender, Event::Start, Event::Finish)?;
+        let _block = EventBlock::start(sender)?;
         let mut session = Session::default();
         self.add_contexts(
             &mut session,
@@ -66,20 +66,15 @@ impl Tenx {
         }
         let mut total_added = 0;
         if !contexts.is_empty() {
-            let _ = EventBlock::new(sender, Event::ContextStart, Event::ContextEnd)?;
+            let _block = EventBlock::context(sender)?;
             for mut context in contexts {
-                let _ = EventBlock::new(
-                    sender,
-                    Event::ContextRefreshStart(context.name().to_string()),
-                    Event::ContextRefreshEnd(context.name().to_string()),
-                )?;
+                let _refresh_block = EventBlock::context_refresh(sender, context.name())?;
                 context.refresh().await?;
                 total_added += context.count(&self.config, session)?;
                 session.add_context(context);
             }
         }
 
-        send_event(sender, Event::Finish)?;
         Ok(total_added)
     }
 
@@ -89,18 +84,11 @@ impl Tenx {
         session: &mut Session,
         sender: &Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
-        send_event(sender, Event::ContextStart)?;
-        {
-            for context in session.contexts.iter_mut() {
-                send_event(
-                    sender,
-                    Event::ContextRefreshStart(context.name().to_string()),
-                )?;
-                context.refresh().await?;
-                send_event(sender, Event::ContextRefreshEnd(context.name().to_string()))?;
-            }
+        let _block = EventBlock::context(sender)?;
+        for context in session.contexts.iter_mut() {
+            let _refresh_block = EventBlock::context_refresh(sender, context.name())?;
+            context.refresh().await?;
         }
-        send_event(sender, Event::ContextEnd)?;
         Ok(())
     }
 
@@ -111,6 +99,7 @@ impl Tenx {
         sender: Option<mpsc::Sender<Event>>,
         prompt: Option<String>,
     ) -> Result<()> {
+        let _block = EventBlock::start(&sender)?;
         let session_store = SessionStore::open(self.config.session_store_dir())?;
         let preflight_result = self.run_preflight_validators(session, &sender);
         let result = if let Err(e) = preflight_result {
@@ -125,7 +114,6 @@ impl Tenx {
         } else {
             Err(TenxError::Internal("No errors found".to_string()))
         };
-        send_event(&sender, Event::Finish)?;
         result
     }
 
@@ -151,6 +139,7 @@ impl Tenx {
         prompt: Option<String>,
         sender: Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
+        let _block = EventBlock::start(&sender)?;
         let session_store = SessionStore::open(self.config.session_store_dir())?;
         if let Some(step) = session.last_step_mut() {
             step.rollback(&self.config)?;
@@ -158,11 +147,8 @@ impl Tenx {
                 step.prompt = Prompt::User(p);
             }
         }
-        let result = self
-            .process_prompt(session, sender.clone(), &session_store)
-            .await;
-        send_event(&sender, Event::Finish)?;
-        result
+        self.process_prompt(session, sender.clone(), &session_store)
+            .await
     }
 
     /// Adds a user prompt to the session and sends it to the model.
@@ -172,13 +158,11 @@ impl Tenx {
         prompt: String,
         sender: Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
+        let _block = EventBlock::start(&sender)?;
         session.add_prompt(Prompt::User(prompt))?;
         let session_store = SessionStore::open(self.config.session_store_dir())?;
-        let result = self
-            .process_prompt(session, sender.clone(), &session_store)
-            .await;
-        send_event(&sender, Event::Finish)?;
-        result
+        self.process_prompt(session, sender.clone(), &session_store)
+            .await
     }
 
     /// Resets the session to a specific step.
@@ -235,13 +219,10 @@ impl Tenx {
                 }
             }
 
-            send_event(&sender, Event::PromptStart)?;
             let result = self.execute_prompt_cycle(session, sender.clone()).await;
-            send_event(&sender, Event::PromptEnd)?;
             match result {
                 Ok(()) => {
                     session_store.save(&self.config, session)?;
-                    send_event(&sender, Event::Finish)?;
                     if !session.should_continue() {
                         return Ok(());
                     }
@@ -260,10 +241,9 @@ impl Tenx {
         session: &mut Session,
         sender: Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
-        send_event(&sender, Event::ModelRequestStart)?;
-        let prompt_result = session.prompt(&self.config, sender.clone()).await;
-        send_event(&sender, Event::ModelRequestEnd)?;
-        prompt_result?;
+        {
+            session.prompt(&self.config, sender.clone()).await?;
+        }
         send_event(&sender, Event::ApplyPatch)?;
         session.apply_last_step(&self.config)?;
         if !session.should_continue() {
@@ -280,14 +260,12 @@ impl Tenx {
         session: &mut Session,
         sender: &Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
-        send_event(sender, Event::FormattingStart)?;
+        let _block = EventBlock::format(sender)?;
         let formatters = crate::formatters::relevant_formatters(&self.config, session)?;
         for formatter in formatters {
-            send_event(sender, Event::FormatterStart(formatter.name().to_string()))?;
+            let _formatter_block = EventBlock::formatter(sender, formatter.name())?;
             formatter.format(&self.config, session)?;
-            send_event(sender, Event::FormatterEnd(formatter.name().to_string()))?;
         }
-        send_event(sender, Event::FormattingEnd)?;
         Ok(())
     }
 
@@ -299,17 +277,12 @@ impl Tenx {
         if self.config.no_preflight {
             return Ok(());
         }
-        send_event(sender, Event::PreflightStart)?;
+        let _block = EventBlock::preflight(sender)?;
         let preflight_validators = crate::validators::relevant_validators(&self.config, session)?;
         for validator in preflight_validators {
-            send_event(sender, Event::ValidatorStart(validator.name().to_string()))?;
-            if let Err(e) = validator.validate(&self.config, session) {
-                send_event(sender, Event::PreflightEnd)?;
-                return Err(e);
-            }
-            send_event(sender, Event::ValidatorOk(validator.name().to_string()))?;
+            let _validator_block = EventBlock::validator(sender, validator.name())?;
+            validator.validate(&self.config, session)?;
         }
-        send_event(sender, Event::PreflightEnd)?;
         Ok(())
     }
 
@@ -320,15 +293,13 @@ impl Tenx {
     ) -> Result<()> {
         if let Some(last_step) = session.steps().last() {
             if last_step.model_response.is_some() {
-                send_event(sender, Event::PostPatchStart)?;
+                let _block = EventBlock::post_patch(sender)?;
                 let post_patch_validators =
                     crate::validators::relevant_validators(&self.config, session)?;
                 for validator in post_patch_validators {
-                    send_event(sender, Event::ValidatorStart(validator.name().to_string()))?;
+                    let _validator_block = EventBlock::validator(sender, validator.name())?;
                     validator.validate(&self.config, session)?;
-                    send_event(sender, Event::ValidatorOk(validator.name().to_string()))?;
                 }
-                send_event(sender, Event::PostPatchEnd)?;
             }
         }
         Ok(())
