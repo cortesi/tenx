@@ -89,6 +89,13 @@ impl OpenAiUsage {
         }
         map
     }
+
+    pub fn totals(&self) -> (u64, u64) {
+        (
+            self.prompt_tokens.unwrap_or(0) as u64,
+            self.completion_tokens.unwrap_or(0) as u64,
+        )
+    }
 }
 
 impl OpenAi {

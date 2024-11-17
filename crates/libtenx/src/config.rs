@@ -132,9 +132,13 @@ fn default_project_map() -> bool {
 /// Configuration for an Anthropic model.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ClaudeConf {
+    /// The name of the model.
     pub name: String,
+    /// The API model identifier.
     pub api_model: String,
+    /// The API key.
     pub key: String,
+    /// The environment variable to load the API key from.
     pub key_env: String,
 }
 
@@ -173,12 +177,19 @@ impl ClaudeConf {
 /// Configuration for an OpenAI model.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct OpenAiConf {
+    /// The name of the model.
     pub name: String,
+    /// The API model identifier.
     pub api_model: String,
+    /// The API key.
     pub key: String,
+    /// The environment variable to load the API key from.
     pub key_env: String,
+    /// The base URL for the API.
     pub api_base: String,
-    pub stream: bool,
+    /// Whether the model can stream responses.
+    pub can_stream: bool,
+    /// Whether the model supports a separate system prompt.
     pub no_system_prompt: bool,
 }
 
@@ -206,7 +217,7 @@ impl OpenAiConf {
             format!("key = {}", key),
             format!("key_env = {}", self.key_env),
             format!("no_system_prompt = {}", self.no_system_prompt),
-            format!("stream = {}", self.stream),
+            format!("stream = {}", self.can_stream),
         ]
         .join("\n")
     }
@@ -217,7 +228,7 @@ impl OpenAiConf {
             api_model: self.api_model.clone(),
             openai_key: self.key.clone(),
             api_base: self.api_base.clone(),
-            streaming: self.stream,
+            streaming: self.can_stream,
             no_system_prompt: self.no_system_prompt,
         }
     }
@@ -542,7 +553,7 @@ impl Default for Config {
                 key: "".to_string(),
                 key_env: DEEPINFRA_API_KEY.to_string(),
                 api_base: DEEPINFRA_API_BASE.to_string(),
-                stream: true,
+                can_stream: true,
                 no_system_prompt: false,
             }));
         }
@@ -555,7 +566,7 @@ impl Default for Config {
                     key: "".to_string(),
                     key_env: OPENAI_API_KEY.to_string(),
                     api_base: crate::model::OPENAI_API_BASE.to_string(),
-                    stream: false,
+                    can_stream: false,
                     no_system_prompt: true,
                 }),
                 ModelConfig::OpenAi(OpenAiConf {
@@ -564,7 +575,7 @@ impl Default for Config {
                     key: "".to_string(),
                     key_env: OPENAI_API_KEY.to_string(),
                     api_base: crate::model::openai::OPENAI_API_BASE.to_string(),
-                    stream: false,
+                    can_stream: false,
                     no_system_prompt: true,
                 }),
                 ModelConfig::OpenAi(OpenAiConf {
@@ -573,7 +584,7 @@ impl Default for Config {
                     key: "".to_string(),
                     key_env: OPENAI_API_KEY.to_string(),
                     api_base: crate::model::openai::OPENAI_API_BASE.to_string(),
-                    stream: true,
+                    can_stream: true,
                     no_system_prompt: false,
                 }),
                 ModelConfig::OpenAi(OpenAiConf {
@@ -582,7 +593,7 @@ impl Default for Config {
                     key: "".to_string(),
                     key_env: OPENAI_API_KEY.to_string(),
                     api_base: crate::model::openai::OPENAI_API_BASE.to_string(),
-                    stream: true,
+                    can_stream: true,
                     no_system_prompt: false,
                 }),
             ]);
@@ -595,7 +606,7 @@ impl Default for Config {
                 key: "".to_string(),
                 key_env: XAI_API_KEY.to_string(),
                 api_base: XAI_API_BASE.to_string(),
-                stream: true,
+                can_stream: true,
                 no_system_prompt: false,
             }));
         }
@@ -607,7 +618,7 @@ impl Default for Config {
                 key: "".to_string(),
                 key_env: GOOGLEAI_API_KEY.to_string(),
                 api_base: GOOGLEAI_API_BASE.to_string(),
-                stream: false,
+                can_stream: false,
                 no_system_prompt: false,
             }));
         }

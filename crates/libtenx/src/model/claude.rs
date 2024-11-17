@@ -70,6 +70,14 @@ impl ClaudeUsage {
         }
         map
     }
+
+    pub fn totals(&self) -> (u64, u64) {
+        let input = self.input_tokens.unwrap_or(0) as u64
+            + self.cache_creation_input_tokens.unwrap_or(0) as u64
+            + self.cache_read_input_tokens.unwrap_or(0) as u64;
+        let output = self.output_tokens.unwrap_or(0) as u64;
+        (input, output)
+    }
 }
 
 impl From<serde_json::Error> for TenxError {

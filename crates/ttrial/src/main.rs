@@ -34,13 +34,13 @@ fn print_trial_report(report: &TrialReport) {
         String::new()
     };
     println!(
-        "{} - {}: {}, {:.1}s, words (in/out): {}/{} {}",
+        "{} - {}: {}, {:.1}s, tokens (in/out): {}/{} {}",
         report.model_name.blue(),
         report.trial_name,
         status,
         report.time_taken,
-        report.request_words,
-        report.response_words,
+        report.tokens_in,
+        report.tokens_out,
         errors
     );
 }

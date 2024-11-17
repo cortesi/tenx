@@ -19,6 +19,10 @@ impl DummyUsage {
         map.insert("dummy_counter".to_string(), self.dummy_counter as u64);
         map
     }
+
+    pub fn totals(&self) -> (u64, u64) {
+        (self.dummy_counter as u64, self.dummy_counter as u64)
+    }
 }
 
 /// A dummy model for testing purposes.

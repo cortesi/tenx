@@ -3,7 +3,7 @@
 //! A trial consists of a TrialConf at NAME.toml which specifies the operations to perform, as well
 //! as an embedded tenx configuration.
 
-use crate::{Event, ModelResponse};
+use crate::Event;
 use glob::glob;
 use std::{
     fs,
@@ -97,10 +97,10 @@ pub struct TrialReport {
     pub failed: bool,
     /// Number of steps taken
     pub steps: usize,
-    /// Total number of words in all model responses
-    pub response_words: usize,
-    /// Total number of words in all requests
-    pub request_words: usize,
+    /// Total tokens used in input
+    pub tokens_in: u64,
+    /// Total tokens used in output
+    pub tokens_out: u64,
     /// Number of patch errors
     pub error_patch: usize,
     /// Number of validation errors
@@ -122,20 +122,14 @@ impl TrialReport {
         time_taken: f64,
     ) -> Self {
         let steps = session.steps().len();
-        let response_words: usize = session
+        let (tokens_in, tokens_out) = session
             .steps()
             .iter()
-            .map(|step| Self::count_words(&step.model_response))
-            .sum();
-        let request_words: usize = session
-            .steps()
-            .iter()
-            .map(|step| match &step.prompt {
-                crate::prompt::Prompt::User(text) | crate::prompt::Prompt::Auto(text) => {
-                    text.split_whitespace().count()
-                }
-            })
-            .sum();
+            .filter_map(|step| step.model_response.as_ref()?.usage.as_ref())
+            .map(|usage| usage.totals())
+            .fold((0, 0), |(acc_in, acc_out), (in_, out)| {
+                (acc_in + in_, acc_out + out)
+            });
         let failed = session.last_step_error().is_some();
 
         let mut error_patch = 0;
@@ -159,22 +153,14 @@ impl TrialReport {
             model_name,
             failed,
             steps,
-            response_words,
-            request_words,
+            tokens_in,
+            tokens_out,
             error_patch,
             error_validation,
             error_response_parse,
             error_other,
             time_taken,
         }
-    }
-
-    fn count_words(response: &Option<ModelResponse>) -> usize {
-        response.as_ref().map_or(0, |r| {
-            r.comment
-                .as_ref()
-                .map_or(0, |c| c.split_whitespace().count())
-        })
     }
 }
 

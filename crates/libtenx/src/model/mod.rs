@@ -33,6 +33,15 @@ impl Usage {
             Usage::Dummy(usage) => usage.values(),
         }
     }
+
+    /// Returns a tuple of (tokens in, tokens out).
+    pub fn totals(&self) -> (u64, u64) {
+        match self {
+            Usage::Claude(usage) => usage.totals(),
+            Usage::OpenAi(usage) => usage.totals(),
+            Usage::Dummy(usage) => usage.totals(),
+        }
+    }
 }
 
 /// Implemented by types that expose a prompt operation.
