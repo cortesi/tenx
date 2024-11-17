@@ -8,7 +8,42 @@ use tracing_subscriber::util::SubscriberInitExt;
 use libtenx::{
     self,
     event_consumers::{self, output_logs, output_progress},
+    trial::TrialReport,
 };
+
+/// Prints a trial execution report in a single-line format
+fn print_trial_report(report: &TrialReport) {
+    let status = if report.failed {
+        "fail".red()
+    } else {
+        "pass".green()
+    };
+    let errors = if report.error_patch > 0
+        || report.error_validation > 0
+        || report.error_response_parse > 0
+        || report.error_other > 0
+    {
+        format!(
+            " (patch:{},valid:{},parse:{},other:{})",
+            report.error_patch,
+            report.error_validation,
+            report.error_response_parse,
+            report.error_other
+        )
+    } else {
+        String::new()
+    };
+    println!(
+        "{} - {}: {}, {:.1}s, words (in/out): {}/{} {}",
+        report.model_name.blue(),
+        report.trial_name,
+        status,
+        report.time_taken,
+        report.request_words,
+        report.response_words,
+        errors
+    );
+}
 
 #[derive(Parser)]
 #[clap(name = "ttrial")]
@@ -95,7 +130,8 @@ async fn main() -> anyhow::Result<()> {
             let mut trial = libtenx::trial::Trial::load(&trials_path, &name)?;
             let conf = trial.tenx_conf.load_env();
             trial.tenx_conf = conf;
-            trial.execute(Some(sender.clone()), model.clone()).await?;
+            let report = trial.execute(Some(sender.clone()), model.clone()).await?;
+            print_trial_report(&report);
             Ok(())
         }
         Commands::List => {

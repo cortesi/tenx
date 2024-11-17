@@ -3,7 +3,7 @@
 //! A trial consists of a TrialConf at NAME.toml which specifies the operations to perform, as well
 //! as an embedded tenx configuration.
 
-use crate::Event;
+use crate::{Event, ModelResponse};
 use glob::glob;
 use std::{
     fs,
@@ -86,6 +86,98 @@ pub struct Trial {
     pub tenx_conf: Config,
 }
 
+/// A report about a trial execution.
+#[derive(Debug)]
+pub struct TrialReport {
+    /// Name of the trial
+    pub trial_name: String,
+    /// Name of the model used
+    pub model_name: String,
+    /// Whether the trial failed
+    pub failed: bool,
+    /// Number of steps taken
+    pub steps: usize,
+    /// Total number of words in all model responses
+    pub response_words: usize,
+    /// Total number of words in all requests
+    pub request_words: usize,
+    /// Number of patch errors
+    pub error_patch: usize,
+    /// Number of validation errors
+    pub error_validation: usize,
+    /// Number of response parse errors
+    pub error_response_parse: usize,
+    /// Number of other errors
+    pub error_other: usize,
+    /// Total execution time in seconds
+    pub time_taken: f64,
+}
+
+impl TrialReport {
+    /// Computes a trial report from a session
+    pub fn from_session(
+        session: &crate::Session,
+        trial_name: String,
+        model_name: String,
+        time_taken: f64,
+    ) -> Self {
+        let steps = session.steps().len();
+        let response_words: usize = session
+            .steps()
+            .iter()
+            .map(|step| Self::count_words(&step.model_response))
+            .sum();
+        let request_words: usize = session
+            .steps()
+            .iter()
+            .map(|step| match &step.prompt {
+                crate::prompt::Prompt::User(text) | crate::prompt::Prompt::Auto(text) => {
+                    text.split_whitespace().count()
+                }
+            })
+            .sum();
+        let failed = session.last_step_error().is_some();
+
+        let mut error_patch = 0;
+        let mut error_validation = 0;
+        let mut error_response_parse = 0;
+        let mut error_other = 0;
+
+        for step in session.steps() {
+            if let Some(err) = &step.err {
+                match err {
+                    TenxError::Patch { .. } => error_patch += 1,
+                    TenxError::Validation { .. } => error_validation += 1,
+                    TenxError::ResponseParse { .. } => error_response_parse += 1,
+                    _ => error_other += 1,
+                }
+            }
+        }
+
+        TrialReport {
+            trial_name,
+            model_name,
+            failed,
+            steps,
+            response_words,
+            request_words,
+            error_patch,
+            error_validation,
+            error_response_parse,
+            error_other,
+            time_taken,
+        }
+    }
+
+    fn count_words(response: &Option<ModelResponse>) -> usize {
+        response.as_ref().map_or(0, |r| {
+            r.comment
+                .as_ref()
+                .map_or(0, |c| c.split_whitespace().count())
+        })
+    }
+}
+
 impl Trial {
     /// Creates a temporary directory and copies the project into it. The project will be placed at
     /// "$tempdir/project" regardless of source directory name.
@@ -122,7 +214,6 @@ impl Trial {
         Ok(temp_dir)
     }
 
-    /// Executes the trial in a temporary directory
     /// Execute the trial in a temporary directory
     ///
     /// If `model` is provided, it will override the default model in the config.
@@ -130,7 +221,9 @@ impl Trial {
         &self,
         sender: Option<mpsc::Sender<Event>>,
         model: Option<String>,
-    ) -> Result<()> {
+    ) -> Result<TrialReport> {
+        use std::time::Instant;
+        let start_time = Instant::now();
         let temp_dir = self.setup_temp_project()?;
         let mut conf = self.tenx_conf.clone();
         conf.session_store_dir = temp_dir.path().join("session");
@@ -143,28 +236,39 @@ impl Trial {
         let mut session = tenx.new_session_from_cwd(&sender).await?;
 
         info!("trial setup complete");
-        match &self.trial_conf.op {
+        let result = match &self.trial_conf.op {
             TrialOp::Ask(edit) => {
                 for path in &edit.editable {
                     session.add_editable(&tenx.config, &path.to_string_lossy())?;
                 }
-                tenx.ask(&mut session, edit.prompt.clone(), sender).await?;
+                tenx.ask(&mut session, edit.prompt.clone(), sender).await
             }
             TrialOp::Fix(fix) => {
                 for path in &fix.editable {
                     session.add_editable(&tenx.config, &path.to_string_lossy())?;
                 }
-                tenx.fix(&mut session, sender, fix.prompt.clone()).await?;
+                tenx.fix(&mut session, sender, fix.prompt.clone()).await
             }
         };
-        Ok(())
+
+        result?;
+        let time_taken = start_time.elapsed().as_secs_f64();
+        let model_name = self.tenx_conf.default_model.clone().unwrap_or_default();
+        Ok(TrialReport::from_session(
+            &session,
+            self.name.clone(),
+            model_name,
+            time_taken,
+        ))
     }
 
-    /// Returns a default configuration for trials
+    /// Returns a default configuration for trials. These need to be over-ridden by the trial
+    /// if needed.
     fn default_config() -> Result<Config> {
         let mut config = Config::default();
         config.include = Include::Glob(vec!["**/*".to_string()]);
         config.exclude = vec!["target/**".to_string()];
+        config.retry_limit = 1;
         Ok(config)
     }
 
