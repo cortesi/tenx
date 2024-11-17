@@ -1,4 +1,3 @@
-use std::io::Write;
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand, ValueEnum};
@@ -95,7 +94,10 @@ enum Commands {
     },
     /// List all available trials (alias: ls)
     #[clap(alias = "ls")]
-    List,
+    List {
+        /// Optional glob patterns to filter trials
+        patterns: Vec<String>,
+    },
 }
 
 #[tokio::main]
@@ -173,8 +175,14 @@ async fn main() -> anyhow::Result<()> {
             }
             Ok(())
         }
-        Commands::List => {
-            let trials = libtenx::trial::list(&trials_path)?;
+        Commands::List { patterns } => {
+            let pattern_refs: Vec<&str> = patterns.iter().map(|s| s.as_str()).collect();
+            let pattern_slice = if pattern_refs.is_empty() {
+                None
+            } else {
+                Some(pattern_refs.as_slice())
+            };
+            let trials = libtenx::trial::list(&trials_path, pattern_slice)?;
             for trial in trials {
                 println!("{}", trial.name.blue().bold());
                 if !trial.desc.is_empty() {

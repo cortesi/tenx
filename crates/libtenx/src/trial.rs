@@ -285,13 +285,16 @@ impl Trial {
 }
 
 /// Lists all trials in a directory by finding .toml files and loading them as Trial objects.
-pub fn list<P: AsRef<Path>>(base_dir: P) -> Result<Vec<Trial>> {
+/// Lists all trials in a directory with an optional name pattern.
+/// Lists all trials in a directory with optional name patterns.
+/// Returns trials that match any of the provided patterns, without duplicates.
+pub fn list<P: AsRef<Path>>(base_dir: P, patterns: Option<&[&str]>) -> Result<Vec<Trial>> {
     let mut trials = Vec::new();
-    let pattern = base_dir.as_ref().join("*.toml");
-    let pattern = pattern.to_string_lossy();
+    let fs_pattern = base_dir.as_ref().join("*.toml");
+    let fs_pattern = fs_pattern.to_string_lossy();
 
-    for entry in
-        glob(&pattern).map_err(|e| TenxError::Internal(format!("Invalid glob pattern: {}", e)))?
+    for entry in glob(&fs_pattern)
+        .map_err(|e| TenxError::Internal(format!("Invalid glob pattern: {}", e)))?
     {
         let path =
             entry.map_err(|e| TenxError::Internal(format!("Failed to read glob entry: {}", e)))?;
@@ -307,7 +310,22 @@ pub fn list<P: AsRef<Path>>(base_dir: P) -> Result<Vec<Trial>> {
         }
     }
 
-    Ok(trials)
+    if let Some(patterns) = patterns {
+        let compiled_patterns: Vec<glob::Pattern> = patterns
+            .iter()
+            .map(|p| {
+                glob::Pattern::new(p)
+                    .map_err(|e| TenxError::Internal(format!("Invalid glob pattern: {}", e)))
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        Ok(trials
+            .into_iter()
+            .filter(|t| compiled_patterns.iter().any(|p| p.matches(&t.name)))
+            .collect())
+    } else {
+        Ok(trials)
+    }
 }
 
 #[cfg(test)]
@@ -315,7 +333,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_list_trials() -> Result<()> {
+    fn test_list_trials_with_glob() -> Result<()> {
         use std::fs;
         use tempfile::tempdir;
 
@@ -332,7 +350,34 @@ mod tests {
 
         fs::write(dir.path().join("test1.toml"), test_toml)?;
         fs::write(dir.path().join("test2.toml"), test_toml)?;
-        let trials = list(dir.path())?;
+        fs::write(dir.path().join("other.toml"), test_toml)?;
+
+        // Test with no patterns
+        let trials = list(dir.path(), None)?;
+        assert_eq!(trials.len(), 3);
+        assert!(trials.iter().any(|t| t.name == "test1"));
+        assert!(trials.iter().any(|t| t.name == "test2"));
+        assert!(trials.iter().any(|t| t.name == "other"));
+
+        // Test with single pattern
+        let trials = list(dir.path(), Some(&["test1"]))?;
+        assert_eq!(trials.len(), 1);
+        assert_eq!(trials[0].name, "test1");
+
+        // Test with wildcard pattern
+        let trials = list(dir.path(), Some(&["test*"]))?;
+        assert_eq!(trials.len(), 2);
+        assert!(trials.iter().any(|t| t.name == "test1"));
+        assert!(trials.iter().any(|t| t.name == "test2"));
+
+        // Test with multiple patterns
+        let trials = list(dir.path(), Some(&["test1", "other"]))?;
+        assert_eq!(trials.len(), 2);
+        assert!(trials.iter().any(|t| t.name == "test1"));
+        assert!(trials.iter().any(|t| t.name == "other"));
+
+        // Test with overlapping patterns
+        let trials = list(dir.path(), Some(&["test*", "test1"]))?;
         assert_eq!(trials.len(), 2);
         assert!(trials.iter().any(|t| t.name == "test1"));
         assert!(trials.iter().any(|t| t.name == "test2"));
