@@ -169,8 +169,18 @@ impl ClaudeConf {
     }
 
     /// Converts ClaudeConf to a Claude model.
-    pub fn to_model(&self) -> Result<model::Claude> {
-        model::Claude::new(self.api_model.clone(), self.key.clone())
+    pub fn to_model(&self, no_stream: bool) -> Result<model::Claude> {
+        if self.api_model.is_empty() {
+            return Err(TenxError::Model("Empty API model name".into()));
+        }
+        if self.key.is_empty() {
+            return Err(TenxError::Model("Empty Anthropic API key".into()));
+        }
+        Ok(model::Claude {
+            api_model: self.api_model.clone(),
+            anthropic_key: self.key.clone(),
+            streaming: !no_stream,
+        })
     }
 }
 
@@ -223,12 +233,12 @@ impl OpenAiConf {
     }
 
     /// Converts OpenAiConf to an OpenAi model.
-    pub fn to_model(&self) -> model::OpenAi {
+    pub fn to_model(&self, no_stream: bool) -> model::OpenAi {
         model::OpenAi {
             api_model: self.api_model.clone(),
             openai_key: self.key.clone(),
             api_base: self.api_base.clone(),
-            streaming: self.can_stream,
+            streaming: self.can_stream && !no_stream,
             no_system_prompt: self.no_system_prompt,
         }
     }
@@ -389,6 +399,10 @@ pub struct Config {
     /// Available model configurations
     #[serde(default)]
     pub models: Vec<ModelConfig>,
+
+    /// Disable streaming for all models
+    #[serde(default)]
+    pub no_stream: bool,
 
     /// The default dialect.
     #[serde(default)]
@@ -660,6 +674,7 @@ impl Default for Config {
             formatters: Formatters::default(),
             project_root: ProjectRoot::default(),
             test_cwd: None,
+            no_stream: false,
         }
     }
 }
@@ -956,8 +971,8 @@ impl Config {
         };
 
         match model_config {
-            ModelConfig::Claude(conf) => Ok(model::Model::Claude(conf.to_model()?)),
-            ModelConfig::OpenAi(conf) => Ok(model::Model::OpenAi(conf.to_model())),
+            ModelConfig::Claude(conf) => Ok(model::Model::Claude(conf.to_model(self.no_stream)?)),
+            ModelConfig::OpenAi(conf) => Ok(model::Model::OpenAi(conf.to_model(self.no_stream))),
         }
     }
 

@@ -36,6 +36,8 @@ pub struct Claude {
     pub api_model: String,
     /// The Anthropic API key
     pub anthropic_key: String,
+    /// Whether to stream responses
+    pub streaming: bool,
 }
 
 /// Mirrors the Usage struct from misanthropy to track token usage statistics.
@@ -87,20 +89,6 @@ impl From<serde_json::Error> for TenxError {
 }
 
 impl Claude {
-    /// Creates a new Claude model instance
-    pub fn new(api_model: String, anthropic_key: String) -> Result<Self> {
-        if api_model.is_empty() {
-            return Err(TenxError::Model("Empty API model name".into()));
-        }
-        if anthropic_key.is_empty() {
-            return Err(TenxError::Model("Empty Anthropic API key".into()));
-        }
-        Ok(Self {
-            api_model,
-            anthropic_key,
-        })
-    }
-
     async fn stream_response(
         &mut self,
         api_key: String,
@@ -287,10 +275,21 @@ impl ModelProvider for Claude {
         }
         let dialect = config.dialect()?;
         let mut req = self.request(config, session, &dialect)?;
+        req.stream = self.streaming;
         trace!("Sending request: {}", serde_json::to_string_pretty(&req)?);
-        let resp = self
-            .stream_response(self.anthropic_key.clone(), &req, sender)
-            .await?;
+
+        let resp = if self.streaming {
+            self.stream_response(self.anthropic_key.clone(), &req, sender)
+                .await?
+        } else {
+            let anthropic = Anthropic::new(&self.anthropic_key);
+            let resp = anthropic.messages(&req).await?;
+            if let Some(text) = resp.format_content().into() {
+                send_event(&sender, Event::ModelResponse(text))?;
+            }
+            resp
+        };
+
         trace!("Got response: {}", serde_json::to_string_pretty(&resp)?);
         req.merge_response(&resp);
         let mut modresp = self.extract_changes(&dialect, &req)?;

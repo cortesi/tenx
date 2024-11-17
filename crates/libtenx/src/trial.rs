@@ -255,6 +255,7 @@ impl Trial {
         config.include = Include::Glob(vec!["**/*".to_string()]);
         config.exclude = vec!["target/**".to_string()];
         config.retry_limit = 1;
+        config.no_stream = true;
         Ok(config)
     }
 
