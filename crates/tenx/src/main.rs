@@ -70,6 +70,10 @@ struct Cli {
     #[clap(long)]
     no_preflight: bool,
 
+    /// Disable streaming model output
+    #[clap(long)]
+    no_stream: bool,
+
     /// Force colored output
     #[clap(long, conflicts_with = "no_color")]
     color: bool,
@@ -378,6 +382,7 @@ fn load_config(cli: &Cli) -> Result<config::Config> {
         config.default_model = Some(model.clone());
     }
     config.no_preflight = cli.no_preflight;
+    config.no_stream = cli.no_stream;
 
     // Override validator configurations
     if let Some(value) = cli.rust_cargo_clippy {
