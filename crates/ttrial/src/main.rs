@@ -5,6 +5,7 @@ use colored::*;
 use tokio::sync::mpsc;
 use tracing_subscriber::util::SubscriberInitExt;
 
+use comfy_table::{presets::UTF8_FULL, Cell, Color, Table};
 use indicatif::{ProgressBar, ProgressStyle};
 use libtenx::{
     self,
@@ -20,8 +21,14 @@ enum OutputMode {
     Sum,
 }
 
+#[derive(ValueEnum, Clone, Debug)]
+enum ReportFormat {
+    Text,
+    Table,
+}
+
 /// Run a single trial and return its report
-async fn run_single_trial(
+async fn run_trial(
     trial: &mut libtenx::trial::Trial,
     output_mode: &OutputMode,
     sender: &mpsc::Sender<libtenx::Event>,
@@ -57,45 +64,92 @@ async fn run_single_trial(
             "pass".green()
         };
         println!("    {}", status);
-    } else {
-        print_trial_report(&report);
     }
 
     Ok(report)
 }
 
-/// Prints a trial execution report in a single-line format
-fn print_trial_report(report: &TrialReport) {
-    let status = if report.failed {
-        "fail".red()
-    } else {
-        "pass".green()
-    };
-    let errors = if report.error_patch > 0
-        || report.error_validation > 0
-        || report.error_response_parse > 0
-        || report.error_other > 0
-    {
-        format!(
-            " (patch:{},valid:{},parse:{},other:{})",
-            report.error_patch,
-            report.error_validation,
-            report.error_response_parse,
-            report.error_other
-        )
-    } else {
-        String::new()
-    };
-    println!(
-        "{} - {}: {}, {:.1}s, tokens (in/out): {}/{} {}",
-        report.model_name.blue(),
-        report.trial_name,
-        status,
-        report.time_taken,
-        report.tokens_in,
-        report.tokens_out,
-        errors
-    );
+/// Prints trial execution reports in a formatted output
+fn print_report_text(reports: &[TrialReport]) {
+    for report in reports {
+        let status = if report.failed {
+            "fail".red()
+        } else {
+            "pass".green()
+        };
+        let errors = if report.error_patch > 0
+            || report.error_validation > 0
+            || report.error_response_parse > 0
+            || report.error_other > 0
+        {
+            format!(
+                " (patch:{},valid:{},parse:{},other:{})",
+                report.error_patch,
+                report.error_validation,
+                report.error_response_parse,
+                report.error_other
+            )
+        } else {
+            String::new()
+        };
+        println!(
+            "{} - {}: {}, {:.1}s, tokens (in/out): {}/{} {}",
+            report.model_name.blue(),
+            report.trial_name,
+            status,
+            report.time_taken,
+            report.tokens_in,
+            report.tokens_out,
+            errors
+        );
+    }
+}
+
+/// Prints trial execution reports in a table format
+fn print_report_table(reports: &[TrialReport]) {
+    let mut table = Table::new();
+    table.load_preset(UTF8_FULL).set_header(vec![
+        Cell::new("model"),
+        Cell::new("trial"),
+        Cell::new("status"),
+        Cell::new("time(s)"),
+        Cell::new("tokens (in/out)"),
+        Cell::new("errors"),
+    ]);
+
+    for report in reports {
+        let status = if report.failed { "fail" } else { "pass" };
+
+        let mut errors = Vec::new();
+        if report.error_validation > 0 {
+            errors.push(format!("validation: {}", report.error_validation));
+        }
+        if report.error_patch > 0 {
+            errors.push(format!("patch: {}", report.error_patch));
+        }
+        if report.error_response_parse > 0 {
+            errors.push(format!("parse: {}", report.error_response_parse));
+        }
+        if report.error_other > 0 {
+            errors.push(format!("other: {}", report.error_other));
+        }
+        let errors = errors.join("\n");
+
+        table.add_row(vec![
+            Cell::new(&report.model_name),
+            Cell::new(&report.trial_name),
+            Cell::new(status).fg(if report.failed {
+                Color::Red
+            } else {
+                Color::Green
+            }),
+            Cell::new(format!("{:.1}", report.time_taken)),
+            Cell::new(format!("{}/{}", report.tokens_in, report.tokens_out)),
+            Cell::new(errors),
+        ]);
+    }
+
+    println!("{table}");
 }
 
 #[derive(Parser)]
@@ -116,6 +170,10 @@ struct Cli {
     /// Output mode (progress, logs, or sum)
     #[clap(long, value_enum, default_value = "sum")]
     output: OutputMode,
+
+    /// Report format (text or table)
+    #[clap(long, value_enum, default_value = "table")]
+    report: ReportFormat,
 
     /// Path to trials directory
     #[clap(long)]
@@ -196,12 +254,15 @@ async fn main() -> anyhow::Result<()> {
 
             let mut reports = Vec::new();
             for mut trial in trials {
-                let report =
-                    run_single_trial(&mut trial, &cli.output, &sender, model.clone()).await?;
+                let report = run_trial(&mut trial, &cli.output, &sender, model.clone()).await?;
                 reports.push(report);
             }
 
-            // Print summary
+            match cli.report {
+                ReportFormat::Text => print_report_text(&reports),
+                ReportFormat::Table => print_report_table(&reports),
+            }
+
             if reports.len() > 1 {
                 println!("\nSummary:");
                 let total = reports.len();

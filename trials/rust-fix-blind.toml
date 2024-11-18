@@ -5,4 +5,3 @@ desc = "fix: fix a Rust syntax error, without an editable"
 editable = []
 
 [config]
-no_preflight = true

@@ -18,6 +18,7 @@ use tracing::info;
 
 use crate::{
     config::{Config, Include, ProjectRoot},
+    model::ModelProvider,
     Result, Tenx, TenxError,
 };
 
@@ -217,6 +218,7 @@ impl Trial {
         if let Some(m) = model {
             conf.default_model = Some(m);
         }
+        let model_name = conf.model()?.name();
         let tenx = Tenx::new(conf);
 
         let mut session = tenx.new_session_from_cwd(&sender).await?;
@@ -243,7 +245,6 @@ impl Trial {
         }
 
         let time_taken = start_time.elapsed().as_secs_f64();
-        let model_name = self.tenx_conf.default_model.clone().unwrap_or_default();
         Ok(TrialReport::from_session(
             &session,
             self.name.clone(),
