@@ -221,7 +221,7 @@ impl Trial {
 
         let mut session = tenx.new_session_from_cwd(&sender).await?;
 
-        info!("trial setup complete");
+        info!("trial setup complete: {}", self.name);
         let result = match &self.trial_conf.op {
             TrialOp::Ask(edit) => {
                 for path in &edit.editable {
@@ -237,7 +237,11 @@ impl Trial {
             }
         };
 
-        result?;
+        match &result {
+            Ok(_) => info!("trial completed successfully: {}", self.name),
+            Err(e) => info!("trial failed: {}: {}", self.name, e),
+        }
+
         let time_taken = start_time.elapsed().as_secs_f64();
         let model_name = self.tenx_conf.default_model.clone().unwrap_or_default();
         Ok(TrialReport::from_session(

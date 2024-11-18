@@ -194,6 +194,10 @@ impl Tenx {
         loop {
             if let Some(e) = session.last_step_error() {
                 if let Some(model_message) = e.should_retry() {
+                    if retry_count >= self.config.retry_limit {
+                        warn!("Retry limit reached. Last error: {}", e);
+                        return Err(e.clone());
+                    }
                     send_event(
                         &sender,
                         Event::Retry {
@@ -202,10 +206,6 @@ impl Tenx {
                         },
                     )?;
                     retry_count += 1;
-                    if retry_count >= self.config.retry_limit {
-                        warn!("Retry limit reached. Last error: {}", e);
-                        return Err(e.clone());
-                    }
                     debug!(
                         "Retryable error (attempt {}/{}): {}",
                         retry_count, self.config.retry_limit, e

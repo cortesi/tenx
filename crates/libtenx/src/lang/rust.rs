@@ -155,8 +155,6 @@ fn run_cargo_command(config: &Config, name: &str, state: &Session, args: &[&str]
             model: format!("stderr:\n{}", stderr),
         })
     } else if !output.status.success() {
-        println!("stdout: {}", stdout);
-        println!("stderr: {}", stderr);
         Err(TenxError::Validation {
             name: name.to_string(),
             user: format!("Cargo {} failed", args[0]),

@@ -20,6 +20,50 @@ enum OutputMode {
     Sum,
 }
 
+/// Run a single trial and return its report
+async fn run_single_trial(
+    trial: &mut libtenx::trial::Trial,
+    output_mode: &OutputMode,
+    sender: &mpsc::Sender<libtenx::Event>,
+    model: Option<String>,
+) -> anyhow::Result<TrialReport> {
+    trial.tenx_conf = trial.tenx_conf.clone().load_env();
+
+    let progress = if matches!(output_mode, OutputMode::Sum) {
+        let pb = ProgressBar::new_spinner();
+        pb.set_style(
+            ProgressStyle::default_spinner()
+                .template("{msg} {spinner:.blue} ")
+                .unwrap(),
+        );
+        let display_name = match &model {
+            Some(m) => format!("{}: {}", m, trial.name),
+            None => format!("{}: {}", trial.tenx_conf.model()?.name(), trial.name),
+        };
+        pb.set_message(display_name);
+        pb.enable_steady_tick(std::time::Duration::from_millis(100));
+        Some(pb)
+    } else {
+        None
+    };
+
+    let report = trial.execute(Some(sender.clone()), model).await?;
+
+    if let Some(pb) = progress {
+        pb.finish();
+        let status = if report.failed {
+            "fail".red()
+        } else {
+            "pass".green()
+        };
+        println!("    {}", status);
+    } else {
+        print_trial_report(&report);
+    }
+
+    Ok(report)
+}
+
 /// Prints a trial execution report in a single-line format
 fn print_trial_report(report: &TrialReport) {
     let status = if report.failed {
@@ -83,10 +127,10 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Run a trial
+    /// Run trials matching patterns
     Run {
-        /// Name of the trial to run
-        name: String,
+        /// Optional glob patterns to filter trials
+        patterns: Vec<String>,
 
         /// Override the model to use
         #[clap(long)]
@@ -137,42 +181,45 @@ async fn main() -> anyhow::Result<()> {
     }
 
     let result = match cli.command {
-        Commands::Run { name, model } => {
-            let mut trial = libtenx::trial::Trial::load(&trials_path, &name)?;
-            let conf = trial.tenx_conf.load_env();
-            trial.tenx_conf = conf;
-
-            let progress = if matches!(cli.output, OutputMode::Sum) {
-                let pb = ProgressBar::new_spinner();
-                pb.set_style(
-                    ProgressStyle::default_spinner()
-                        .template("{msg} {spinner:.blue} ")
-                        .unwrap(),
-                );
-                let display_name = match &model {
-                    Some(m) => format!("{}: {}", m, name),
-                    None => format!("{}: {}", trial.tenx_conf.model()?.name(), name),
-                };
-                pb.set_message(display_name);
-                pb.enable_steady_tick(std::time::Duration::from_millis(100));
-                Some(pb)
-            } else {
+        Commands::Run { patterns, model } => {
+            let pattern_refs: Vec<&str> = patterns.iter().map(|s| s.as_str()).collect();
+            let pattern_slice = if pattern_refs.is_empty() {
                 None
-            };
-
-            let report = trial.execute(Some(sender.clone()), model.clone()).await?;
-
-            if let Some(pb) = progress {
-                pb.finish();
-                let status = if report.failed {
-                    "fail".red()
-                } else {
-                    "pass".green()
-                };
-                println!("    {}", status);
             } else {
-                print_trial_report(&report);
+                Some(pattern_refs.as_slice())
+            };
+            let trials = libtenx::trial::list(&trials_path, pattern_slice)?;
+
+            if trials.is_empty() {
+                return Err(anyhow::anyhow!("No trials found matching patterns"));
             }
+
+            let mut reports = Vec::new();
+            for mut trial in trials {
+                let report =
+                    run_single_trial(&mut trial, &cli.output, &sender, model.clone()).await?;
+                reports.push(report);
+            }
+
+            // Print summary
+            if reports.len() > 1 {
+                println!("\nSummary:");
+                let total = reports.len();
+                let failed = reports.iter().filter(|r| r.failed).count();
+                let total_time: f64 = reports.iter().map(|r| r.time_taken).sum();
+                let total_tokens_in: u64 = reports.iter().map(|r| r.tokens_in).sum();
+                let total_tokens_out: u64 = reports.iter().map(|r| r.tokens_out).sum();
+
+                println!(
+                    "Ran {} trials in {:.1}s ({} failed)",
+                    total, total_time, failed
+                );
+                println!(
+                    "Total tokens: {} in, {} out",
+                    total_tokens_in, total_tokens_out
+                );
+            }
+
             Ok(())
         }
         Commands::List { patterns } => {

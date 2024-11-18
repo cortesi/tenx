@@ -6,5 +6,5 @@ primpt = "Fix the test failure, but don't touch the unit tests."
 editable = []
 
 [config]
-retry_limit = 3
+retry_limit = 5
 
