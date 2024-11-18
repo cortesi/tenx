@@ -1,12 +1,15 @@
 use colored::*;
 use indicatif::{ProgressBar, ProgressStyle};
 use std::time::Duration;
+use textwrap;
 use tokio::sync::mpsc;
 use tracing::Subscriber;
 use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::{fmt, EnvFilter};
 
 use crate::{Event, LogLevel};
+
+const SPINNER_STRINGS: &[&str] = &["▹▹▹▹▹", "▸▹▹▹▹", "▹▸▹▹▹", "▹▹▸▹▹", "▹▹▹▸▹", "▹▹▹▹▸"];
 
 /// Discards all events without processing them
 pub async fn discard_events(
@@ -102,9 +105,10 @@ pub async fn output_progress(
     mut kill_signal: mpsc::Receiver<()>,
     verbosity: u8,
 ) {
+    let spinner_indent = SPINNER_STRINGS[0].chars().count();
     let validator_spinner_style = ProgressStyle::with_template("    {spinner:.green.bold} {msg}")
         .unwrap()
-        .tick_strings(&["▹▹▹▹▹", "▸▹▹▹▹", "▹▸▹▹▹", "▹▹▸▹▹", "▹▹▹▸▹", "▹▹▹▹▸"]);
+        .tick_strings(SPINNER_STRINGS);
 
     let mut current_spinner: Option<ProgressBar> = None;
 
@@ -148,14 +152,19 @@ pub async fn output_progress(
                 match event {
                     Event::Retry{ref user, ref model} => {
                         manage_spinner(&mut current_spinner, |s| s.finish());
-                        println!("{}", format!("Retrying: {}", user).yellow());
+                        println!("{:>width$}{}", "", format!("retrying: {}", user).yellow(), width=spinner_indent);
                         if verbosity > 0 {
-                            println!("{}", format!("Model message: {}", model).yellow());
+                            let wrapped = textwrap::indent(
+                                &textwrap::fill(model, 80 - spinner_indent),
+                                &" ".repeat(spinner_indent)
+                            );
+                            println!("{:>width$}Model message:", "", width=spinner_indent);
+                            println!("{}", wrapped.yellow());
                         }
                     }
                     Event::Fatal(ref message) => {
                         manage_spinner(&mut current_spinner, |s| s.finish());
-                        println!("{}", format!("Fatal: {}", message).red());
+                        println!("{:>width$}{}", "", format!("fatal: {}", message).red(), width=spinner_indent);
                     }
                     Event::Snippet(ref chunk) => {
                         manage_spinner(&mut current_spinner, |s| s.finish());

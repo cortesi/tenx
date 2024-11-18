@@ -45,7 +45,7 @@ pub enum TenxError {
     Patch { user: String, model: String },
 
     /// A patch error, which could cause a retry.
-    #[error("Error applying {name} validation: {user}")]
+    #[error("{name}: {user}")]
     Validation {
         /// The name of the validator that failed
         name: String,

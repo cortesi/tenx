@@ -151,13 +151,13 @@ fn run_cargo_command(config: &Config, name: &str, state: &Session, args: &[&str]
     if args[0] == "clippy" && !stderr.is_empty() {
         Err(TenxError::Validation {
             name: name.to_string(),
-            user: "Cargo clippy found issues".to_string(),
+            user: "cargo clippy found issues".to_string(),
             model: format!("stderr:\n{}", stderr),
         })
     } else if !output.status.success() {
         Err(TenxError::Validation {
             name: name.to_string(),
-            user: format!("Cargo {} failed", args[0]),
+            user: format!("cargo {} failed", args[0]),
             model: format!("stdout:\n{}\n\nstderr:\n{}", stdout, stderr),
         })
     } else {
