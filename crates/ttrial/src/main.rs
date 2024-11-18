@@ -190,9 +190,9 @@ enum Commands {
         /// Optional glob patterns to filter trials
         patterns: Vec<String>,
 
-        /// Override the model to use
-        #[clap(long)]
-        model: Option<String>,
+        /// Override the models to use (can be specified multiple times)
+        #[clap(long, num_args = 1)]
+        model: Vec<String>,
     },
     /// List all available trials (alias: ls)
     #[clap(alias = "ls")]
@@ -246,16 +246,23 @@ async fn main() -> anyhow::Result<()> {
             } else {
                 Some(pattern_refs.as_slice())
             };
-            let trials = libtenx::trial::list(&trials_path, pattern_slice)?;
+            let mut trials = libtenx::trial::list(&trials_path, pattern_slice)?;
 
             if trials.is_empty() {
                 return Err(anyhow::anyhow!("No trials found matching patterns"));
             }
 
             let mut reports = Vec::new();
-            for mut trial in trials {
-                let report = run_trial(&mut trial, &cli.output, &sender, model.clone()).await?;
-                reports.push(report);
+            let models = if model.is_empty() {
+                vec![None]
+            } else {
+                model.iter().map(Some).collect()
+            };
+            for model in models {
+                for trial in &mut trials {
+                    let report = run_trial(trial, &cli.output, &sender, model.cloned()).await?;
+                    reports.push(report);
+                }
             }
 
             match cli.report {

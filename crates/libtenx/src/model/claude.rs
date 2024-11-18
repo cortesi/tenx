@@ -255,7 +255,7 @@ impl Claude {
 #[async_trait::async_trait]
 impl ModelProvider for Claude {
     fn name(&self) -> String {
-        "claude".to_string()
+        self.api_model.clone()
     }
 
     async fn send(

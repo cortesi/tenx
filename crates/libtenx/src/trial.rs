@@ -79,6 +79,7 @@ impl TrialConf {
     }
 }
 
+#[derive(Debug)]
 pub struct Trial {
     pub name: String,
     pub desc: String,
