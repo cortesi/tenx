@@ -6,7 +6,7 @@ use crate::{
     context::{Context, ContextProvider},
     events::*,
     prompt::Prompt,
-    session_store::normalize_path,
+    session_store::path_to_filename,
     Result, Session, SessionStore, TenxError,
 };
 
@@ -120,7 +120,7 @@ impl Tenx {
     /// Saves a session to the store.
     pub fn save_session(&self, session: &Session) -> Result<()> {
         let session_store = SessionStore::open(self.config.session_store_dir())?;
-        session_store.save(&self.config, session)?;
+        session_store.save_current(&self.config, session)?;
         Ok(())
     }
 
@@ -128,7 +128,7 @@ impl Tenx {
     pub fn load_session(&self) -> Result<Session> {
         let root = self.config.project_root();
         let session_store = SessionStore::open(self.config.session_store_dir())?;
-        let name = normalize_path(&root);
+        let name = path_to_filename(&root);
         session_store.load(name)
     }
 
@@ -179,13 +179,13 @@ impl Tenx {
         sender: Option<mpsc::Sender<Event>>,
         session_store: &SessionStore,
     ) -> Result<()> {
-        session_store.save(&self.config, session)?;
+        session_store.save_current(&self.config, session)?;
         if session.last_step_error().is_none() {
             if let Err(e) = self.run_preflight_validators(session, &sender) {
                 if let Some(step) = session.last_step_mut() {
                     step.err = Some(e.clone());
                 }
-                session_store.save(&self.config, session)?;
+                session_store.save_current(&self.config, session)?;
                 return Err(e);
             }
         }
@@ -211,7 +211,7 @@ impl Tenx {
                         retry_count, self.config.retry_limit, e
                     );
                     session.add_prompt(Prompt::Auto(model_message.to_string()))?;
-                    session_store.save(&self.config, session)?;
+                    session_store.save_current(&self.config, session)?;
                 } else {
                     debug!("Non-retryable error: {}", e);
                     send_event(&sender, Event::Fatal(format!("{}", e)))?;
@@ -222,7 +222,7 @@ impl Tenx {
             let result = self.execute_prompt_cycle(session, sender.clone()).await;
             match result {
                 Ok(()) => {
-                    session_store.save(&self.config, session)?;
+                    session_store.save_current(&self.config, session)?;
                     if !session.should_continue() {
                         return Ok(());
                     }
