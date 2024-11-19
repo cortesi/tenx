@@ -7,7 +7,7 @@ use libtenx::{
     self,
     config::{self},
     dialect::DialectProvider,
-    event_consumers::{self, output_logs, output_progress},
+    event_consumers,
     model::ModelProvider,
     Session, Tenx,
 };
@@ -177,7 +177,7 @@ enum Commands {
         command: DialectCommands,
     },
     /// Make an AI-assisted change using the current session
-    Ask {
+    Code {
         /// Specifies files to edit
         #[clap(value_parser)]
         files: Option<Vec<String>>,
@@ -411,8 +411,6 @@ async fn main() -> anyhow::Result<()> {
     let config = load_config(&cli)?;
     let tx = Tenx::new(config.clone());
 
-    // Removed add_context function
-
     if cli.color {
         colored::control::set_override(true);
     } else if cli.no_color {
@@ -424,9 +422,13 @@ async fn main() -> anyhow::Result<()> {
     let subscriber = event_consumers::create_tracing_subscriber(verbosity, sender.clone());
     subscriber.init();
     let event_task = if cli.logs {
-        tokio::spawn(output_logs(receiver, event_kill_rx))
+        tokio::spawn(event_consumers::output_logs(receiver, event_kill_rx))
     } else {
-        tokio::spawn(output_progress(receiver, event_kill_rx, verbosity))
+        tokio::spawn(event_consumers::output_progress(
+            receiver,
+            event_kill_rx,
+            verbosity,
+        ))
     };
 
     let result = match &cli.command {
@@ -565,11 +567,11 @@ async fn main() -> anyhow::Result<()> {
                     Some(p) => p,
                     None => return Ok(()),
                 };
-                tx.ask(&mut session, user_prompt, Some(sender.clone()))
+                tx.code(&mut session, user_prompt, Some(sender.clone()))
                     .await?;
                 Ok(())
             }
-            Commands::Ask {
+            Commands::Code {
                 files,
                 prompt,
                 prompt_file,
@@ -589,7 +591,7 @@ async fn main() -> anyhow::Result<()> {
                     Some(p) => p,
                     None => return Ok(()),
                 };
-                tx.ask(&mut session, user_prompt, Some(sender)).await?;
+                tx.code(&mut session, user_prompt, Some(sender)).await?;
                 Ok(())
             }
             Commands::Session {
