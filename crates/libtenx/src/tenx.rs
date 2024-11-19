@@ -117,7 +117,7 @@ impl Tenx {
 
     /// Saves a session to the store.
     pub fn save_session(&self, session: &Session) -> Result<()> {
-        let session_store = SessionStore::open(self.config.session_store_dir())?;
+        let session_store = SessionStore::open(self.config.session_store_dir.clone())?;
         let root = self.config.project_root();
         let name = path_to_filename(&root);
         session_store.save(&name, session)
@@ -126,7 +126,7 @@ impl Tenx {
     /// Loads a session from the store.
     pub fn load_session(&self) -> Result<Session> {
         let root = self.config.project_root();
-        let session_store = SessionStore::open(self.config.session_store_dir())?;
+        let session_store = SessionStore::open(self.config.session_store_dir.clone())?;
         let name = path_to_filename(&root);
         session_store.load(name)
     }

@@ -431,6 +431,7 @@ pub struct Config {
 
     /// The directory to store session state.
     #[serde(default)]
+    /// The directory to store session state. Defaults to ~/.config/tenx/state
     pub session_store_dir: PathBuf,
 
     /// The number of times to retry a request.
@@ -659,7 +660,7 @@ impl Default for Config {
             include: Include::Git,
             exclude: Vec::new(),
             models,
-            session_store_dir: PathBuf::new(),
+            session_store_dir: home_config_dir().join("state"),
             retry_limit: DEFAULT_RETRY_LIMIT,
             no_preflight: false,
             default_dialect: ConfigDialect::default(),
@@ -692,14 +693,6 @@ impl Config {
     pub fn with_test_cwd(mut self, path: PathBuf) -> Self {
         self.test_cwd = Some(path.to_string_lossy().into_owned());
         self
-    }
-
-    pub fn session_store_dir(&self) -> PathBuf {
-        if self.session_store_dir.as_os_str().is_empty() {
-            home_config_dir().join("state")
-        } else {
-            self.session_store_dir.clone()
-        }
     }
 
     pub fn project_root(&self) -> PathBuf {
@@ -900,7 +893,9 @@ impl Config {
         if other.include != dflt.include {
             self.include = other.include.clone();
         }
-        if other.session_store_dir != dflt.session_store_dir {
+        if !other.session_store_dir.as_os_str().is_empty()
+            && other.session_store_dir != dflt.session_store_dir
+        {
             self.session_store_dir = other.session_store_dir.clone();
         }
         if other.retry_limit != dflt.retry_limit {
@@ -1133,10 +1128,9 @@ mod tests {
 
         let config_without_change = config.clone();
         assert_eq!(
-            config_without_change.session_store_dir(),
+            config_without_change.session_store_dir,
             home_config_dir().join("state")
         );
-        assert_eq!(config_without_change.session_store_dir, PathBuf::new());
 
         let mut config_with_existing = Config::default();
         set_config!(
