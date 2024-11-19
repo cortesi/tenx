@@ -32,8 +32,8 @@ async fn run_trial(
     trial: &mut libtenx::trial::Trial,
     output_mode: &OutputMode,
     sender: &mpsc::Sender<libtenx::Event>,
-    model: Option<String>,
-) -> anyhow::Result<TrialReport> {
+    model_name: Option<String>,
+) -> anyhow::Result<(TrialReport, libtenx::Session)> {
     trial.tenx_conf = trial.tenx_conf.clone().load_env();
 
     let progress = if matches!(output_mode, OutputMode::Sum) {
@@ -43,7 +43,7 @@ async fn run_trial(
                 .template("{msg} {spinner:.blue} ")
                 .unwrap(),
         );
-        let display_name = match &model {
+        let display_name = match &model_name {
             Some(m) => format!("{}: {}", m, trial.name),
             None => format!("{}: {}", trial.tenx_conf.model()?.name(), trial.name),
         };
@@ -54,7 +54,7 @@ async fn run_trial(
         None
     };
 
-    let report = trial.execute(Some(sender.clone()), model).await?;
+    let (report, session) = trial.execute(Some(sender.clone()), model_name).await?;
 
     if let Some(pb) = progress {
         pb.finish();
@@ -66,7 +66,7 @@ async fn run_trial(
         println!("    {}", status);
     }
 
-    Ok(report)
+    Ok((report, session))
 }
 
 /// Prints trial execution reports in a formatted output
@@ -193,6 +193,10 @@ enum Commands {
         /// Override the models to use (can be specified multiple times)
         #[clap(long, num_args = 1)]
         model: Vec<String>,
+
+        /// Directory to save failed trial sessions to
+        #[clap(long)]
+        save_failures: Option<PathBuf>,
     },
     /// List all available trials (alias: ls)
     #[clap(alias = "ls")]
@@ -239,7 +243,11 @@ async fn main() -> anyhow::Result<()> {
     }
 
     let result = match cli.command {
-        Commands::Run { patterns, model } => {
+        Commands::Run {
+            patterns,
+            model,
+            save_failures,
+        } => {
             let pattern_refs: Vec<&str> = patterns.iter().map(|s| s.as_str()).collect();
             let pattern_slice = if pattern_refs.is_empty() {
                 None
@@ -260,7 +268,17 @@ async fn main() -> anyhow::Result<()> {
             };
             for model in models {
                 for trial in &mut trials {
-                    let report = run_trial(trial, &cli.output, &sender, model.cloned()).await?;
+                    let (report, session) =
+                        run_trial(trial, &cli.output, &sender, model.cloned()).await?;
+
+                    if report.failed {
+                        if let Some(failures_dir) = &save_failures {
+                            let store =
+                                libtenx::session_store::SessionStore::open(failures_dir.clone())?;
+                            let session_name = format!("{}-{}", report.model_name, trial.name);
+                            store.save(&session_name, &session)?;
+                        }
+                    }
                     reports.push(report);
                 }
             }

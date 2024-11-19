@@ -2,7 +2,7 @@ mod error;
 mod events;
 mod lang;
 mod session;
-mod session_store;
+pub mod session_store;
 mod tenx;
 mod testutils;
 mod validators;

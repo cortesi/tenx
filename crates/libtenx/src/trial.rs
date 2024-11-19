@@ -2,24 +2,22 @@
 //!
 //! A trial consists of a TrialConf at NAME.toml which specifies the operations to perform, as well
 //! as an embedded tenx configuration.
-
-use crate::Event;
-use glob::glob;
 use std::{
     fs,
     path::{Path, PathBuf},
 };
-use tokio::sync::mpsc;
 
 use fs_extra;
+use glob::glob;
 use serde::Deserialize;
 use tempfile::TempDir;
+use tokio::sync::mpsc;
 use tracing::info;
 
 use crate::{
     config::{Config, Include, ProjectRoot},
     model::ModelProvider,
-    Result, Tenx, TenxError,
+    Event, Result, Tenx, TenxError,
 };
 
 #[derive(Debug, Clone, Deserialize)]
@@ -209,12 +207,12 @@ impl Trial {
         &self,
         sender: Option<mpsc::Sender<Event>>,
         model: Option<String>,
-    ) -> Result<TrialReport> {
+    ) -> Result<(TrialReport, crate::Session)> {
         use std::time::Instant;
         let start_time = Instant::now();
         let temp_dir = self.setup_temp_project()?;
         let mut conf = self.tenx_conf.clone();
-        conf.session_store_dir = temp_dir.path().join("session");
+        conf.session_store_dir = PathBuf::from("");
         conf.project_root = ProjectRoot::Path(temp_dir.path().join("project"));
         if let Some(m) = model {
             conf.default_model = Some(m);
@@ -246,11 +244,9 @@ impl Trial {
         }
 
         let time_taken = start_time.elapsed().as_secs_f64();
-        Ok(TrialReport::from_session(
-            &session,
-            self.name.clone(),
-            model_name,
-            time_taken,
+        Ok((
+            TrialReport::from_session(&session, self.name.clone(), model_name, time_taken),
+            session,
         ))
     }
 

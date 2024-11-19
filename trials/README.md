@@ -1,11 +1,11 @@
 
 # Writing Tenx Trials
 
-Trials are automated tests for tenx commands - they ensure that tenx behaves
-consistently, catch regressions, and allow us to consistently test prompting
-strategies and models. 
+Trials are automated, real-world tests for tenx - they help to ensure that tenx
+behaves consistently, catch regressions, and allow us to test prompting
+strategies and benchmark models. 
 
-Each trial consists of a project directory and a configuration file that
+Each trial consists of a project directory and a trial configuration file that
 specifies what commands to run.
 
 Trials are run using the **ttrial** tool in the tenx project. See the tool's
@@ -13,20 +13,19 @@ help for details.
 
 ## Best Practices
 
-When writing trials, keep your projects minimal by including only the files and
-dependencies necessary for the test. Projects should be focused on testing a
-single specific feature or behavior, using clear and specific prompts, with a
-short list of editable files.
+Keep your projects minimal by including only the files and dependencies
+necessary for the test. Projects should be focused on testing a single specific
+feature or behavior, use clear and specific prompts, and have a short list of
+editable files.
 
 Choose descriptive names for your trial files that clearly indicate what's
 being tested, and include a clear description in the `desc` field. This makes
 it easier to understand the purpose of each trial at a glance.
 
-It's important to test failure cases as well. Each trial should have a clear
-failure condition, typically enforced through unit tests. Use the retry limit
-configuration to ensure that the trial fails conclusively if the model cannot
-produce the desired output.
-
+Each trial should have a clear failure condition that can be detected by a
+validators, typically unit tests. Use the retry limit configuration to ensure
+that the trial fails conclusively if the model cannot produce the desired
+output.
 
 
 ## Configuration Format

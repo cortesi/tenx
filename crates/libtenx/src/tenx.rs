@@ -117,6 +117,9 @@ impl Tenx {
 
     /// Saves a session to the store.
     pub fn save_session(&self, session: &Session) -> Result<()> {
+        if self.config.session_store_dir.as_os_str().is_empty() {
+            return Ok(());
+        }
         let session_store = SessionStore::open(self.config.session_store_dir.clone())?;
         let root = self.config.project_root();
         let name = path_to_filename(&root);
