@@ -1,31 +1,31 @@
 
 # Writing Tenx Trials
 
-Trials are automated tests for tenx commands - they help ensure the tool
-behaves consistently, catch regressions, and allow us to consistently test
-prompting strategies and models. Each trial consists of a project directory and
-a configuration file that specifies what commands to run.
+Trials are automated tests for tenx commands - they ensure that tenx behaves
+consistently, catch regressions, and allow us to consistently test prompting
+strategies and models. 
 
-## Basic Structure
+Each trial consists of a project directory and a configuration file that
+specifies what commands to run.
 
-A trial consists of:
+Trials are run using the **ttrial** tool in the tenx project. See the tool's
+help for details. 
 
-1. A project directory under `trials/projects/`
-2. A TOML configuration file in `trials/`
+## Best Practices
 
-For example:
+When writing trials, keep your projects minimal by including only the files and
+dependencies necessary for the test. Projects should be focused on testing a
+single specific feature or behavior, using clear and specific prompts, with a
+short list of editable files.
 
-```
-trials/
-  ├── projects/
-  │   └── simple/          # Project directory
-  │       ├── src/
-  │       └── Cargo.toml
-  └── simple.toml          # Trial configuration
-```
+Choose descriptive names for your trial files that clearly indicate what's
+being tested, and include a clear description in the `desc` field. This makes
+it easier to understand the purpose of each trial at a glance.
 
-Projects might be shared between multiple trials, so be careful whe modifying
-them.
+It's important to test failure cases as well. Each trial should have a clear
+failure condition, typically enforced through unit tests. Use the retry limit
+configuration to ensure that the trial fails conclusively if the model cannot
+produce the desired output.
 
 
 
@@ -34,10 +34,10 @@ them.
 Trial configurations are TOML files with the following structure:
 
 ```toml
-# Required: Directory name under trials/projects/
+# Directory name under trials/projects/
 project = "simple"
 
-# Optional: Trial description
+# Trial description
 desc = "Tests basic Rust code generation"
 
 # Required: Operation to perform (ask or fix)
@@ -65,58 +65,4 @@ editable = ["src/main.rs"]
 [op.fix]
 prompt = "Fix the compiler errors"  # Optional
 editable = ["src/lib.rs"]
-```
-
-
-## How Trials Work
-
-When a trial is executed, tenx:
-
-1. Creates a temporary directory
-2. Copies the target project directory into the temp dir
-3. Creates a session subdirectory for storing conversation state
-4. Loads or creates a tenx configuration:
-   - Uses embedded config from trial TOML if present
-   - Falls back to defaults if neither exists
-5. Initializes tenx with the project root set to the temp copy
-6. Creates a new session and executes the specified operation:
-   - For `ask`: sets up editable files and sends prompt
-   - For `fix`: sets up editable files and runs validation/fixes
-
-This isolation ensures trials can modify project files without affecting the
-original source, and prevents trials from interfering with each other.
-
-## Best Practices
-
-1. Keep projects minimal
-    - Include only files necessary for the test
-    - Remove unnecessary dependencies
-
-2. Make tests focused
-    - Test one specific feature or behavior
-    - Use clear, specific prompts
-    - Keep editable files list short
-
-3. Use descriptive names
-    - Trial filenames should indicate what's being tested
-    - Add a clear description in the `desc` field
-
-4. Test failure cases
-    - Include trials that test error handling
-    - Verify validation and retry behavior
-
-
-
-## Running Trials
-
-The trial command runner is built into the `tenx` binary.
-
-Run a specific trial:
-```bash 
-cargo run --bin tenx -- trial run NAME
-```
-
-List available trials:
-```bash
-cargo run --bin tenx -- trial list
 ```

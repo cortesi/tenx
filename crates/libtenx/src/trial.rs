@@ -46,7 +46,7 @@ pub struct TrialConf {
     pub project: String,
     pub op: TrialOp,
     pub config: Option<Config>,
-    pub desc: Option<String>,
+    pub desc: String,
 }
 
 impl TrialConf {
@@ -282,7 +282,7 @@ impl Trial {
 
         Ok(Trial {
             name: name.to_string(),
-            desc: trial_conf.desc.clone().unwrap_or_default(),
+            desc: trial_conf.desc.clone(),
             base_dir: base_dir.as_ref().to_path_buf(),
             trial_conf,
             tenx_conf,
@@ -349,6 +349,7 @@ mod tests {
 
         let test_toml = r#"
             project = "test_project"
+            desc = "Test trial description"
             [op.ask]
             prompt = "test prompt"
             editable = ["file1.rs"]
@@ -420,7 +421,7 @@ mod tests {
                     editable: vec![],
                 }),
                 config: None,
-                desc: None,
+                desc: "Test trial".to_string(),
             },
             tenx_conf: Config::default(),
         };
@@ -466,7 +467,7 @@ mod tests {
                     editable: vec![],
                 }),
                 config: None,
-                desc: None,
+                desc: "Test trial".to_string(),
             },
             tenx_conf: Config::default(),
         };
