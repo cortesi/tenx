@@ -100,7 +100,6 @@ impl Tenx {
         prompt: Option<String>,
     ) -> Result<()> {
         let _block = EventBlock::start(&sender)?;
-        let session_store = SessionStore::open(self.config.session_store_dir())?;
         let preflight_result = self.run_preflight_validators(session, &sender);
         let result = if let Err(e) = preflight_result {
             let prompt = prompt.unwrap_or_else(|| "Please fix the following errors.".to_string());
@@ -109,8 +108,7 @@ impl Tenx {
                 step.err = Some(e.clone());
             }
             self.save_session(session)?;
-            self.process_prompt(session, sender.clone(), &session_store)
-                .await
+            self.process_prompt(session, sender.clone()).await
         } else {
             Err(TenxError::Internal("No errors found".to_string()))
         };
@@ -120,8 +118,9 @@ impl Tenx {
     /// Saves a session to the store.
     pub fn save_session(&self, session: &Session) -> Result<()> {
         let session_store = SessionStore::open(self.config.session_store_dir())?;
-        session_store.save_current(&self.config, session)?;
-        Ok(())
+        let root = self.config.project_root();
+        let name = path_to_filename(&root);
+        session_store.save(&name, session)
     }
 
     /// Loads a session from the store.
@@ -140,15 +139,13 @@ impl Tenx {
         sender: Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
         let _block = EventBlock::start(&sender)?;
-        let session_store = SessionStore::open(self.config.session_store_dir())?;
         if let Some(step) = session.last_step_mut() {
             step.rollback(&self.config)?;
             if let Some(p) = prompt {
                 step.prompt = Prompt::User(p);
             }
         }
-        self.process_prompt(session, sender.clone(), &session_store)
-            .await
+        self.process_prompt(session, sender.clone()).await
     }
 
     /// Adds a user prompt to the session and sends it to the model.
@@ -160,9 +157,7 @@ impl Tenx {
     ) -> Result<()> {
         let _block = EventBlock::start(&sender)?;
         session.add_prompt(Prompt::User(prompt))?;
-        let session_store = SessionStore::open(self.config.session_store_dir())?;
-        self.process_prompt(session, sender.clone(), &session_store)
-            .await
+        self.process_prompt(session, sender.clone()).await
     }
 
     /// Resets the session to a specific step.
@@ -177,15 +172,14 @@ impl Tenx {
         &self,
         session: &mut Session,
         sender: Option<mpsc::Sender<Event>>,
-        session_store: &SessionStore,
     ) -> Result<()> {
-        session_store.save_current(&self.config, session)?;
+        self.save_session(session)?;
         if session.last_step_error().is_none() {
             if let Err(e) = self.run_preflight_validators(session, &sender) {
                 if let Some(step) = session.last_step_mut() {
                     step.err = Some(e.clone());
                 }
-                session_store.save_current(&self.config, session)?;
+                self.save_session(session)?;
                 return Err(e);
             }
         }
@@ -211,7 +205,7 @@ impl Tenx {
                         retry_count, self.config.retry_limit, e
                     );
                     session.add_prompt(Prompt::Auto(model_message.to_string()))?;
-                    session_store.save_current(&self.config, session)?;
+                    self.save_session(session)?;
                 } else {
                     debug!("Non-retryable error: {}", e);
                     send_event(&sender, Event::Fatal(format!("{}", e)))?;
@@ -222,7 +216,7 @@ impl Tenx {
             let result = self.execute_prompt_cycle(session, sender.clone()).await;
             match result {
                 Ok(()) => {
-                    session_store.save_current(&self.config, session)?;
+                    self.save_session(session)?;
                     if !session.should_continue() {
                         return Ok(());
                     }
@@ -351,10 +345,7 @@ mod tests {
             .add_editable_path(&config, test_file_path.clone())
             .unwrap();
 
-        let session_store = SessionStore::open(config.session_store_dir).unwrap();
-        tenx.process_prompt(&mut session, None, &session_store)
-            .await
-            .unwrap();
+        tenx.process_prompt(&mut session, None).await.unwrap();
 
         assert_eq!(session.steps().len(), 1);
         assert!(session.steps()[0].model_response.is_some());
