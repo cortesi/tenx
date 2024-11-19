@@ -322,6 +322,9 @@ enum Commands {
     /// Show the current session (alias: sess)
     #[clap(alias = "sess")]
     Session {
+        /// Path to a session file to load
+        session_file: Option<PathBuf>,
+
         /// Print the entire session object verbosely
         #[clap(long)]
         raw: bool,
@@ -589,9 +592,18 @@ async fn main() -> anyhow::Result<()> {
                 tx.ask(&mut session, user_prompt, Some(sender)).await?;
                 Ok(())
             }
-            Commands::Session { raw, render, full } => {
+            Commands::Session {
+                session_file,
+                raw,
+                render,
+                full,
+            } => {
                 let model = config.model()?;
-                let session = tx.load_session()?;
+                let session = if let Some(path) = session_file {
+                    libtenx::session_store::load_session(path)?
+                } else {
+                    tx.load_session()?
+                };
                 if *raw {
                     println!("{:#?}", session);
                 } else if *render {

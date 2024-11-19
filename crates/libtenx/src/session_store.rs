@@ -11,6 +11,12 @@ pub fn path_to_filename(path: &Path) -> String {
         .replace([':', '<', '>', '"', '|', '?', '*'], "")
 }
 
+/// Loads a session from a file located at a specific path.
+pub fn load_session<P: AsRef<Path>>(path: P) -> Result<Session> {
+    let serialized = fs::read_to_string(path)?;
+    serde_json::from_str(&serialized).map_err(|e| TenxError::Internal(format!("{}", e)))
+}
+
 /// Manages the storage and retrieval of State objects.
 pub struct SessionStore {
     base_dir: PathBuf,
@@ -39,16 +45,10 @@ impl SessionStore {
         self.save(&file_name, state)
     }
 
-    /// Loads a session from a file located at a specific path.
-    pub fn load_session<P: AsRef<Path>>(path: P) -> Result<Session> {
-        let serialized = fs::read_to_string(path)?;
-        serde_json::from_str(&serialized).map_err(|e| TenxError::Internal(format!("{}", e)))
-    }
-
     /// Loads a State from a file based on the given name.
     pub fn load<S: AsRef<str>>(&self, name: S) -> Result<Session> {
         let file_path = self.base_dir.join(name.as_ref());
-        Self::load_session(file_path)
+        load_session(file_path)
     }
 }
 
