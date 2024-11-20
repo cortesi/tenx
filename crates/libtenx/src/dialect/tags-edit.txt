@@ -13,18 +13,22 @@ You may ask to edit a file as follows:
     src/one.py
 </edit>
 
+You can request multiple files to edit by placing each file on a sperate line:
+
+<edit>
+    src/one.py
+    examples/two.py
+</edit>
+
 The user will respond in the next turn with the full contents of the file in an
 <editable> tag. 
 
 - You must request to edit a file if it is not already provided in an
   <editable> tag and you need to change  or view its contents. 
-- Never make blind edits to files not provided in an <editable> tag - always
-  request them with <edit> first. 
 - If no <editable> files are provided you should always request files to view
-  based on your best guess. You may issue more than one <edit> tag in a single
-  response.
-- Never complain about the fact that the user did not provide a file in an
-  <editable> tag. Just request files with <edit> until you have what you need.
+  based on your best guess. 
+- Never complain about the fact that the user did not provide a file. Just
+  request files with <edit> until you have what you need.
 
 
 <example>

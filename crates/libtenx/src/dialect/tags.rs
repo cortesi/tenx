@@ -217,14 +217,12 @@ impl DialectProvider for Tags {
                     }
                     "edit" => {
                         let (_, content) = xmlish::parse_block("edit", &mut lines)?;
-                        if content.len() > 1 {
-                            return Err(TenxError::ResponseParse {
-                                user: "Failed to parse model response".into(),
-                                model: "<edit> tag content must be a single line".into(),
-                            });
+                        for line in content {
+                            let path = line.trim().to_string();
+                            if !path.is_empty() {
+                                operations.push(Operation::Edit(PathBuf::from(path)));
+                            }
                         }
-                        let path = content.first().unwrap_or(&String::new()).trim().to_string();
-                        operations.push(Operation::Edit(PathBuf::from(path)));
                     }
                     _ => {
                         lines.next();
@@ -427,20 +425,24 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_edit_multiline_error() {
+    fn test_parse_edit_multiline() {
         let d = Tags::default();
 
         let input = indoc! {r#"
             <edit>
-            first line
-            second line
+            /path/to/first
+            /path/to/second
             </edit>
         "#};
 
-        assert!(matches!(
-            d.parse(input),
-            Err(TenxError::ResponseParse { .. })
-        ));
+        let result = d.parse(input).unwrap();
+        assert_eq!(
+            result.operations,
+            vec![
+                Operation::Edit(PathBuf::from("/path/to/first")),
+                Operation::Edit(PathBuf::from("/path/to/second")),
+            ]
+        );
     }
 
     #[test]
