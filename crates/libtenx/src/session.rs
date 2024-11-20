@@ -290,6 +290,52 @@ impl Session {
         Ok(())
     }
 
+    /// Return the list of files that should be included in the editable block before a given step.
+    /// - Files are included for step N, if they are modified in step N-1, AND that modification
+    ///   is the last modification in to the file in the step list.
+    /// - Edit operations and appearing in a Patch are both counted as a modifications.
+    /// - Offset can be num_steps + 1, meaning we're considering all steps and calculating the edit
+    ///   set for a new step to be added.
+    /// - Passing an offset beyond num_steps + 1 is an error
+    pub fn editables_for_step(&self, step_offset: usize) -> Result<Vec<PathBuf>> {
+        if step_offset > self.steps.len() {
+            return Err(TenxError::Internal("Invalid step offset".into()));
+        }
+
+        // Initialize with all files having -1 as their last modification step
+        let mut most_recent_modified: HashMap<PathBuf, i32> = self
+            .editable
+            .iter()
+            .map(|path| (path.clone(), -1))
+            .collect();
+
+        // Record all file modifications with their step index
+        for (idx, step) in self.steps.iter().enumerate() {
+            if let Some(resp) = &step.model_response {
+                // Add files modified by patches
+                if let Some(patch) = &resp.patch {
+                    for path in patch.changed_files() {
+                        most_recent_modified.insert(path.clone(), idx as i32);
+                    }
+                }
+                // Add files that were requested for editing
+                for op in &resp.operations {
+                    let Operation::Edit(path) = op;
+                    most_recent_modified.insert(path.clone(), idx as i32);
+                }
+            }
+        }
+
+        // Return files modified in the previous step
+        let target_step = (step_offset as i32) - 1;
+        Ok(self
+            .editable
+            .iter()
+            .filter(|path| most_recent_modified.get(*path) == Some(&target_step))
+            .cloned()
+            .collect())
+    }
+
     /// Partitions the given files based on whether they will be modified in future steps. This is
     /// most useful when writing dialects that want to use conversation rewriting to omit contents
     /// of files that will be modified in future steps. When a model requests a file to edit, we
@@ -476,6 +522,106 @@ mod tests {
             vec![PathBuf::from("test1.txt"), PathBuf::from("test3.txt")]
         );
         assert_eq!(future, vec![PathBuf::from("test2.txt")]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_editables_for_step() -> Result<()> {
+        let mut test_project = crate::testutils::test_project();
+        test_project.create_file_tree(&["file1.txt", "file2.txt", "file3.txt"]);
+        test_project.write("file1.txt", "content1");
+        test_project.write("file2.txt", "content2");
+        test_project.write("file3.txt", "content3");
+
+        // Add all files as editable
+        test_project
+            .session
+            .add_editable_path(&test_project.config, "file1.txt")?;
+        test_project
+            .session
+            .add_editable_path(&test_project.config, "file2.txt")?;
+        test_project
+            .session
+            .add_editable_path(&test_project.config, "file3.txt")?;
+
+        // Test 1: Before any steps are added, all files should be marked as modified
+        let editables = test_project.session.editables_for_step(0)?;
+        assert_eq!(editables.len(), 3,);
+
+        // Step 0: Modify file1.txt through patch
+        test_project
+            .session
+            .add_prompt(Prompt::User("step0".into()))?;
+        let step = test_project.session.steps.last_mut().unwrap();
+        step.model_response = Some(ModelResponse {
+            patch: Some(Patch {
+                changes: vec![Change::Write(WriteFile {
+                    path: PathBuf::from("file1.txt"),
+                    content: "modified1".into(),
+                })],
+            }),
+            operations: vec![],
+            usage: None,
+            comment: None,
+        });
+
+        // Step 1: Request to edit file2.txt and modify file3.txt through patch
+        test_project
+            .session
+            .add_prompt(Prompt::User("step1".into()))?;
+        let step = test_project.session.steps.last_mut().unwrap();
+        step.model_response = Some(ModelResponse {
+            patch: Some(Patch {
+                changes: vec![Change::Write(WriteFile {
+                    path: PathBuf::from("file3.txt"),
+                    content: "modified3".into(),
+                })],
+            }),
+            operations: vec![Operation::Edit(PathBuf::from("file2.txt"))],
+            usage: None,
+            comment: None,
+        });
+
+        // Step 2: Empty step (no modifications)
+        test_project
+            .session
+            .add_prompt(Prompt::User("step2".into()))?;
+        let step = test_project.session.steps.last_mut().unwrap();
+        step.model_response = Some(ModelResponse {
+            patch: None,
+            operations: vec![],
+            usage: None,
+            comment: None,
+        });
+
+        // Test 2: At step 0, no files should be editable (no previous step)
+        let editables = test_project.session.editables_for_step(0)?;
+        assert!(
+            editables.is_empty(),
+            "No files should be editable at step 0"
+        );
+
+        // Test 3: At step 1, file1.txt should be editable (modified in step 0)
+        let editables = test_project.session.editables_for_step(1)?;
+        assert_eq!(editables.len(), 1, "One file should be editable");
+        assert_eq!(editables[0], PathBuf::from("file1.txt"));
+
+        // Test 4: At step 2, both file2.txt and file3.txt should be editable (modified in step 1)
+        let editables = test_project.session.editables_for_step(2)?;
+        assert_eq!(editables.len(), 2, "Two files should be editable");
+        assert!(editables.contains(&PathBuf::from("file2.txt")));
+        assert!(editables.contains(&PathBuf::from("file3.txt")));
+
+        // Test 5: At step 3, no files should be editable (nothing modified in step 2)
+        let editables = test_project.session.editables_for_step(3)?;
+        assert!(
+            editables.is_empty(),
+            "No files should be editable at step 3"
+        );
+
+        // Test 6: Error case - invalid step offset
+        assert!(test_project.session.editables_for_step(5).is_err());
 
         Ok(())
     }
