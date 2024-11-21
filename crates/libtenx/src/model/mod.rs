@@ -1,4 +1,5 @@
 mod claude;
+mod conversation;
 mod dummy_model;
 pub mod openai;
 
