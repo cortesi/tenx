@@ -57,3 +57,90 @@ where
     conversation.add_editables(req, config, session, dialect, session.steps().len())?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::dialect::DummyDialect;
+
+    #[derive(Debug, PartialEq, Clone)]
+    enum Message {
+        User(String),
+        Agent(String),
+    }
+
+    #[derive(Default)]
+    struct DummyRequest {
+        system_prompt: Option<String>,
+        messages: Vec<Message>,
+        editable_calls: Vec<usize>,
+    }
+
+    struct DummyConversation;
+
+    impl Conversation<DummyRequest> for DummyConversation {
+        fn set_system_prompt(&self, req: &mut DummyRequest, prompt: String) -> Result<()> {
+            match req.system_prompt {
+                None => {
+                    req.system_prompt = Some(prompt);
+                    Ok(())
+                }
+                Some(_) => panic!("system prompt already set"),
+            }
+        }
+
+        fn add_user_message(&self, req: &mut DummyRequest, text: String) -> Result<()> {
+            req.messages.push(Message::User(text));
+            Ok(())
+        }
+
+        fn add_agent_message(&self, req: &mut DummyRequest, text: &str) -> Result<()> {
+            req.messages.push(Message::Agent(text.to_string()));
+            Ok(())
+        }
+
+        fn add_editables(
+            &self,
+            req: &mut DummyRequest,
+            _config: &Config,
+            _session: &Session,
+            _dialect: &Dialect,
+            step_offset: usize,
+        ) -> Result<()> {
+            req.editable_calls.push(step_offset);
+            Ok(())
+        }
+    }
+
+    /// Verifies that messages follow the correct conversation flow:
+    /// - Starts with a user message
+    /// - Strictly alternates between user and agent messages
+    fn assert_flow(messages: &[Message]) {
+        assert!(!messages.is_empty(), "conversation must have messages");
+
+        for pair in messages.chunks(2) {
+            match pair {
+                [Message::User(_), Message::Agent(_)] => (),
+                [Message::User(_)] if pair.len() == 1 => (),
+                _ => panic!("conversation must consist of (user, agent) pairs, possibly ending with a user message"),
+            }
+        }
+    }
+
+    #[test]
+    fn test_basic_conversation_flow() -> Result<()> {
+        let conversation = DummyConversation {};
+        let mut req = DummyRequest::default();
+        let dialect = Dialect::Dummy(DummyDialect::default());
+        let config = Config::default();
+        let mut session = Session::default();
+        session.add_prompt(crate::prompt::Prompt::User("test prompt".to_string()))?;
+
+        build_conversation(&conversation, &mut req, &config, &session, &dialect)?;
+
+        assert!(req.system_prompt.is_some());
+        assert_flow(&req.messages);
+
+        Ok(())
+    }
+}
