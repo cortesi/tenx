@@ -18,7 +18,7 @@ use crate::{
     config::Config,
     dialect::{Dialect, DialectProvider},
     events::Event,
-    model::ModelProvider,
+    model::{conversation::Conversation, ModelProvider},
     send_event,
     session::ModelResponse,
     Result, Session, TenxError,
@@ -32,6 +32,7 @@ const EDITABLE_LEADIN: &str =
 const EDITABLE_UPDATE_LEADIN: &str = "Here are the updated files.";
 const OMITTED_FILES_LEADIN: &str =
     "These files have been omitted since they were updated later in the conversation:";
+const ACK: &str = "Ok";
 
 fn render_editables_with_omitted(
     config: &Config,
@@ -60,6 +61,81 @@ pub struct OpenAi {
     pub api_base: String,
     pub streaming: bool,
     pub no_system_prompt: bool,
+}
+
+impl Conversation<CreateChatCompletionRequest> for OpenAi {
+    fn set_system_prompt(
+        &self,
+        req: &mut CreateChatCompletionRequest,
+        prompt: String,
+    ) -> Result<()> {
+        if self.no_system_prompt {
+            req.messages.push(
+                ChatCompletionRequestUserMessageArgs::default()
+                    .content(prompt)
+                    .build()?
+                    .into(),
+            );
+            req.messages.push(
+                ChatCompletionRequestAssistantMessageArgs::default()
+                    .content(ACK)
+                    .build()?
+                    .into(),
+            );
+        } else {
+            req.messages.push(
+                ChatCompletionRequestSystemMessageArgs::default()
+                    .content(prompt)
+                    .build()?
+                    .into(),
+            );
+        }
+        Ok(())
+    }
+
+    fn add_user_message(&self, req: &mut CreateChatCompletionRequest, text: String) -> Result<()> {
+        req.messages.push(
+            ChatCompletionRequestUserMessageArgs::default()
+                .content(text)
+                .build()?
+                .into(),
+        );
+        Ok(())
+    }
+
+    fn add_agent_message(&self, req: &mut CreateChatCompletionRequest, text: &str) -> Result<()> {
+        req.messages.push(
+            ChatCompletionRequestAssistantMessageArgs::default()
+                .content(text)
+                .build()?
+                .into(),
+        );
+        Ok(())
+    }
+
+    fn add_editables(
+        &self,
+        req: &mut CreateChatCompletionRequest,
+        config: &Config,
+        session: &Session,
+        dialect: &Dialect,
+        step_offset: usize,
+    ) -> Result<()> {
+        let editables = session.editables_for_step(step_offset)?;
+        if !editables.is_empty() {
+            let (included, omitted) = session.partition_modified(&editables, step_offset);
+            self.add_user_message(
+                req,
+                format!(
+                    "{}\n{}",
+                    EDITABLE_LEADIN,
+                    render_editables_with_omitted(config, session, dialect, included, omitted)?
+                ),
+            )?;
+            self.add_agent_message(req, ACK)?;
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
@@ -196,7 +272,7 @@ impl OpenAi {
 
         messages.push(
             ChatCompletionRequestAssistantMessageArgs::default()
-                .content("Got it")
+                .content(ACK)
                 .build()?
                 .into(),
         );
@@ -250,7 +326,7 @@ impl OpenAi {
 
                     messages.push(
                         ChatCompletionRequestAssistantMessageArgs::default()
-                            .content("Got it.")
+                            .content(ACK)
                             .build()?
                             .into(),
                     );
