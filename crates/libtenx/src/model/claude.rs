@@ -1,5 +1,5 @@
 //! This module implements the Claude model provider for the tenx system.
-use std::{collections::HashMap, convert::From, path::PathBuf};
+use std::{collections::HashMap, convert::From};
 
 use misanthropy::{Anthropic, Content, ContentBlockDelta, Role, StreamEvent};
 use serde::{Deserialize, Serialize};
@@ -18,11 +18,7 @@ use crate::{
 
 const MAX_TOKENS: u32 = 8192;
 const CONTEXT_LEADIN: &str = "Here is some immutable context that you may not edit.\n";
-const EDITABLE_LEADIN: &str =
-    "Here are the editable files. You will modify only these, nothing else.\n";
-const EDITABLE_UPDATE_LEADIN: &str = "Here are the updated files.";
-const OMITTED_FILES_LEADIN: &str =
-    "These files have been omitted since they were updated later in the conversation:";
+const EDITABLE_LEADIN: &str = "Here are the editable files.";
 
 /// A model that interacts with the Anthropic API. The general design of the model is to:
 ///
@@ -135,27 +131,6 @@ impl Claude {
         Err(TenxError::Internal("No patch to parse.".into()))
     }
 
-    /// Renders the editable files and appends a list of omitted files if any.
-    ///
-    /// Returns a formatted string containing the rendered editables and omitted files.
-    fn render_editables_with_omitted(
-        &self,
-        config: &Config,
-        session: &Session,
-        dialect: &Dialect,
-        files: Vec<PathBuf>,
-        omitted: Vec<PathBuf>,
-    ) -> Result<String> {
-        let mut result = dialect.render_editables(config, session, files)?;
-        if !omitted.is_empty() {
-            result.push_str(&format!("\n{}\n", OMITTED_FILES_LEADIN));
-            for file in omitted {
-                result.push_str(&format!("- {}\n", file.display()));
-            }
-        }
-        Ok(result)
-    }
-
     fn request(
         &self,
         config: &Config,
@@ -165,90 +140,120 @@ impl Claude {
         let mut req = misanthropy::MessagesRequest {
             model: self.api_model.clone(),
             max_tokens: MAX_TOKENS,
-            messages: vec![
-                misanthropy::Message {
-                    role: misanthropy::Role::User,
-                    content: vec![misanthropy::Content::Text(misanthropy::Text {
-                        text: format!(
-                            "{}\n{}",
-                            CONTEXT_LEADIN,
-                            dialect.render_context(config, session)?
-                        ),
-                        cache_control: Some(misanthropy::CacheControl::Ephemeral),
-                    })],
-                },
-                misanthropy::Message {
-                    role: misanthropy::Role::Assistant,
-                    content: vec![misanthropy::Content::text("Got it")],
-                },
-                misanthropy::Message {
-                    role: misanthropy::Role::User,
-                    content: vec![misanthropy::Content::text(format!(
-                        "{}\n{}",
-                        EDITABLE_LEADIN,
-                        {
-                            let (included, omitted) =
-                                session.partition_modified(session.editable(), 0);
-                            self.render_editables_with_omitted(
-                                config, session, dialect, included, omitted,
-                            )?
-                        }
-                    ))],
-                },
-                misanthropy::Message {
-                    role: misanthropy::Role::Assistant,
-                    content: vec![misanthropy::Content::text("Got it")],
-                },
-            ],
-            system: vec![misanthropy::Content::Text(misanthropy::Text {
-                text: dialect.system(),
-                cache_control: Some(misanthropy::CacheControl::Ephemeral),
-            })],
+            messages: Vec::new(),
+            system: vec![],
             temperature: None,
             stream: true,
             tools: vec![],
             tool_choice: misanthropy::ToolChoice::Auto,
             stop_sequences: vec![],
         };
-        for (i, s) in session.steps().iter().enumerate() {
-            req.messages.push(misanthropy::Message {
-                role: misanthropy::Role::User,
-                content: vec![misanthropy::Content::text(
-                    dialect.render_step_request(config, session, i)?,
-                )],
-            });
-            if let Some(resp) = &s.model_response {
-                if let Some(patch) = &resp.patch {
-                    req.messages.push(misanthropy::Message {
-                        role: misanthropy::Role::Assistant,
-                        content: vec![misanthropy::Content::text(
-                            dialect.render_step_response(config, session, i)?,
-                        )],
-                    });
-                    let (included, omitted) = session.partition_modified(&patch.changed_files(), i);
-                    req.messages.push(misanthropy::Message {
-                        role: misanthropy::Role::User,
-                        content: vec![misanthropy::Content::text(format!(
-                            "{}\n{}",
-                            EDITABLE_UPDATE_LEADIN,
-                            self.render_editables_with_omitted(
-                                config, session, dialect, included, omitted
-                            )?
-                        ))],
-                    });
-                    req.messages.push(misanthropy::Message {
-                        role: misanthropy::Role::Assistant,
-                        content: vec![misanthropy::Content::text("Got it.")],
-                    });
-                }
-            } else if i != session.steps().len() - 1 {
-                req.messages.push(misanthropy::Message {
-                    role: misanthropy::Role::Assistant,
-                    content: vec![misanthropy::Content::text("omitted due to error")],
-                });
-            }
-        }
+        build_conversation(self, &mut req, config, session, dialect)?;
         Ok(req)
+    }
+}
+
+/// Trait for managing conversation flow with AI models
+trait Conversation<R> {
+    fn set_system_prompt(&self, req: &mut R, prompt: String) -> Result<()>;
+    fn add_user_message(&self, req: &mut R, text: String) -> Result<()>;
+    fn add_agent_message(&self, req: &mut R, text: &str) -> Result<()>;
+    fn add_editables(
+        &self,
+        req: &mut R,
+        config: &Config,
+        session: &Session,
+        dialect: &Dialect,
+        step_offset: usize,
+    ) -> Result<()>;
+}
+
+/// Builds a conversation following our standard pattern
+fn build_conversation<C, R>(
+    conversation: &C,
+    req: &mut R,
+    config: &Config,
+    session: &Session,
+    dialect: &Dialect,
+) -> Result<()>
+where
+    C: Conversation<R>,
+{
+    conversation.set_system_prompt(req, dialect.system())?;
+    conversation.add_user_message(
+        req,
+        format!(
+            "{}\n{}",
+            CONTEXT_LEADIN,
+            dialect.render_context(config, session)?
+        ),
+    )?;
+    conversation.add_agent_message(req, "Got it")?;
+
+    for (i, step) in session.steps().iter().enumerate() {
+        conversation.add_editables(req, config, session, dialect, i)?;
+        conversation.add_user_message(req, dialect.render_step_request(config, session, i)?)?;
+        if step.model_response.is_some() {
+            conversation
+                .add_agent_message(req, &dialect.render_step_response(config, session, i)?)?;
+        } else if i != session.steps().len() - 1 {
+            conversation.add_agent_message(req, "omitted due to error")?;
+        }
+    }
+    conversation.add_editables(req, config, session, dialect, session.steps().len())?;
+    Ok(())
+}
+
+impl Conversation<misanthropy::MessagesRequest> for Claude {
+    fn set_system_prompt(
+        &self,
+        req: &mut misanthropy::MessagesRequest,
+        prompt: String,
+    ) -> Result<()> {
+        req.system = vec![misanthropy::Content::Text(misanthropy::Text {
+            text: prompt,
+            cache_control: Some(misanthropy::CacheControl::Ephemeral),
+        })];
+        Ok(())
+    }
+
+    fn add_user_message(&self, req: &mut misanthropy::MessagesRequest, text: String) -> Result<()> {
+        req.messages.push(misanthropy::Message {
+            role: misanthropy::Role::User,
+            content: vec![misanthropy::Content::text(text)],
+        });
+        Ok(())
+    }
+
+    fn add_agent_message(&self, req: &mut misanthropy::MessagesRequest, text: &str) -> Result<()> {
+        req.messages.push(misanthropy::Message {
+            role: misanthropy::Role::Assistant,
+            content: vec![misanthropy::Content::text(text)],
+        });
+        Ok(())
+    }
+
+    fn add_editables(
+        &self,
+        req: &mut misanthropy::MessagesRequest,
+        config: &Config,
+        session: &Session,
+        dialect: &Dialect,
+        step_offset: usize,
+    ) -> Result<()> {
+        let editables = session.editables_for_step(step_offset)?;
+        if !editables.is_empty() {
+            self.add_user_message(
+                req,
+                format!(
+                    "{}\n{}",
+                    EDITABLE_LEADIN,
+                    dialect.render_editables(config, session, editables)?
+                ),
+            )?;
+            self.add_agent_message(req, "Got it.")?;
+        }
+        Ok(())
     }
 }
 
