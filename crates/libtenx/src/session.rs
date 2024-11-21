@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     path::{Path, PathBuf},
 };
 
@@ -336,46 +336,6 @@ impl Session {
             .cloned()
             .collect())
     }
-
-    /// Partitions the given files based on whether they will be modified in future steps. This is
-    /// most useful when writing dialects that want to use conversation rewriting to omit contents
-    /// of files that will be modified in future steps. When a model requests a file to edit, we
-    /// count that as a modification.
-    ///
-    /// Returns a (past, future) tuple, with each element beign a subset of the input file list.
-    pub fn partition_modified(
-        &self,
-        files: &[PathBuf],
-        step_offset: usize,
-    ) -> (Vec<PathBuf>, Vec<PathBuf>) {
-        let mut future_modified_files = HashSet::new();
-        // Include modifications starting from current step
-        if step_offset < self.steps().len() {
-            for step in self.steps().iter().skip(step_offset) {
-                if let Some(resp) = &step.model_response {
-                    // Add files modified by patches
-                    if let Some(patch) = &resp.patch {
-                        future_modified_files.extend(patch.changed_files());
-                    }
-                    // Add files that will be edited in future steps
-                    for op in &resp.operations {
-                        match op {
-                            Operation::Edit(path) => {
-                                future_modified_files.insert(path.clone());
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        let (past, future): (Vec<_>, Vec<_>) = files
-            .iter()
-            .partition(|file| !future_modified_files.contains(*file));
-        (
-            past.into_iter().cloned().collect(),
-            future.into_iter().cloned().collect(),
-        )
-    }
 }
 
 #[cfg(test)]
@@ -464,65 +424,6 @@ mod tests {
 
         assert_eq!(test_project.session.steps.len(), 1);
         assert_eq!(test_project.read("test.txt"), "Content 1");
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_partition_modified() -> Result<()> {
-        let mut test_project = crate::testutils::test_project();
-        test_project.create_file_tree(&["test1.txt", "test2.txt", "test3.txt"]);
-
-        // Add first step with a patch
-        test_project
-            .session
-            .add_prompt(Prompt::User("test1".into()))?;
-        let step = test_project.session.steps.last_mut().unwrap();
-        step.model_response = Some(ModelResponse {
-            patch: Some(Patch {
-                changes: vec![Change::Write(WriteFile {
-                    path: PathBuf::from("test1.txt"),
-                    content: "modified".into(),
-                })],
-            }),
-            operations: vec![],
-            usage: None,
-            comment: None,
-        });
-
-        // Add second step with an edit operation
-        test_project
-            .session
-            .add_prompt(Prompt::User("test2".into()))?;
-        let step = test_project.session.steps.last_mut().unwrap();
-        step.model_response = Some(ModelResponse {
-            patch: None,
-            operations: vec![Operation::Edit(PathBuf::from("test2.txt"))],
-            usage: None,
-            comment: None,
-        });
-
-        let files = vec![
-            PathBuf::from("test1.txt"),
-            PathBuf::from("test2.txt"),
-            PathBuf::from("test3.txt"),
-        ];
-
-        // Partition from start - both test1.txt and test2.txt will be modified in future steps
-        let (past, future) = test_project.session.partition_modified(&files, 0);
-        assert_eq!(past, vec![PathBuf::from("test3.txt")]);
-        assert_eq!(
-            future,
-            vec![PathBuf::from("test1.txt"), PathBuf::from("test2.txt")]
-        );
-
-        // Partition from step one - now test1.txt has already been modified
-        let (past, future) = test_project.session.partition_modified(&files, 1);
-        assert_eq!(
-            past,
-            vec![PathBuf::from("test1.txt"), PathBuf::from("test3.txt")]
-        );
-        assert_eq!(future, vec![PathBuf::from("test2.txt")]);
 
         Ok(())
     }

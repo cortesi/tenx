@@ -4,8 +4,9 @@ use crate::{
     Result, Session,
 };
 
-const CONTEXT_LEADIN: &str = "Here is some immutable context that you may not edit.\n";
-const ACK: &str = "Got it.";
+pub const EDITABLE_LEADIN: &str = "Here are the editable files.";
+pub const CONTEXT_LEADIN: &str = "Here is some immutable context that you may not edit.";
+pub const ACK: &str = "Got it.";
 
 /// Conversation lets us extact a generic strategy for dealing with conversational
 /// models, where there is a User/Assistant rlquest/response cycle.

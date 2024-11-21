@@ -11,14 +11,13 @@ use crate::{
     config::Config,
     dialect::{Dialect, DialectProvider},
     events::*,
-    model::conversation::{build_conversation, Conversation},
+    model::conversation::{build_conversation, Conversation, ACK, EDITABLE_LEADIN},
     model::ModelProvider,
     session::ModelResponse,
     Result, Session, TenxError,
 };
 
 const MAX_TOKENS: u32 = 8192;
-const EDITABLE_LEADIN: &str = "Here are the editable files.";
 
 /// A model that interacts with the Anthropic API. The general design of the model is to:
 ///
@@ -200,7 +199,7 @@ impl Conversation<misanthropy::MessagesRequest> for Claude {
                     dialect.render_editables(config, session, editables)?
                 ),
             )?;
-            self.add_agent_message(req, "Got it.")?;
+            self.add_agent_message(req, ACK)?;
         }
         Ok(())
     }

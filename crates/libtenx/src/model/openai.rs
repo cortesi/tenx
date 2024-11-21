@@ -19,7 +19,7 @@ use crate::{
     dialect::{Dialect, DialectProvider},
     events::Event,
     model::{
-        conversation::{build_conversation, Conversation},
+        conversation::{build_conversation, Conversation, ACK, EDITABLE_LEADIN},
         ModelProvider,
     },
     send_event,
@@ -27,30 +27,7 @@ use crate::{
     Result, Session, TenxError,
 };
 
-use std::{collections::HashMap, path::PathBuf};
-
-const EDITABLE_LEADIN: &str =
-    "Here are the editable files. You will modify only these, nothing else.\n";
-const OMITTED_FILES_LEADIN: &str =
-    "These files have been omitted since they were updated later in the conversation:";
-const ACK: &str = "Ok";
-
-fn render_editables_with_omitted(
-    config: &Config,
-    session: &Session,
-    dialect: &Dialect,
-    files: Vec<PathBuf>,
-    omitted: Vec<PathBuf>,
-) -> Result<String> {
-    let mut result = dialect.render_editables(config, session, files)?;
-    if !omitted.is_empty() {
-        result.push_str(&format!("\n{}\n", OMITTED_FILES_LEADIN));
-        for file in omitted {
-            result.push_str(&format!("- {}\n", file.display()));
-        }
-    }
-    Ok(result)
-}
+use std::collections::HashMap;
 
 pub const OPENAI_API_BASE: &str = "https://api.openai.com/v1";
 
@@ -124,13 +101,12 @@ impl Conversation<CreateChatCompletionRequest> for OpenAi {
     ) -> Result<()> {
         let editables = session.editables_for_step(step_offset)?;
         if !editables.is_empty() {
-            let (included, omitted) = session.partition_modified(&editables, step_offset);
             self.add_user_message(
                 req,
                 format!(
                     "{}\n{}",
                     EDITABLE_LEADIN,
-                    render_editables_with_omitted(config, session, dialect, included, omitted)?
+                    dialect.render_editables(config, session, editables)?
                 ),
             )?;
             self.add_agent_message(req, ACK)?;
