@@ -1,7 +1,7 @@
 use async_openai::{
     config::OpenAIConfig,
     types::{
-        ChatChoice, ChatCompletionRequestAssistantMessageArgs, ChatCompletionRequestMessage,
+        ChatChoice, ChatCompletionRequestAssistantMessageArgs,
         ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessageArgs,
         ChatCompletionResponseMessage, CreateChatCompletionRequest,
         CreateChatCompletionRequestArgs, CreateChatCompletionResponse, FinishReason,
@@ -18,7 +18,10 @@ use crate::{
     config::Config,
     dialect::{Dialect, DialectProvider},
     events::Event,
-    model::{conversation::Conversation, ModelProvider},
+    model::{
+        conversation::{build_conversation, Conversation},
+        ModelProvider,
+    },
     send_event,
     session::ModelResponse,
     Result, Session, TenxError,
@@ -26,10 +29,8 @@ use crate::{
 
 use std::{collections::HashMap, path::PathBuf};
 
-const CONTEXT_LEADIN: &str = "Here is some immutable context that you may not edit.\n";
 const EDITABLE_LEADIN: &str =
     "Here are the editable files. You will modify only these, nothing else.\n";
-const EDITABLE_UPDATE_LEADIN: &str = "Here are the updated files.";
 const OMITTED_FILES_LEADIN: &str =
     "These files have been omitted since they were updated later in the conversation:";
 const ACK: &str = "Ok";
@@ -236,108 +237,12 @@ impl OpenAi {
         session: &Session,
         dialect: &Dialect,
     ) -> Result<CreateChatCompletionRequest> {
-        let mut messages: Vec<ChatCompletionRequestMessage> = Vec::new();
-
-        if self.no_system_prompt {
-            messages.push(
-                ChatCompletionRequestUserMessageArgs::default()
-                    .content(format!(
-                        "{}\n{}\n{}",
-                        dialect.system(),
-                        CONTEXT_LEADIN,
-                        dialect.render_context(config, session)?
-                    ))
-                    .build()?
-                    .into(),
-            );
-        } else {
-            messages.push(
-                ChatCompletionRequestSystemMessageArgs::default()
-                    .content(dialect.system())
-                    .build()?
-                    .into(),
-            );
-
-            messages.push(
-                ChatCompletionRequestUserMessageArgs::default()
-                    .content(format!(
-                        "{}\n{}",
-                        CONTEXT_LEADIN,
-                        dialect.render_context(config, session)?
-                    ))
-                    .build()?
-                    .into(),
-            );
-        }
-
-        messages.push(
-            ChatCompletionRequestAssistantMessageArgs::default()
-                .content(ACK)
-                .build()?
-                .into(),
-        );
-
-        messages.push(
-            ChatCompletionRequestUserMessageArgs::default()
-                .content(format!("{}\n{}", EDITABLE_LEADIN, {
-                    let (included, omitted) = session.partition_modified(session.editable(), 0);
-                    render_editables_with_omitted(config, session, dialect, included, omitted)?
-                }))
-                .build()?
-                .into(),
-        );
-
-        messages.push(
-            ChatCompletionRequestAssistantMessageArgs::default()
-                .content("Got it")
-                .build()?
-                .into(),
-        );
-
-        for (i, s) in session.steps().iter().enumerate() {
-            messages.push(
-                ChatCompletionRequestUserMessageArgs::default()
-                    .content(dialect.render_step_request(config, session, i)?)
-                    .build()?
-                    .into(),
-            );
-
-            if let Some(resp) = &s.model_response {
-                if let Some(patch) = &resp.patch {
-                    messages.push(
-                        ChatCompletionRequestAssistantMessageArgs::default()
-                            .content(dialect.render_step_response(config, session, i)?)
-                            .build()?
-                            .into(),
-                    );
-
-                    messages.push(
-                        ChatCompletionRequestUserMessageArgs::default()
-                            .content(format!("{}\n{}", EDITABLE_UPDATE_LEADIN, {
-                                let (included, omitted) =
-                                    session.partition_modified(&patch.changed_files(), i);
-                                render_editables_with_omitted(
-                                    config, session, dialect, included, omitted,
-                                )?
-                            }))
-                            .build()?
-                            .into(),
-                    );
-
-                    messages.push(
-                        ChatCompletionRequestAssistantMessageArgs::default()
-                            .content(ACK)
-                            .build()?
-                            .into(),
-                    );
-                }
-            }
-        }
-
-        Ok(CreateChatCompletionRequestArgs::default()
+        let mut req = CreateChatCompletionRequestArgs::default()
             .model(&self.api_model)
-            .messages(messages)
-            .build()?)
+            .messages(Vec::new())
+            .build()?;
+        build_conversation(self, &mut req, config, session, dialect)?;
+        Ok(req)
     }
 }
 
