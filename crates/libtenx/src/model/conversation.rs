@@ -51,6 +51,11 @@ where
             conversation
                 .add_agent_message(req, &dialect.render_step_response(config, session, i)?)?;
         } else if i != session.steps().len() - 1 {
+            // We have no model response, but we're not the last step, so this isn't a user request
+            // step just about to be sent to the model. This is presumably an error - the best we
+            // can do to preserve sequencing is either omit the step entirely or add an omission
+            // message from the agent. Since omitting the step will lose the user's prompt, we opt
+            // for the latter.
             conversation.add_agent_message(req, "omitted due to error")?;
         }
     }

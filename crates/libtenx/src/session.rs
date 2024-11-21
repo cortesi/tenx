@@ -39,7 +39,8 @@ pub struct Step {
     pub prompt: Prompt,
     /// The response from the model
     pub model_response: Option<ModelResponse>,
-    /// An error from the model
+    /// An associated error. This may be retryable, in which case a new step is synthesized to go
+    /// back to the model.
     pub err: Option<TenxError>,
     /// A cache of the file contents before the step was applied
     pub rollback_cache: HashMap<PathBuf, String>,
