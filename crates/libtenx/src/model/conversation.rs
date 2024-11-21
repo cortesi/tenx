@@ -148,4 +148,22 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_empty_session() -> Result<()> {
+        let conversation = DummyConversation {};
+        let mut req = DummyRequest::default();
+        let dialect = Dialect::Dummy(DummyDialect::default());
+        let config = Config::default();
+        let session = Session::default();
+
+        build_conversation(&conversation, &mut req, &config, &session, &dialect)?;
+
+        assert!(req.system_prompt.is_some());
+        assert_eq!(req.editable_calls, vec![0]);
+        assert_eq!(req.messages.len(), 2); // Context message and ACK only
+        assert_flow(&req.messages);
+
+        Ok(())
+    }
 }
