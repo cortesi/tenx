@@ -353,8 +353,20 @@ fn load_config(cli: &Cli) -> Result<config::Config> {
     config.no_pre_check = cli.no_pre_check;
     config.no_stream = cli.no_stream;
 
-    // Add enabled and disabled checks
+    // Validate and add enabled checks
+    for check_name in &cli.check {
+        if config.get_check(check_name).is_none() {
+            return Err(anyhow::anyhow!("Check '{}' does not exist", check_name));
+        }
+    }
     config.checks.enable.extend(cli.check.clone());
+
+    // Validate and add disabled checks
+    for check_name in &cli.no_check {
+        if config.get_check(check_name).is_none() {
+            return Err(anyhow::anyhow!("Check '{}' does not exist", check_name));
+        }
+    }
     config.checks.disable.extend(cli.no_check.clone());
 
     Ok(config)

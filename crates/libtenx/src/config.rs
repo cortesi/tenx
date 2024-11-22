@@ -957,12 +957,17 @@ impl Config {
         builtin_checks()
     }
 
+    /// Get a check by name
+    pub fn get_check<S: AsRef<str>>(&self, name: S) -> Option<Check> {
+        self.all_checks()
+            .into_iter()
+            .find(|c| c.name == name.as_ref())
+    }
+
     /// Returns true if a check is enabled based on its name and default state in the config
     pub fn check_enabled<S: AsRef<str>>(&self, name: S) -> bool {
         let name = name.as_ref();
-        let check = self.all_checks().into_iter().find(|c| c.name == name);
-
-        if let Some(check) = check {
+        if let Some(check) = self.get_check(name) {
             if check.default_off() {
                 // Return only if explicitly enabled
                 self.checks.enable.contains(&name.to_string())
