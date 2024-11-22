@@ -18,7 +18,7 @@ impl Runnable {
 
 pub trait Validator {
     /// Returns the name of the validator.
-    fn name(&self) -> &'static str;
+    fn name(&self) -> String;
 
     /// Performs a check on the given PromptInput and State.
     fn validate(&self, config: &Config, state: &Session) -> Result<()>;

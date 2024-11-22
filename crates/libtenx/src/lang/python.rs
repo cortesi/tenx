@@ -9,8 +9,8 @@ pub struct PythonRuffCheck;
 pub struct PythonRuffFormatter;
 
 impl Validator for PythonRuffCheck {
-    fn name(&self) -> &'static str {
-        "python: ruff check"
+    fn name(&self) -> String {
+        "python: ruff check".to_string()
     }
 
     fn validate(&self, config: &Config, state: &Session) -> Result<()> {

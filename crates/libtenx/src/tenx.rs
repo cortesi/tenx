@@ -281,7 +281,7 @@ impl Tenx {
         let _block = EventBlock::preflight(sender)?;
         let preflight_validators = crate::validators::relevant_validators(&self.config, session)?;
         for validator in preflight_validators {
-            let _validator_block = EventBlock::validator(sender, validator.name())?;
+            let _validator_block = EventBlock::validator(sender, &validator.name())?;
             validator.validate(&self.config, session)?;
         }
         Ok(())
@@ -298,7 +298,7 @@ impl Tenx {
                 let post_patch_validators =
                     crate::validators::relevant_validators(&self.config, session)?;
                 for validator in post_patch_validators {
-                    let _validator_block = EventBlock::validator(sender, validator.name())?;
+                    let _validator_block = EventBlock::validator(sender, &validator.name())?;
                     validator.validate(&self.config, session)?;
                 }
             }

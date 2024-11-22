@@ -15,8 +15,8 @@ pub struct Shell {
 }
 
 impl Validator for Shell {
-    fn name(&self) -> &'static str {
-        Box::leak(self.name.clone().into_boxed_str())
+    fn name(&self) -> String {
+        self.name.clone()
     }
 
     fn validate(&self, config: &Config, _state: &Session) -> Result<()> {

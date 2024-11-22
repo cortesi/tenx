@@ -19,12 +19,12 @@ fn cargo_runnable() -> Result<Runnable> {
 }
 
 impl Validator for RustCargoCheck {
-    fn name(&self) -> &'static str {
-        "rust: cargo check"
+    fn name(&self) -> String {
+        "rust: cargo check".to_string()
     }
 
     fn validate(&self, config: &Config, state: &Session) -> Result<()> {
-        run_cargo_command(config, self.name(), state, &["check", "--tests"])
+        run_cargo_command(config, &self.name(), state, &["check", "--tests"])
     }
 
     fn is_relevant(&self, config: &Config, state: &Session) -> Result<bool> {
@@ -41,12 +41,12 @@ impl Validator for RustCargoCheck {
 }
 
 impl Validator for RustCargoTest {
-    fn name(&self) -> &'static str {
-        "rust: cargo test"
+    fn name(&self) -> String {
+        "rust: cargo test".to_string()
     }
 
     fn validate(&self, config: &Config, state: &Session) -> Result<()> {
-        run_cargo_command(config, self.name(), state, &["test", "-q"])
+        run_cargo_command(config, &self.name(), state, &["test", "-q"])
     }
 
     fn is_relevant(&self, config: &Config, state: &Session) -> Result<bool> {
@@ -63,14 +63,14 @@ impl Validator for RustCargoTest {
 }
 
 impl Validator for RustCargoClippy {
-    fn name(&self) -> &'static str {
-        "rust: cargo clippy"
+    fn name(&self) -> String {
+        "rust: cargo clippy".to_string()
     }
 
     fn validate(&self, config: &Config, state: &Session) -> Result<()> {
         run_cargo_command(
             config,
-            self.name(),
+            &self.name(),
             state,
             &["clippy", "--no-deps", "--all", "--tests", "-q"],
         )
