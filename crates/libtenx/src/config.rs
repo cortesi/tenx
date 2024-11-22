@@ -15,8 +15,8 @@ use toml;
 
 use crate::{checks::builtin_checks, checks::Check, dialect, model, Result, TenxError};
 
-pub const HOME_CONFIG_FILE: &str = "tenx.toml";
-pub const LOCAL_CONFIG_FILE: &str = ".tenx.toml";
+pub const HOME_CONFIG_FILE: &str = "tenx.ron";
+pub const LOCAL_CONFIG_FILE: &str = ".tenx.ron";
 const DEFAULT_RETRY_LIMIT: usize = 16;
 
 const ANTHROPIC_API_KEY: &str = "ANTHROPIC_API_KEY";
@@ -1078,9 +1078,9 @@ mod tests {
             Include::Glob(vec!["*.rs".to_string(), "*.toml".to_string()])
         );
 
-        let toml_str = config.to_toml().unwrap();
+        let ron_str = config.to_ron().unwrap();
 
-        let deserialized_config = Config::from_toml(&toml_str).unwrap();
+        let deserialized_config = Config::from_ron(&ron_str).unwrap();
 
         assert!(matches!(deserialized_config.include, Include::Glob(_)));
         if let Include::Glob(patterns) = deserialized_config.include {
@@ -1089,10 +1089,10 @@ mod tests {
 
         // Test default value (Git) is not serialized
         let default_config = Config::default();
-        let default_toml_str = default_config.to_toml().unwrap();
-        let parsed_toml: toml::Value = toml::from_str(&default_toml_str).unwrap();
-        let table = parsed_toml.as_table().unwrap();
-        assert!(!table.contains_key("include"));
+        let default_ron_str = default_config.to_ron().unwrap();
+        let parsed_ron: ron::Value = ron::from_str(&default_ron_str).unwrap();
+        let struct_fields_str = format!("{:?}", parsed_ron);
+        assert!(!struct_fields_str.contains("include"));
     }
 
     #[test]
@@ -1176,8 +1176,8 @@ mod tests {
 
     #[test]
     fn test_single_value_deserialization() {
-        let toml_str = "retry_limit = 42";
-        let mut config = Config::from_toml(toml_str).unwrap();
+        let ron_str = "(retry_limit: 42)";
+        let mut config = Config::from_ron(ron_str).unwrap();
         config.models = vec![ModelConfig::Claude {
             name: "sonnet".to_string(),
             api_model: "test".to_string(),

@@ -320,7 +320,7 @@ fn load_config(cli: &Cli) -> Result<config::Config> {
     if home_config_path.exists() {
         let home_config_str =
             fs::read_to_string(&home_config_path).context("Failed to read home config file")?;
-        let home_config = config::Config::from_toml(&home_config_str)
+        let home_config = config::Config::from_ron(&home_config_str)
             .context("Failed to parse home config file")?;
         config.merge(&home_config);
     }
@@ -331,7 +331,7 @@ fn load_config(cli: &Cli) -> Result<config::Config> {
     if local_config_path.exists() {
         let local_config_str =
             fs::read_to_string(&local_config_path).context("Failed to read local config file")?;
-        let local_config = config::Config::from_toml(&local_config_str)
+        let local_config = config::Config::from_ron(&local_config_str)
             .context("Failed to parse local config file")?;
         config.merge(&local_config);
     }
