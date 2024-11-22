@@ -94,22 +94,6 @@ struct Cli {
     #[clap(long)]
     tags_udiff: Option<bool>,
 
-    /// Rust Cargo Clippy validator
-    #[clap(long)]
-    rust_cargo_clippy: Option<bool>,
-
-    /// Rust Cargo Check validator
-    #[clap(long)]
-    rust_cargo_check: Option<bool>,
-
-    /// Rust Cargo Test validator
-    #[clap(long)]
-    rust_cargo_test: Option<bool>,
-
-    /// Python Ruff Check validator
-    #[clap(long)]
-    python_ruff_check: Option<bool>,
-
     /// Enable a specific check
     #[clap(long)]
     check: Vec<String>,
@@ -402,20 +386,6 @@ fn load_config(cli: &Cli) -> Result<config::Config> {
     // Add enabled and disabled checks
     config.checks.enable.extend(cli.check.clone());
     config.checks.disable.extend(cli.no_check.clone());
-
-    // Override validator configurations
-    if let Some(value) = cli.rust_cargo_clippy {
-        config.checks.rust_cargo_clippy = value;
-    }
-    if let Some(value) = cli.rust_cargo_check {
-        config.checks.rust_cargo_check = value;
-    }
-    if let Some(value) = cli.rust_cargo_test {
-        config.checks.rust_cargo_test = value;
-    }
-    if let Some(value) = cli.python_ruff_check {
-        config.checks.python_ruff_check = value;
-    }
 
     Ok(config)
 }

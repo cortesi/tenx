@@ -52,27 +52,16 @@ impl Check for Shell {
 
     fn is_relevant(&self, _config: &Config, state: &Session) -> Result<bool> {
         if state.editable().is_empty() {
-            eprintln!("No editables");
             return Ok(false);
         }
-
         for editable in state.editable() {
             let path_str = editable.to_str().unwrap_or_default();
-            eprintln!("Checking editable path: {}", path_str);
-
             for pattern in &self.globs {
-                eprintln!("Against pattern: {}", pattern);
                 let glob_pattern =
                     glob::Pattern::new(pattern).map_err(|e| TenxError::Internal(e.to_string()))?;
-
                 // Try both with and without leading ./
                 let clean_path = path_str.trim_start_matches("./");
                 let matches = glob_pattern.matches(path_str) || glob_pattern.matches(clean_path);
-                eprintln!(
-                    "Clean path: {}, Pattern match result: {}",
-                    clean_path, matches
-                );
-
                 if matches {
                     return Ok(true);
                 }

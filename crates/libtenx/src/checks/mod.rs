@@ -3,17 +3,26 @@ pub mod shell;
 
 pub use builtin::*;
 
-use crate::{
-    config::Config,
-    lang::{python::*, rust::*},
-    Result, Session,
-};
+use crate::{config::Config, Result, Session};
 
 /// The mode in which the check should run - preflight, post-patch or both.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Mode {
     Pre,
     Post,
     Both,
+}
+
+impl Mode {
+    /// Returns true if this mode includes preflight checks.
+    pub fn is_pre(&self) -> bool {
+        matches!(self, Mode::Pre | Mode::Both)
+    }
+
+    /// Returns true if this mode includes post-patch checks.
+    pub fn is_post(&self) -> bool {
+        matches!(self, Mode::Post | Mode::Both)
+    }
 }
 
 pub enum Runnable {
@@ -50,25 +59,4 @@ pub trait Check {
     fn mode(&self) -> Mode {
         Mode::Both
     }
-}
-
-/// Returns a vector of all available checks.
-pub fn all_checks() -> Vec<Box<dyn Check>> {
-    vec![
-        Box::new(RustCargoCheck),
-        Box::new(RustCargoTest),
-        Box::new(RustCargoClippy),
-        Box::new(PythonRuffCheck),
-    ]
-}
-
-/// Returns a list of checks based on the given prompt and state.
-pub fn relevant_checks(config: &Config, state: &Session) -> Result<Vec<Box<dyn Check>>> {
-    let mut checks: Vec<Box<dyn Check>> = Vec::new();
-    for checker in all_checks() {
-        if checker.is_relevant(config, state)? && checker.runnable()?.is_ok() {
-            checks.push(checker);
-        }
-    }
-    Ok(checks)
 }

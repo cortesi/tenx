@@ -1,39 +1,11 @@
 use std::path::Path;
 use std::process::Command;
 
-use crate::checks::{Check, Runnable};
+use crate::checks::Runnable;
 use crate::formatters::Formatter;
 use crate::{config::Config, Result, Session, TenxError};
 
-pub struct PythonRuffCheck;
 pub struct PythonRuffFormatter;
-
-impl Check for PythonRuffCheck {
-    fn name(&self) -> String {
-        "python: ruff check".to_string()
-    }
-
-    fn check(&self, config: &Config, state: &Session) -> Result<()> {
-        for file in state.abs_editables(config)? {
-            if file.extension().map_or(false, |ext| ext == "py") {
-                run_ruff_check(&file)?;
-            }
-        }
-        Ok(())
-    }
-
-    fn is_relevant(&self, config: &Config, state: &Session) -> Result<bool> {
-        should_run_python_check(config, state)
-    }
-
-    fn runnable(&self) -> Result<Runnable> {
-        if is_ruff_installed() {
-            Ok(Runnable::Ok)
-        } else {
-            Ok(Runnable::Error("ruff is not installed".to_string()))
-        }
-    }
-}
 
 impl Formatter for PythonRuffFormatter {
     fn name(&self) -> &'static str {
@@ -85,29 +57,6 @@ fn should_run_python_check(config: &Config, state: &Session) -> Result<bool> {
             .included_files()?
             .iter()
             .any(|path| path.extension().map_or(false, |ext| ext == "py")))
-    }
-}
-
-fn run_ruff_check(file_path: &Path) -> Result<()> {
-    let output = Command::new("ruff")
-        .args(["check", "-q"])
-        .arg(file_path)
-        .output()
-        .map_err(|e| TenxError::Check {
-            name: "python: ruff check".to_string(),
-            user: format!("Failed to execute ruff command: {}", e),
-            model: e.to_string(),
-        })?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        Err(TenxError::Check {
-            name: "python: ruff check".to_string(),
-            user: "Ruff found issues".to_string(),
-            model: format!("stderr:\n{}", stderr),
-        })
-    } else {
-        Ok(())
     }
 }
 

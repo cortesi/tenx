@@ -279,10 +279,12 @@ impl Tenx {
             return Ok(());
         }
         let _block = EventBlock::preflight(sender)?;
-        let preflight_validators = crate::checks::relevant_checks(&self.config, session)?;
-        for validator in preflight_validators {
-            let _validator_block = EventBlock::validator(sender, &validator.name())?;
-            validator.check(&self.config, session)?;
+        // let preflight_validators = crate::checks::relevant_checks(&self.config, session)?;
+        for c in self.config.enabled_checks() {
+            if c.mode().is_pre() && c.is_relevant(&self.config, session)? {
+                let _check_block = EventBlock::validator(sender, &c.name())?;
+                c.check(&self.config, session)?;
+            }
         }
         Ok(())
     }
@@ -295,10 +297,11 @@ impl Tenx {
         if let Some(last_step) = session.steps().last() {
             if last_step.model_response.is_some() {
                 let _block = EventBlock::post_patch(sender)?;
-                let post_patch_validators = crate::checks::relevant_checks(&self.config, session)?;
-                for validator in post_patch_validators {
-                    let _validator_block = EventBlock::validator(sender, &validator.name())?;
-                    validator.check(&self.config, session)?;
+                for c in self.config.enabled_checks() {
+                    if c.mode().is_post() && c.is_relevant(&self.config, session)? {
+                        let _check_block = EventBlock::validator(sender, &c.name())?;
+                        c.check(&self.config, session)?;
+                    }
                 }
             }
         }

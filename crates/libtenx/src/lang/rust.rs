@@ -1,81 +1,14 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use crate::checks::{Check, Runnable};
 use crate::formatters::Formatter;
 use crate::{config::Config, Result, Session, TenxError};
 
+use crate::checks::Runnable;
 pub struct RustCargoCheck;
 pub struct RustCargoTest;
 pub struct RustCargoClippy;
 pub struct CargoFormatter;
-
-fn cargo_runnable() -> Result<Runnable> {
-    if is_cargo_installed() {
-        Ok(Runnable::Ok)
-    } else {
-        Ok(Runnable::Error("Cargo is not installed".to_string()))
-    }
-}
-
-impl Check for RustCargoCheck {
-    fn name(&self) -> String {
-        "rust: cargo check".to_string()
-    }
-
-    fn check(&self, config: &Config, state: &Session) -> Result<()> {
-        run_cargo_command(config, &self.name(), state, &["check", "--tests"])
-    }
-
-    fn is_relevant(&self, config: &Config, state: &Session) -> Result<bool> {
-        should_run_rust_check(config, state)
-    }
-
-    fn runnable(&self) -> Result<Runnable> {
-        cargo_runnable()
-    }
-}
-
-impl Check for RustCargoTest {
-    fn name(&self) -> String {
-        "rust: cargo test".to_string()
-    }
-
-    fn check(&self, config: &Config, state: &Session) -> Result<()> {
-        run_cargo_command(config, &self.name(), state, &["test", "-q"])
-    }
-
-    fn is_relevant(&self, config: &Config, state: &Session) -> Result<bool> {
-        should_run_rust_check(config, state)
-    }
-
-    fn runnable(&self) -> Result<Runnable> {
-        cargo_runnable()
-    }
-}
-
-impl Check for RustCargoClippy {
-    fn name(&self) -> String {
-        "rust: cargo clippy".to_string()
-    }
-
-    fn check(&self, config: &Config, state: &Session) -> Result<()> {
-        run_cargo_command(
-            config,
-            &self.name(),
-            state,
-            &["clippy", "--no-deps", "--all", "--tests", "-q"],
-        )
-    }
-
-    fn is_relevant(&self, config: &Config, state: &Session) -> Result<bool> {
-        should_run_rust_check(config, state)
-    }
-
-    fn runnable(&self) -> Result<Runnable> {
-        cargo_runnable()
-    }
-}
 
 impl Formatter for CargoFormatter {
     fn name(&self) -> &'static str {
@@ -95,7 +28,7 @@ impl Formatter for CargoFormatter {
     }
 
     fn runnable(&self) -> Result<Runnable> {
-        cargo_runnable()
+        Ok(Runnable::Ok)
     }
 }
 
@@ -111,14 +44,6 @@ fn should_run_rust_check(config: &Config, state: &Session) -> Result<bool> {
             .iter()
             .any(|path| path.extension().map_or(false, |ext| ext == "rs")))
     }
-}
-
-fn is_cargo_installed() -> bool {
-    Command::new("cargo")
-        .arg("--version")
-        .output()
-        .map(|output| output.status.success())
-        .unwrap_or(false)
 }
 
 fn run_cargo_command(config: &Config, name: &str, state: &Session, args: &[&str]) -> Result<()> {
@@ -245,30 +170,6 @@ mod tests {
     use super::*;
     use crate::{prompt::Prompt, testutils::create_dummy_project};
     use tempfile::TempDir;
-
-    #[test]
-    fn test_cargo_checker() -> Result<()> {
-        let temp_dir = TempDir::new().unwrap();
-        let config = Config::default().with_root(temp_dir.path());
-        create_dummy_project(temp_dir.path()).unwrap();
-
-        let edit_paths = vec![
-            temp_dir.path().join("crate1/src/lib.rs"),
-            temp_dir.path().join("crate2/src/lib.rs"),
-        ];
-        let prompt = Prompt::User(String::new());
-
-        let mut session = Session::default();
-        session.add_prompt(prompt.clone())?;
-        for p in edit_paths {
-            session.add_editable_path(&config, &p)?;
-        }
-
-        let checker = RustCargoCheck;
-        assert!(checker.check(&config, &session).is_ok());
-
-        Ok(())
-    }
 
     #[test]
     fn test_discover_workspace() -> Result<()> {

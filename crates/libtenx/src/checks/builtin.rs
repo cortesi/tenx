@@ -27,7 +27,7 @@ pub fn builtin_checks() -> Vec<Box<dyn Check>> {
         Box::new(Shell {
             name: "python-ruff".to_string(),
             command: "ruff check -q".to_string(),
-            globs: vec!["*.rs".to_string()],
+            globs: vec!["*.py".to_string()],
             default_off: false,
             fail_on_stderr: false,
         }),
