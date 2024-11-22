@@ -51,7 +51,7 @@ Tenx uses Ruskel to generate skeletonized versions of Rust crates. This gives
 the AI a simplified, single-page view of complex Rust codebases, boosting
 context understanding and code generation accuracy.
 
-### Rust Validators
+### Rust Checks
 
 To ensure top-notch AI-generated Rust code, Tenx uses specialized Rust
 validators:

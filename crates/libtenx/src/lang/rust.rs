@@ -1,8 +1,8 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use crate::checks::{Check, Runnable};
 use crate::formatters::Formatter;
-use crate::validators::{Runnable, Validator};
 use crate::{config::Config, Result, Session, TenxError};
 
 pub struct RustCargoCheck;
@@ -18,21 +18,21 @@ fn cargo_runnable() -> Result<Runnable> {
     }
 }
 
-impl Validator for RustCargoCheck {
+impl Check for RustCargoCheck {
     fn name(&self) -> String {
         "rust: cargo check".to_string()
     }
 
-    fn validate(&self, config: &Config, state: &Session) -> Result<()> {
+    fn check(&self, config: &Config, state: &Session) -> Result<()> {
         run_cargo_command(config, &self.name(), state, &["check", "--tests"])
     }
 
     fn is_relevant(&self, config: &Config, state: &Session) -> Result<bool> {
-        should_run_rust_validator(config, state)
+        should_run_rust_check(config, state)
     }
 
     fn is_configured(&self, config: &Config) -> bool {
-        config.validators.rust_cargo_check
+        config.checks.rust_cargo_check
     }
 
     fn runnable(&self) -> Result<Runnable> {
@@ -40,21 +40,21 @@ impl Validator for RustCargoCheck {
     }
 }
 
-impl Validator for RustCargoTest {
+impl Check for RustCargoTest {
     fn name(&self) -> String {
         "rust: cargo test".to_string()
     }
 
-    fn validate(&self, config: &Config, state: &Session) -> Result<()> {
+    fn check(&self, config: &Config, state: &Session) -> Result<()> {
         run_cargo_command(config, &self.name(), state, &["test", "-q"])
     }
 
     fn is_relevant(&self, config: &Config, state: &Session) -> Result<bool> {
-        should_run_rust_validator(config, state)
+        should_run_rust_check(config, state)
     }
 
     fn is_configured(&self, config: &Config) -> bool {
-        config.validators.rust_cargo_test
+        config.checks.rust_cargo_test
     }
 
     fn runnable(&self) -> Result<Runnable> {
@@ -62,12 +62,12 @@ impl Validator for RustCargoTest {
     }
 }
 
-impl Validator for RustCargoClippy {
+impl Check for RustCargoClippy {
     fn name(&self) -> String {
         "rust: cargo clippy".to_string()
     }
 
-    fn validate(&self, config: &Config, state: &Session) -> Result<()> {
+    fn check(&self, config: &Config, state: &Session) -> Result<()> {
         run_cargo_command(
             config,
             &self.name(),
@@ -77,11 +77,11 @@ impl Validator for RustCargoClippy {
     }
 
     fn is_relevant(&self, config: &Config, state: &Session) -> Result<bool> {
-        should_run_rust_validator(config, state)
+        should_run_rust_check(config, state)
     }
 
     fn is_configured(&self, config: &Config) -> bool {
-        config.validators.rust_cargo_clippy
+        config.checks.rust_cargo_clippy
     }
 
     fn runnable(&self) -> Result<Runnable> {
@@ -99,7 +99,7 @@ impl Formatter for CargoFormatter {
     }
 
     fn is_relevant(&self, config: &Config, state: &Session) -> Result<bool> {
-        should_run_rust_validator(config, state)
+        should_run_rust_check(config, state)
     }
 
     fn is_configured(&self, config: &Config) -> bool {
@@ -111,7 +111,7 @@ impl Formatter for CargoFormatter {
     }
 }
 
-fn should_run_rust_validator(config: &Config, state: &Session) -> Result<bool> {
+fn should_run_rust_check(config: &Config, state: &Session) -> Result<bool> {
     let editables = state.abs_editables(config)?;
     if !editables.is_empty() {
         Ok(editables
@@ -139,7 +139,7 @@ fn run_cargo_command(config: &Config, name: &str, state: &Session, args: &[&str]
         .args(args)
         .current_dir(&workspace.root_path)
         .output()
-        .map_err(|e| TenxError::Validation {
+        .map_err(|e| TenxError::Check {
             name: name.to_string(),
             user: format!("Failed to execute cargo command: {}", e),
             model: e.to_string(),
@@ -149,13 +149,13 @@ fn run_cargo_command(config: &Config, name: &str, state: &Session, args: &[&str]
     let stderr = String::from_utf8_lossy(&output.stderr);
 
     if args[0] == "clippy" && !stderr.is_empty() {
-        Err(TenxError::Validation {
+        Err(TenxError::Check {
             name: name.to_string(),
             user: "cargo clippy found issues".to_string(),
             model: format!("stderr:\n{}", stderr),
         })
     } else if !output.status.success() {
-        Err(TenxError::Validation {
+        Err(TenxError::Check {
             name: name.to_string(),
             user: format!("cargo {} failed", args[0]),
             model: format!("stdout:\n{}\n\nstderr:\n{}", stdout, stderr),
@@ -277,7 +277,7 @@ mod tests {
         }
 
         let checker = RustCargoCheck;
-        assert!(checker.validate(&config, &session).is_ok());
+        assert!(checker.check(&config, &session).is_ok());
 
         Ok(())
     }

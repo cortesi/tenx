@@ -49,9 +49,9 @@ pub enum Event {
     ContextRefreshEnd(String),
 
     /// A a preflight or post-patch check has started
-    ValidatorStart(String),
+    CheckStart(String),
     /// A a preflight or post-patch check has passed
-    ValidatorOk(String),
+    CheckOk(String),
 
     /// A model request has started
     PromptStart(String),
@@ -102,7 +102,7 @@ impl Event {
     pub fn progress_event(&self) -> Option<String> {
         match self {
             Event::ContextRefreshStart(s) => Some(s.clone()),
-            Event::ValidatorStart(s) => Some(s.clone()),
+            Event::CheckStart(s) => Some(s.clone()),
             Event::FormatterStart(s) => Some(s.clone()),
             _ => None,
         }
@@ -127,7 +127,7 @@ impl Event {
             Event::Snippet(s)
             | Event::FormatterStart(s)
             | Event::FormatterEnd(s)
-            | Event::ValidatorStart(s) => s.clone(),
+            | Event::CheckStart(s) => s.clone(),
             Event::Log(_, s) => s.clone(),
             _ => String::new(),
         }
@@ -139,7 +139,7 @@ impl Event {
             Event::PreflightStart => Some("Preflight checks...".to_string()),
             Event::FormattingStart => Some("Formatting...".to_string()),
             Event::PostPatchStart => Some("Post-patch validation...".to_string()),
-            Event::ValidatorStart(name) => Some(format!("Validator {}...", name)),
+            Event::CheckStart(name) => Some(format!("Check {}...", name)),
             Event::PromptStart(model) => Some(format!("Prompting {}...", model)),
             Event::ApplyPatch => Some("Applying patch...".to_string()),
             _ => None,
@@ -200,8 +200,8 @@ impl EventBlock {
     pub fn validator(sender: &Option<mpsc::Sender<Event>>, name: &str) -> Result<Self> {
         Self::new(
             sender,
-            Event::ValidatorStart(name.to_string()),
-            Event::ValidatorOk(name.to_string()),
+            Event::CheckStart(name.to_string()),
+            Event::CheckOk(name.to_string()),
         )
     }
 

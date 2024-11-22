@@ -227,10 +227,10 @@ fn print_patch(config: &Config, patch: &libtenx::patch::Patch, full: bool, width
 /// Pretty prints a TenxError with full details.
 pub fn full_error(error: &TenxError) -> String {
     match error {
-        TenxError::Validation { name, user, model } => {
+        TenxError::Check { name, user, model } => {
             format!(
                 "{}: {}\n{}: {}\n{}: {}",
-                "Validation Error".red().bold(),
+                "Check Error".red().bold(),
                 name,
                 "User Message".yellow().bold(),
                 user,

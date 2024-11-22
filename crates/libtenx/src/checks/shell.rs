@@ -1,14 +1,14 @@
 use std::process::Command;
 
 use crate::{
+    checks::{Check, Runnable},
     config::Config,
-    validators::{Runnable, Validator},
     Result, Session, TenxError,
 };
 
 /// A validator that runs a shell command and checks its output. Relies on `sh` being available.
 ///
-/// Validator commands are always run in the project root directory.
+/// Check commands are always run in the project root directory.
 pub struct Shell {
     /// Name of the validator for display and error reporting
     pub name: String,
@@ -22,12 +22,12 @@ pub struct Shell {
     pub fail_on_stderr: bool,
 }
 
-impl Validator for Shell {
+impl Check for Shell {
     fn name(&self) -> String {
         self.name.clone()
     }
 
-    fn validate(&self, config: &Config, _state: &Session) -> Result<()> {
+    fn check(&self, config: &Config, _state: &Session) -> Result<()> {
         let output = Command::new("sh")
             .arg("-c")
             .arg(&self.command)
@@ -39,8 +39,8 @@ impl Validator for Shell {
         let stderr = String::from_utf8_lossy(&output.stderr);
 
         if !output.status.success() || (self.fail_on_stderr && !stderr.is_empty()) {
-            let msg = format!("Validator command failed: {}", self.command);
-            Err(TenxError::Validation {
+            let msg = format!("Check command failed: {}", self.command);
+            Err(TenxError::Check {
                 name: self.name.clone(),
                 user: msg,
                 model: format!("stdout:\n{}\n\nstderr:\n{}", stdout, stderr),
@@ -126,7 +126,7 @@ mod tests {
         };
 
         let (config, session) = setup_test_session(&[]);
-        let result = shell.validate(&config, &session);
+        let result = shell.check(&config, &session);
         assert!(result.is_ok());
     }
 
@@ -141,17 +141,17 @@ mod tests {
         };
 
         let (config, session) = setup_test_session(&[]);
-        let result = shell.validate(&config, &session);
+        let result = shell.check(&config, &session);
         assert!(result.is_err());
 
         match result {
-            Err(TenxError::Validation { name, user, model }) => {
+            Err(TenxError::Check { name, user, model }) => {
                 assert_eq!(name, "test");
-                assert!(user.contains("Validator command failed"));
+                assert!(user.contains("Check command failed"));
                 assert!(model.contains("stdout:\noutput message"));
                 assert!(model.contains("stderr:\nerror message"));
             }
-            _ => panic!("Expected Validation error"),
+            _ => panic!("Expected Check error"),
         }
     }
 

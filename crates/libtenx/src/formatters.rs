@@ -1,7 +1,7 @@
 pub use crate::lang::python::PythonRuffFormatter;
 pub use crate::lang::rust::*;
 
-use crate::{config::Config, validators::Runnable, Result, Session};
+use crate::{checks::Runnable, config::Config, Result, Session};
 
 pub trait Formatter {
     fn name(&self) -> &'static str;

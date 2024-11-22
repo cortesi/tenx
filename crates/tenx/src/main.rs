@@ -338,7 +338,7 @@ enum Commands {
         full: bool,
     },
     /// List all validators and their status
-    Validators,
+    Checks,
 }
 
 /// Creates a Config from disk and CLI arguments
@@ -389,16 +389,16 @@ fn load_config(cli: &Cli) -> Result<config::Config> {
 
     // Override validator configurations
     if let Some(value) = cli.rust_cargo_clippy {
-        config.validators.rust_cargo_clippy = value;
+        config.checks.rust_cargo_clippy = value;
     }
     if let Some(value) = cli.rust_cargo_check {
-        config.validators.rust_cargo_check = value;
+        config.checks.rust_cargo_check = value;
     }
     if let Some(value) = cli.rust_cargo_test {
-        config.validators.rust_cargo_test = value;
+        config.checks.rust_cargo_test = value;
     }
     if let Some(value) = cli.python_ruff_check {
-        config.validators.python_ruff_check = value;
+        config.checks.python_ruff_check = value;
     }
 
     Ok(config)
@@ -490,11 +490,11 @@ async fn main() -> anyhow::Result<()> {
                 }
                 Ok(())
             }
-            Commands::Validators => {
-                for validator in libtenx::all_validators() {
-                    let name = validator.name();
-                    let configured = validator.is_configured(&config);
-                    let runnable = validator.runnable();
+            Commands::Checks => {
+                for check in libtenx::all_checks() {
+                    let name = check.name();
+                    let configured = check.is_configured(&config);
+                    let runnable = check.runnable();
 
                     let status = if !configured {
                         format!("{} {}", "✗".yellow(), " (disabled)".yellow())

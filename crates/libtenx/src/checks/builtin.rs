@@ -1,7 +1,7 @@
 use super::shell::Shell;
-use super::Validator;
+use super::Check;
 
-pub fn builtin_validators() -> Vec<Box<dyn Validator>> {
+pub fn builtin_validators() -> Vec<Box<dyn Check>> {
     vec![
         Box::new(Shell {
             name: "cargo-check".to_string(),

@@ -12,7 +12,7 @@ use serde::ser::SerializeStruct;
 
 use toml;
 
-use crate::{dialect, model, Result, TenxError};
+use crate::{checks::builtin_validators, checks::Check, dialect, model, Result, TenxError};
 
 pub const HOME_CONFIG_FILE: &str = "tenx.toml";
 pub const LOCAL_CONFIG_FILE: &str = ".tenx.toml";
@@ -356,14 +356,14 @@ impl std::fmt::Display for Include {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct Validators {
+pub struct Checks {
     pub rust_cargo_check: bool,
     pub rust_cargo_test: bool,
     pub rust_cargo_clippy: bool,
     pub python_ruff_check: bool,
 }
 
-impl Default for Validators {
+impl Default for Checks {
     fn default() -> Self {
         Self {
             rust_cargo_check: true,
@@ -454,9 +454,9 @@ pub struct Config {
     #[serde(default)]
     pub default_model: Option<String>,
 
-    /// Validation configuration.
+    /// Check configuration.
     #[serde(default)]
-    pub validators: Validators,
+    pub checks: Checks,
 
     /// Formatting configuration.
     #[serde(default)]
@@ -500,7 +500,7 @@ impl Serialize for Config {
         serialize_if_different!(state, self, default, tags);
         serialize_if_different!(state, self, default, ops);
         serialize_if_different!(state, self, default, default_context);
-        serialize_if_different!(state, self, default, validators);
+        serialize_if_different!(state, self, default, checks);
         serialize_if_different!(state, self, default, formatters);
         serialize_if_different!(state, self, default, project_root);
         state.end()
@@ -671,7 +671,7 @@ impl Default for Config {
             default_context: DefaultContext::default(),
             default_model: None,
             full: false,
-            validators: Validators::default(),
+            checks: Checks::default(),
             formatters: Formatters::default(),
             project_root: ProjectRoot::default(),
             test_cwd: None,
@@ -984,6 +984,10 @@ impl Config {
                 self.ops.edit,
             ))),
         }
+    }
+
+    pub fn validators(&self) -> Vec<Box<dyn Check>> {
+        builtin_validators()
     }
 }
 

@@ -141,7 +141,7 @@ impl TrialReport {
             if let Some(err) = &step.err {
                 match err {
                     TenxError::Patch { .. } => error_patch += 1,
-                    TenxError::Validation { .. } => error_validation += 1,
+                    TenxError::Check { .. } => error_validation += 1,
                     TenxError::ResponseParse { .. } => error_response_parse += 1,
                     _ => error_other += 1,
                 }

@@ -1,19 +1,19 @@
 use std::path::Path;
 use std::process::Command;
 
+use crate::checks::{Check, Runnable};
 use crate::formatters::Formatter;
-use crate::validators::{Runnable, Validator};
 use crate::{config::Config, Result, Session, TenxError};
 
 pub struct PythonRuffCheck;
 pub struct PythonRuffFormatter;
 
-impl Validator for PythonRuffCheck {
+impl Check for PythonRuffCheck {
     fn name(&self) -> String {
         "python: ruff check".to_string()
     }
 
-    fn validate(&self, config: &Config, state: &Session) -> Result<()> {
+    fn check(&self, config: &Config, state: &Session) -> Result<()> {
         for file in state.abs_editables(config)? {
             if file.extension().map_or(false, |ext| ext == "py") {
                 run_ruff_check(&file)?;
@@ -23,11 +23,11 @@ impl Validator for PythonRuffCheck {
     }
 
     fn is_relevant(&self, config: &Config, state: &Session) -> Result<bool> {
-        should_run_python_validator(config, state)
+        should_run_python_check(config, state)
     }
 
     fn is_configured(&self, config: &Config) -> bool {
-        config.validators.python_ruff_check
+        config.checks.python_ruff_check
     }
 
     fn runnable(&self) -> Result<Runnable> {
@@ -54,7 +54,7 @@ impl Formatter for PythonRuffFormatter {
     }
 
     fn is_relevant(&self, config: &Config, state: &Session) -> Result<bool> {
-        should_run_python_validator(config, state)
+        should_run_python_check(config, state)
     }
 
     fn is_configured(&self, config: &Config) -> bool {
@@ -78,7 +78,7 @@ fn is_ruff_installed() -> bool {
         .unwrap_or(false)
 }
 
-fn should_run_python_validator(config: &Config, state: &Session) -> Result<bool> {
+fn should_run_python_check(config: &Config, state: &Session) -> Result<bool> {
     let editables = state.abs_editables(config)?;
     if !editables.is_empty() {
         Ok(editables
@@ -97,7 +97,7 @@ fn run_ruff_check(file_path: &Path) -> Result<()> {
         .args(["check", "-q"])
         .arg(file_path)
         .output()
-        .map_err(|e| TenxError::Validation {
+        .map_err(|e| TenxError::Check {
             name: "python: ruff check".to_string(),
             user: format!("Failed to execute ruff command: {}", e),
             model: e.to_string(),
@@ -105,7 +105,7 @@ fn run_ruff_check(file_path: &Path) -> Result<()> {
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        Err(TenxError::Validation {
+        Err(TenxError::Check {
             name: "python: ruff check".to_string(),
             user: "Ruff found issues".to_string(),
             model: format!("stderr:\n{}", stderr),
@@ -120,7 +120,7 @@ fn run_ruff_format(file_path: &Path) -> Result<()> {
         .args(["format"])
         .arg(file_path)
         .output()
-        .map_err(|e| TenxError::Validation {
+        .map_err(|e| TenxError::Check {
             name: "python: ruff format".to_string(),
             user: format!("Failed to execute ruff format command: {}", e),
             model: e.to_string(),
@@ -128,7 +128,7 @@ fn run_ruff_format(file_path: &Path) -> Result<()> {
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        Err(TenxError::Validation {
+        Err(TenxError::Check {
             name: "python: ruff format".to_string(),
             user: "Ruff format failed".to_string(),
             model: format!("stderr:\n{}", stderr),
