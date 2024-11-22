@@ -65,15 +65,6 @@ pub enum Event {
     /// Patch application has started
     ApplyPatch,
 
-    /// The formatting suite has started
-    FormattingStart,
-    /// A formatter has started running
-    FormatterStart(String),
-    /// A formatter has finished running
-    FormatterEnd(String),
-    /// The formatting suite has ended
-    FormattingEnd,
-
     /// The command has started
     Start,
     /// The command has finished successfully
@@ -103,7 +94,6 @@ impl Event {
         match self {
             Event::ContextRefreshStart(s) => Some(s.clone()),
             Event::CheckStart(s) => Some(s.clone()),
-            Event::FormatterStart(s) => Some(s.clone()),
             _ => None,
         }
     }
@@ -113,7 +103,6 @@ impl Event {
         match self {
             Event::ApplyPatch => Some("applying patch".to_string()),
             Event::ContextStart => Some("context".to_string()),
-            Event::FormattingStart => Some("formatting".to_string()),
             Event::PreflightStart => Some("preflight validation".to_string()),
             Event::PostPatchStart => Some("post-patch validation".to_string()),
             Event::PromptStart(n) => Some(format!("prompting {}", n)),
@@ -124,10 +113,7 @@ impl Event {
     /// Returns the enclosed string if any, otherwise an empty string
     pub fn display(&self) -> String {
         match self {
-            Event::Snippet(s)
-            | Event::FormatterStart(s)
-            | Event::FormatterEnd(s)
-            | Event::CheckStart(s) => s.clone(),
+            Event::Snippet(s) | Event::CheckStart(s) => s.clone(),
             Event::Log(_, s) => s.clone(),
             _ => String::new(),
         }
@@ -137,7 +123,6 @@ impl Event {
     pub fn step_start_message(&self) -> Option<String> {
         match self {
             Event::PreflightStart => Some("Preflight checks...".to_string()),
-            Event::FormattingStart => Some("Formatting...".to_string()),
             Event::PostPatchStart => Some("Post-patch validation...".to_string()),
             Event::CheckStart(name) => Some(format!("Check {}...", name)),
             Event::PromptStart(model) => Some(format!("Prompting {}...", model)),
@@ -186,11 +171,6 @@ impl EventBlock {
         )
     }
 
-    /// Creates a new EventBlock for formatting operations
-    pub fn format(sender: &Option<mpsc::Sender<Event>>) -> Result<Self> {
-        Self::new(sender, Event::FormattingStart, Event::FormattingEnd)
-    }
-
     /// Creates a new EventBlock for preflight validation operations
     pub fn preflight(sender: &Option<mpsc::Sender<Event>>) -> Result<Self> {
         Self::new(sender, Event::PreflightStart, Event::PreflightEnd)
@@ -208,15 +188,6 @@ impl EventBlock {
     /// Creates a new EventBlock for post-patch validation operations
     pub fn post_patch(sender: &Option<mpsc::Sender<Event>>) -> Result<Self> {
         Self::new(sender, Event::PostPatchStart, Event::PostPatchEnd)
-    }
-
-    /// Creates a new EventBlock for formatter operations
-    pub fn formatter(sender: &Option<mpsc::Sender<Event>>, name: &str) -> Result<Self> {
-        Self::new(
-            sender,
-            Event::FormatterStart(name.to_string()),
-            Event::FormatterEnd(name.to_string()),
-        )
     }
 
     /// Creates a new EventBlock for model request operations

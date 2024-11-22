@@ -248,24 +248,8 @@ impl Tenx {
         send_event(&sender, Event::ApplyPatch)?;
         session.apply_last_step(&self.config)?;
         if !session.should_continue() {
-            // We're done, now we check if formatter or validators return an error we need to
-            // process
-            self.run_formatters(session, &sender)?;
+            // We're done, now we check if checks return an error we need to process
             self.run_post_patch_validators(session, &sender)?;
-        }
-        Ok(())
-    }
-
-    pub fn run_formatters(
-        &self,
-        session: &mut Session,
-        sender: &Option<mpsc::Sender<Event>>,
-    ) -> Result<()> {
-        let _block = EventBlock::format(sender)?;
-        let formatters = crate::formatters::relevant_formatters(&self.config, session)?;
-        for formatter in formatters {
-            let _formatter_block = EventBlock::formatter(sender, formatter.name())?;
-            formatter.format(&self.config, session)?;
         }
         Ok(())
     }

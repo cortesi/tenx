@@ -355,42 +355,10 @@ impl std::fmt::Display for Include {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Checks {
-    pub rust_cargo_check: bool,
-    pub rust_cargo_test: bool,
-    pub rust_cargo_clippy: bool,
-    pub python_ruff_check: bool,
     pub enable: Vec<String>,
     pub disable: Vec<String>,
-}
-
-impl Default for Checks {
-    fn default() -> Self {
-        Self {
-            rust_cargo_check: true,
-            rust_cargo_test: true,
-            rust_cargo_clippy: false,
-            python_ruff_check: true,
-            enable: Vec::new(),
-            disable: Vec::new(),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct Formatters {
-    pub rust_cargo_fmt: bool,
-    pub python_ruff_fmt: bool,
-}
-
-impl Default for Formatters {
-    fn default() -> Self {
-        Self {
-            rust_cargo_fmt: true,
-            python_ruff_fmt: true,
-        }
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -495,10 +463,6 @@ pub struct Config {
     #[serde(default)]
     pub checks: Checks,
 
-    /// Formatting configuration.
-    #[serde(default)]
-    pub formatters: Formatters,
-
     /// Project root configuration.
     #[serde(default)]
     pub project_root: ProjectRoot,
@@ -538,7 +502,6 @@ impl Serialize for Config {
         serialize_if_different!(state, self, default, ops);
         serialize_if_different!(state, self, default, default_context);
         serialize_if_different!(state, self, default, checks);
-        serialize_if_different!(state, self, default, formatters);
         serialize_if_different!(state, self, default, project_root);
         state.end()
     }
@@ -676,7 +639,6 @@ impl Default for Config {
             default_model: None,
             full: false,
             checks: Checks::default(),
-            formatters: Formatters::default(),
             project_root: ProjectRoot::default(),
             test_cwd: None,
             no_stream: false,

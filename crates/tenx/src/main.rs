@@ -233,10 +233,6 @@ enum Commands {
         #[clap(long)]
         edit: bool,
     },
-    /// Run formatters on the current session
-    Format,
-    /// List all formatters and their status
-    Formatters,
     /// Create a new session
     New {
         /// Specifies files to add as context
@@ -500,28 +496,6 @@ async fn main() -> anyhow::Result<()> {
                 }
                 Ok(())
             }
-            Commands::Formatters => {
-                for formatter in libtenx::formatters::all_formatters() {
-                    let name = formatter.name();
-                    let configured = formatter.is_configured(&config);
-                    let runnable = formatter.runnable();
-
-                    let status = if !configured {
-                        format!("{} {}", "✗".yellow(), " (disabled)".yellow())
-                    } else {
-                        match runnable {
-                            Ok(libtenx::Runnable::Ok) => "✓".green().to_string(),
-                            Ok(libtenx::Runnable::Error(msg)) => {
-                                format!("{}  ({})", "✗".red(), msg.red())
-                            }
-                            Err(_) => "✗".red().to_string(),
-                        }
-                    };
-
-                    println!("{:<30} {}", name, status);
-                }
-                Ok(())
-            }
             Commands::Dialect { command } => {
                 let dialect = config.dialect()?;
                 match command {
@@ -724,12 +698,6 @@ async fn main() -> anyhow::Result<()> {
                 session.clear();
                 tx.save_session(&session)?;
                 println!("Session cleared");
-                Ok(())
-            }
-            Commands::Format => {
-                let mut session = tx.load_session()?;
-                tx.run_formatters(&mut session, &Some(sender.clone()))?;
-                tx.save_session(&session)?;
                 Ok(())
             }
             Commands::Preflight => {
