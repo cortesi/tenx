@@ -13,8 +13,17 @@ pub fn path_to_filename(path: &Path) -> String {
 
 /// Loads a session from a file located at a specific path.
 pub fn load_session<P: AsRef<Path>>(path: P) -> Result<Session> {
-    let serialized = fs::read_to_string(path)?;
-    serde_json::from_str(&serialized).map_err(|e| TenxError::Internal(format!("{}", e)))
+    let path = path.as_ref();
+    if !path.exists() {
+        return Err(TenxError::SessionStore(format!(
+            "No such session: {}",
+            path.display()
+        )));
+    }
+    let serialized = fs::read_to_string(path)
+        .map_err(|e| TenxError::SessionStore(format!("Failed to read session: {}", e)))?;
+    serde_json::from_str(&serialized)
+        .map_err(|e| TenxError::SessionStore(format!("Failed to parse session: {}", e)))
 }
 
 /// Manages the storage and retrieval of State objects.

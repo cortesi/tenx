@@ -34,7 +34,7 @@ pub enum TenxError {
     #[error("Resolution error: {0}")]
     Resolve(String),
 
-    #[error("Session store error: {0}")]
+    #[error("{0}")]
     SessionStore(String),
 
     #[error("Internal error: {0}")]
