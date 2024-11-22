@@ -84,6 +84,10 @@ impl Check for Shell {
     fn runnable(&self) -> Result<Runnable> {
         Ok(Runnable::Ok)
     }
+
+    fn default_off(&self) -> bool {
+        self.default_off
+    }
 }
 
 #[cfg(test)]

@@ -110,6 +110,14 @@ struct Cli {
     #[clap(long)]
     python_ruff_check: Option<bool>,
 
+    /// Enable a specific check
+    #[clap(long)]
+    check: Vec<String>,
+
+    /// Disable a specific check
+    #[clap(long)]
+    no_check: Vec<String>,
+
     #[clap(subcommand)]
     command: Option<Commands>,
 }
@@ -386,6 +394,10 @@ fn load_config(cli: &Cli) -> Result<config::Config> {
     }
     config.no_preflight = cli.no_preflight;
     config.no_stream = cli.no_stream;
+
+    // Add enabled and disabled checks
+    config.checks.enable.extend(cli.check.clone());
+    config.checks.disable.extend(cli.no_check.clone());
 
     // Override validator configurations
     if let Some(value) = cli.rust_cargo_clippy {

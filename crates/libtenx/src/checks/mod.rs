@@ -42,6 +42,11 @@ pub trait Check {
     /// Checks if the check can be run.
     fn runnable(&self) -> Result<Runnable>;
 
+    /// Returns true if this check is disabled by default.
+    fn default_off(&self) -> bool {
+        true
+    }
+
     fn mode(&self) -> Mode {
         Mode::Both
     }

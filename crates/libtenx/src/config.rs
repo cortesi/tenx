@@ -990,12 +990,35 @@ impl Config {
         }
     }
 
+    /// Return all configured checks, even if disabled.
     pub fn all_checks(&self) -> Vec<Box<dyn Check>> {
         builtin_checks()
     }
 
+    /// Returns true if a check is enabled based on its name and default state in the config
+    pub fn check_enabled<S: AsRef<str>>(&self, name: S) -> bool {
+        let name = name.as_ref();
+        let check = self.all_checks().into_iter().find(|c| c.name() == name);
+
+        if let Some(check) = check {
+            if check.default_off() {
+                // Return only if explicitly enabled
+                self.checks.enable.contains(&name.to_string())
+            } else {
+                // Return unless explicitly disabled
+                !self.checks.disable.contains(&name.to_string())
+            }
+        } else {
+            false
+        }
+    }
+
+    /// Return all enabled checks.
     pub fn enabled_checks(&self) -> Vec<Box<dyn Check>> {
         self.all_checks()
+            .into_iter()
+            .filter(|check| self.check_enabled(check.name()))
+            .collect()
     }
 }
 
