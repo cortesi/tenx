@@ -1,7 +1,7 @@
 use std::process::Command;
 
 use crate::{
-    checks::{Check, Runnable},
+    checks::{Check, Mode, Runnable},
     config::Config,
     Result, Session, TenxError,
 };
@@ -20,11 +20,17 @@ pub struct Shell {
     pub default_off: bool,
     /// Whether to treat any stderr output as a failure, regardless of exit code
     pub fail_on_stderr: bool,
+    /// When this check should run
+    pub mode: Mode,
 }
 
 impl Check for Shell {
     fn name(&self) -> String {
         self.name.clone()
+    }
+
+    fn mode(&self) -> Mode {
+        self.mode
     }
 
     fn check(&self, config: &Config, _state: &Session) -> Result<()> {
@@ -111,6 +117,7 @@ mod tests {
             globs: vec!["*.rs".to_string()],
             default_off: false,
             fail_on_stderr: true,
+            mode: Mode::Both,
         };
 
         let (config, session) = setup_test_session(&[]);
@@ -126,6 +133,7 @@ mod tests {
             globs: vec!["*.rs".to_string()],
             default_off: false,
             fail_on_stderr: true,
+            mode: super::Mode::Both,
         };
 
         let (config, session) = setup_test_session(&[]);
@@ -155,6 +163,7 @@ mod tests {
             ],
             default_off: false,
             fail_on_stderr: true,
+            mode: super::Mode::Both,
         };
 
         // Test empty session
