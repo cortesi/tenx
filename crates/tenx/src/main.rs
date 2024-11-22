@@ -345,8 +345,12 @@ enum Commands {
         #[clap(long)]
         full: bool,
     },
-    /// List all validators and their status
-    Checks,
+    /// List validators and their status
+    Checks {
+        /// Show all checks, including disabled
+        #[clap(long)]
+        all: bool,
+    },
 }
 
 /// Creates a Config from disk and CLI arguments
@@ -502,25 +506,23 @@ async fn main() -> anyhow::Result<()> {
                 }
                 Ok(())
             }
-            Commands::Checks => {
-                for check in libtenx::all_checks() {
+            Commands::Checks { all } => {
+                let checks = if *all {
+                    config.all_checks()
+                } else {
+                    config.enabled_checks()
+                };
+                for check in checks {
                     let name = check.name();
-                    let runnable = check.runnable();
-                    let configured = true;
+                    let enabled = config.check_enabled(&name);
 
-                    let status = if !configured {
-                        format!("{} {}", "✗".yellow(), " (disabled)".yellow())
+                    let status = if !enabled {
+                        " (disabled)".yellow().to_string()
                     } else {
-                        match runnable {
-                            Ok(libtenx::Runnable::Ok) => "✓".green().to_string(),
-                            Ok(libtenx::Runnable::Error(msg)) => {
-                                format!("{}  ({})", "✗".red(), msg.red())
-                            }
-                            Err(_) => "✗".red().to_string(),
-                        }
+                        String::new()
                     };
 
-                    println!("{:<30} {}", name, status);
+                    println!("{}{}", name, status);
                 }
                 Ok(())
             }
