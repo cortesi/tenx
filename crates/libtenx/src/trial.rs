@@ -1,6 +1,6 @@
 //! Trial module for defining and running test trials.
 //!
-//! A trial consists of a TrialConf at NAME.toml which specifies the operations to perform, as well
+//! A trial consists of a TrialConf at NAME.ron which specifies the operations to perform, as well
 //! as an embedded tenx configuration.
 use std::{
     fs,
@@ -33,7 +33,6 @@ pub struct Fix {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "snake_case")]
 pub enum TrialOp {
     Ask(Ask),
     Fix(Fix),
@@ -48,13 +47,13 @@ pub struct TrialConf {
 }
 
 impl TrialConf {
-    /// Parse a TOML string into a TrialConf
+    /// Parse a RON string into a TrialConf
     fn from_str(s: &str) -> Result<Self> {
-        toml::from_str(s)
-            .map_err(|e| TenxError::Internal(format!("Failed to parse trial TOML: {}", e)))
+        ron::from_str(s)
+            .map_err(|e| TenxError::Internal(format!("Failed to parse trial RON: {}", e)))
     }
 
-    /// Read a trial configuration from a TOML file
+    /// Read a trial configuration from a RON file
     pub fn read<P: AsRef<Path>>(path: P) -> Result<Self> {
         let contents = fs::read_to_string(path)
             .map_err(|e| TenxError::Internal(format!("Failed to read trial file: {}", e)))?;
@@ -267,7 +266,7 @@ impl Trial {
     pub fn load<P: AsRef<Path>>(base_dir: P, name: &str) -> Result<Self> {
         info!("loading trial: {}", name);
         let mut path = PathBuf::from(base_dir.as_ref());
-        path.push(format!("{}.toml", name));
+        path.push(format!("{}.ron", name));
         let trial_conf = TrialConf::read(&path)?;
         trial_conf.validate(&base_dir)?;
 
@@ -286,13 +285,10 @@ impl Trial {
     }
 }
 
-/// Lists all trials in a directory by finding .toml files and loading them as Trial objects.
-/// Lists all trials in a directory with an optional name pattern.
-/// Lists all trials in a directory with optional name patterns.
 /// Returns trials that match any of the provided patterns, without duplicates.
 pub fn list<P: AsRef<Path>>(base_dir: P, patterns: Option<&[&str]>) -> Result<Vec<Trial>> {
     let mut trials = Vec::new();
-    let fs_pattern = base_dir.as_ref().join("*.toml");
+    let fs_pattern = base_dir.as_ref().join("*.ron");
     let fs_pattern = fs_pattern.to_string_lossy();
 
     for entry in glob(&fs_pattern)
@@ -304,11 +300,8 @@ pub fn list<P: AsRef<Path>>(base_dir: P, patterns: Option<&[&str]>) -> Result<Ve
             .file_stem()
             .and_then(|s| s.to_str())
             .ok_or_else(|| TenxError::Internal("Invalid trial file name".to_string()))?;
-
-        if !name.ends_with(".conf") {
-            if let Ok(trial) = Trial::load(&base_dir, name) {
-                trials.push(trial);
-            }
+        if let Ok(trial) = Trial::load(&base_dir, name) {
+            trials.push(trial);
         }
     }
 
@@ -343,17 +336,18 @@ mod tests {
         let test_project_dir = dir.path().join("projects").join("test_project");
         fs::create_dir_all(&test_project_dir)?;
 
-        let test_toml = r#"
-            project = "test_project"
-            desc = "Test trial description"
-            [op.ask]
-            prompt = "test prompt"
-            editable = ["file1.rs"]
-        "#;
+        let test_ron = r#"(
+            project: "test_project",
+            desc: "Test trial description",
+            op: Ask((
+                prompt: "test prompt",
+                editable: ["file1.rs"],
+            ))
+        )"#;
 
-        fs::write(dir.path().join("test1.toml"), test_toml)?;
-        fs::write(dir.path().join("test2.toml"), test_toml)?;
-        fs::write(dir.path().join("other.toml"), test_toml)?;
+        fs::write(dir.path().join("test1.ron"), test_ron)?;
+        fs::write(dir.path().join("test2.ron"), test_ron)?;
+        fs::write(dir.path().join("other.ron"), test_ron)?;
 
         // Test with no patterns
         let trials = list(dir.path(), None)?;
@@ -490,18 +484,19 @@ mod tests {
 
     #[test]
     fn test_trial_conf_from_str() -> Result<()> {
-        let toml = r#"
-            project = "test_project"
-            desc = "Test trial description"
-            [op.ask]
-            prompt = "test prompt"
-            editable = ["file1.rs", "file2.rs"]
-            [config]
-            anthropic_key = "test_key"
-            no_pre_check = true
-        "#;
+        let ron = r#"(
+            project: "test_project",
+            desc: "Test trial description",
+            op: Ask((
+                prompt: "test prompt",
+                editable: ["file1.rs", "file2.rs"],
+            )),
+            config: Some((
+                no_pre: true,
+            ))
+        )"#;
 
-        let conf = TrialConf::from_str(toml)?;
+        let conf = TrialConf::from_str(ron)?;
         assert_eq!(conf.project, "test_project");
 
         match conf.op {
