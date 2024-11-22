@@ -79,7 +79,7 @@ impl Check {
     fn match_globs(&self, path_str: &str, patterns: &[String]) -> Result<bool> {
         for pattern in patterns {
             let glob_pattern =
-                glob::Pattern::new(&pattern).map_err(|e| TenxError::Internal(e.to_string()))?;
+                glob::Pattern::new(pattern).map_err(|e| TenxError::Internal(e.to_string()))?;
             let clean_path = path_str.trim_start_matches("./");
             if glob_pattern.matches(path_str) || glob_pattern.matches(clean_path) {
                 return Ok(true);
