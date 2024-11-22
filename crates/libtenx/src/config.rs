@@ -360,6 +360,8 @@ pub struct Checks {
     pub enable: Vec<String>,
     pub disable: Vec<String>,
     pub no_pre: bool,
+    #[serde(default)]
+    pub only: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -960,10 +962,17 @@ impl Config {
 
     /// Return all enabled checks.
     pub fn enabled_checks(&self) -> Vec<Check> {
-        self.all_checks()
-            .into_iter()
-            .filter(|check| self.check_enabled(&check.name))
-            .collect()
+        if let Some(only_check) = &self.checks.only {
+            self.all_checks()
+                .into_iter()
+                .filter(|check| check.name == *only_check)
+                .collect()
+        } else {
+            self.all_checks()
+                .into_iter()
+                .filter(|check| self.check_enabled(&check.name))
+                .collect()
+        }
     }
 }
 

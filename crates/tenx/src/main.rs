@@ -70,6 +70,10 @@ struct Cli {
     #[clap(long)]
     no_pre_check: bool,
 
+    /// Only run this check
+    #[clap(long)]
+    only_check: Option<String>,
+
     /// Disable streaming model output
     #[clap(long)]
     no_stream: bool,
@@ -351,9 +355,15 @@ fn load_config(cli: &Cli) -> Result<config::Config> {
         config.default_model = Some(model.clone());
     }
     config.checks.no_pre = cli.no_pre_check;
+    config.checks.only = cli.only_check.clone();
     config.no_stream = cli.no_stream;
 
-    // Validate and add enabled checks
+    // Validate checks
+    if let Some(name) = &cli.only_check {
+        if config.get_check(name).is_none() {
+            return Err(anyhow::anyhow!("Check '{}' does not exist", name));
+        }
+    }
     for check_name in &cli.check {
         if config.get_check(check_name).is_none() {
             return Err(anyhow::anyhow!("Check '{}' does not exist", check_name));
