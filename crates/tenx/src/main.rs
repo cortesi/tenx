@@ -453,7 +453,7 @@ async fn main() -> anyhow::Result<()> {
                     config.enabled_checks()
                 };
                 for check in checks {
-                    let name = check.name();
+                    let name = &check.name;
                     let enabled = config.check_enabled(&name);
 
                     let status = if !enabled {
@@ -463,9 +463,9 @@ async fn main() -> anyhow::Result<()> {
                     };
 
                     println!("{}{}", name.blue().bold(), status);
-                    println!("    globs: {:?}", check.globs());
-                    println!("    pre: {}", check.mode().is_pre());
-                    println!("    post: {}", check.mode().is_post());
+                    println!("    globs: {:?}", check.globs);
+                    println!("    pre: {}", check.mode.is_pre());
+                    println!("    post: {}", check.mode.is_post());
                     println!();
                 }
                 Ok(())

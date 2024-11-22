@@ -52,18 +52,6 @@ pub struct Check {
 }
 
 impl Check {
-    pub fn name(&self) -> String {
-        self.name.clone()
-    }
-
-    pub fn globs(&self) -> Vec<String> {
-        self.globs.clone()
-    }
-
-    pub fn mode(&self) -> Mode {
-        self.mode
-    }
-
     pub fn check(&self, config: &Config, _state: &Session) -> Result<()> {
         let output = Command::new("sh")
             .arg("-c")
@@ -111,7 +99,7 @@ impl Check {
 
         for path in paths {
             let path_str = path.to_str().unwrap_or_default();
-            if self.match_globs(path_str, &self.globs())? {
+            if self.match_globs(path_str, &self.globs)? {
                 return Ok(true);
             }
         }
@@ -148,7 +136,7 @@ mod tests {
             mode: Mode::Both,
         };
 
-        let patterns = check.globs();
+        let patterns = check.globs.clone();
         assert!(check.match_globs("src/lib.rs", &patterns).unwrap());
         assert!(check.match_globs("tests/unit/check.rs", &patterns).unwrap());
         assert!(!check.match_globs("README.md", &patterns).unwrap());

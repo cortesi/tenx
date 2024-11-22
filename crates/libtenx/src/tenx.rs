@@ -264,8 +264,8 @@ impl Tenx {
         }
         let _block = EventBlock::pre_check(sender)?;
         for c in self.config.enabled_checks() {
-            if c.mode().is_pre() && c.is_relevant(&self.config, session)? {
-                let _check_block = EventBlock::validator(sender, &c.name())?;
+            if c.mode.is_pre() && c.is_relevant(&self.config, session)? {
+                let _check_block = EventBlock::validator(sender, &c.name)?;
                 c.check(&self.config, session)?;
             }
         }
@@ -281,8 +281,8 @@ impl Tenx {
             if last_step.model_response.is_some() {
                 let _block = EventBlock::post_patch(sender)?;
                 for c in self.config.enabled_checks() {
-                    if c.mode().is_post() && c.is_relevant(&self.config, session)? {
-                        let _check_block = EventBlock::validator(sender, &c.name())?;
+                    if c.mode.is_post() && c.is_relevant(&self.config, session)? {
+                        let _check_block = EventBlock::validator(sender, &c.name)?;
                         c.check(&self.config, session)?;
                     }
                 }

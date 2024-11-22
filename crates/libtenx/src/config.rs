@@ -960,7 +960,7 @@ impl Config {
     /// Returns true if a check is enabled based on its name and default state in the config
     pub fn check_enabled<S: AsRef<str>>(&self, name: S) -> bool {
         let name = name.as_ref();
-        let check = self.all_checks().into_iter().find(|c| c.name() == name);
+        let check = self.all_checks().into_iter().find(|c| c.name == name);
 
         if let Some(check) = check {
             if check.default_off() {
@@ -979,7 +979,7 @@ impl Config {
     pub fn enabled_checks(&self) -> Vec<Check> {
         self.all_checks()
             .into_iter()
-            .filter(|check| self.check_enabled(check.name()))
+            .filter(|check| self.check_enabled(&check.name))
             .collect()
     }
 }
