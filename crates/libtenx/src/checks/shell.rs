@@ -81,10 +81,6 @@ impl Check for Shell {
         Ok(false)
     }
 
-    fn is_configured(&self, _config: &Config) -> bool {
-        true
-    }
-
     fn runnable(&self) -> Result<Runnable> {
         Ok(Runnable::Ok)
     }
@@ -103,10 +99,9 @@ mod tests {
 
     fn setup_test_session(paths: &[&str]) -> (Config, Session) {
         let config = test_config();
-        let mut session = Session::default();
-        let editables: Vec<_> = paths.iter().map(|p| std::path::PathBuf::from(p)).collect();
+        let editables: Vec<_> = paths.iter().map(std::path::PathBuf::from).collect();
         // Access the private field through serde
-        session = serde_json::from_str(&format!(
+        let session: Session = serde_json::from_str(&format!(
             r#"{{"editable":{:?},"steps":[],"contexts":[]}}"#,
             editables
         ))

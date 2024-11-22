@@ -493,8 +493,8 @@ async fn main() -> anyhow::Result<()> {
             Commands::Checks => {
                 for check in libtenx::all_checks() {
                     let name = check.name();
-                    let configured = check.is_configured(&config);
                     let runnable = check.runnable();
+                    let configured = true;
 
                     let status = if !configured {
                         format!("{} {}", "✗".yellow(), " (disabled)".yellow())

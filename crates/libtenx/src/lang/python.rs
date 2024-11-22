@@ -26,10 +26,6 @@ impl Check for PythonRuffCheck {
         should_run_python_check(config, state)
     }
 
-    fn is_configured(&self, config: &Config) -> bool {
-        config.checks.python_ruff_check
-    }
-
     fn runnable(&self) -> Result<Runnable> {
         if is_ruff_installed() {
             Ok(Runnable::Ok)

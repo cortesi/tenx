@@ -12,7 +12,7 @@ use serde::ser::SerializeStruct;
 
 use toml;
 
-use crate::{checks::builtin_validators, checks::Check, dialect, model, Result, TenxError};
+use crate::{checks::builtin_checks, checks::Check, dialect, model, Result, TenxError};
 
 pub const HOME_CONFIG_FILE: &str = "tenx.toml";
 pub const LOCAL_CONFIG_FILE: &str = ".tenx.toml";
@@ -361,6 +361,8 @@ pub struct Checks {
     pub rust_cargo_test: bool,
     pub rust_cargo_clippy: bool,
     pub python_ruff_check: bool,
+    pub enable: Vec<String>,
+    pub disable: Vec<String>,
 }
 
 impl Default for Checks {
@@ -370,6 +372,8 @@ impl Default for Checks {
             rust_cargo_test: true,
             rust_cargo_clippy: false,
             python_ruff_check: true,
+            enable: Vec::new(),
+            disable: Vec::new(),
         }
     }
 }
@@ -385,6 +389,39 @@ impl Default for Formatters {
         Self {
             rust_cargo_fmt: true,
             python_ruff_fmt: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub enum ProjectRoot {
+    #[default]
+    Discover,
+    Path(PathBuf),
+}
+
+impl Serialize for ProjectRoot {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            ProjectRoot::Discover => serializer.serialize_str(""),
+            ProjectRoot::Path(path) => path.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for ProjectRoot {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        if s.is_empty() {
+            Ok(ProjectRoot::Discover)
+        } else {
+            Ok(ProjectRoot::Path(PathBuf::from(s)))
         }
     }
 }
@@ -504,39 +541,6 @@ impl Serialize for Config {
         serialize_if_different!(state, self, default, formatters);
         serialize_if_different!(state, self, default, project_root);
         state.end()
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Default)]
-pub enum ProjectRoot {
-    #[default]
-    Discover,
-    Path(PathBuf),
-}
-
-impl Serialize for ProjectRoot {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        match self {
-            ProjectRoot::Discover => serializer.serialize_str(""),
-            ProjectRoot::Path(path) => path.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> Deserialize<'de> for ProjectRoot {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s = String::deserialize(deserializer)?;
-        if s.is_empty() {
-            Ok(ProjectRoot::Discover)
-        } else {
-            Ok(ProjectRoot::Path(PathBuf::from(s)))
-        }
     }
 }
 
@@ -986,8 +990,12 @@ impl Config {
         }
     }
 
-    pub fn validators(&self) -> Vec<Box<dyn Check>> {
-        builtin_validators()
+    pub fn all_checks(&self) -> Vec<Box<dyn Check>> {
+        builtin_checks()
+    }
+
+    pub fn enabled_checks(&self) -> Vec<Box<dyn Check>> {
+        self.all_checks()
     }
 }
 

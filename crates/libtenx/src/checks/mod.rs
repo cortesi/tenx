@@ -39,9 +39,6 @@ pub trait Check {
     /// file. Otherwise, the check will run if any of the project included files are relevant.
     fn is_relevant(&self, config: &Config, state: &Session) -> Result<bool>;
 
-    /// Checks if the check is configured to run.
-    fn is_configured(&self, config: &Config) -> bool;
-
     /// Checks if the check can be run.
     fn runnable(&self) -> Result<Runnable>;
 
@@ -64,10 +61,7 @@ pub fn all_checks() -> Vec<Box<dyn Check>> {
 pub fn relevant_checks(config: &Config, state: &Session) -> Result<Vec<Box<dyn Check>>> {
     let mut checks: Vec<Box<dyn Check>> = Vec::new();
     for checker in all_checks() {
-        if checker.is_configured(config)
-            && checker.is_relevant(config, state)?
-            && checker.runnable()?.is_ok()
-        {
+        if checker.is_relevant(config, state)? && checker.runnable()?.is_ok() {
             checks.push(checker);
         }
     }

@@ -31,10 +31,6 @@ impl Check for RustCargoCheck {
         should_run_rust_check(config, state)
     }
 
-    fn is_configured(&self, config: &Config) -> bool {
-        config.checks.rust_cargo_check
-    }
-
     fn runnable(&self) -> Result<Runnable> {
         cargo_runnable()
     }
@@ -51,10 +47,6 @@ impl Check for RustCargoTest {
 
     fn is_relevant(&self, config: &Config, state: &Session) -> Result<bool> {
         should_run_rust_check(config, state)
-    }
-
-    fn is_configured(&self, config: &Config) -> bool {
-        config.checks.rust_cargo_test
     }
 
     fn runnable(&self) -> Result<Runnable> {
@@ -78,10 +70,6 @@ impl Check for RustCargoClippy {
 
     fn is_relevant(&self, config: &Config, state: &Session) -> Result<bool> {
         should_run_rust_check(config, state)
-    }
-
-    fn is_configured(&self, config: &Config) -> bool {
-        config.checks.rust_cargo_clippy
     }
 
     fn runnable(&self) -> Result<Runnable> {
