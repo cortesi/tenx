@@ -38,6 +38,7 @@ async-openai = "0.26.0"
 reqwest = "0.12.9"
 futures-util = "0.3.31"
 textwrap = "0.16"
+ron = "0.8.1"
 
 [dev-dependencies]
 indoc = "2.0.5"

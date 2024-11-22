@@ -443,7 +443,7 @@ async fn main() -> anyhow::Result<()> {
                 if *json {
                     println!("{}", to_string_pretty(&conf)?);
                 } else {
-                    println!("{}", conf.to_toml()?);
+                    println!("{}", conf.to_ron()?);
                 }
                 Ok(()) as anyhow::Result<()>
             }

@@ -10,6 +10,7 @@ use normalize_path::NormalizePath;
 use pathdiff::diff_paths;
 use serde::ser::SerializeStruct;
 
+use ron;
 use toml;
 
 use crate::{checks::builtin_checks, checks::Check, dialect, model, Result, TenxError};
@@ -40,8 +41,8 @@ const GOOGLEAI_API_BASE: &str = "https://generativelanguage.googleapis.com/v1bet
 const GOOGLEAI_GEMINI_EXP: &str = "gemini-exp-1114";
 
 macro_rules! serialize_if_different {
-    ($state:expr, $self:expr, $default:expr, $field:ident) => {
-        if $self.$field != $default.$field {
+    ($state:expr, $full:expr, $self:expr, $default:expr, $field:ident) => {
+        if $full || $self.$field != $default.$field {
             $state.serialize_field(stringify!($field), &$self.$field)?;
         }
     };
@@ -491,17 +492,17 @@ impl Serialize for Config {
     {
         let default = Config::default();
         let mut state = serializer.serialize_struct("Config", 11)?;
-        serialize_if_different!(state, self, default, include);
-        serialize_if_different!(state, self, default, models);
-        serialize_if_different!(state, self, default, session_store_dir);
-        serialize_if_different!(state, self, default, retry_limit);
-        serialize_if_different!(state, self.checks, default.checks, no_pre);
-        serialize_if_different!(state, self, default, default_dialect);
-        serialize_if_different!(state, self, default, tags);
-        serialize_if_different!(state, self, default, ops);
-        serialize_if_different!(state, self, default, default_context);
-        serialize_if_different!(state, self, default, checks);
-        serialize_if_different!(state, self, default, project_root);
+        serialize_if_different!(state, self.full, self, default, include);
+        serialize_if_different!(state, self.full, self, default, models);
+        serialize_if_different!(state, self.full, self, default, session_store_dir);
+        serialize_if_different!(state, self.full, self, default, retry_limit);
+        serialize_if_different!(state, self.full, self.checks, default.checks, no_pre);
+        serialize_if_different!(state, self.full, self, default, default_dialect);
+        serialize_if_different!(state, self.full, self, default, tags);
+        serialize_if_different!(state, self.full, self, default, ops);
+        serialize_if_different!(state, self.full, self, default, default_context);
+        serialize_if_different!(state, self.full, self, default, checks);
+        serialize_if_different!(state, self.full, self, default, project_root);
         state.end()
     }
 }
@@ -833,6 +834,24 @@ impl Config {
             .map_err(|e| TenxError::Internal(format!("Failed to parse TOML: {}", e)))
     }
 
+    /// Serialize the Config into a TOML string.
+    pub fn to_toml(&self) -> Result<String> {
+        toml::to_string_pretty(self)
+            .map_err(|e| TenxError::Internal(format!("Failed to serialize to TOML: {}", e)))
+    }
+
+    /// Deserialize a RON string into a Config.
+    pub fn from_ron(toml_str: &str) -> Result<Self> {
+        ron::from_str(toml_str)
+            .map_err(|e| TenxError::Internal(format!("Failed to parse TOML: {}", e)))
+    }
+
+    /// Serialize the Config into a RON string.
+    pub fn to_ron(&self) -> Result<String> {
+        ron::ser::to_string_pretty(self, ron::ser::PrettyConfig::default())
+            .map_err(|e| TenxError::Internal(format!("Failed to serialize to TOML: {}", e)))
+    }
+
     /// Merge another Config into this one, only overriding non-default values.
     pub fn merge(&mut self, other: &Config) {
         let dflt = Config::default();
@@ -865,12 +884,6 @@ impl Config {
         if other.default_context != dflt.default_context {
             self.default_context = other.default_context.clone();
         }
-    }
-
-    /// Serialize the Config into a TOML string.
-    pub fn to_toml(&self) -> Result<String> {
-        toml::to_string_pretty(self)
-            .map_err(|e| TenxError::Internal(format!("Failed to serialize to TOML: {}", e)))
     }
 
     pub fn with_dummy_model(mut self, model: model::DummyModel) -> Self {
