@@ -87,6 +87,19 @@ impl Check {
         }
     }
 
+    /// Determines if a path matches any of the given glob patterns.
+    fn match_globs(&self, path_str: &str, patterns: &[String]) -> Result<bool> {
+        for pattern in patterns {
+            let glob_pattern =
+                glob::Pattern::new(&pattern).map_err(|e| TenxError::Internal(e.to_string()))?;
+            let clean_path = path_str.trim_start_matches("./");
+            if glob_pattern.matches(path_str) || glob_pattern.matches(clean_path) {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
     /// Is a check relevant based on its glob patterns and the files to check? If the session has
     /// editables, those are used, otherwise falls back to all included files from config.
     pub fn is_relevant(&self, config: &Config, state: &Session) -> Result<bool> {
@@ -98,15 +111,8 @@ impl Check {
 
         for path in paths {
             let path_str = path.to_str().unwrap_or_default();
-            for pattern in self.globs() {
-                let glob_pattern =
-                    glob::Pattern::new(&pattern).map_err(|e| TenxError::Internal(e.to_string()))?;
-                // Try both with and without leading ./
-                let clean_path = path_str.trim_start_matches("./");
-                let matches = glob_pattern.matches(path_str) || glob_pattern.matches(clean_path);
-                if matches {
-                    return Ok(true);
-                }
+            if self.match_globs(path_str, &self.globs())? {
+                return Ok(true);
             }
         }
         Ok(false)
@@ -124,12 +130,28 @@ impl Check {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json;
 
     fn test_config() -> Config {
         let mut config = Config::default();
         config.project_root = crate::config::ProjectRoot::Path(".".into());
         config
+    }
+
+    #[test]
+    fn test_match_globs() {
+        let check = Check {
+            name: "test".to_string(),
+            command: "true".to_string(),
+            globs: vec!["src/*.rs".to_string(), "tests/**/*.rs".to_string()],
+            default_off: false,
+            fail_on_stderr: true,
+            mode: Mode::Both,
+        };
+
+        let patterns = check.globs();
+        assert!(check.match_globs("src/lib.rs", &patterns).unwrap());
+        assert!(check.match_globs("tests/unit/check.rs", &patterns).unwrap());
+        assert!(!check.match_globs("README.md", &patterns).unwrap());
     }
 
     fn setup_test_session(paths: &[&str]) -> (Config, Session) {
