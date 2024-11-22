@@ -1,9 +1,18 @@
+pub mod builtin;
 pub mod shell;
 
-use crate::lang::python::*;
-use crate::lang::rust::*;
+use crate::{
+    config::Config,
+    lang::{python::*, rust::*},
+    Result, Session,
+};
 
-use crate::{config::Config, Result, Session};
+/// The mode in which the validator should run - preflight, post-patch or both.
+pub enum Mode {
+    Pre,
+    Post,
+    Both,
+}
 
 pub enum Runnable {
     Ok,
@@ -33,6 +42,10 @@ pub trait Validator {
 
     /// Checks if the validator can be run.
     fn runnable(&self) -> Result<Runnable>;
+
+    fn mode(&self) -> Mode {
+        Mode::Both
+    }
 }
 
 /// Returns a vector of all available validators.
