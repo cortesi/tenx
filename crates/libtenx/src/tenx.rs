@@ -259,7 +259,7 @@ impl Tenx {
         session: &mut Session,
         sender: &Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
-        if self.config.no_pre_check {
+        if self.config.checks.no_pre {
             return Ok(());
         }
         let _block = EventBlock::pre_check(sender)?;

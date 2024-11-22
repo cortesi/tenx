@@ -350,7 +350,7 @@ fn load_config(cli: &Cli) -> Result<config::Config> {
     if let Some(model) = &cli.model {
         config.default_model = Some(model.clone());
     }
-    config.no_pre_check = cli.no_pre_check;
+    config.checks.no_pre = cli.no_pre_check;
     config.no_stream = cli.no_stream;
 
     // Validate and add enabled checks

@@ -41,7 +41,7 @@ const GOOGLEAI_GEMINI_EXP: &str = "gemini-exp-1114";
 
 macro_rules! serialize_if_different {
     ($state:expr, $self:expr, $default:expr, $field:ident) => {
-        if $self.full || $self.$field != $default.$field {
+        if $self.$field != $default.$field {
             $state.serialize_field(stringify!($field), &$self.$field)?;
         }
     };
@@ -359,6 +359,7 @@ impl std::fmt::Display for Include {
 pub struct Checks {
     pub enable: Vec<String>,
     pub disable: Vec<String>,
+    pub no_pre: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -430,10 +431,6 @@ pub struct Config {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub exclude: Vec<String>,
 
-    /// Skip the pre check.
-    #[serde(default)]
-    pub no_pre_check: bool,
-
     /// The directory to store session state.
     #[serde(default)]
     /// The directory to store session state. Defaults to ~/.config/tenx/state
@@ -496,7 +493,7 @@ impl Serialize for Config {
         serialize_if_different!(state, self, default, models);
         serialize_if_different!(state, self, default, session_store_dir);
         serialize_if_different!(state, self, default, retry_limit);
-        serialize_if_different!(state, self, default, no_pre_check);
+        serialize_if_different!(state, self.checks, default.checks, no_pre);
         serialize_if_different!(state, self, default, default_dialect);
         serialize_if_different!(state, self, default, tags);
         serialize_if_different!(state, self, default, ops);
@@ -605,31 +602,12 @@ impl Default for Config {
             }));
         }
 
-        // If no API keys are available, add default models with empty keys
-        if models.is_empty() {
-            models.extend_from_slice(&[
-                ModelConfig::Claude(ClaudeConf {
-                    name: "sonnet".to_string(),
-                    api_model: ANTHROPIC_CLAUDE_SONNET.to_string(),
-                    key: "".to_string(),
-                    key_env: ANTHROPIC_API_KEY.to_string(),
-                }),
-                ModelConfig::Claude(ClaudeConf {
-                    name: "haiku".to_string(),
-                    api_model: ANTHROPIC_CLAUDE_HAIKU.to_string(),
-                    key: "".to_string(),
-                    key_env: ANTHROPIC_API_KEY.to_string(),
-                }),
-            ]);
-        }
-
         Self {
             include: Include::Git,
             exclude: Vec::new(),
             models,
             session_store_dir: home_config_dir().join("state"),
             retry_limit: DEFAULT_RETRY_LIMIT,
-            no_pre_check: false,
             default_dialect: ConfigDialect::default(),
             dummy_model: None,
             dummy_dialect: None,
@@ -867,8 +845,8 @@ impl Config {
         if other.retry_limit != dflt.retry_limit {
             self.retry_limit = other.retry_limit;
         }
-        if other.no_pre_check != dflt.no_pre_check {
-            self.no_pre_check = other.no_pre_check;
+        if other.checks.no_pre != dflt.checks.no_pre {
+            self.checks.no_pre = other.checks.no_pre;
         }
         if !other.models.is_empty() && other.models != dflt.models {
             self.models = other.models.clone();
@@ -1010,7 +988,7 @@ mod tests {
         }
         set_config!(config, session_store_dir, PathBuf::from("/tmp/test"));
         set_config!(config, retry_limit, 5);
-        set_config!(config, no_pre_check, true);
+        set_config!(config.checks, no_pre, true);
         set_config!(config, tags.smart, false);
         set_config!(config, ops.edit, false);
         set_config!(config, default_dialect, ConfigDialect::Tags);
@@ -1028,7 +1006,7 @@ mod tests {
                 deserialized_config.session_store_dir
             );
             assert_eq!(config.retry_limit, deserialized_config.retry_limit);
-            assert_eq!(config.no_pre_check, deserialized_config.no_pre_check);
+            assert_eq!(config.checks.no_pre, deserialized_config.checks.no_pre);
             assert_eq!(config.default_dialect, deserialized_config.default_dialect);
             assert_eq!(config.tags.smart, deserialized_config.tags.smart);
             assert_eq!(config.ops.edit, deserialized_config.ops.edit);
@@ -1090,7 +1068,7 @@ mod tests {
             conf.key = "other_key".to_string();
         }
         set_config!(other_config, session_store_dir, PathBuf::from("/tmp/other"));
-        set_config!(other_config, no_pre_check, true);
+        set_config!(other_config.checks, no_pre, true);
         set_config!(
             other_config,
             include,
@@ -1103,7 +1081,7 @@ mod tests {
             assert_eq!(conf.key, "other_key".to_string());
             assert_eq!(base_config.session_store_dir, PathBuf::from("/tmp/other"));
             assert_eq!(base_config.retry_limit, 5);
-            assert!(base_config.no_pre_check);
+            assert!(base_config.checks.no_pre);
             assert_eq!(base_config.default_dialect, ConfigDialect::Tags);
             assert!(!base_config.tags.smart);
             assert!(matches!(base_config.include, Include::Glob(_)));
@@ -1171,7 +1149,7 @@ mod tests {
         if let ModelConfig::Claude(conf) = &config.models[0] {
             assert_eq!(conf.key, "");
             assert_eq!(config.session_store_dir, PathBuf::new());
-            assert!(!config.no_pre_check);
+            assert!(!config.checks.no_pre);
             let default_model = &config.models[0];
             assert!(matches!(default_model, ModelConfig::Claude(_)));
             assert_eq!(config.default_dialect, ConfigDialect::Tags);
