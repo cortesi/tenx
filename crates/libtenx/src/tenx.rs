@@ -92,7 +92,7 @@ impl Tenx {
         Ok(())
     }
 
-    /// Attempts to fix issues in the session by running preflight checks and adding a new prompt if there's an error.
+    /// Attempts to fix issues in the session by running pre checks and adding a new prompt if there's an error.
     pub async fn fix(
         &self,
         session: &mut Session,
@@ -100,8 +100,8 @@ impl Tenx {
         prompt: Option<String>,
     ) -> Result<()> {
         let _block = EventBlock::start(&sender)?;
-        let preflight_result = self.run_preflight_validators(session, &sender);
-        let result = if let Err(e) = preflight_result {
+        let pre_result = self.run_pre_checks(session, &sender);
+        let result = if let Err(e) = pre_result {
             let prompt = prompt.unwrap_or_else(|| "Please fix the following errors.".to_string());
             session.add_prompt(Prompt::Auto(prompt))?;
             if let Some(step) = session.last_step_mut() {
@@ -178,7 +178,7 @@ impl Tenx {
     ) -> Result<()> {
         self.save_session(session)?;
         if session.last_step_error().is_none() {
-            if let Err(e) = self.run_preflight_validators(session, &sender) {
+            if let Err(e) = self.run_pre_checks(session, &sender) {
                 if let Some(step) = session.last_step_mut() {
                     step.err = Some(e.clone());
                 }
@@ -249,21 +249,20 @@ impl Tenx {
         session.apply_last_step(&self.config)?;
         if !session.should_continue() {
             // We're done, now we check if checks return an error we need to process
-            self.run_post_patch_validators(session, &sender)?;
+            self.run_post_checks(session, &sender)?;
         }
         Ok(())
     }
 
-    pub fn run_preflight_validators(
+    pub fn run_pre_checks(
         &self,
         session: &mut Session,
         sender: &Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
-        if self.config.no_preflight {
+        if self.config.no_pre_check {
             return Ok(());
         }
-        let _block = EventBlock::preflight(sender)?;
-        // let preflight_validators = crate::checks::relevant_checks(&self.config, session)?;
+        let _block = EventBlock::pre_check(sender)?;
         for c in self.config.enabled_checks() {
             if c.mode().is_pre() && c.is_relevant(&self.config, session)? {
                 let _check_block = EventBlock::validator(sender, &c.name())?;
@@ -273,7 +272,7 @@ impl Tenx {
         Ok(())
     }
 
-    fn run_post_patch_validators(
+    fn run_post_checks(
         &self,
         session: &mut Session,
         sender: &Option<mpsc::Sender<Event>>,

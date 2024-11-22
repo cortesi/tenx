@@ -6,4 +6,4 @@ prompt = "Complete the evenmedian function."
 editable = ["**/code.rs"]
 
 [config]
-no_preflight = true
+no_pre_check = true

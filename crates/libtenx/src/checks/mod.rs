@@ -5,7 +5,7 @@ pub use builtin::*;
 
 use crate::{config::Config, Result, Session};
 
-/// The mode in which the check should run - preflight, post-patch or both.
+/// The mode in which the check should run - pre, post or both.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Mode {
     Pre,
@@ -14,7 +14,7 @@ pub enum Mode {
 }
 
 impl Mode {
-    /// Returns true if this mode includes preflight checks.
+    /// Returns true if this mode includes pre checks.
     pub fn is_pre(&self) -> bool {
         matches!(self, Mode::Pre | Mode::Both)
     }

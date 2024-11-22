@@ -55,17 +55,6 @@ pub enum TenxError {
         model: String,
     },
 
-    /// A preflight error, which occurs during preflight validation.
-    #[error("Preflight error: {name}: {user}\nDetails:\n{model}")]
-    Preflight {
-        /// The name of the validator that failed
-        name: String,
-        /// An error to display to the user
-        user: String,
-        /// An error to the model, often the full tool output
-        model: String,
-    },
-
     /// An error that occurs when sending an event.
     #[error("Error sending event: {0}")]
     EventSend(String),

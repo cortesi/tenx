@@ -66,9 +66,9 @@ struct Cli {
     #[clap(long)]
     retry_limit: Option<usize>,
 
-    /// Skip preflight checks
+    /// Skip pre checks
     #[clap(long)]
-    no_preflight: bool,
+    no_pre_check: bool,
 
     /// Disable streaming model output
     #[clap(long)]
@@ -199,7 +199,7 @@ enum Commands {
         /// Optional glob pattern to filter files
         pattern: Option<String>,
     },
-    /// Start a new session and attempt to fix any preflight failures
+    /// Start a new session and attempt to fix any pre check failures
     Fix {
         /// Specifies files to edit
         #[clap(value_parser)]
@@ -273,8 +273,8 @@ enum Commands {
         #[clap(long)]
         prompt_file: Option<PathBuf>,
     },
-    /// Run preflight validation suite on the current session
-    Preflight,
+    /// Run check suite on the current session
+    Check,
     /// Print information about the current project
     Project,
     /// Refresh all contexts in the current session
@@ -376,7 +376,7 @@ fn load_config(cli: &Cli) -> Result<config::Config> {
     if let Some(model) = &cli.model {
         config.default_model = Some(model.clone());
     }
-    config.no_preflight = cli.no_preflight;
+    config.no_pre_check = cli.no_pre_check;
     config.no_stream = cli.no_stream;
 
     // Add enabled and disabled checks
@@ -700,9 +700,9 @@ async fn main() -> anyhow::Result<()> {
                 println!("Session cleared");
                 Ok(())
             }
-            Commands::Preflight => {
+            Commands::Check => {
                 let mut session = tx.load_session()?;
-                tx.run_preflight_validators(&mut session, &Some(sender.clone()))?;
+                tx.run_pre_checks(&mut session, &Some(sender.clone()))?;
                 Ok(())
             }
             Commands::Refresh => {

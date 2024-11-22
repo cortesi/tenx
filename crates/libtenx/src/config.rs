@@ -430,9 +430,9 @@ pub struct Config {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub exclude: Vec<String>,
 
-    /// Skip the preflight check.
+    /// Skip the pre check.
     #[serde(default)]
-    pub no_preflight: bool,
+    pub no_pre_check: bool,
 
     /// The directory to store session state.
     #[serde(default)]
@@ -496,7 +496,7 @@ impl Serialize for Config {
         serialize_if_different!(state, self, default, models);
         serialize_if_different!(state, self, default, session_store_dir);
         serialize_if_different!(state, self, default, retry_limit);
-        serialize_if_different!(state, self, default, no_preflight);
+        serialize_if_different!(state, self, default, no_pre_check);
         serialize_if_different!(state, self, default, default_dialect);
         serialize_if_different!(state, self, default, tags);
         serialize_if_different!(state, self, default, ops);
@@ -629,7 +629,7 @@ impl Default for Config {
             models,
             session_store_dir: home_config_dir().join("state"),
             retry_limit: DEFAULT_RETRY_LIMIT,
-            no_preflight: false,
+            no_pre_check: false,
             default_dialect: ConfigDialect::default(),
             dummy_model: None,
             dummy_dialect: None,
@@ -867,8 +867,8 @@ impl Config {
         if other.retry_limit != dflt.retry_limit {
             self.retry_limit = other.retry_limit;
         }
-        if other.no_preflight != dflt.no_preflight {
-            self.no_preflight = other.no_preflight;
+        if other.no_pre_check != dflt.no_pre_check {
+            self.no_pre_check = other.no_pre_check;
         }
         if !other.models.is_empty() && other.models != dflt.models {
             self.models = other.models.clone();
@@ -1005,7 +1005,7 @@ mod tests {
         }
         set_config!(config, session_store_dir, PathBuf::from("/tmp/test"));
         set_config!(config, retry_limit, 5);
-        set_config!(config, no_preflight, true);
+        set_config!(config, no_pre_check, true);
         set_config!(config, tags.smart, false);
         set_config!(config, ops.edit, false);
         set_config!(config, default_dialect, ConfigDialect::Tags);
@@ -1023,7 +1023,7 @@ mod tests {
                 deserialized_config.session_store_dir
             );
             assert_eq!(config.retry_limit, deserialized_config.retry_limit);
-            assert_eq!(config.no_preflight, deserialized_config.no_preflight);
+            assert_eq!(config.no_pre_check, deserialized_config.no_pre_check);
             assert_eq!(config.default_dialect, deserialized_config.default_dialect);
             assert_eq!(config.tags.smart, deserialized_config.tags.smart);
             assert_eq!(config.ops.edit, deserialized_config.ops.edit);
@@ -1039,7 +1039,7 @@ mod tests {
         assert!(!table.contains_key("anthropic_key"));
         assert!(!table.contains_key("session_store_dir"));
         assert!(!table.contains_key("retry_limit"));
-        assert!(!table.contains_key("no_preflight"));
+        assert!(!table.contains_key("no_pre_check"));
         assert!(!table.contains_key("default_model"));
         assert!(!table.contains_key("default_dialect"));
         assert!(!table.contains_key("tags"));
@@ -1085,7 +1085,7 @@ mod tests {
             conf.key = "other_key".to_string();
         }
         set_config!(other_config, session_store_dir, PathBuf::from("/tmp/other"));
-        set_config!(other_config, no_preflight, true);
+        set_config!(other_config, no_pre_check, true);
         set_config!(
             other_config,
             include,
@@ -1098,7 +1098,7 @@ mod tests {
             assert_eq!(conf.key, "other_key".to_string());
             assert_eq!(base_config.session_store_dir, PathBuf::from("/tmp/other"));
             assert_eq!(base_config.retry_limit, 5);
-            assert!(base_config.no_preflight);
+            assert!(base_config.no_pre_check);
             assert_eq!(base_config.default_dialect, ConfigDialect::Tags);
             assert!(!base_config.tags.smart);
             assert!(matches!(base_config.include, Include::Glob(_)));
@@ -1166,7 +1166,7 @@ mod tests {
         if let ModelConfig::Claude(conf) = &config.models[0] {
             assert_eq!(conf.key, "");
             assert_eq!(config.session_store_dir, PathBuf::new());
-            assert!(!config.no_preflight);
+            assert!(!config.no_pre_check);
             let default_model = &config.models[0];
             assert!(matches!(default_model, ModelConfig::Claude(_)));
             assert_eq!(config.default_dialect, ConfigDialect::Tags);

@@ -498,7 +498,7 @@ mod tests {
             editable = ["file1.rs", "file2.rs"]
             [config]
             anthropic_key = "test_key"
-            no_preflight = true
+            no_pre_check = true
         "#;
 
         let conf = TrialConf::from_str(toml)?;

@@ -46,7 +46,7 @@ editable = ["src/lib.rs"]
 
 # Optional: Override default tenx configuration
 [config]
-no_preflight = true
+no_pre_check = true
 retry_limit = 2
 ```
 

@@ -28,15 +28,15 @@ pub fn send_event(sender: &Option<mpsc::Sender<Event>>, event: Event) -> Result<
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Event {
-    /// The preflight check suite has started
-    PreflightStart,
-    /// The preflight check suite has ended
-    PreflightEnd,
+    /// The pre check suite has started
+    PreCheckStart,
+    /// The pre check suite has ended
+    PreCheckEnd,
 
     /// The post-patch validation suite has started
-    PostPatchStart,
+    PostCheckStart,
     /// The post-patch validation suite has ended
-    PostPatchEnd,
+    PostCheckEnd,
 
     /// Context operations have started
     ContextStart,
@@ -48,9 +48,9 @@ pub enum Event {
     /// A context refresh operation ended
     ContextRefreshEnd(String),
 
-    /// A a preflight or post-patch check has started
+    /// A check has started
     CheckStart(String),
-    /// A a preflight or post-patch check has passed
+    /// A check has passed
     CheckOk(String),
 
     /// A model request has started
@@ -103,8 +103,8 @@ impl Event {
         match self {
             Event::ApplyPatch => Some("applying patch".to_string()),
             Event::ContextStart => Some("context".to_string()),
-            Event::PreflightStart => Some("preflight validation".to_string()),
-            Event::PostPatchStart => Some("post-patch validation".to_string()),
+            Event::PreCheckStart => Some("pre check".to_string()),
+            Event::PostCheckStart => Some("post check".to_string()),
             Event::PromptStart(n) => Some(format!("prompting {}", n)),
             _ => None,
         }
@@ -122,8 +122,8 @@ impl Event {
     /// Returns an optional String if there's a commencement message related to the event
     pub fn step_start_message(&self) -> Option<String> {
         match self {
-            Event::PreflightStart => Some("Preflight checks...".to_string()),
-            Event::PostPatchStart => Some("Post-patch validation...".to_string()),
+            Event::PreCheckStart => Some("Pre checks...".to_string()),
+            Event::PostCheckStart => Some("Post checks...".to_string()),
             Event::CheckStart(name) => Some(format!("Check {}...", name)),
             Event::PromptStart(model) => Some(format!("Prompting {}...", model)),
             Event::ApplyPatch => Some("Applying patch...".to_string()),
@@ -171,9 +171,9 @@ impl EventBlock {
         )
     }
 
-    /// Creates a new EventBlock for preflight validation operations
-    pub fn preflight(sender: &Option<mpsc::Sender<Event>>) -> Result<Self> {
-        Self::new(sender, Event::PreflightStart, Event::PreflightEnd)
+    /// Creates a new EventBlock for pre check operations
+    pub fn pre_check(sender: &Option<mpsc::Sender<Event>>) -> Result<Self> {
+        Self::new(sender, Event::PreCheckStart, Event::PreCheckEnd)
     }
 
     /// Creates a new EventBlock for validator operations
@@ -187,7 +187,7 @@ impl EventBlock {
 
     /// Creates a new EventBlock for post-patch validation operations
     pub fn post_patch(sender: &Option<mpsc::Sender<Event>>) -> Result<Self> {
-        Self::new(sender, Event::PostPatchStart, Event::PostPatchEnd)
+        Self::new(sender, Event::PostCheckStart, Event::PostCheckEnd)
     }
 
     /// Creates a new EventBlock for model request operations
