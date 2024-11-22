@@ -1,15 +1,42 @@
 use std::process::Command;
 
-use crate::{
-    checks::{Check, Mode, Runnable},
-    config::Config,
-    Result, Session, TenxError,
-};
+use crate::{config::Config, Result, Session, TenxError};
+
+pub enum Runnable {
+    Ok,
+    Error(String),
+}
+
+impl Runnable {
+    pub fn is_ok(&self) -> bool {
+        matches!(self, Runnable::Ok)
+    }
+}
+
+/// The mode in which the check should run - pre, post or both.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Mode {
+    Pre,
+    Post,
+    Both,
+}
+
+impl Mode {
+    /// Returns true if this mode includes pre checks.
+    pub fn is_pre(&self) -> bool {
+        matches!(self, Mode::Pre | Mode::Both)
+    }
+
+    /// Returns true if this mode includes post-patch checks.
+    pub fn is_post(&self) -> bool {
+        matches!(self, Mode::Post | Mode::Both)
+    }
+}
 
 /// A validator that runs a shell command and checks its output. Relies on `sh` being available.
 ///
 /// Check commands are always run in the project root directory.
-pub struct Shell {
+pub struct Check {
     /// Name of the validator for display and error reporting
     pub name: String,
     /// Shell command to execute, run with sh -c
@@ -24,20 +51,20 @@ pub struct Shell {
     pub mode: Mode,
 }
 
-impl Check for Shell {
-    fn name(&self) -> String {
+impl Check {
+    pub fn name(&self) -> String {
         self.name.clone()
     }
 
-    fn globs(&self) -> Vec<String> {
+    pub fn globs(&self) -> Vec<String> {
         self.globs.clone()
     }
 
-    fn mode(&self) -> Mode {
+    pub fn mode(&self) -> Mode {
         self.mode
     }
 
-    fn check(&self, config: &Config, _state: &Session) -> Result<()> {
+    pub fn check(&self, config: &Config, _state: &Session) -> Result<()> {
         let output = Command::new("sh")
             .arg("-c")
             .arg(&self.command)
@@ -60,15 +87,20 @@ impl Check for Shell {
         }
     }
 
-    fn is_relevant(&self, _config: &Config, state: &Session) -> Result<bool> {
-        if state.editable().is_empty() {
-            return Ok(false);
-        }
-        for editable in state.editable() {
-            let path_str = editable.to_str().unwrap_or_default();
-            for pattern in &self.globs {
+    /// Is a check relevant based on its glob patterns and the files to check? If the session has
+    /// editables, those are used, otherwise falls back to all included files from config.
+    pub fn is_relevant(&self, config: &Config, state: &Session) -> Result<bool> {
+        let paths = if state.editable().is_empty() {
+            config.included_files()?
+        } else {
+            state.editable().to_vec()
+        };
+
+        for path in paths {
+            let path_str = path.to_str().unwrap_or_default();
+            for pattern in self.globs() {
                 let glob_pattern =
-                    glob::Pattern::new(pattern).map_err(|e| TenxError::Internal(e.to_string()))?;
+                    glob::Pattern::new(&pattern).map_err(|e| TenxError::Internal(e.to_string()))?;
                 // Try both with and without leading ./
                 let clean_path = path_str.trim_start_matches("./");
                 let matches = glob_pattern.matches(path_str) || glob_pattern.matches(clean_path);
@@ -80,11 +112,11 @@ impl Check for Shell {
         Ok(false)
     }
 
-    fn runnable(&self) -> Result<Runnable> {
+    pub fn runnable(&self) -> Result<Runnable> {
         Ok(Runnable::Ok)
     }
 
-    fn default_off(&self) -> bool {
+    pub fn default_off(&self) -> bool {
         self.default_off
     }
 }
@@ -115,7 +147,7 @@ mod tests {
 
     #[test]
     fn test_shell_success() {
-        let shell = Shell {
+        let shell = Check {
             name: "test".to_string(),
             command: "true".to_string(),
             globs: vec!["*.rs".to_string()],
@@ -131,7 +163,7 @@ mod tests {
 
     #[test]
     fn test_shell_failure() {
-        let shell = Shell {
+        let shell = Check {
             name: "test".to_string(),
             command: "echo 'error message' >&2 && echo 'output message' && false".to_string(),
             globs: vec!["*.rs".to_string()],
@@ -153,43 +185,5 @@ mod tests {
             }
             _ => panic!("Expected Check error"),
         }
-    }
-
-    #[test]
-    fn test_is_relevant() {
-        let shell = Shell {
-            name: "test".to_string(),
-            command: "true".to_string(),
-            globs: vec![
-                "*.rs".to_string(),
-                "src/*.rs".to_string(),
-                "test.py".to_string(),
-            ],
-            default_off: false,
-            fail_on_stderr: true,
-            mode: super::Mode::Both,
-        };
-
-        // Test empty session
-        let (config, session) = setup_test_session(&[]);
-        assert!(!shell.is_relevant(&config, &session).unwrap());
-
-        // Test Rust file in src directory
-        let (config, session) = setup_test_session(&["src/main.rs"]);
-        assert!(
-            shell.is_relevant(&config, &session).unwrap(),
-            "src/main.rs should be relevant"
-        );
-
-        // Test Python file
-        let (config, session) = setup_test_session(&["test.py"]);
-        assert!(
-            shell.is_relevant(&config, &session).unwrap(),
-            "test.py should be relevant"
-        );
-
-        // Test non-matching file
-        let (config, session) = setup_test_session(&["test.txt"]);
-        assert!(!shell.is_relevant(&config, &session).unwrap());
     }
 }

@@ -953,7 +953,7 @@ impl Config {
     }
 
     /// Return all configured checks, even if disabled.
-    pub fn all_checks(&self) -> Vec<Box<dyn Check>> {
+    pub fn all_checks(&self) -> Vec<Check> {
         builtin_checks()
     }
 
@@ -976,7 +976,7 @@ impl Config {
     }
 
     /// Return all enabled checks.
-    pub fn enabled_checks(&self) -> Vec<Box<dyn Check>> {
+    pub fn enabled_checks(&self) -> Vec<Check> {
         self.all_checks()
             .into_iter()
             .filter(|check| self.check_enabled(check.name()))

@@ -1,91 +1,9 @@
-pub mod builtin;
-pub mod shell;
+mod builtin;
+mod check;
 
 pub use builtin::*;
-pub use shell::*;
+pub use check::*;
 
-use crate::{config::Config, Result, Session, TenxError};
 
-/// The mode in which the check should run - pre, post or both.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Mode {
-    Pre,
-    Post,
-    Both,
-}
 
-impl Mode {
-    /// Returns true if this mode includes pre checks.
-    pub fn is_pre(&self) -> bool {
-        matches!(self, Mode::Pre | Mode::Both)
-    }
 
-    /// Returns true if this mode includes post-patch checks.
-    pub fn is_post(&self) -> bool {
-        matches!(self, Mode::Post | Mode::Both)
-    }
-}
-
-/// Is a check relevant based on its glob patterns and the files to check? If the session has
-/// editables, those are used, otherwise falls back to all included files from config.
-pub fn is_relevant(check: &dyn Check, config: &Config, state: &Session) -> Result<bool> {
-    let paths = if state.editable().is_empty() {
-        config.included_files()?
-    } else {
-        state.editable().to_vec()
-    };
-
-    for path in paths {
-        let path_str = path.to_str().unwrap_or_default();
-        for pattern in check.globs() {
-            let glob_pattern =
-                glob::Pattern::new(&pattern).map_err(|e| TenxError::Internal(e.to_string()))?;
-            // Try both with and without leading ./
-            let clean_path = path_str.trim_start_matches("./");
-            let matches = glob_pattern.matches(path_str) || glob_pattern.matches(clean_path);
-            if matches {
-                return Ok(true);
-            }
-        }
-    }
-    Ok(false)
-}
-
-pub enum Runnable {
-    Ok,
-    Error(String),
-}
-
-impl Runnable {
-    pub fn is_ok(&self) -> bool {
-        matches!(self, Runnable::Ok)
-    }
-}
-
-pub trait Check {
-    /// Returns the name of the check.
-    fn name(&self) -> String;
-
-    /// Performs a check on the given PromptInput and State.
-    fn check(&self, config: &Config, state: &Session) -> Result<()>;
-
-    /// Determines if the check should run for the given session. If editables are specified in
-    /// the session, the check will only run if the session's editables contain a relevant
-    /// file. Otherwise, the check will run if any of the project included files are relevant.
-    fn is_relevant(&self, config: &Config, state: &Session) -> Result<bool>;
-
-    /// Checks if the check can be run.
-    fn runnable(&self) -> Result<Runnable>;
-
-    /// Returns the glob patterns this check uses to determine relevance
-    fn globs(&self) -> Vec<String>;
-
-    /// Returns true if this check is disabled by default.
-    fn default_off(&self) -> bool {
-        true
-    }
-
-    fn mode(&self) -> Mode {
-        Mode::Both
-    }
-}
