@@ -1,5 +1,7 @@
-pub use crate::lang::python::*;
-pub use crate::lang::rust::*;
+pub mod shell;
+
+use crate::lang::python::*;
+use crate::lang::rust::*;
 
 use crate::{config::Config, Result, Session};
 
