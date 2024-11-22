@@ -1,5 +1,4 @@
-use super::shell::Shell;
-use super::Check;
+use super::{shell::Shell, Check, Mode};
 
 pub fn builtin_checks() -> Vec<Box<dyn Check>> {
     vec![
@@ -9,7 +8,7 @@ pub fn builtin_checks() -> Vec<Box<dyn Check>> {
             globs: vec!["*.rs".to_string()],
             default_off: false,
             fail_on_stderr: false,
-            mode: super::Mode::Both,
+            mode: Mode::Both,
         }),
         Box::new(Shell {
             name: "cargo-test".to_string(),
@@ -17,7 +16,7 @@ pub fn builtin_checks() -> Vec<Box<dyn Check>> {
             globs: vec!["*.rs".to_string()],
             default_off: false,
             fail_on_stderr: false,
-            mode: super::Mode::Both,
+            mode: Mode::Both,
         }),
         Box::new(Shell {
             name: "cargo-clippy".to_string(),
@@ -25,7 +24,15 @@ pub fn builtin_checks() -> Vec<Box<dyn Check>> {
             globs: vec!["*.rs".to_string()],
             default_off: true,
             fail_on_stderr: true,
-            mode: super::Mode::Both,
+            mode: Mode::Both,
+        }),
+        Box::new(Shell {
+            name: "cargo-fmt".to_string(),
+            command: "cargo fmt --all".to_string(),
+            globs: vec!["*.rs".to_string()],
+            default_off: false,
+            fail_on_stderr: true,
+            mode: Mode::Post,
         }),
         Box::new(Shell {
             name: "python-ruff".to_string(),
@@ -33,7 +40,7 @@ pub fn builtin_checks() -> Vec<Box<dyn Check>> {
             globs: vec!["*.py".to_string()],
             default_off: false,
             fail_on_stderr: false,
-            mode: super::Mode::Both,
+            mode: Mode::Both,
         }),
     ]
 }

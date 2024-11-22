@@ -51,6 +51,9 @@ pub trait Check {
     /// Checks if the check can be run.
     fn runnable(&self) -> Result<Runnable>;
 
+    /// Returns the glob patterns this check uses to determine relevance
+    fn globs(&self) -> Vec<String>;
+
     /// Returns true if this check is disabled by default.
     fn default_off(&self) -> bool {
         true

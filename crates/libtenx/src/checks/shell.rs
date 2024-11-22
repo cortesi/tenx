@@ -29,6 +29,10 @@ impl Check for Shell {
         self.name.clone()
     }
 
+    fn globs(&self) -> Vec<String> {
+        self.globs.clone()
+    }
+
     fn mode(&self) -> Mode {
         self.mode
     }

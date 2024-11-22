@@ -492,7 +492,11 @@ async fn main() -> anyhow::Result<()> {
                         String::new()
                     };
 
-                    println!("{}{}", name, status);
+                    println!("{}{}", name.blue().bold(), status);
+                    println!("    globs: {:?}", check.globs());
+                    println!("    pre: {}", check.mode().is_pre());
+                    println!("    post: {}", check.mode().is_post());
+                    println!();
                 }
                 Ok(())
             }
