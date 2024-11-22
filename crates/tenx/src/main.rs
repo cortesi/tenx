@@ -116,40 +116,37 @@ enum DialectCommands {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// List configured models (alias: ls)
-    #[clap(alias = "ls")]
-    Models {
-        /// Show full configuration details
-        #[clap(short, long)]
-        full: bool,
-    },
-    /// Add editable files to a session
-    Edit {
-        /// Specifies files to edit
-        #[clap(value_parser)]
-        files: Vec<String>,
-    },
-
-    /// Add items to context (alias: ctx)
-    #[clap(alias = "ctx")]
-    Context {
-        /// Add items as ruskel documentation modules
-        #[clap(long, group = "type")]
-        ruskel: bool,
-
-        /// Add items as files
-        #[clap(long, group = "type")]
-        file: bool,
-
-        /// Add items as URLs
-        #[clap(long, group = "type")]
-        url: bool,
-
-        /// Items to add to context
-        items: Vec<String>,
+    /// Run check suite on the current session
+    Check,
+    /// List validators and their status
+    Checks {
+        /// Show all checks, including disabled
+        #[clap(long)]
+        all: bool,
     },
     /// Clear the current session without resetting changes
     Clear,
+    /// Make an AI-assisted change using the current session
+    Code {
+        /// Specifies files to edit
+        #[clap(value_parser)]
+        files: Option<Vec<String>>,
+        /// User prompt for the edit operation
+        #[clap(long)]
+        prompt: Option<String>,
+        /// Path to a file containing the prompt
+        #[clap(long)]
+        prompt_file: Option<PathBuf>,
+        /// Add ruskel documentation as context
+        #[clap(long)]
+        ruskel: Vec<String>,
+        /// Add files as context
+        #[clap(long)]
+        ctx: Vec<String>,
+        /// Add URLs as context
+        #[clap(long)]
+        url: Vec<String>,
+    },
     /// Print the current configuration
     Conf {
         /// Output as JSON instead of TOML
@@ -162,37 +159,32 @@ enum Commands {
         #[clap(long)]
         defaults: bool,
     },
+    /// Add items to context (alias: ctx)
+    #[clap(alias = "ctx")]
+    Context {
+        /// Add items as ruskel documentation modules
+        #[clap(long, group = "type")]
+        ruskel: bool,
+        /// Add items as files
+        #[clap(long, group = "type")]
+        file: bool,
+        /// Add URLs as context
+        #[clap(long, group = "type")]
+        url: bool,
+        /// Items to add to context
+        items: Vec<String>,
+    },
     /// Dialect commands (alias: dia)
     #[clap(alias = "dia")]
     Dialect {
         #[clap(subcommand)]
         command: DialectCommands,
     },
-    /// Make an AI-assisted change using the current session
-    Code {
+    /// Add editable files to a session
+    Edit {
         /// Specifies files to edit
         #[clap(value_parser)]
-        files: Option<Vec<String>>,
-
-        /// User prompt for the edit operation
-        #[clap(long)]
-        prompt: Option<String>,
-
-        /// Path to a file containing the prompt
-        #[clap(long)]
-        prompt_file: Option<PathBuf>,
-
-        /// Add ruskel documentation as context
-        #[clap(long)]
-        ruskel: Vec<String>,
-
-        /// Add files as context
-        #[clap(long)]
-        ctx: Vec<String>,
-
-        /// Add URLs as context
-        #[clap(long)]
-        url: Vec<String>,
+        files: Vec<String>,
     },
     /// List files included in the project
     Files {
@@ -204,79 +196,70 @@ enum Commands {
         /// Specifies files to edit
         #[clap(value_parser)]
         files: Vec<String>,
-
         /// Add ruskel documentation as context
         #[clap(long)]
         ruskel: Vec<String>,
-
         /// Add files as context
         #[clap(long)]
         ctx: Vec<String>,
-
         /// Add URLs as context
         #[clap(long)]
         url: Vec<String>,
-
         /// Clear the current session, and use it to fix
         #[clap(long)]
         clear: bool,
-
         /// User prompt for the fix operation
         #[clap(long)]
         prompt: Option<String>,
-
         /// Path to a file containing the prompt
         #[clap(long)]
         prompt_file: Option<PathBuf>,
-
         /// Edit the prompt before fixing
         #[clap(long)]
         edit: bool,
+    },
+    /// List configured models (alias: ls)
+    #[clap(alias = "ls")]
+    Models {
+        /// Show full configuration details
+        #[clap(short, long)]
+        full: bool,
     },
     /// Create a new session
     New {
         /// Specifies files to add as context
         #[clap(value_parser)]
         files: Vec<String>,
-
         /// Add ruskel documentation
         #[clap(long)]
         ruskel: Vec<String>,
-
         /// Add URLs as context
         #[clap(long)]
         url: Vec<String>,
     },
+    /// Print information about the current project
+    Project,
     /// Start a new session, edit the prompt, and run it
     Quick {
         /// Specifies files to edit
         #[clap(value_parser)]
         files: Vec<String>,
-
         /// Add ruskel documentation as context
         #[clap(long)]
         ruskel: Vec<String>,
-
         /// Add files as context
         #[clap(long)]
         ctx: Vec<String>,
-
         /// Add URLs as context
         #[clap(long)]
         url: Vec<String>,
-
         /// User prompt for the edit operation
         #[clap(long)]
         prompt: Option<String>,
-
         /// Path to a file containing the prompt
         #[clap(long)]
         prompt_file: Option<PathBuf>,
     },
-    /// Run check suite on the current session
-    Check,
-    /// Print information about the current project
-    Project,
     /// Refresh all contexts in the current session
     Refresh,
     /// Reset the session to a specific step, undoing changes
@@ -312,24 +295,15 @@ enum Commands {
     Session {
         /// Path to a session file to load
         session_file: Option<PathBuf>,
-
         /// Print the entire session object verbosely
         #[clap(long)]
         raw: bool,
-
         /// Output the rendered session
         #[clap(long)]
         render: bool,
-
         /// Show full details
         #[clap(long)]
         full: bool,
-    },
-    /// List validators and their status
-    Checks {
-        /// Show all checks, including disabled
-        #[clap(long)]
-        all: bool,
     },
 }
 

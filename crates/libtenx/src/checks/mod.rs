@@ -2,8 +2,9 @@ pub mod builtin;
 pub mod shell;
 
 pub use builtin::*;
+pub use shell::*;
 
-use crate::{config::Config, Result, Session};
+use crate::{config::Config, Result, Session, TenxError};
 
 /// The mode in which the check should run - pre, post or both.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -23,6 +24,31 @@ impl Mode {
     pub fn is_post(&self) -> bool {
         matches!(self, Mode::Post | Mode::Both)
     }
+}
+
+/// Is a check relevant based on its glob patterns and the files to check? If the session has
+/// editables, those are used, otherwise falls back to all included files from config.
+pub fn is_relevant(check: &dyn Check, config: &Config, state: &Session) -> Result<bool> {
+    let paths = if state.editable().is_empty() {
+        config.included_files()?
+    } else {
+        state.editable().to_vec()
+    };
+
+    for path in paths {
+        let path_str = path.to_str().unwrap_or_default();
+        for pattern in check.globs() {
+            let glob_pattern =
+                glob::Pattern::new(&pattern).map_err(|e| TenxError::Internal(e.to_string()))?;
+            // Try both with and without leading ./
+            let clean_path = path_str.trim_start_matches("./");
+            let matches = glob_pattern.matches(path_str) || glob_pattern.matches(clean_path);
+            if matches {
+                return Ok(true);
+            }
+        }
+    }
+    Ok(false)
 }
 
 pub enum Runnable {
