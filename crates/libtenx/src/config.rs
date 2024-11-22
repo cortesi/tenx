@@ -1017,7 +1017,7 @@ mod tests {
     }
 
     #[test]
-    fn test_toml_serialization() {
+    fn test_ron_serialization() {
         let mut config = Config::default();
         if let ModelConfig::Claude { ref mut key, .. } = &mut config.models[0] {
             *key = "test_key".to_string();
@@ -1029,9 +1029,9 @@ mod tests {
         set_config!(config, ops.edit, false);
         set_config!(config, default_dialect, ConfigDialect::Tags);
 
-        let toml_str = config.to_toml().unwrap();
+        let ron_str = config.to_ron().unwrap();
 
-        let deserialized_config = Config::from_toml(&toml_str).unwrap();
+        let deserialized_config = Config::from_ron(&ron_str).unwrap();
 
         if let (
             ModelConfig::Claude { key: conf_key, .. },
@@ -1054,19 +1054,19 @@ mod tests {
 
         // Test default value serialization
         let default_config = Config::default();
-        let default_toml_str = default_config.to_toml().unwrap();
+        let default_ron_str = default_config.to_ron().unwrap();
 
-        let parsed_toml: toml::Value = toml::from_str(&default_toml_str).unwrap();
-        let table = parsed_toml.as_table().unwrap();
+        let parsed_ron: ron::Value = ron::from_str(&default_ron_str).unwrap();
+        let struct_fields_str = format!("{:?}", parsed_ron);
 
-        assert!(!table.contains_key("anthropic_key"));
-        assert!(!table.contains_key("session_store_dir"));
-        assert!(!table.contains_key("retry_limit"));
-        assert!(!table.contains_key("no_pre_check"));
-        assert!(!table.contains_key("default_model"));
-        assert!(!table.contains_key("default_dialect"));
-        assert!(!table.contains_key("tags"));
-        assert!(!table.contains_key("ops"));
+        assert!(!struct_fields_str.contains("anthropic_key"));
+        assert!(!struct_fields_str.contains("session_store_dir"));
+        assert!(!struct_fields_str.contains("retry_limit"));
+        assert!(!struct_fields_str.contains("no_pre_check"));
+        assert!(!struct_fields_str.contains("default_model"));
+        assert!(!struct_fields_str.contains("default_dialect"));
+        assert!(!struct_fields_str.contains("tags"));
+        assert!(!struct_fields_str.contains("ops"));
     }
 
     #[test]
