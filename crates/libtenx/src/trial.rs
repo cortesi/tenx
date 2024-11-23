@@ -254,13 +254,13 @@ impl Trial {
     /// Returns a default configuration for trials. These need to be over-ridden by the trial
     /// if needed.
     fn default_config() -> Result<Config> {
-        let mut config = Config::default();
-        config.include = Include::Glob(vec!["**/*".to_string()]);
-        config.exclude = vec!["target/**".to_string()];
-        config.retry_limit = 1;
-        // We disable streaming for trials by default, because streaming messes up token counts in
-        // complicated ways.
-        config.no_stream = true;
+        let config = Config {
+            include: Include::Glob(vec!["**/*".to_string()]),
+            exclude: vec!["target/**".to_string()],
+            retry_limit: 1,
+            no_stream: true, // We disable streaming for trials by default, because streaming messes up token counts
+            ..Default::default()
+        };
         Ok(config)
     }
 

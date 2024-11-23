@@ -902,13 +902,15 @@ mod tests {
 
     #[test]
     fn test_ron_serialization() {
-        let mut config = Config::default();
-        config.models = vec![ModelConfig::Claude {
-            name: "sonnet".to_string(),
-            api_model: "test".to_string(),
-            key: "".to_string(),
-            key_env: "key_env".to_string(),
-        }];
+        let mut config = Config {
+            models: vec![ModelConfig::Claude {
+                name: "sonnet".to_string(),
+                api_model: "test".to_string(),
+                key: "".to_string(),
+                key_env: "key_env".to_string(),
+            }],
+            ..Default::default()
+        };
         if let ModelConfig::Claude { ref mut key, .. } = &mut config.models[0] {
             *key = "test_key".to_string();
         }
@@ -987,25 +989,29 @@ mod tests {
 
     #[test]
     fn test_config_merge() {
-        let mut base_config = Config::default();
-        base_config.models = vec![ModelConfig::Claude {
-            name: "sonnet".to_string(),
-            api_model: "test".to_string(),
-            key: "".to_string(),
-            key_env: "key_env".to_string(),
-        }];
+        let mut base_config = Config {
+            models: vec![ModelConfig::Claude {
+                name: "sonnet".to_string(),
+                api_model: "test".to_string(),
+                key: "".to_string(),
+                key_env: "key_env".to_string(),
+            }],
+            ..Default::default()
+        };
         if let ModelConfig::Claude { ref mut key, .. } = &mut base_config.models[0] {
             *key = "base_key".to_string();
         }
         set_config!(base_config, retry_limit, 5);
 
-        let mut other_config = Config::default();
-        other_config.models = vec![ModelConfig::Claude {
-            name: "sonnet".to_string(),
-            api_model: "test".to_string(),
-            key: "".to_string(),
-            key_env: "key_env".to_string(),
-        }];
+        let mut other_config = Config {
+            models: vec![ModelConfig::Claude {
+                name: "sonnet".to_string(),
+                api_model: "test".to_string(),
+                key: "".to_string(),
+                key_env: "key_env".to_string(),
+            }],
+            ..Default::default()
+        };
         if let ModelConfig::Claude { ref mut key, .. } = &mut other_config.models[0] {
             *key = "other_key".to_string();
         }

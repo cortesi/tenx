@@ -80,8 +80,10 @@ mod tests {
     #[test]
     fn test_state_store() -> Result<()> {
         let temp_dir = TempDir::new().unwrap();
-        let mut config = Config::default();
-        config.project_root = ProjectRoot::Path(temp_dir.path().into());
+        let config = Config {
+            project_root: ProjectRoot::Path(temp_dir.path().into()),
+            ..Default::default()
+        };
 
         let state_store = SessionStore::open(temp_dir.path().into()).unwrap();
 
