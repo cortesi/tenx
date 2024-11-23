@@ -78,6 +78,34 @@ fn find_project_root(current_dir: &Path) -> PathBuf {
     current_dir.to_path_buf()
 }
 
+/// Loads the configuration by merging defaults, home, and local configuration files.
+/// Returns the complete Config object.
+pub fn load_config() -> Result<Config> {
+    let mut config = super::default_config();
+
+    // Load from home config file
+    let home_config_path = home_config_dir().join(HOME_CONFIG_FILE);
+    if home_config_path.exists() {
+        let home_config_str = fs::read_to_string(&home_config_path)
+            .map_err(|e| TenxError::Config(format!("Failed to read home config file: {}", e)))?;
+        let home_config = Config::from_ron(&home_config_str)
+            .map_err(|e| TenxError::Config(format!("Failed to parse home config file: {}", e)))?;
+        config.merge(&home_config);
+    }
+
+    // Load from local config file
+    let project_root = config.project_root();
+    let local_config_path = project_root.join(LOCAL_CONFIG_FILE);
+    if local_config_path.exists() {
+        let local_config_str = fs::read_to_string(&local_config_path)
+            .map_err(|e| TenxError::Config(format!("Failed to read local config file: {}", e)))?;
+        let local_config = Config::from_ron(&local_config_str)
+            .map_err(|e| TenxError::Config(format!("Failed to parse local config file: {}", e)))?;
+        config.merge(&local_config);
+    }
+    Ok(config)
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub struct DefaultContext {

@@ -313,28 +313,7 @@ enum Commands {
 
 /// Creates a Config from disk and CLI arguments
 fn load_config(cli: &Cli) -> Result<config::Config> {
-    let mut config = config::Config::default();
-
-    // Load from home config file
-    let home_config_path = config::home_config_dir().join(config::HOME_CONFIG_FILE);
-    if home_config_path.exists() {
-        let home_config_str =
-            fs::read_to_string(&home_config_path).context("Failed to read home config file")?;
-        let home_config = config::Config::from_ron(&home_config_str)
-            .context("Failed to parse home config file")?;
-        config.merge(&home_config);
-    }
-
-    // Load from local config file
-    let project_root = config.project_root();
-    let local_config_path = project_root.join(config::LOCAL_CONFIG_FILE);
-    if local_config_path.exists() {
-        let local_config_str =
-            fs::read_to_string(&local_config_path).context("Failed to read local config file")?;
-        let local_config = config::Config::from_ron(&local_config_str)
-            .context("Failed to parse local config file")?;
-        config.merge(&local_config);
-    }
+    let mut config = config::load_config()?;
 
     macro_rules! set_config {
         ($config:expr, $($field:ident).+, $value:expr) => {
@@ -361,12 +340,12 @@ fn load_config(cli: &Cli) -> Result<config::Config> {
     // Validate checks
     if let Some(name) = &cli.only_check {
         if config.get_check(name).is_none() {
-            return Err(anyhow::anyhow!("Check '{}' does not exist", name));
+            return Err(anyhow::anyhow!("check '{}' does not exist", name));
         }
     }
     for check_name in &cli.check {
         if config.get_check(check_name).is_none() {
-            return Err(anyhow::anyhow!("Check '{}' does not exist", check_name));
+            return Err(anyhow::anyhow!("check '{}' does not exist", check_name));
         }
     }
     config.checks.enable.extend(cli.check.clone());
@@ -374,7 +353,7 @@ fn load_config(cli: &Cli) -> Result<config::Config> {
     // Validate and add disabled checks
     for check_name in &cli.no_check {
         if config.get_check(check_name).is_none() {
-            return Err(anyhow::anyhow!("Check '{}' does not exist", check_name));
+            return Err(anyhow::anyhow!("check '{}' does not exist", check_name));
         }
     }
     config.checks.disable.extend(cli.no_check.clone());

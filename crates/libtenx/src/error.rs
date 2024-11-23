@@ -5,6 +5,9 @@ pub type Result<T> = std::result::Result<T, TenxError>;
 
 #[derive(Error, Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub enum TenxError {
+    #[error("config error: {0}")]
+    Config(String),
+
     #[error("Failed to render query: {0}")]
     Render(String),
 
