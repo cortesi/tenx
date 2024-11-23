@@ -10,3 +10,8 @@ Model response robustness:
     - Allow write_file to create files
     - Partial application of patches
     - Ignore <edit> requests for files that are already being edited
+
+
+Bugs:
+    
+    - retry doesn't work with fix

@@ -1,4 +1,3 @@
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     env, fs,
     path::{absolute, Path, PathBuf},
@@ -9,6 +8,7 @@ use globset::{Glob, GlobSetBuilder};
 use normalize_path::NormalizePath;
 use pathdiff::diff_paths;
 use serde::ser::SerializeStruct;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use ron;
 
@@ -16,28 +16,6 @@ use crate::{checks::builtin_checks, checks::Check, dialect, model, Result, TenxE
 
 pub const HOME_CONFIG_FILE: &str = "tenx.ron";
 pub const LOCAL_CONFIG_FILE: &str = ".tenx.ron";
-const DEFAULT_RETRY_LIMIT: usize = 16;
-
-const ANTHROPIC_API_KEY: &str = "ANTHROPIC_API_KEY";
-const ANTHROPIC_CLAUDE_SONNET: &str = "claude-3-5-sonnet-latest";
-const ANTHROPIC_CLAUDE_HAIKU: &str = "claude-3-5-haiku-latest";
-
-const OPENAI_API_KEY: &str = "OPENAI_API_KEY";
-const OPENAI_GPT_O1_PREVIEW: &str = "o1-preview";
-const OPENAI_GPT_O1_MINI: &str = "o1-mini";
-const OPENAI_GPT4O: &str = "gpt-4o";
-const OPENAI_GPT4O_MINI: &str = "gpt-4o-mini";
-
-const DEEPINFRA_API_KEY: &str = "DEEPINFRA_API_KEY";
-const DEEPINFRA_API_BASE: &str = "https://api.deepinfra.com/v1/openai";
-
-const XAI_API_KEY: &str = "XAI_API_KEY";
-const XAI_API_BASE: &str = "https://api.x.ai/v1";
-const XAI_DEFAULT_GROK: &str = "grok-beta";
-
-const GOOGLEAI_API_KEY: &str = "GOOGLEAI_API_KEY";
-const GOOGLEAI_API_BASE: &str = "https://generativelanguage.googleapis.com/v1beta/openai";
-const GOOGLEAI_GEMINI_EXP: &str = "gemini-exp-1114";
 
 macro_rules! serialize_if_different {
     ($state:expr, $full:expr, $self:expr, $default:expr, $field:ident) => {
@@ -45,10 +23,6 @@ macro_rules! serialize_if_different {
             $state.serialize_field(stringify!($field), &$self.$field)?;
         }
     };
-}
-
-fn default_retry_limit() -> usize {
-    DEFAULT_RETRY_LIMIT
 }
 
 fn is_relative<P: AsRef<Path>>(path: P) -> bool {
@@ -357,6 +331,8 @@ pub struct Checks {
     #[serde(default)]
     pub custom: Vec<CheckConfig>,
     #[serde(default)]
+    pub builtin: Vec<CheckConfig>,
+    #[serde(default)]
     pub disable: Vec<String>,
     #[serde(default)]
     pub enable: Vec<String>,
@@ -441,7 +417,7 @@ impl CheckConfig {
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Default, Clone, Deserialize)]
 pub struct Config {
     /// Available model configurations
     #[serde(default)]
@@ -469,7 +445,7 @@ pub struct Config {
     pub session_store_dir: PathBuf,
 
     /// The number of times to retry a request.
-    #[serde(default = "default_retry_limit")]
+    #[serde(default)]
     pub retry_limit: usize,
 
     /// The tags dialect configuration.
@@ -498,20 +474,20 @@ pub struct Config {
 
     /// Set a dummy model for end-to-end testing. Over-rides the configured model.
     #[serde(skip)]
-    dummy_model: Option<model::DummyModel>,
+    pub(crate) dummy_model: Option<model::DummyModel>,
 
     /// Set a dummy dialect for end-to-end testing. Over-rides the configured dialect.
     #[serde(skip)]
-    dummy_dialect: Option<dialect::DummyDialect>,
+    pub(crate) dummy_dialect: Option<dialect::DummyDialect>,
 
     /// When true, serializes all fields regardless of default values.
     #[serde(skip)]
-    full: bool,
+    pub(crate) full: bool,
 
     /// The current working directory when testing. We need this, because we can't change the CWD
     /// reliably in tests for reasons of concurrency.
     #[serde(skip)]
-    test_cwd: Option<String>,
+    pub(crate) test_cwd: Option<String>,
 }
 
 impl Serialize for Config {
@@ -533,126 +509,6 @@ impl Serialize for Config {
         serialize_if_different!(state, self.full, self, default, checks);
         serialize_if_different!(state, self.full, self, default, project_root);
         state.end()
-    }
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        let mut models = Vec::new();
-
-        if env::var(ANTHROPIC_API_KEY).is_ok() {
-            models.extend_from_slice(&[
-                ModelConfig::Claude {
-                    name: "sonnet".to_string(),
-                    api_model: ANTHROPIC_CLAUDE_SONNET.to_string(),
-                    key: "".to_string(),
-                    key_env: ANTHROPIC_API_KEY.to_string(),
-                },
-                ModelConfig::Claude {
-                    name: "haiku".to_string(),
-                    api_model: ANTHROPIC_CLAUDE_HAIKU.to_string(),
-                    key: "".to_string(),
-                    key_env: ANTHROPIC_API_KEY.to_string(),
-                },
-            ]);
-        }
-
-        if env::var(DEEPINFRA_API_KEY).is_ok() {
-            models.push(ModelConfig::OpenAi {
-                name: "qwen-coder".to_string(),
-                api_model: "Qwen/Qwen2.5-Coder-32B-Instruct".to_string(),
-                key: "".to_string(),
-                key_env: DEEPINFRA_API_KEY.to_string(),
-                api_base: DEEPINFRA_API_BASE.to_string(),
-                can_stream: true,
-                no_system_prompt: false,
-            });
-        }
-
-        if env::var(OPENAI_API_KEY).is_ok() {
-            models.extend_from_slice(&[
-                ModelConfig::OpenAi {
-                    name: "o1".to_string(),
-                    api_model: OPENAI_GPT_O1_PREVIEW.to_string(),
-                    key: "".to_string(),
-                    key_env: OPENAI_API_KEY.to_string(),
-                    api_base: crate::model::OPENAI_API_BASE.to_string(),
-                    can_stream: false,
-                    no_system_prompt: true,
-                },
-                ModelConfig::OpenAi {
-                    name: "o1-mini".to_string(),
-                    api_model: OPENAI_GPT_O1_MINI.to_string(),
-                    key: "".to_string(),
-                    key_env: OPENAI_API_KEY.to_string(),
-                    api_base: crate::model::openai::OPENAI_API_BASE.to_string(),
-                    can_stream: false,
-                    no_system_prompt: true,
-                },
-                ModelConfig::OpenAi {
-                    name: "gpt4o".to_string(),
-                    api_model: OPENAI_GPT4O.to_string(),
-                    key: "".to_string(),
-                    key_env: OPENAI_API_KEY.to_string(),
-                    api_base: crate::model::openai::OPENAI_API_BASE.to_string(),
-                    can_stream: true,
-                    no_system_prompt: false,
-                },
-                ModelConfig::OpenAi {
-                    name: "gpt4o-mini".to_string(),
-                    api_model: OPENAI_GPT4O_MINI.to_string(),
-                    key: "".to_string(),
-                    key_env: OPENAI_API_KEY.to_string(),
-                    api_base: crate::model::openai::OPENAI_API_BASE.to_string(),
-                    can_stream: true,
-                    no_system_prompt: false,
-                },
-            ]);
-        }
-
-        if env::var(XAI_API_KEY).is_ok() {
-            models.push(ModelConfig::OpenAi {
-                name: "grok".to_string(),
-                api_model: XAI_DEFAULT_GROK.to_string(),
-                key: "".to_string(),
-                key_env: XAI_API_KEY.to_string(),
-                api_base: XAI_API_BASE.to_string(),
-                can_stream: true,
-                no_system_prompt: false,
-            });
-        }
-
-        if env::var(GOOGLEAI_API_KEY).is_ok() {
-            models.push(ModelConfig::OpenAi {
-                name: "gemini".to_string(),
-                api_model: GOOGLEAI_GEMINI_EXP.to_string(),
-                key: "".to_string(),
-                key_env: GOOGLEAI_API_KEY.to_string(),
-                api_base: GOOGLEAI_API_BASE.to_string(),
-                can_stream: false,
-                no_system_prompt: false,
-            });
-        }
-
-        Self {
-            include: Include::Git,
-            exclude: Vec::new(),
-            models,
-            session_store_dir: home_config_dir().join("state"),
-            retry_limit: DEFAULT_RETRY_LIMIT,
-            default_dialect: ConfigDialect::default(),
-            dummy_model: None,
-            dummy_dialect: None,
-            tags: Tags::default(),
-            ops: Ops::default(),
-            default_context: DefaultContext::default(),
-            default_model: None,
-            full: false,
-            checks: Checks::default(),
-            project_root: ProjectRoot::default(),
-            test_cwd: None,
-            no_stream: false,
-        }
     }
 }
 
@@ -1047,6 +903,12 @@ mod tests {
     #[test]
     fn test_ron_serialization() {
         let mut config = Config::default();
+        config.models = vec![ModelConfig::Claude {
+            name: "sonnet".to_string(),
+            api_model: "test".to_string(),
+            key: "".to_string(),
+            key_env: "key_env".to_string(),
+        }];
         if let ModelConfig::Claude { ref mut key, .. } = &mut config.models[0] {
             *key = "test_key".to_string();
         }
@@ -1126,12 +988,24 @@ mod tests {
     #[test]
     fn test_config_merge() {
         let mut base_config = Config::default();
+        base_config.models = vec![ModelConfig::Claude {
+            name: "sonnet".to_string(),
+            api_model: "test".to_string(),
+            key: "".to_string(),
+            key_env: "key_env".to_string(),
+        }];
         if let ModelConfig::Claude { ref mut key, .. } = &mut base_config.models[0] {
             *key = "base_key".to_string();
         }
         set_config!(base_config, retry_limit, 5);
 
         let mut other_config = Config::default();
+        other_config.models = vec![ModelConfig::Claude {
+            name: "sonnet".to_string(),
+            api_model: "test".to_string(),
+            key: "".to_string(),
+            key_env: "key_env".to_string(),
+        }];
         if let ModelConfig::Claude { ref mut key, .. } = &mut other_config.models[0] {
             *key = "other_key".to_string();
         }
@@ -1175,10 +1049,7 @@ mod tests {
         );
 
         let config_without_change = config.clone();
-        assert_eq!(
-            config_without_change.session_store_dir,
-            home_config_dir().join("state")
-        );
+        assert_eq!(config_without_change.session_store_dir, PathBuf::new());
 
         let mut config_with_existing = Config::default();
         set_config!(
@@ -1210,7 +1081,7 @@ mod tests {
             name: "sonnet".to_string(),
             api_model: "test".to_string(),
             key: "".to_string(),
-            key_env: ANTHROPIC_API_KEY.to_string(),
+            key_env: "key_env".to_string(),
         }];
 
         assert_eq!(config.retry_limit, 42);
