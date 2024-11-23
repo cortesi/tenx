@@ -1,9 +1,0 @@
-project = "rust/evenmedian"
-desc = "A simple problem that won't be a simple recitation from memory."
-
-[op.ask]
-prompt = "Complete the evenmedian function."
-editable = ["**/code.rs"]
-
-[config]
-no_pre_check = true

@@ -1,7 +1,0 @@
-project = "rust/broken"
-desc = "Fix a Rust syntax error, without an editable"
-
-[op.fix]
-editable = []
-
-[config]

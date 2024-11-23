@@ -355,8 +355,11 @@ impl std::fmt::Display for Include {
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Checks {
+    #[serde(default)]
     pub enable: Vec<String>,
+    #[serde(default)]
     pub disable: Vec<String>,
+    #[serde(default)]
     pub no_pre: bool,
     #[serde(default)]
     pub only: Option<String>,
@@ -883,6 +886,9 @@ impl Config {
         }
         if other.default_context != dflt.default_context {
             self.default_context = other.default_context.clone();
+        }
+        if other.default_model != dflt.default_model {
+            self.default_model = other.default_model.clone();
         }
     }
 

@@ -21,13 +21,18 @@ use crate::{
 };
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum TrialOp {
     Code {
+        #[serde(default)]
         prompt: String,
+        #[serde(default)]
         editable: Vec<PathBuf>,
     },
     Fix {
+        #[serde(default)]
         prompt: Option<String>,
+        #[serde(default)]
         editable: Vec<PathBuf>,
     },
 }
@@ -297,9 +302,7 @@ pub fn list<P: AsRef<Path>>(base_dir: P, patterns: Option<&[&str]>) -> Result<Ve
             .file_stem()
             .and_then(|s| s.to_str())
             .ok_or_else(|| TenxError::Internal("Invalid trial file name".to_string()))?;
-        if let Ok(trial) = Trial::load(&base_dir, name) {
-            trials.push(trial);
-        }
+        trials.push(Trial::load(&base_dir, name)?);
     }
 
     if let Some(patterns) = patterns {
@@ -336,7 +339,7 @@ mod tests {
         let test_ron = r#"(
             project: "test_project",
             desc: "Test trial description",
-            op: Code(
+            op: code(
                 prompt: "test prompt",
                 editable: ["file1.rs"],
             )
@@ -484,7 +487,7 @@ mod tests {
         let ron = r#"(
             project: "test_project",
             desc: "Test trial description",
-            op: Code(
+            op: code(
                 prompt: "test prompt",
                 editable: ["file1.rs", "file2.rs"],
             ),

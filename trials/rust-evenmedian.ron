@@ -1,0 +1,13 @@
+(
+    project: "rust/evenmedian",
+    desc: "A simple problem that won't be a simple recitation from memory.",
+    op: code(
+        prompt: "Complete the evenmedian function.",
+        editable: ["**/code.rs"]
+    ),
+    config: (
+        checks: (
+            no_pre: true
+        )
+    )
+)

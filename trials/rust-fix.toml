@@ -1,5 +1,0 @@
-project = "rust/broken"
-desc = "Fix a Rust syntax error"
-
-[op.fix]
-editable = ["**/*.rs"]

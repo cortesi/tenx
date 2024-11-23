@@ -1,4 +1,5 @@
 (
+    default_model: "gpt4o",
     retry_limit: 18,
     default_context: (
         ruskel: ["libtenx"]
