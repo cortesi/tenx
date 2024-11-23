@@ -355,9 +355,11 @@ impl std::fmt::Display for Include {
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Checks {
     #[serde(default)]
-    pub enable: Vec<String>,
+    pub custom: Vec<CheckConfig>,
     #[serde(default)]
     pub disable: Vec<String>,
+    #[serde(default)]
+    pub enable: Vec<String>,
     #[serde(default)]
     pub no_pre: bool,
     #[serde(default)]
@@ -397,8 +399,49 @@ impl<'de> Deserialize<'de> for ProjectRoot {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub enum ModeConfig {
+    Pre,
+    Post,
+    #[default]
+    Both,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CheckConfig {
+    /// Name of the validator for display and error reporting
+    pub name: String,
+    /// Shell command to execute, run with sh -c
+    pub command: String,
+    /// List of glob patterns to match against files for determining relevance
+    pub globs: Vec<String>,
+    /// Whether this validator defaults to off in the configuration
+    pub default_off: bool,
+    /// Whether to treat any stderr output as a failure, regardless of exit code
+    pub fail_on_stderr: bool,
+    /// When this check should run
+    pub mode: ModeConfig,
+}
+
+impl CheckConfig {
+    /// Converts a CheckConfig to a concrete Check object.
+    pub fn to_check(&self) -> Check {
+        Check {
+            name: self.name.clone(),
+            command: self.command.clone(),
+            globs: self.globs.clone(),
+            default_off: self.default_off,
+            fail_on_stderr: self.fail_on_stderr,
+            mode: match self.mode {
+                ModeConfig::Pre => crate::Mode::Pre,
+                ModeConfig::Post => crate::Mode::Post,
+                ModeConfig::Both => crate::Mode::Both,
+            },
+        }
+    }
+}
+
 #[derive(Debug, Clone, Deserialize)]
-/// Configuration for the Tenx application.
 pub struct Config {
     /// Available model configurations
     #[serde(default)]
