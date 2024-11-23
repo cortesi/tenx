@@ -839,8 +839,11 @@ impl Config {
 
     /// Deserialize a RON string into a Config.
     pub fn from_ron(toml_str: &str) -> Result<Self> {
-        ron::from_str(toml_str)
-            .map_err(|e| TenxError::Internal(format!("Failed to parse TOML: {}", e)))
+        let options = ron::Options::default()
+            .with_default_extension(ron::extensions::Extensions::IMPLICIT_SOME);
+        options
+            .from_str(toml_str)
+            .map_err(|e| TenxError::Internal(format!("Failed to parse RON: {}", e)))
     }
 
     /// Serialize the Config into a RON string.

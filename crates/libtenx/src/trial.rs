@@ -21,21 +21,15 @@ use crate::{
 };
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct Ask {
-    pub prompt: String,
-    pub editable: Vec<PathBuf>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct Fix {
-    pub prompt: Option<String>,
-    pub editable: Vec<PathBuf>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
 pub enum TrialOp {
-    Ask(Ask),
-    Fix(Fix),
+    Code {
+        prompt: String,
+        editable: Vec<PathBuf>,
+    },
+    Fix {
+        prompt: Option<String>,
+        editable: Vec<PathBuf>,
+    },
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -49,7 +43,10 @@ pub struct TrialConf {
 impl TrialConf {
     /// Parse a RON string into a TrialConf
     fn from_str(s: &str) -> Result<Self> {
-        ron::from_str(s)
+        let options = ron::Options::default()
+            .with_default_extension(ron::extensions::Extensions::IMPLICIT_SOME);
+        options
+            .from_str(s)
             .map_err(|e| TenxError::Internal(format!("Failed to parse trial RON: {}", e)))
     }
 
@@ -223,17 +220,17 @@ impl Trial {
 
         info!("trial setup complete: {}", self.name);
         let result = match &self.trial_conf.op {
-            TrialOp::Ask(edit) => {
-                for path in &edit.editable {
+            TrialOp::Code { prompt, editable } => {
+                for path in editable {
                     session.add_editable(&tenx.config, &path.to_string_lossy())?;
                 }
-                tenx.code(&mut session, edit.prompt.clone(), sender).await
+                tenx.code(&mut session, prompt.clone(), sender).await
             }
-            TrialOp::Fix(fix) => {
-                for path in &fix.editable {
+            TrialOp::Fix { prompt, editable } => {
+                for path in editable {
                     session.add_editable(&tenx.config, &path.to_string_lossy())?;
                 }
-                tenx.fix(&mut session, sender, fix.prompt.clone()).await
+                tenx.fix(&mut session, sender, prompt.clone()).await
             }
         };
 
@@ -339,10 +336,10 @@ mod tests {
         let test_ron = r#"(
             project: "test_project",
             desc: "Test trial description",
-            op: Ask((
+            op: Code(
                 prompt: "test prompt",
                 editable: ["file1.rs"],
-            ))
+            )
         )"#;
 
         fs::write(dir.path().join("test1.ron"), test_ron)?;
@@ -406,10 +403,10 @@ mod tests {
             base_dir: base_dir.path().to_path_buf(),
             trial_conf: TrialConf {
                 project: "nested/test_proj".to_string(),
-                op: TrialOp::Ask(Ask {
+                op: TrialOp::Code {
                     prompt: "test".to_string(),
                     editable: vec![],
-                }),
+                },
                 config: None,
                 desc: "Test trial".to_string(),
             },
@@ -452,10 +449,10 @@ mod tests {
             base_dir: base_dir.path().to_path_buf(),
             trial_conf: TrialConf {
                 project: "test_proj".to_string(),
-                op: TrialOp::Ask(Ask {
+                op: TrialOp::Code {
                     prompt: "test".to_string(),
                     editable: vec![],
-                }),
+                },
                 config: None,
                 desc: "Test trial".to_string(),
             },
@@ -487,27 +484,27 @@ mod tests {
         let ron = r#"(
             project: "test_project",
             desc: "Test trial description",
-            op: Ask((
+            op: Code(
                 prompt: "test prompt",
                 editable: ["file1.rs", "file2.rs"],
-            )),
-            config: Some((
+            ),
+            config: (
                 no_pre: true,
-            ))
+            )
         )"#;
 
         let conf = TrialConf::from_str(ron)?;
         assert_eq!(conf.project, "test_project");
 
         match conf.op {
-            TrialOp::Ask(edit) => {
-                assert_eq!(edit.prompt, "test prompt");
+            TrialOp::Code { prompt, editable } => {
+                assert_eq!(prompt, "test prompt");
                 assert_eq!(
-                    edit.editable,
+                    editable,
                     vec![PathBuf::from("file1.rs"), PathBuf::from("file2.rs")]
                 );
             }
-            TrialOp::Fix(_) => panic!("Expected Ask variant"),
+            TrialOp::Fix { .. } => panic!("Expected Code variant"),
         }
 
         Ok(())
