@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     env, fs,
     path::{absolute, Path, PathBuf},
     process::Command,
@@ -12,7 +13,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use ron;
 
-use crate::{checks::builtin_checks, checks::Check, dialect, model, Result, TenxError};
+use crate::{checks::Check, dialect, model, Result, TenxError};
 
 pub const HOME_CONFIG_FILE: &str = "tenx.ron";
 pub const LOCAL_CONFIG_FILE: &str = ".tenx.ron";
@@ -869,11 +870,24 @@ impl Config {
         }
     }
 
-    /// Return all configured checks, even if disabled.
+    /// Return all configured checks, even if disabled. Custom checks with the same name as builtin
+    /// checks replace the builtin checks.
     pub fn all_checks(&self) -> Vec<Check> {
-        let mut checks = builtin_checks();
-        checks.extend(self.checks.custom.iter().map(|c| c.to_check()));
-        checks
+        let builtin = self
+            .checks
+            .builtin
+            .iter()
+            .map(|c| (c.name.clone(), c.to_check()));
+        let custom = self
+            .checks
+            .custom
+            .iter()
+            .map(|c| (c.name.clone(), c.to_check()));
+
+        let mut check_map: HashMap<String, Check> = builtin.collect();
+        check_map.extend(custom);
+
+        check_map.into_values().collect()
     }
 
     /// Get a check by name
@@ -884,7 +898,7 @@ impl Config {
     }
 
     /// Returns true if a check is enabled based on its name and default state in the config
-    pub fn check_enabled<S: AsRef<str>>(&self, name: S) -> bool {
+    pub fn is_check_enabled<S: AsRef<str>>(&self, name: S) -> bool {
         let name = name.as_ref();
         if let Some(check) = self.get_check(name) {
             if check.default_off() {
@@ -909,7 +923,7 @@ impl Config {
         } else {
             self.all_checks()
                 .into_iter()
-                .filter(|check| self.check_enabled(&check.name))
+                .filter(|check| self.is_check_enabled(&check.name))
                 .collect()
         }
     }

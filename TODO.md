@@ -1,6 +1,7 @@
 
 UX:
 
+    - Check each glob passed on the command-line to ensure it matches at least one file on disk
     - User-assigned model name should be printed in progress output, not the
       api model name
 
@@ -15,3 +16,8 @@ Model response robustness:
 Bugs:
     
     - retry doesn't work with fix
+
+
+Features:
+
+    - custom system prompt additions

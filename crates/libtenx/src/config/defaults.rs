@@ -25,7 +25,8 @@ const GOOGLEAI_API_KEY: &str = "GOOGLEAI_API_KEY";
 const GOOGLEAI_API_BASE: &str = "https://generativelanguage.googleapis.com/v1beta/openai";
 const GOOGLEAI_GEMINI_EXP: &str = "gemini-exp-1114";
 
-pub fn default_config() -> Config {
+/// Returns the default set of model configurations based on available API keys
+fn default_models() -> Vec<ModelConfig> {
     let mut models = Vec::new();
 
     if env::var(ANTHROPIC_API_KEY).is_ok() {
@@ -122,23 +123,73 @@ pub fn default_config() -> Config {
         });
     }
 
+    models
+}
+
+/// Returns the default set of check configurations
+fn default_checks() -> Checks {
+    Checks {
+        builtin: vec![
+            CheckConfig {
+                name: "cargo-check".to_string(),
+                command: "cargo check --tests".to_string(),
+                globs: vec!["*.rs".to_string()],
+                default_off: false,
+                fail_on_stderr: false,
+                mode: ModeConfig::Both,
+            },
+            CheckConfig {
+                name: "cargo-test".to_string(),
+                command: "cargo test -q".to_string(),
+                globs: vec!["*.rs".to_string()],
+                default_off: false,
+                fail_on_stderr: false,
+                mode: ModeConfig::Both,
+            },
+            CheckConfig {
+                name: "cargo-clippy".to_string(),
+                command: "cargo clippy --no-deps --all --tests -q".to_string(),
+                globs: vec!["*.rs".to_string()],
+                default_off: true,
+                fail_on_stderr: true,
+                mode: ModeConfig::Both,
+            },
+            CheckConfig {
+                name: "cargo-fmt".to_string(),
+                command: "cargo fmt --all".to_string(),
+                globs: vec!["*.rs".to_string()],
+                default_off: false,
+                fail_on_stderr: true,
+                mode: ModeConfig::Post,
+            },
+            CheckConfig {
+                name: "ruff-check".to_string(),
+                command: "ruff check -q".to_string(),
+                globs: vec!["*.py".to_string()],
+                default_off: false,
+                fail_on_stderr: false,
+                mode: ModeConfig::Both,
+            },
+            CheckConfig {
+                name: "ruff-format".to_string(),
+                command: "ruff format -q".to_string(),
+                globs: vec!["*.py".to_string()],
+                default_off: false,
+                fail_on_stderr: false,
+                mode: ModeConfig::Post,
+            },
+        ],
+        ..Default::default()
+    }
+}
+
+pub fn default_config() -> Config {
     Config {
         include: Include::Git,
-        exclude: Vec::new(),
-        models,
+        models: default_models(),
         session_store_dir: home_config_dir().join("state"),
         retry_limit: DEFAULT_RETRY_LIMIT,
-        default_dialect: ConfigDialect::default(),
-        dummy_model: None,
-        dummy_dialect: None,
-        tags: Tags::default(),
-        ops: Ops::default(),
-        default_context: DefaultContext::default(),
-        default_model: None,
-        full: false,
-        checks: Checks::default(),
-        project_root: ProjectRoot::default(),
-        test_cwd: None,
-        no_stream: false,
+        checks: default_checks(),
+        ..Default::default()
     }
 }

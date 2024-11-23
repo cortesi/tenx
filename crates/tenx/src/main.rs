@@ -455,7 +455,7 @@ async fn main() -> anyhow::Result<()> {
                 };
                 for check in checks {
                     let name = &check.name;
-                    let enabled = config.check_enabled(name);
+                    let enabled = config.is_check_enabled(name);
 
                     let status = if !enabled {
                         " (disabled)".yellow().to_string()
