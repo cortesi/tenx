@@ -35,12 +35,20 @@ pub fn builtin_checks() -> Vec<Check> {
             mode: Mode::Post,
         },
         Check {
-            name: "python-ruff".to_string(),
+            name: "ruff-check".to_string(),
             command: "ruff check -q".to_string(),
             globs: vec!["*.py".to_string()],
             default_off: false,
             fail_on_stderr: false,
             mode: Mode::Both,
+        },
+        Check {
+            name: "ruff-format".to_string(),
+            command: "ruff format -q".to_string(),
+            globs: vec!["*.py".to_string()],
+            default_off: false,
+            fail_on_stderr: false,
+            mode: Mode::Post,
         },
     ]
 }

@@ -987,7 +987,9 @@ impl Config {
 
     /// Return all configured checks, even if disabled.
     pub fn all_checks(&self) -> Vec<Check> {
-        builtin_checks()
+        let mut checks = builtin_checks();
+        checks.extend(self.checks.custom.iter().map(|c| c.to_check()));
+        checks
     }
 
     /// Get a check by name
