@@ -11,7 +11,6 @@ use pathdiff::diff_paths;
 use serde::ser::SerializeStruct;
 
 use ron;
-use toml;
 
 use crate::{checks::builtin_checks, checks::Check, dialect, model, Result, TenxError};
 
@@ -398,10 +397,6 @@ impl<'de> Deserialize<'de> for ProjectRoot {
     }
 }
 
-// Note that we can't use Optional values in the config. TOML includes no way to render
-// optional values, so our strategy of rendering the full config with a default config for
-// documentation falls by the wayside.
-
 #[derive(Debug, Clone, Deserialize)]
 /// Configuration for the Tenx application.
 pub struct Config {
@@ -418,15 +413,6 @@ pub struct Config {
     pub default_dialect: ConfigDialect,
 
     /// Which files are included by default
-    ///
-    /// TOML examples:
-    /// ```toml
-    /// # Default Git include
-    /// include = "git"
-    ///
-    /// # Glob include
-    /// include = { glob = ["*.rs", "*.toml"] }
-    /// ```
     #[serde(default)]
     pub include: Include,
 
@@ -828,31 +814,19 @@ impl Config {
         self
     }
 
-    /// Deserialize a TOML string into a Config.
-    pub fn from_toml(toml_str: &str) -> Result<Self> {
-        toml::from_str(toml_str)
-            .map_err(|e| TenxError::Internal(format!("Failed to parse TOML: {}", e)))
-    }
-
-    /// Serialize the Config into a TOML string.
-    pub fn to_toml(&self) -> Result<String> {
-        toml::to_string_pretty(self)
-            .map_err(|e| TenxError::Internal(format!("Failed to serialize to TOML: {}", e)))
-    }
-
     /// Deserialize a RON string into a Config.
-    pub fn from_ron(toml_str: &str) -> Result<Self> {
+    pub fn from_ron(ron_str: &str) -> Result<Self> {
         let options = ron::Options::default()
             .with_default_extension(ron::extensions::Extensions::IMPLICIT_SOME);
         options
-            .from_str(toml_str)
+            .from_str(ron_str)
             .map_err(|e| TenxError::Internal(format!("Failed to parse RON: {}", e)))
     }
 
     /// Serialize the Config into a RON string.
     pub fn to_ron(&self) -> Result<String> {
         ron::ser::to_string_pretty(self, ron::ser::PrettyConfig::default())
-            .map_err(|e| TenxError::Internal(format!("Failed to serialize to TOML: {}", e)))
+            .map_err(|e| TenxError::Internal(format!("Failed to serialize to RON: {}", e)))
     }
 
     /// Merge another Config into this one, only overriding non-default values.
