@@ -132,7 +132,7 @@ fn default_project_map() -> bool {
     true
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ModelConfig {
     Claude {
@@ -369,6 +369,20 @@ pub struct Checks {
     pub no_pre: bool,
     #[serde(default)]
     pub only: Option<String>,
+}
+
+#[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Models {
+    #[serde(default)]
+    pub custom: Option<Vec<ModelConfig>>,
+    #[serde(default)]
+    pub builtin: Option<Vec<ModelConfig>>,
+    #[serde(default)]
+    pub default: Option<String>,
+}
+
+impl Models {
+    fn merge(&mut self, other: Option<Models>) {}
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
