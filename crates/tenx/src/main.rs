@@ -159,15 +159,6 @@ enum Commands {
         /// Path to a file containing the prompt
         #[clap(long)]
         prompt_file: Option<PathBuf>,
-        /// Add ruskel documentation as context
-        #[clap(long)]
-        ruskel: Vec<String>,
-        /// Add files as context
-        #[clap(long)]
-        ctx: Vec<String>,
-        /// Add URLs as context
-        #[clap(long)]
-        url: Vec<String>,
     },
     /// Print the current configuration
     Conf {
@@ -199,19 +190,8 @@ enum Commands {
         pattern: Option<String>,
     },
     /// Start a new session and attempt to fix any pre check failures
+    /// Start a new session and attempt to fix any pre check failures
     Fix {
-        /// Specifies files to edit
-        #[clap(value_parser)]
-        files: Vec<String>,
-        /// Add ruskel documentation as context
-        #[clap(long)]
-        ruskel: Vec<String>,
-        /// Add files as context
-        #[clap(long)]
-        ctx: Vec<String>,
-        /// Add URLs as context
-        #[clap(long)]
-        url: Vec<String>,
         /// Clear the current session, and use it to fix
         #[clap(long)]
         clear: bool,
@@ -232,17 +212,8 @@ enum Commands {
         full: bool,
     },
     /// Create a new session
-    New {
-        /// Specifies files to add as context
-        #[clap(value_parser)]
-        files: Vec<String>,
-        /// Add ruskel documentation
-        #[clap(long)]
-        ruskel: Vec<String>,
-        /// Add URLs as context
-        #[clap(long)]
-        url: Vec<String>,
-    },
+    /// Create a new session
+    New,
     /// Print information about the current project
     Project,
     /// Start a new session, edit the prompt, and run it
@@ -250,15 +221,6 @@ enum Commands {
         /// Specifies files to edit
         #[clap(value_parser)]
         files: Vec<String>,
-        /// Add ruskel documentation as context
-        #[clap(long)]
-        ruskel: Vec<String>,
-        /// Add files as context
-        #[clap(long)]
-        ctx: Vec<String>,
-        /// Add URLs as context
-        #[clap(long)]
-        url: Vec<String>,
         /// User prompt for the edit operation
         #[clap(long)]
         prompt: Option<String>,
@@ -274,21 +236,13 @@ enum Commands {
         step_offset: usize,
     },
     /// Retry a prompt
+    /// Retry a prompt
     Retry {
         /// The step offset to retry from
         step_offset: Option<usize>,
         /// Edit the prompt before retrying
         #[clap(long)]
         edit: bool,
-        /// Add files as context
-        #[clap(long)]
-        ctx: Vec<String>,
-        /// Add ruskel documentation as context
-        #[clap(long)]
-        ruskel: Vec<String>,
-        /// Add URLs as context
-        #[clap(long)]
-        url: Vec<String>,
         /// User prompt for the edit operation
         #[clap(long)]
         prompt: Option<String>,
@@ -478,15 +432,10 @@ async fn main() -> anyhow::Result<()> {
             }
             Commands::Quick {
                 files,
-                ruskel,
-                ctx,
-                url,
                 prompt,
                 prompt_file,
             } => {
                 let mut session = tx.new_session_from_cwd(&Some(sender.clone())).await?;
-                tx.add_contexts(&mut session, ctx, ruskel, url, false, &Some(sender.clone()))
-                    .await?;
                 for file in files {
                     session.add_editable(&config, file)?;
                 }
@@ -503,17 +452,12 @@ async fn main() -> anyhow::Result<()> {
                 files,
                 prompt,
                 prompt_file,
-                ruskel,
-                ctx,
-                url,
             } => {
                 let mut session = tx.load_session()?;
 
                 for f in files.clone().unwrap_or_default() {
                     session.add_editable(&config, &f)?;
                 }
-                tx.add_contexts(&mut session, ctx, ruskel, url, false, &Some(sender.clone()))
-                    .await?;
 
                 let user_prompt = match get_prompt(prompt, prompt_file, &session, false)? {
                     Some(p) => p,
@@ -588,9 +532,6 @@ async fn main() -> anyhow::Result<()> {
             Commands::Retry {
                 step_offset,
                 edit,
-                ctx,
-                ruskel,
-                url,
                 prompt,
                 prompt_file,
             } => {
@@ -598,9 +539,6 @@ async fn main() -> anyhow::Result<()> {
 
                 let offset = step_offset.unwrap_or(session.steps().len() - 1);
                 tx.reset(&mut session, offset)?;
-
-                tx.add_contexts(&mut session, ctx, ruskel, url, false, &Some(sender.clone()))
-                    .await?;
 
                 let prompt = if *edit || prompt.is_some() || prompt_file.is_some() {
                     get_prompt(prompt, prompt_file, &session, true)?
@@ -611,26 +549,13 @@ async fn main() -> anyhow::Result<()> {
                 tx.retry(&mut session, prompt, Some(sender.clone())).await?;
                 Ok(())
             }
-            Commands::New { files, ruskel, url } => {
+            Commands::New => {
                 let mut session = tx.new_session_from_cwd(&Some(sender.clone())).await?;
-                tx.add_contexts(
-                    &mut session,
-                    files,
-                    ruskel,
-                    url,
-                    false,
-                    &Some(sender.clone()),
-                )
-                .await?;
                 tx.save_session(&session)?;
                 println!("new session: {}", config.project_root().display());
                 Ok(())
             }
             Commands::Fix {
-                files,
-                ruskel,
-                ctx,
-                url,
                 clear,
                 prompt,
                 prompt_file,
@@ -643,12 +568,6 @@ async fn main() -> anyhow::Result<()> {
                 } else {
                     tx.new_session_from_cwd(&Some(sender.clone())).await?
                 };
-
-                for file in files {
-                    session.add_editable(&config, file)?;
-                }
-                tx.add_contexts(&mut session, ctx, ruskel, url, false, &Some(sender.clone()))
-                    .await?;
 
                 let prompt = if prompt.is_some() || prompt_file.is_some() || *edit {
                     get_prompt(prompt, prompt_file, &session, false)?
