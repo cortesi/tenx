@@ -13,7 +13,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use ron;
 
-use crate::{checks::Check, dialect, model, TenxError};
+use crate::{checks::Check, config::default_config, dialect, model, TenxError};
 
 pub const HOME_CONFIG_FILE: &str = "tenx.ron";
 pub const LOCAL_CONFIG_FILE: &str = ".tenx.ron";
@@ -86,7 +86,7 @@ pub fn parse_config(
     home_config: Option<String>,
     local_config: Option<String>,
 ) -> crate::Result<Config> {
-    let default_conf = super::default_config();
+    let default_conf = default_config();
     let mut cnf = ConfigFile::default();
     // Load from home config file
     if let Some(home_config_str) = home_config {
@@ -117,7 +117,7 @@ pub fn load_config() -> crate::Result<Config> {
             None
         };
 
-    let default_conf = super::default_config();
+    let default_conf = default_config();
     let project_root = default_conf.project_root();
     let local_config_path = project_root.join(LOCAL_CONFIG_FILE);
     let local_config =
@@ -493,7 +493,7 @@ impl CheckConfig {
 }
 
 #[optional_struct(ConfigFile)]
-#[derive(Debug, Default, Clone, Deserialize, Serialize)]
+#[derive(Debug, Default, Clone, Deserialize, Serialize, PartialEq)]
 pub struct Config {
     /// Model configuration
     #[optional_rename(OptionalModels)]
@@ -921,6 +921,35 @@ mod tests {
     use crate::testutils;
 
     use tempfile::TempDir;
+
+    #[test]
+    fn test_config_roundtrip() -> crate::Result<()> {
+        let mut config = default_config();
+        config.retry_limit = 42;
+        config.exclude.push("*.test".to_string());
+
+        let ron = config.to_ron()?;
+        let parsed = parse_config(None, Some(ron))?;
+
+        assert_eq!(parsed, config);
+        Ok(())
+    }
+
+    #[test]
+    fn test_parse_config_value() -> crate::Result<()> {
+        // Test loading a config with a custom retry_limit
+        let test_config = r#"(retry_limit: 10)"#;
+        let config = parse_config(None, Some(test_config.to_string()))?;
+        assert_eq!(config.retry_limit, 10);
+
+        // Test that other values remain at default
+        let default_config = default_config();
+        assert_eq!(config.models, default_config.models);
+        assert_eq!(config.include, default_config.include);
+        assert_eq!(config.exclude, default_config.exclude);
+
+        Ok(())
+    }
 
     macro_rules! set_config {
         ($config:expr, $($field:ident).+, $value:expr) => {

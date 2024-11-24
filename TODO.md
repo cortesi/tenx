@@ -16,6 +16,7 @@ Model response robustness:
 Bugs:
     
     - retry doesn't work with fix
+    - progress output interferes with some commands
 
 
 Features:
