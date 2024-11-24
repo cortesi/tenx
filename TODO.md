@@ -21,3 +21,4 @@ Bugs:
 Features:
 
     - custom system prompt additions
+    - git diff context

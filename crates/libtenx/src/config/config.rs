@@ -381,8 +381,25 @@ pub struct Models {
     pub default: Option<String>,
 }
 
+macro_rules! merge_atom {
+    ($a:expr, $b:expr, $field:ident) => {
+        $a.$field = match (&$a.$field, &$b.$field) {
+            (Some(_), Some(rhs)) => Some(rhs.clone()),
+            (None, Some(rhs)) => Some(rhs.clone()),
+            (Some(lhs), None) => Some(lhs.clone()),
+            (None, None) => None,
+        };
+    };
+}
+
 impl Models {
-    fn merge(&mut self, other: Option<Models>) {}
+    pub fn merge(&mut self, other: Option<Models>) {
+        if let Some(other) = other {
+            merge_atom!(self, other, custom);
+            merge_atom!(self, other, builtin);
+            merge_atom!(self, other, default);
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -462,9 +479,13 @@ impl CheckConfig {
 
 #[derive(Debug, Default, Clone, Deserialize)]
 pub struct Config {
+    /// Model configuration
+    #[serde(default)]
+    pub models: Models,
+
     /// Available model configurations
     #[serde(default)]
-    pub models: Vec<ModelConfig>,
+    pub model_confs: Vec<ModelConfig>,
 
     /// Disable streaming for all models
     #[serde(default)]
@@ -541,7 +562,7 @@ impl Serialize for Config {
         let default = Config::default();
         let mut state = serializer.serialize_struct("Config", 11)?;
         serialize_if_different!(state, self.full, self, default, include);
-        serialize_if_different!(state, self.full, self, default, models);
+        serialize_if_different!(state, self.full, self, default, model_confs);
         serialize_if_different!(state, self.full, self, default, session_store_dir);
         serialize_if_different!(state, self.full, self, default, retry_limit);
         serialize_if_different!(state, self.full, self.checks, default.checks, no_pre);
@@ -788,8 +809,8 @@ impl Config {
         if other.checks.no_pre != dflt.checks.no_pre {
             self.checks.no_pre = other.checks.no_pre;
         }
-        if !other.models.is_empty() && other.models != dflt.models {
-            self.models = other.models.clone();
+        if !other.model_confs.is_empty() && other.model_confs != dflt.model_confs {
+            self.model_confs = other.model_confs.clone();
         }
         if other.default_dialect != dflt.default_dialect {
             self.default_dialect = other.default_dialect.clone();
@@ -825,7 +846,7 @@ impl Config {
 
     /// Loads API keys from environment variables if they exist.
     pub fn load_env(mut self) -> Self {
-        self.models = self.models.into_iter().map(|m| m.load_env()).collect();
+        self.model_confs = self.model_confs.into_iter().map(|m| m.load_env()).collect();
         self
     }
 
@@ -836,12 +857,12 @@ impl Config {
         }
 
         let model_config = if let Some(name) = &self.default_model {
-            self.models
+            self.model_confs
                 .iter()
                 .find(|m| m.name() == name)
                 .ok_or_else(|| TenxError::Internal(format!("Model {} not found", name)))?
         } else {
-            self.models
+            self.model_confs
                 .first()
                 .ok_or_else(|| TenxError::Internal("No model configured".to_string()))?
         };
@@ -959,7 +980,7 @@ mod tests {
     #[test]
     fn test_ron_serialization() {
         let mut config = Config {
-            models: vec![ModelConfig::Claude {
+            model_confs: vec![ModelConfig::Claude {
                 name: "sonnet".to_string(),
                 api_model: "test".to_string(),
                 key: "".to_string(),
@@ -967,7 +988,7 @@ mod tests {
             }],
             ..Default::default()
         };
-        if let ModelConfig::Claude { ref mut key, .. } = &mut config.models[0] {
+        if let ModelConfig::Claude { ref mut key, .. } = &mut config.model_confs[0] {
             *key = "test_key".to_string();
         }
         set_config!(config, session_store_dir, PathBuf::from("/tmp/test"));
@@ -986,7 +1007,7 @@ mod tests {
             ModelConfig::Claude {
                 key: deserial_key, ..
             },
-        ) = (&config.models[0], &deserialized_config.models[0])
+        ) = (&config.model_confs[0], &deserialized_config.model_confs[0])
         {
             assert_eq!(conf_key, deserial_key);
             assert_eq!(
@@ -1046,7 +1067,7 @@ mod tests {
     #[test]
     fn test_config_merge() {
         let mut base_config = Config {
-            models: vec![ModelConfig::Claude {
+            model_confs: vec![ModelConfig::Claude {
                 name: "sonnet".to_string(),
                 api_model: "test".to_string(),
                 key: "".to_string(),
@@ -1054,13 +1075,13 @@ mod tests {
             }],
             ..Default::default()
         };
-        if let ModelConfig::Claude { ref mut key, .. } = &mut base_config.models[0] {
+        if let ModelConfig::Claude { ref mut key, .. } = &mut base_config.model_confs[0] {
             *key = "base_key".to_string();
         }
         set_config!(base_config, retry_limit, 5);
 
         let mut other_config = Config {
-            models: vec![ModelConfig::Claude {
+            model_confs: vec![ModelConfig::Claude {
                 name: "sonnet".to_string(),
                 api_model: "test".to_string(),
                 key: "".to_string(),
@@ -1068,7 +1089,7 @@ mod tests {
             }],
             ..Default::default()
         };
-        if let ModelConfig::Claude { ref mut key, .. } = &mut other_config.models[0] {
+        if let ModelConfig::Claude { ref mut key, .. } = &mut other_config.model_confs[0] {
             *key = "other_key".to_string();
         }
         set_config!(other_config, session_store_dir, PathBuf::from("/tmp/other"));
@@ -1081,7 +1102,7 @@ mod tests {
 
         base_config.merge(&other_config);
 
-        if let ModelConfig::Claude { key, .. } = &base_config.models[0] {
+        if let ModelConfig::Claude { key, .. } = &base_config.model_confs[0] {
             assert_eq!(key, "other_key");
             assert_eq!(base_config.session_store_dir, PathBuf::from("/tmp/other"));
             assert_eq!(base_config.retry_limit, 5);
@@ -1139,7 +1160,7 @@ mod tests {
     fn test_single_value_deserialization() {
         let ron_str = "(retry_limit: 42)";
         let mut config = Config::from_ron(ron_str).unwrap();
-        config.models = vec![ModelConfig::Claude {
+        config.model_confs = vec![ModelConfig::Claude {
             name: "sonnet".to_string(),
             api_model: "test".to_string(),
             key: "".to_string(),
@@ -1147,11 +1168,11 @@ mod tests {
         }];
 
         assert_eq!(config.retry_limit, 42);
-        if let ModelConfig::Claude { key, .. } = &config.models[0] {
+        if let ModelConfig::Claude { key, .. } = &config.model_confs[0] {
             assert_eq!(key, "");
             assert_eq!(config.session_store_dir, PathBuf::new());
             assert!(!config.checks.no_pre);
-            let default_model = &config.models[0];
+            let default_model = &config.model_confs[0];
             assert!(matches!(default_model, ModelConfig::Claude { .. }));
             assert_eq!(config.default_dialect, ConfigDialect::Tags);
             assert!(!config.tags.smart);
@@ -1358,5 +1379,68 @@ mod tests {
         );
 
         Ok(())
+    }
+
+    #[test]
+    fn test_models_merge() {
+        // Test case 1: Merging with None
+        let mut models = Models {
+            custom: Some(vec![ModelConfig::Claude {
+                name: "test".to_string(),
+                api_model: "model1".to_string(),
+                key: "key1".to_string(),
+                key_env: "env1".to_string(),
+            }]),
+            builtin: None,
+            default: Some("test".to_string()),
+        };
+        models.merge(None);
+        assert_eq!(models.custom.as_ref().unwrap().len(), 1);
+        assert_eq!(models.default.as_ref().unwrap(), "test");
+        assert!(models.builtin.is_none());
+
+        // Test case 2: Merging Some into None fields
+        let mut models = Models {
+            custom: None,
+            builtin: None,
+            default: None,
+        };
+        models.merge(Some(Models {
+            custom: Some(vec![ModelConfig::Claude {
+                name: "test".to_string(),
+                api_model: "model1".to_string(),
+                key: "key1".to_string(),
+                key_env: "env1".to_string(),
+            }]),
+            builtin: Some(vec![]),
+            default: Some("test".to_string()),
+        }));
+        assert!(models.custom.is_some());
+        assert!(models.builtin.is_some());
+        assert_eq!(models.default.as_ref().unwrap(), "test");
+
+        // Test case 3: Merging Some into existing Some
+        let mut models = Models {
+            custom: Some(vec![ModelConfig::Claude {
+                name: "test1".to_string(),
+                api_model: "model1".to_string(),
+                key: "key1".to_string(),
+                key_env: "env1".to_string(),
+            }]),
+            builtin: None,
+            default: Some("test1".to_string()),
+        };
+        models.merge(Some(Models {
+            custom: Some(vec![ModelConfig::Claude {
+                name: "test2".to_string(),
+                api_model: "model2".to_string(),
+                key: "key2".to_string(),
+                key_env: "env2".to_string(),
+            }]),
+            builtin: None,
+            default: Some("test2".to_string()),
+        }));
+        assert_eq!(models.custom.as_ref().unwrap()[0].name(), "test2");
+        assert_eq!(models.default.as_ref().unwrap(), "test2");
     }
 }
