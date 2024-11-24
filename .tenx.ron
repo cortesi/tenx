@@ -2,5 +2,8 @@
     retry_limit: 18,
     default_context: (
         ruskel: ["libtenx"]
+    ),
+    checks: (
+        enable: ["cargo-clippy"]
     )
 )

@@ -126,6 +126,12 @@ pub fn load_config() -> crate::Result<Config> {
     parse_config(&home_config, &project_config)
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+pub struct TextContext {
+    pub name: String,
+    pub content: String,
+}
+
 #[optional_struct]
 #[derive(Default, Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -133,6 +139,7 @@ pub struct ContextConfig {
     pub ruskel: Vec<String>,
     pub path: Vec<String>,
     pub project_map: bool,
+    pub text: Vec<TextContext>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

@@ -41,6 +41,11 @@ impl Tenx {
             session.add_context(Context::new_ruskel(ruskel));
         }
 
+        // Add text contexts
+        for text in &self.config.context.text {
+            session.add_context(Context::new_text(&text.name, &text.content));
+        }
+
         // Add project map if configured
         if self.config.context.project_map {
             session.add_context(Context::new_project_map());
