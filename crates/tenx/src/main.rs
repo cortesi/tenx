@@ -110,6 +110,25 @@ struct Cli {
 }
 
 #[derive(Subcommand)]
+enum ContextCommands {
+    /// Add ruskel documentation to context
+    Ruskel {
+        /// Items to add to context
+        items: Vec<String>,
+    },
+    /// Add files to context
+    File {
+        /// Items to add to context
+        items: Vec<String>,
+    },
+    /// Add URLs to context
+    Url {
+        /// Items to add to context
+        items: Vec<String>,
+    },
+}
+
+#[derive(Subcommand)]
 enum DialectCommands {
     /// Print the current dialect and its settings
     Info,
@@ -159,17 +178,8 @@ enum Commands {
     /// Add items to context (alias: ctx)
     #[clap(alias = "ctx")]
     Context {
-        /// Add items as ruskel documentation modules
-        #[clap(long, group = "type")]
-        ruskel: bool,
-        /// Add items as files
-        #[clap(long, group = "type")]
-        file: bool,
-        /// Add URLs as context
-        #[clap(long, group = "type")]
-        url: bool,
-        /// Items to add to context
-        items: Vec<String>,
+        #[clap(subcommand)]
+        command: ContextCommands,
     },
     /// Dialect commands (alias: dia)
     #[clap(alias = "dia")]
@@ -216,7 +226,6 @@ enum Commands {
         edit: bool,
     },
     /// List configured models (alias: ls)
-    #[clap(alias = "ls")]
     Models {
         /// Show full configuration details
         #[clap(short, long)]
@@ -550,23 +559,22 @@ async fn main() -> anyhow::Result<()> {
                 tx.save_session(&session)?;
                 Ok(())
             }
-            Commands::Context {
-                ruskel,
-                file,
-                url,
-                items,
-            } => {
+            Commands::Context { command } => {
                 let mut session = tx.load_session()?;
-                let added = tx
-                    .add_contexts(
-                        &mut session,
-                        if *file { items } else { &[] },
-                        if *ruskel { items } else { &[] },
-                        if *url { items } else { &[] },
-                        false,
-                        &Some(sender.clone()),
-                    )
-                    .await?;
+                let added = match command {
+                    ContextCommands::Ruskel { items } => {
+                        tx.add_contexts(&mut session, &[], items, &[], false, &Some(sender.clone()))
+                            .await?
+                    }
+                    ContextCommands::File { items } => {
+                        tx.add_contexts(&mut session, items, &[], &[], false, &Some(sender.clone()))
+                            .await?
+                    }
+                    ContextCommands::Url { items } => {
+                        tx.add_contexts(&mut session, &[], &[], items, false, &Some(sender.clone()))
+                            .await?
+                    }
+                };
                 println!("{} context items added", added);
                 tx.save_session(&session)?;
                 Ok(())
@@ -664,7 +672,7 @@ async fn main() -> anyhow::Result<()> {
             }
             Commands::Refresh => {
                 let mut session = tx.load_session()?;
-                tx.refresh_context(&mut session, &Some(sender.clone()))
+                tx.refresh_contexts(&mut session, &Some(sender.clone()))
                     .await?;
                 tx.save_session(&session)?;
                 Ok(())

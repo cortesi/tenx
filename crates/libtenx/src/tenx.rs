@@ -78,8 +78,8 @@ impl Tenx {
         Ok(total_added)
     }
 
-    /// Refreshes all contexts in the specified session.
-    pub async fn refresh_context(
+    /// Refreshes all contexts in the session.
+    pub async fn refresh_contexts(
         &self,
         session: &mut Session,
         sender: &Option<mpsc::Sender<Event>>,
