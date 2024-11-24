@@ -506,32 +506,25 @@ async fn main() -> anyhow::Result<()> {
             }
             Commands::Context { command } => {
                 let mut session = tx.load_session()?;
-                let mut added = 0;
-
                 match command {
                     ContextCommands::Ruskel { items } => {
                         for item in items {
                             session.add_context(Context::new_ruskel(item));
-                            added += 1;
                         }
                     }
                     ContextCommands::File { items } => {
                         for item in items {
                             session.add_context(Context::new_path(&config, item)?);
-                            added += 1;
                         }
                     }
                     ContextCommands::Url { items } => {
                         for item in items {
                             session.add_context(Context::new_url(item));
-                            added += 1;
                         }
                     }
                 };
-
-                tx.refresh_contexts(&mut session, &Some(sender.clone()))
+                tx.refresh_needed_contexts(&mut session, &Some(sender.clone()))
                     .await?;
-                println!("{} context items added", added);
                 tx.save_session(&session)?;
                 Ok(())
             }
@@ -598,7 +591,7 @@ async fn main() -> anyhow::Result<()> {
             }
             Commands::Check => {
                 let mut session = tx.load_session()?;
-                tx.run_pre_checks(&mut session, &Some(sender.clone()))?;
+                tx.check(&mut session, &Some(sender.clone()))?;
                 Ok(())
             }
             Commands::Refresh => {

@@ -56,10 +56,28 @@ impl Tenx {
         session: &mut Session,
         sender: &Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
+        let _block = EventBlock::start(&sender)?;
         let _block = EventBlock::context(sender)?;
         for context in session.contexts.iter_mut() {
             let _refresh_block = EventBlock::context_refresh(sender, &context.human())?;
             context.refresh().await?;
+        }
+        Ok(())
+    }
+
+    /// Refreshes only contexts that need refreshing according to their needs_refresh() method.
+    pub async fn refresh_needed_contexts(
+        &self,
+        session: &mut Session,
+        sender: &Option<mpsc::Sender<Event>>,
+    ) -> Result<()> {
+        let _block = EventBlock::start(&sender)?;
+        let _block = EventBlock::context(sender)?;
+        for context in session.contexts.iter_mut() {
+            if context.needs_refresh().await {
+                let _refresh_block = EventBlock::context_refresh(sender, &context.human())?;
+                context.refresh().await?;
+            }
         }
         Ok(())
     }
@@ -139,6 +157,11 @@ impl Tenx {
     pub fn reset(&self, session: &mut Session, offset: usize) -> Result<()> {
         session.reset(&self.config, offset)?;
         self.save_session(session)
+    }
+
+    pub fn check(&self, session: &mut Session, sender: &Option<mpsc::Sender<Event>>) -> Result<()> {
+        let _block = EventBlock::start(sender)?;
+        self.run_pre_checks(session, sender)
     }
 
     /// Common logic for processing a prompt and updating the state. The prompt that will be
@@ -226,7 +249,7 @@ impl Tenx {
         Ok(())
     }
 
-    pub fn run_pre_checks(
+    fn run_pre_checks(
         &self,
         session: &mut Session,
         sender: &Option<mpsc::Sender<Event>>,
