@@ -47,7 +47,7 @@ fn print_context_specs(session: &Session) -> String {
     if !session.contexts().is_empty() {
         output.push_str(&format!("{}\n", "context:".blue().bold()));
         for context in session.contexts() {
-            output.push_str(&format!("{}- {}\n", INDENT, context.human()));
+            output.push_str(&format!("{}- {}\n", INDENT, context.human().blue().bold()));
         }
     }
     output
@@ -262,49 +262,35 @@ fn wrapped_block(text: &str, width: usize, indent: usize) -> String {
 }
 
 /// Pretty prints a context item with optional full detail
-fn print_context_item(
-    config: &Config,
-    context: &libtenx::context::Context,
-    full: bool,
-) -> Result<String> {
+fn print_context_item(item: &libtenx::context::ContextItem) -> String {
     let mut output = String::new();
-    output.push_str(&format!("{}- {}\n", INDENT, context.human()));
 
-    if full {
-        let items = context.contexts(config, &Session::default())?;
-        for item in items {
-            output.push_str(&format!("{}content:\n", INDENT.repeat(2)));
-            output.push_str(&wrapped_block(
-                &item.body,
-                get_term_width(),
-                INDENT.len() * 3,
-            ));
-            output.push('\n');
+    output.push_str(&format!(
+        "{}{}: {}\n",
+        INDENT.repeat(2),
+        item.ty.blue().bold(),
+        item.source
+    ));
 
-            match item.ty.as_str() {
-                "file" => {
-                    output.push_str(&format!("{}path: {}\n", INDENT.repeat(2), item.source));
-                }
-                "url" => {
-                    output.push_str(&format!("{}url: {}\n", INDENT.repeat(2), item.source));
-                }
-                _ => {}
-            }
-        }
-    }
+    output.push_str(&wrapped_block(
+        &item.body,
+        get_term_width(),
+        INDENT.len() * 3,
+    ));
+    output.push('\n');
 
-    Ok(output)
+    output
 }
 
 /// Pretty prints all contexts in a session
-pub fn print_contexts(config: &Config, session: &Session, full: bool) -> Result<String> {
+pub fn print_contexts(config: &Config, session: &Session) -> Result<String> {
     let mut output = String::new();
-    output.push_str(&format!("{}\n", "Contexts:".blue().bold()));
-
     for context in session.contexts() {
-        output.push_str(&print_context_item(config, context, full)?);
+        let items = context.contexts(config, &Session::default())?;
+        if let Some(item) = items.into_iter().next() {
+            output.push_str(&print_context_item(&item));
+        }
     }
-
     Ok(output)
 }
 

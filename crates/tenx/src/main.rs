@@ -546,7 +546,7 @@ async fn main() -> anyhow::Result<()> {
                             println!("No contexts in session");
                             return Ok(());
                         }
-                        println!("{}", pretty::print_contexts(&config, &session, true)?);
+                        println!("{}", pretty::print_contexts(&config, &session)?);
                         return Ok(());
                     }
                 };

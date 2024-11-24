@@ -21,6 +21,7 @@ Bugs:
 
 Features:
 
+    - --no-context flag to disable default context if needed
     - command output context type
     - custom system prompt additions
     - git diff context
