@@ -218,7 +218,7 @@ impl Trial {
         if let Some(m) = model {
             conf.default_model = Some(m);
         }
-        let model_name = conf.model()?.name();
+        let model_name = conf.active_model()?.name();
         let tenx = Tenx::new(conf);
 
         let mut session = tenx.new_session_from_cwd(&sender).await?;

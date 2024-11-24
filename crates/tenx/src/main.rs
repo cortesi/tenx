@@ -537,7 +537,7 @@ async fn main() -> anyhow::Result<()> {
                 render,
                 full,
             } => {
-                let model = config.model()?;
+                let model = config.active_model()?;
                 let session = if let Some(path) = session_file {
                     libtenx::session_store::load_session(path)?
                 } else {

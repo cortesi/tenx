@@ -481,7 +481,7 @@ impl CheckConfig {
 pub struct Config {
     /// Model configuration
     #[serde(default)]
-    pub models: Models,
+    pub models: Option<Models>,
 
     /// Available model configurations
     #[serde(default)]
@@ -572,6 +572,7 @@ impl Serialize for Config {
         serialize_if_different!(state, self.full, self, default, default_context);
         serialize_if_different!(state, self.full, self, default, checks);
         serialize_if_different!(state, self.full, self, default, project_root);
+        serialize_if_different!(state, self.full, self, default, models);
         state.end()
     }
 }
@@ -847,25 +848,40 @@ impl Config {
     /// Loads API keys from environment variables if they exist.
     pub fn load_env(mut self) -> Self {
         self.model_confs = self.model_confs.into_iter().map(|m| m.load_env()).collect();
+        if let Some(models) = &mut self.models {
+            if let Some(custom) = &models.custom {
+                models.custom = Some(custom.iter().map(|m| m.clone().load_env()).collect());
+            }
+            if let Some(builtin) = &models.builtin {
+                models.builtin = Some(builtin.iter().map(|m| m.clone().load_env()).collect());
+            }
+        }
         self
     }
 
     /// Returns the configured model.
-    pub fn model(&self) -> Result<crate::model::Model> {
+    pub fn active_model(&self) -> Result<crate::model::Model> {
         if let Some(dummy_model) = &self.dummy_model {
             return Ok(model::Model::Dummy(dummy_model.clone()));
         }
 
-        let model_config = if let Some(name) = &self.default_model {
-            self.model_confs
-                .iter()
-                .find(|m| m.name() == name)
-                .ok_or_else(|| TenxError::Internal(format!("Model {} not found", name)))?
-        } else {
-            self.model_confs
-                .first()
-                .ok_or_else(|| TenxError::Internal("No model configured".to_string()))?
-        };
+        let models = self
+            .models
+            .as_ref()
+            .ok_or_else(|| TenxError::Internal("No models configured".to_string()))?;
+
+        let name = models
+            .default
+            .as_deref()
+            .ok_or_else(|| TenxError::Internal("No default model specified".to_string()))?;
+
+        let model_config = models
+            .custom
+            .iter()
+            .flatten()
+            .chain(models.builtin.iter().flatten())
+            .find(|m| m.name() == name)
+            .ok_or_else(|| TenxError::Internal(format!("Model {} not found", name)))?;
 
         match model_config {
             ModelConfig::Claude { api_model, key, .. } => Ok(model::Model::Claude(model::Claude {

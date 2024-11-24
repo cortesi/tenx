@@ -45,7 +45,7 @@ async fn run_trial(
         );
         let display_name = match &model_name {
             Some(m) => format!("{}: {}", m, trial.name),
-            None => format!("{}: {}", trial.tenx_conf.model()?.name(), trial.name),
+            None => format!("{}: {}", trial.tenx_conf.active_model()?.name(), trial.name),
         };
         pb.set_message(display_name);
         pb.enable_steady_tick(std::time::Duration::from_millis(100));

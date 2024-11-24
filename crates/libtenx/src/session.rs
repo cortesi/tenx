@@ -256,7 +256,7 @@ impl Session {
         config: &config::Config,
         sender: Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
-        let mut model = config.model()?;
+        let mut model = config.active_model()?;
         let _block = EventBlock::prompt(&sender, &model.name())?;
         let resp = model.send(config, self, sender).await?;
         if let Some(last_step) = self.last_step_mut() {
