@@ -5,6 +5,7 @@ use crate::{
     config::Config,
     context::{Context, ContextProvider},
     events::*,
+    model::ModelProvider,
     prompt::Prompt,
     session_store::path_to_filename,
     Result, Session, SessionStore, TenxError,
@@ -237,14 +238,27 @@ impl Tenx {
         session: &mut Session,
         sender: Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
-        {
-            session.prompt(&self.config, sender.clone()).await?;
-        }
+        self.prompt(session, sender.clone()).await?;
         send_event(&sender, Event::ApplyPatch)?;
         session.apply_last_step(&self.config)?;
         if !session.should_continue() {
             // We're done, now we check if checks return an error we need to process
             self.run_post_checks(session, &sender)?;
+        }
+        Ok(())
+    }
+
+    /// Prompts the current model with the session's state and sets the resulting patch and usage.
+    async fn prompt(
+        &self,
+        session: &mut Session,
+        sender: Option<mpsc::Sender<Event>>,
+    ) -> Result<()> {
+        let mut model = self.config.active_model()?;
+        let _block = EventBlock::prompt(&sender, &model.name())?;
+        let resp = model.send(&self.config, session, sender).await?;
+        if let Some(last_step) = session.last_step_mut() {
+            last_step.model_response = Some(resp);
         }
         Ok(())
     }

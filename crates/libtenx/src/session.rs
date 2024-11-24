@@ -5,12 +5,8 @@ use std::{
 
 use fs_err as fs;
 use serde::{Deserialize, Serialize};
-use tokio::sync::mpsc;
 
-use crate::{
-    config, context, events::*, model::ModelProvider, model::Usage, patch::Patch, prompt::Prompt,
-    Result, TenxError,
-};
+use crate::{config, context, model::Usage, patch::Patch, prompt::Prompt, Result, TenxError};
 
 /// A parsed model response
 #[derive(Debug, Deserialize, Serialize, Clone, Default, PartialEq, Eq)]
@@ -247,21 +243,6 @@ impl Session {
         }
 
         self.steps.truncate(offset + 1);
-        Ok(())
-    }
-
-    /// Prompts the current model with the session's state and sets the resulting patch and usage.
-    pub async fn prompt(
-        &mut self,
-        config: &config::Config,
-        sender: Option<mpsc::Sender<Event>>,
-    ) -> Result<()> {
-        let mut model = config.active_model()?;
-        let _block = EventBlock::prompt(&sender, &model.name())?;
-        let resp = model.send(config, self, sender).await?;
-        if let Some(last_step) = self.last_step_mut() {
-            last_step.model_response = Some(resp);
-        }
         Ok(())
     }
 
