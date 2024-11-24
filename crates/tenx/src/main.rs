@@ -6,6 +6,7 @@ use colored::*;
 use libtenx::{
     self,
     config::{self},
+    context::Context,
     dialect::DialectProvider,
     event_consumers,
     model::ModelProvider,
@@ -505,20 +506,31 @@ async fn main() -> anyhow::Result<()> {
             }
             Commands::Context { command } => {
                 let mut session = tx.load_session()?;
-                let added = match command {
+                let mut added = 0;
+
+                match command {
                     ContextCommands::Ruskel { items } => {
-                        tx.add_contexts(&mut session, &[], items, &[], false, &Some(sender.clone()))
-                            .await?
+                        for item in items {
+                            session.add_context(Context::new_ruskel(item));
+                            added += 1;
+                        }
                     }
                     ContextCommands::File { items } => {
-                        tx.add_contexts(&mut session, items, &[], &[], false, &Some(sender.clone()))
-                            .await?
+                        for item in items {
+                            session.add_context(Context::new_path(&config, item)?);
+                            added += 1;
+                        }
                     }
                     ContextCommands::Url { items } => {
-                        tx.add_contexts(&mut session, &[], &[], items, false, &Some(sender.clone()))
-                            .await?
+                        for item in items {
+                            session.add_context(Context::new_url(item));
+                            added += 1;
+                        }
                     }
                 };
+
+                tx.refresh_contexts(&mut session, &Some(sender.clone()))
+                    .await?;
                 println!("{} context items added", added);
                 tx.save_session(&session)?;
                 Ok(())
@@ -550,7 +562,7 @@ async fn main() -> anyhow::Result<()> {
                 Ok(())
             }
             Commands::New => {
-                let mut session = tx.new_session_from_cwd(&Some(sender.clone())).await?;
+                let session = tx.new_session_from_cwd(&Some(sender.clone())).await?;
                 tx.save_session(&session)?;
                 println!("new session: {}", config.project_root().display());
                 Ok(())

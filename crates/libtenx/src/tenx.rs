@@ -29,53 +29,25 @@ impl Tenx {
     ) -> Result<Session> {
         let _block = EventBlock::start(sender)?;
         let mut session = Session::default();
-        self.add_contexts(
-            &mut session,
-            &self.config.default_context.path,
-            &self.config.default_context.ruskel,
-            &[],
-            self.config.default_context.project_map,
-            sender,
-        )
-        .await?;
+
+        // Add path contexts
+        for path in &self.config.default_context.path {
+            session.add_context(Context::new_path(&self.config, path)?);
+        }
+
+        // Add ruskel contexts
+        for ruskel in &self.config.default_context.ruskel {
+            session.add_context(Context::new_ruskel(ruskel));
+        }
+
+        // Add project map if configured
+        if self.config.default_context.project_map {
+            session.add_context(Context::new_project_map());
+        }
+
+        // Refresh all contexts
+        self.refresh_contexts(&mut session, sender).await?;
         Ok(session)
-    }
-
-    /// Adds contexts to a session in a batch. Returns the total count of items added.
-    pub async fn add_contexts(
-        &self,
-        session: &mut Session,
-        glob: &[String],
-        ruskel: &[String],
-        url: &[String],
-        project_map: bool,
-        sender: &Option<mpsc::Sender<Event>>,
-    ) -> Result<usize> {
-        let mut contexts = Vec::new();
-        for file in glob {
-            contexts.push(Context::new_path(&self.config, file)?);
-        }
-        for ruskel_doc in ruskel {
-            contexts.push(Context::new_ruskel(ruskel_doc));
-        }
-        for url_str in url {
-            contexts.push(Context::new_url(url_str));
-        }
-        if project_map {
-            contexts.push(Context::new_project_map());
-        }
-        let mut total_added = 0;
-        if !contexts.is_empty() {
-            let _block = EventBlock::context(sender)?;
-            for mut context in contexts {
-                let _refresh_block = EventBlock::context_refresh(sender, &context.human())?;
-                context.refresh().await?;
-                total_added += context.count(&self.config, session)?;
-                session.add_context(context);
-            }
-        }
-
-        Ok(total_added)
     }
 
     /// Refreshes all contexts in the session.
