@@ -331,7 +331,7 @@ fn load_config(cli: &Cli) -> Result<config::Config> {
     set_config!(config, tags.replace, cli.tags_replace);
     set_config!(config, tags.udiff, cli.tags_udiff);
     if let Some(model) = &cli.model {
-        config.default_model = Some(model.clone());
+        config.set_default_model(model.clone());
     }
     config.checks.no_pre = cli.no_pre_check;
     config.checks.only = cli.only_check.clone();

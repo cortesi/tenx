@@ -215,9 +215,11 @@ impl Trial {
         let mut conf = self.tenx_conf.clone();
         conf.session_store_dir = PathBuf::from("");
         conf.project_root = ProjectRoot::Path(temp_dir.path().join("project"));
+
         if let Some(m) = model {
-            conf.default_model = Some(m);
+            conf.set_default_model(m);
         }
+
         let model_name = conf.active_model()?.name();
         let tenx = Tenx::new(conf);
 

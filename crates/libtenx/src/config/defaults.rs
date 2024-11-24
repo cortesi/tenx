@@ -191,7 +191,6 @@ pub fn default_config() -> Config {
             ..Default::default()
         }),
         include: Include::Git,
-        model_confs: default_models(),
         session_store_dir: home_config_dir().join("state"),
         retry_limit: DEFAULT_RETRY_LIMIT,
         checks: default_checks(),

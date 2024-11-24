@@ -483,10 +483,6 @@ pub struct Config {
     #[serde(default)]
     pub models: Option<Models>,
 
-    /// Available model configurations
-    #[serde(default)]
-    pub model_confs: Vec<ModelConfig>,
-
     /// Disable streaming for all models
     #[serde(default)]
     pub no_stream: bool,
@@ -524,10 +520,6 @@ pub struct Config {
     #[serde(default)]
     pub default_context: DefaultContext,
 
-    /// The name of the default model to use
-    #[serde(default)]
-    pub default_model: Option<String>,
-
     /// Check configuration.
     #[serde(default)]
     pub checks: Checks,
@@ -562,7 +554,6 @@ impl Serialize for Config {
         let default = Config::default();
         let mut state = serializer.serialize_struct("Config", 11)?;
         serialize_if_different!(state, self.full, self, default, include);
-        serialize_if_different!(state, self.full, self, default, model_confs);
         serialize_if_different!(state, self.full, self, default, session_store_dir);
         serialize_if_different!(state, self.full, self, default, retry_limit);
         serialize_if_different!(state, self.full, self.checks, default.checks, no_pre);
@@ -578,6 +569,16 @@ impl Serialize for Config {
 }
 
 impl Config {
+    /// Sets the default model name in the configuration.
+    pub fn set_default_model(&mut self, name: String) {
+        if self.models.is_none() {
+            self.models = Some(Models::default());
+        }
+        if let Some(models) = &mut self.models {
+            models.default = Some(name);
+        }
+    }
+
     /// Returns all model configurations, with custom models overriding built-in models with the same name.
     pub fn model_confs(&self) -> Vec<ModelConfig> {
         if let Some(models) = &self.models {
@@ -833,9 +834,6 @@ impl Config {
         if other.checks.no_pre != dflt.checks.no_pre {
             self.checks.no_pre = other.checks.no_pre;
         }
-        if !other.model_confs.is_empty() && other.model_confs != dflt.model_confs {
-            self.model_confs = other.model_confs.clone();
-        }
         if other.default_dialect != dflt.default_dialect {
             self.default_dialect = other.default_dialect.clone();
         }
@@ -847,9 +845,6 @@ impl Config {
         }
         if other.default_context != dflt.default_context {
             self.default_context = other.default_context.clone();
-        }
-        if other.default_model != dflt.default_model {
-            self.default_model = other.default_model.clone();
         }
     }
 
@@ -870,7 +865,6 @@ impl Config {
 
     /// Loads API keys from environment variables if they exist.
     pub fn load_env(mut self) -> Self {
-        self.model_confs = self.model_confs.into_iter().map(|m| m.load_env()).collect();
         if let Some(models) = &mut self.models {
             if let Some(custom) = &models.custom {
                 models.custom = Some(custom.iter().map(|m| m.clone().load_env()).collect());
@@ -1014,67 +1008,6 @@ mod tests {
     }
 
     #[test]
-    fn test_ron_serialization() {
-        let mut config = Config {
-            model_confs: vec![ModelConfig::Claude {
-                name: "sonnet".to_string(),
-                api_model: "test".to_string(),
-                key: "".to_string(),
-                key_env: "key_env".to_string(),
-            }],
-            ..Default::default()
-        };
-        if let ModelConfig::Claude { ref mut key, .. } = &mut config.model_confs[0] {
-            *key = "test_key".to_string();
-        }
-        set_config!(config, session_store_dir, PathBuf::from("/tmp/test"));
-        set_config!(config, retry_limit, 5);
-        set_config!(config.checks, no_pre, true);
-        set_config!(config, tags.smart, false);
-        set_config!(config, ops.edit, false);
-        set_config!(config, default_dialect, ConfigDialect::Tags);
-
-        let ron_str = config.to_ron().unwrap();
-
-        let deserialized_config = Config::from_ron(&ron_str).unwrap();
-
-        if let (
-            ModelConfig::Claude { key: conf_key, .. },
-            ModelConfig::Claude {
-                key: deserial_key, ..
-            },
-        ) = (&config.model_confs[0], &deserialized_config.model_confs[0])
-        {
-            assert_eq!(conf_key, deserial_key);
-            assert_eq!(
-                config.session_store_dir,
-                deserialized_config.session_store_dir
-            );
-            assert_eq!(config.retry_limit, deserialized_config.retry_limit);
-            assert_eq!(config.checks.no_pre, deserialized_config.checks.no_pre);
-            assert_eq!(config.default_dialect, deserialized_config.default_dialect);
-            assert_eq!(config.tags.smart, deserialized_config.tags.smart);
-            assert_eq!(config.ops.edit, deserialized_config.ops.edit);
-        }
-
-        // Test default value serialization
-        let default_config = Config::default();
-        let default_ron_str = default_config.to_ron().unwrap();
-
-        let parsed_ron: ron::Value = ron::from_str(&default_ron_str).unwrap();
-        let struct_fields_str = format!("{:?}", parsed_ron);
-
-        assert!(!struct_fields_str.contains("anthropic_key"));
-        assert!(!struct_fields_str.contains("session_store_dir"));
-        assert!(!struct_fields_str.contains("retry_limit"));
-        assert!(!struct_fields_str.contains("no_pre_check"));
-        assert!(!struct_fields_str.contains("default_model"));
-        assert!(!struct_fields_str.contains("default_dialect"));
-        assert!(!struct_fields_str.contains("tags"));
-        assert!(!struct_fields_str.contains("ops"));
-    }
-
-    #[test]
     fn test_include_serialization() {
         let mut config = Config::default();
         set_config!(
@@ -1098,58 +1031,6 @@ mod tests {
         let parsed_ron: ron::Value = ron::from_str(&default_ron_str).unwrap();
         let struct_fields_str = format!("{:?}", parsed_ron);
         assert!(!struct_fields_str.contains("include"));
-    }
-
-    #[test]
-    fn test_config_merge() {
-        let mut base_config = Config {
-            model_confs: vec![ModelConfig::Claude {
-                name: "sonnet".to_string(),
-                api_model: "test".to_string(),
-                key: "".to_string(),
-                key_env: "key_env".to_string(),
-            }],
-            ..Default::default()
-        };
-        if let ModelConfig::Claude { ref mut key, .. } = &mut base_config.model_confs[0] {
-            *key = "base_key".to_string();
-        }
-        set_config!(base_config, retry_limit, 5);
-
-        let mut other_config = Config {
-            model_confs: vec![ModelConfig::Claude {
-                name: "sonnet".to_string(),
-                api_model: "test".to_string(),
-                key: "".to_string(),
-                key_env: "key_env".to_string(),
-            }],
-            ..Default::default()
-        };
-        if let ModelConfig::Claude { ref mut key, .. } = &mut other_config.model_confs[0] {
-            *key = "other_key".to_string();
-        }
-        set_config!(other_config, session_store_dir, PathBuf::from("/tmp/other"));
-        set_config!(other_config.checks, no_pre, true);
-        set_config!(
-            other_config,
-            include,
-            Include::Glob(vec!["*.rs".to_string()])
-        );
-
-        base_config.merge(&other_config);
-
-        if let ModelConfig::Claude { key, .. } = &base_config.model_confs[0] {
-            assert_eq!(key, "other_key");
-            assert_eq!(base_config.session_store_dir, PathBuf::from("/tmp/other"));
-            assert_eq!(base_config.retry_limit, 5);
-            assert!(base_config.checks.no_pre);
-            assert_eq!(base_config.default_dialect, ConfigDialect::Tags);
-            assert!(!base_config.tags.smart);
-            assert!(matches!(base_config.include, Include::Glob(_)));
-            if let Include::Glob(patterns) = &base_config.include {
-                assert_eq!(patterns, &vec!["*.rs".to_string()]);
-            }
-        }
     }
 
     #[test]
@@ -1190,29 +1071,6 @@ mod tests {
             config_keep_existing.session_store_dir,
             PathBuf::from("/tmp/existing")
         );
-    }
-
-    #[test]
-    fn test_single_value_deserialization() {
-        let ron_str = "(retry_limit: 42)";
-        let mut config = Config::from_ron(ron_str).unwrap();
-        config.model_confs = vec![ModelConfig::Claude {
-            name: "sonnet".to_string(),
-            api_model: "test".to_string(),
-            key: "".to_string(),
-            key_env: "key_env".to_string(),
-        }];
-
-        assert_eq!(config.retry_limit, 42);
-        if let ModelConfig::Claude { key, .. } = &config.model_confs[0] {
-            assert_eq!(key, "");
-            assert_eq!(config.session_store_dir, PathBuf::new());
-            assert!(!config.checks.no_pre);
-            let default_model = &config.model_confs[0];
-            assert!(matches!(default_model, ModelConfig::Claude { .. }));
-            assert_eq!(config.default_dialect, ConfigDialect::Tags);
-            assert!(!config.tags.smart);
-        }
     }
 
     #[test]
