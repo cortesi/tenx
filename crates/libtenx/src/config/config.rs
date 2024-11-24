@@ -9,14 +9,14 @@ use globset::{Glob, GlobSetBuilder};
 use normalize_path::NormalizePath;
 use optional_struct::*;
 use pathdiff::diff_paths;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 
 use ron;
 
 use crate::{checks::Check, config::default_config, dialect, model, TenxError};
 
 pub const HOME_CONFIG_FILE: &str = "tenx.ron";
-pub const LOCAL_CONFIG_FILE: &str = ".tenx.ron";
+pub const PROJECT_CONFIG_FILE: &str = ".tenx.ron";
 
 fn is_relative<P: AsRef<Path>>(path: P) -> bool {
     let path_str = path.as_ref().to_str().unwrap_or("");
@@ -61,7 +61,7 @@ fn walk_directory(
 fn find_project_root(current_dir: &Path) -> PathBuf {
     let mut dir = current_dir.to_path_buf();
     loop {
-        if dir.join(".git").is_dir() || dir.join(LOCAL_CONFIG_FILE).is_file() {
+        if dir.join(".git").is_dir() || dir.join(PROJECT_CONFIG_FILE).is_file() {
             return dir;
         }
         if !dir.pop() {
@@ -71,7 +71,7 @@ fn find_project_root(current_dir: &Path) -> PathBuf {
     current_dir.to_path_buf()
 }
 
-/// Deserialize a RON string into a Config.
+/// Deserialize a RON string into a ConfigFile.
 pub fn parse_config_file(ron_str: &str) -> crate::Result<ConfigFile> {
     let options =
         ron::Options::default().with_default_extension(ron::extensions::Extensions::IMPLICIT_SOME);
@@ -82,24 +82,22 @@ pub fn parse_config_file(ron_str: &str) -> crate::Result<ConfigFile> {
 
 /// Loads the configuration by merging defaults, home, and local configuration files.
 /// Returns the complete Config object.
-pub fn parse_config(
-    home_config: Option<String>,
-    local_config: Option<String>,
-) -> crate::Result<Config> {
+pub fn parse_config(home_config: &str, project_config: &str) -> crate::Result<Config> {
     let default_conf = default_config();
     let mut cnf = ConfigFile::default();
+
     // Load from home config file
-    if let Some(home_config_str) = home_config {
-        let home_config = parse_config_file(&home_config_str)
+    if !home_config.is_empty() {
+        let home_config = parse_config_file(home_config)
             .map_err(|e| TenxError::Config(format!("Failed to parse home config file: {}", e)))?;
         cnf = cnf.apply(home_config);
     }
 
     // Load from local config file
-    if let Some(local_config_str) = local_config {
-        let local_config = parse_config_file(&local_config_str)
+    if !project_config.is_empty() {
+        let project_config = parse_config_file(project_config)
             .map_err(|e| TenxError::Config(format!("Failed to parse local config file: {}", e)))?;
-        cnf = cnf.apply(local_config);
+        cnf = cnf.apply(project_config);
     }
     Ok(cnf.build(default_conf))
 }
@@ -108,53 +106,33 @@ pub fn parse_config(
 /// Returns the complete Config object.
 pub fn load_config() -> crate::Result<Config> {
     let home_config_path = home_config_dir().join(HOME_CONFIG_FILE);
-    let home_config =
-        if home_config_path.exists() {
-            Some(fs::read_to_string(&home_config_path).map_err(|e| {
-                TenxError::Config(format!("Failed to read home config file: {}", e))
-            })?)
-        } else {
-            None
-        };
+    let home_config = if home_config_path.exists() {
+        fs::read_to_string(&home_config_path)
+            .map_err(|e| TenxError::Config(format!("Failed to read home config file: {}", e)))?
+    } else {
+        String::new()
+    };
 
     let default_conf = default_config();
     let project_root = default_conf.project_root();
-    let local_config_path = project_root.join(LOCAL_CONFIG_FILE);
-    let local_config =
-        if local_config_path.exists() {
-            Some(fs::read_to_string(&local_config_path).map_err(|e| {
-                TenxError::Config(format!("Failed to read local config file: {}", e))
-            })?)
-        } else {
-            None
-        };
+    let project_config_path = project_root.join(PROJECT_CONFIG_FILE);
+    let project_config = if project_config_path.exists() {
+        fs::read_to_string(&project_config_path)
+            .map_err(|e| TenxError::Config(format!("Failed to read local config file: {}", e)))?
+    } else {
+        String::new()
+    };
 
-    parse_config(home_config, local_config)
+    parse_config(&home_config, &project_config)
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[optional_struct]
+#[derive(Default, Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub struct DefaultContext {
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub ruskel: Vec<String>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub path: Vec<String>,
-    #[serde(default = "default_project_map")]
     pub project_map: bool,
-}
-
-impl Default for DefaultContext {
-    fn default() -> Self {
-        Self {
-            ruskel: Vec::new(),
-            path: Vec::new(),
-            project_map: true,
-        }
-    }
-}
-
-fn default_project_map() -> bool {
-    true
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -325,18 +303,14 @@ pub enum ConfigDialect {
     Tags,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[optional_struct]
+#[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Ops {
     /// Allow the model to request to edit files in the project map
     pub edit: bool,
 }
 
-impl Default for Ops {
-    fn default() -> Self {
-        Self { edit: true }
-    }
-}
-
+#[optional_struct]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Tags {
     /// EXPERIMENTAL: enable smart change type
@@ -380,6 +354,7 @@ impl std::fmt::Display for Include {
     }
 }
 
+#[optional_struct]
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Checks {
     #[serde(default)]
@@ -417,40 +392,16 @@ pub struct Models {
     pub no_stream: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ProjectRoot {
     #[default]
     Discover,
     Path(PathBuf),
 }
 
-impl Serialize for ProjectRoot {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        match self {
-            ProjectRoot::Discover => serializer.serialize_str(""),
-            ProjectRoot::Path(path) => path.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> Deserialize<'de> for ProjectRoot {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s = String::deserialize(deserializer)?;
-        if s.is_empty() {
-            Ok(ProjectRoot::Discover)
-        } else {
-            Ok(ProjectRoot::Path(PathBuf::from(s)))
-        }
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
 pub enum ModeConfig {
     Pre,
     Post,
@@ -514,20 +465,31 @@ pub struct Config {
     pub retry_limit: usize,
 
     /// The tags dialect configuration.
+    #[optional_rename(OptionalTags)]
+    #[optional_wrap]
     pub tags: Tags,
 
     /// Operations that can be executed by the model.
+    #[optional_rename(OptionalOps)]
+    #[optional_wrap]
     pub ops: Ops,
 
     /// The default context configuration.
+    #[optional_rename(OptionalDefaultContext)]
+    #[optional_wrap]
     pub default_context: DefaultContext,
 
     /// Check configuration.
+    #[optional_rename(OptionalChecks)]
+    #[optional_wrap]
     pub checks: Checks,
 
     /// Project root configuration.
     pub project_root: ProjectRoot,
 
+    //
+    // Internal fields, not to be set in config
+    //
     /// Set a dummy model for end-to-end testing. Over-rides the configured model.
     #[serde(skip)]
     pub(crate) dummy_model: Option<model::DummyModel>,
@@ -768,8 +730,7 @@ impl Config {
 
     /// Serialize the Config into a RON string.
     pub fn to_ron(&self) -> crate::Result<String> {
-        let pretty_config = ron::ser::PrettyConfig::default()
-            .extensions(ron::extensions::Extensions::IMPLICIT_SOME);
+        let pretty_config = ron::ser::PrettyConfig::default();
         ron::ser::to_string_pretty(self, pretty_config)
             .map_err(|e| TenxError::Internal(format!("Failed to serialize to RON: {}", e)))
     }
@@ -923,13 +884,28 @@ mod tests {
     use tempfile::TempDir;
 
     #[test]
+    fn test_config_merge() -> crate::Result<()> {
+        let parsed = parse_config(
+            r#"(models: (default: "foo", no_stream: true))"#,
+            r#"(models: (default: "bar"), project_root: path("/foo"))"#,
+        )?;
+        assert_eq!(parsed.models.default, "bar");
+        assert!(parsed.models.no_stream);
+        assert_eq!(
+            parsed.project_root,
+            ProjectRoot::Path(PathBuf::from("/foo"))
+        );
+        Ok(())
+    }
+
+    #[test]
     fn test_config_roundtrip() -> crate::Result<()> {
         let mut config = default_config();
         config.retry_limit = 42;
         config.exclude.push("*.test".to_string());
 
         let ron = config.to_ron()?;
-        let parsed = parse_config(None, Some(ron))?;
+        let parsed = parse_config("", &ron)?;
 
         assert_eq!(parsed, config);
         Ok(())
@@ -939,7 +915,7 @@ mod tests {
     fn test_parse_config_value() -> crate::Result<()> {
         // Test loading a config with a custom retry_limit
         let test_config = r#"(retry_limit: 10)"#;
-        let config = parse_config(None, Some(test_config.to_string()))?;
+        let config = parse_config("", test_config)?;
         assert_eq!(config.retry_limit, 10);
 
         // Test that other values remain at default

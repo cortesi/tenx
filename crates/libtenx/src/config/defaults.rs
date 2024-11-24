@@ -190,6 +190,11 @@ pub fn default_config() -> Config {
             builtin: default_models(),
             ..Default::default()
         },
+        default_context: DefaultContext {
+            project_map: true,
+            ..Default::default()
+        },
+        ops: Ops { edit: true },
         include: Include::Git,
         session_store_dir: home_config_dir().join("state"),
         retry_limit: DEFAULT_RETRY_LIMIT,
