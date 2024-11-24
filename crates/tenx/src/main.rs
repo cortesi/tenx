@@ -135,6 +135,8 @@ enum ContextCommands {
         /// File to read text from (reads from stdin if not specified)
         file: Option<String>,
     },
+    /// Show the current session's contexts
+    Show,
 }
 
 #[derive(Subcommand)]
@@ -538,6 +540,14 @@ async fn main() -> anyhow::Result<()> {
                         };
                         let name = name.as_deref().unwrap_or("<anonymous>");
                         session.add_context(Context::new_text(name, &text));
+                    }
+                    ContextCommands::Show => {
+                        if session.contexts().is_empty() {
+                            println!("No contexts in session");
+                            return Ok(());
+                        }
+                        println!("{}", pretty::print_contexts(&config, &session, true)?);
+                        return Ok(());
                     }
                 };
                 tx.refresh_needed_contexts(&mut session, &Some(sender.clone()))

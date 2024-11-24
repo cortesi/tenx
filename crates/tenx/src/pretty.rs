@@ -2,10 +2,13 @@ use colored::*;
 use libtenx::{
     config::Config, context::ContextProvider, prompt::Prompt, Result, Session, TenxError,
 };
-use terminal_size::{terminal_size, Width};
 use textwrap::{wrap, Options};
 
-const DEFAULT_WIDTH: usize = 80;
+fn get_term_width() -> usize {
+    termsize::get()
+        .map(|size| size.cols as usize)
+        .unwrap_or(120)
+}
 const INDENT: &str = "  ";
 
 fn format_usage(usage: &libtenx::model::Usage) -> String {
@@ -20,9 +23,7 @@ fn format_usage(usage: &libtenx::model::Usage) -> String {
 
 /// Pretty prints the Session information.
 pub fn session(config: &Config, session: &Session, full: bool) -> Result<String> {
-    let width = terminal_size()
-        .map(|(Width(w), _)| w as usize)
-        .unwrap_or(DEFAULT_WIDTH);
+    let width = get_term_width();
     let mut output = String::new();
     output.push_str(&print_session_info(config, session));
     output.push_str(&print_context_specs(session));
@@ -258,6 +259,53 @@ fn wrapped_block(text: &str, width: usize, indent: usize) -> String {
         .initial_indent(&ident)
         .subsequent_indent(&ident);
     wrap(text, &options).join("\n")
+}
+
+/// Pretty prints a context item with optional full detail
+fn print_context_item(
+    config: &Config,
+    context: &libtenx::context::Context,
+    full: bool,
+) -> Result<String> {
+    let mut output = String::new();
+    output.push_str(&format!("{}- {}\n", INDENT, context.human()));
+
+    if full {
+        let items = context.contexts(config, &Session::default())?;
+        for item in items {
+            output.push_str(&format!("{}content:\n", INDENT.repeat(2)));
+            output.push_str(&wrapped_block(
+                &item.body,
+                get_term_width(),
+                INDENT.len() * 3,
+            ));
+            output.push('\n');
+
+            match item.ty.as_str() {
+                "file" => {
+                    output.push_str(&format!("{}path: {}\n", INDENT.repeat(2), item.source));
+                }
+                "url" => {
+                    output.push_str(&format!("{}url: {}\n", INDENT.repeat(2), item.source));
+                }
+                _ => {}
+            }
+        }
+    }
+
+    Ok(output)
+}
+
+/// Pretty prints all contexts in a session
+pub fn print_contexts(config: &Config, session: &Session, full: bool) -> Result<String> {
+    let mut output = String::new();
+    output.push_str(&format!("{}\n", "Contexts:".blue().bold()));
+
+    for context in session.contexts() {
+        output.push_str(&print_context_item(config, context, full)?);
+    }
+
+    Ok(output)
 }
 
 #[cfg(test)]

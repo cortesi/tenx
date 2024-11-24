@@ -4302,6 +4302,7 @@ dependencies = [
  "pretty_assertions",
  "tempfile",
  "terminal_size",
+ "termsize",
  "textwrap",
  "tokio",
  "tracing-subscriber",
@@ -4315,6 +4316,16 @@ checksum = "4f599bd7ca042cfdf8f4512b277c02ba102247820f9d9d4a9f521f496751a6ef"
 dependencies = [
  "rustix",
  "windows-sys 0.59.0",
+]
+
+[[package]]
+name = "termsize"
+version = "0.1.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6f11ff5c25c172608d5b85e2fb43ee9a6d683a7f4ab7f96ae07b3d8b590368fd"
+dependencies = [
+ "libc",
+ "winapi",
 ]
 
 [[package]]
