@@ -391,7 +391,7 @@ async fn main() -> anyhow::Result<()> {
     let result = match &cli.command {
         Some(cmd) => match cmd {
             Commands::Models { full } => {
-                for model in &config.model_confs {
+                for model in &config.model_confs() {
                     match model {
                         libtenx::config::ModelConfig::Claude { .. }
                         | libtenx::config::ModelConfig::OpenAi { .. } => {

@@ -578,6 +578,29 @@ impl Serialize for Config {
 }
 
 impl Config {
+    /// Returns all model configurations, with custom models overriding built-in models with the same name.
+    pub fn model_confs(&self) -> Vec<ModelConfig> {
+        if let Some(models) = &self.models {
+            let builtin = models
+                .builtin
+                .iter()
+                .flatten()
+                .map(|m| (m.name().to_string(), m.clone()));
+            let custom = models
+                .custom
+                .iter()
+                .flatten()
+                .map(|m| (m.name().to_string(), m.clone()));
+
+            let mut model_map: HashMap<String, ModelConfig> = builtin.collect();
+            model_map.extend(custom);
+
+            model_map.into_values().collect()
+        } else {
+            Vec::new()
+        }
+    }
+
     pub fn cwd(&self) -> Result<PathBuf> {
         if let Some(test_cwd) = &self.test_cwd {
             Ok(PathBuf::from(test_cwd))
@@ -869,17 +892,14 @@ impl Config {
             .models
             .as_ref()
             .ok_or_else(|| TenxError::Internal("No models configured".to_string()))?;
-
         let name = models
             .default
             .as_deref()
             .ok_or_else(|| TenxError::Internal("No default model specified".to_string()))?;
 
-        let model_config = models
-            .custom
-            .iter()
-            .flatten()
-            .chain(models.builtin.iter().flatten())
+        let model_config = self
+            .model_confs()
+            .into_iter()
             .find(|m| m.name() == name)
             .ok_or_else(|| TenxError::Internal(format!("Model {} not found", name)))?;
 
@@ -900,8 +920,8 @@ impl Config {
                 api_model: api_model.clone(),
                 openai_key: key.clone(),
                 api_base: api_base.clone(),
-                streaming: *can_stream && !self.no_stream,
-                no_system_prompt: *no_system_prompt,
+                streaming: can_stream && !self.no_stream,
+                no_system_prompt,
             })),
         }
     }
