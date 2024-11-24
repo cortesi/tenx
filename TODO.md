@@ -21,6 +21,6 @@ Bugs:
 
 Features:
 
-    - Plain-text context
     - custom system prompt additions
     - git diff context
+    - graceful error handling for contexts, e.g. unfetchable urls

@@ -45,6 +45,10 @@ pub trait ContextProvider {
 
     /// Refreshes the content of the context provider.
     async fn refresh(&mut self) -> Result<()>;
+
+    async fn needs_refresh(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
@@ -95,6 +99,10 @@ impl ContextProvider for Ruskel {
             .map_err(|e| TenxError::Resolve(e.to_string()))?;
         Ok(())
     }
+
+    async fn needs_refresh(&self) -> bool {
+        self.content.is_empty()
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
@@ -137,6 +145,10 @@ impl ContextProvider for ProjectMap {
 
     async fn refresh(&mut self) -> Result<()> {
         Ok(())
+    }
+
+    async fn needs_refresh(&self) -> bool {
+        true
     }
 }
 
@@ -276,6 +288,10 @@ impl ContextProvider for Url {
             .map_err(|e| TenxError::Resolve(e.to_string()))?;
         Ok(())
     }
+
+    async fn needs_refresh(&self) -> bool {
+        self.content.is_empty()
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
@@ -412,6 +428,16 @@ impl ContextProvider for Context {
             Context::ProjectMap(p) => p.refresh().await,
             Context::Url(u) => u.refresh().await,
             Context::Text(t) => t.refresh().await,
+        }
+    }
+
+    async fn needs_refresh(&self) -> bool {
+        match self {
+            Context::Ruskel(r) => r.needs_refresh().await,
+            Context::Path(g) => g.needs_refresh().await,
+            Context::ProjectMap(p) => p.needs_refresh().await,
+            Context::Url(u) => u.needs_refresh().await,
+            Context::Text(t) => t.needs_refresh().await,
         }
     }
 }
