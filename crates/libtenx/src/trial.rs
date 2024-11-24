@@ -9,13 +9,14 @@ use std::{
 
 use fs_extra;
 use glob::glob;
+use optional_struct::*;
 use serde::Deserialize;
 use tempfile::TempDir;
 use tokio::sync::mpsc;
 use tracing::info;
 
 use crate::{
-    config::{Config, Include, Models, ProjectRoot},
+    config::{Config, ConfigFile, Include, Models, ProjectRoot},
     model::ModelProvider,
     Event, Result, Tenx, TenxError,
 };
@@ -40,9 +41,12 @@ pub enum TrialOp {
 #[derive(Debug, Clone, Deserialize)]
 pub struct TrialConf {
     pub project: String,
-    pub op: TrialOp,
-    pub config: Option<Config>,
     pub desc: String,
+
+    pub op: TrialOp,
+
+    #[serde(default)]
+    pub config: ConfigFile,
 }
 
 impl TrialConf {
@@ -217,7 +221,7 @@ impl Trial {
         conf.project_root = ProjectRoot::Path(temp_dir.path().join("project"));
 
         if let Some(m) = model {
-            conf.models.default = Some(m);
+            conf.models.default = m;
         }
 
         let model_name = conf.active_model()?.name();
@@ -261,7 +265,7 @@ impl Trial {
             exclude: vec!["target/**".to_string()],
             retry_limit: 1,
             models: Models {
-                no_stream: Some(true), // We disable streaming for trials by default, because streaming messes up token counts
+                no_stream: true, // We disable streaming for trials by default, because streaming messes up token counts
                 ..Default::default()
             },
             ..Default::default()
@@ -276,12 +280,7 @@ impl Trial {
         path.push(format!("{}.ron", name));
         let trial_conf = TrialConf::read(&path)?;
         trial_conf.validate(&base_dir)?;
-
-        let mut tenx_conf = Self::default_config()?;
-        if let Some(config) = &trial_conf.config {
-            tenx_conf.merge(config);
-        }
-
+        let tenx_conf = trial_conf.config.clone().build(Self::default_config()?);
         Ok(Trial {
             name: name.to_string(),
             desc: trial_conf.desc.clone(),
@@ -415,7 +414,7 @@ mod tests {
                     prompt: "test".to_string(),
                     editable: vec![],
                 },
-                config: None,
+                config: ConfigFile::default(),
                 desc: "Test trial".to_string(),
             },
             tenx_conf: Config::default(),
@@ -461,7 +460,7 @@ mod tests {
                     prompt: "test".to_string(),
                     editable: vec![],
                 },
-                config: None,
+                config: ConfigFile::default(),
                 desc: "Test trial".to_string(),
             },
             tenx_conf: Config::default(),

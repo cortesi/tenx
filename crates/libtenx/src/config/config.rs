@@ -7,49 +7,16 @@ use std::{
 
 use globset::{Glob, GlobSetBuilder};
 use normalize_path::NormalizePath;
+use optional_struct::*;
 use pathdiff::diff_paths;
-use serde::ser::SerializeStruct;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use ron;
 
-use crate::{checks::Check, dialect, model, Result, TenxError};
+use crate::{checks::Check, dialect, model, TenxError};
 
 pub const HOME_CONFIG_FILE: &str = "tenx.ron";
 pub const LOCAL_CONFIG_FILE: &str = ".tenx.ron";
-
-macro_rules! serialize_if_different {
-    ($state:expr, $full:expr, $self:expr, $default:expr, $field:ident) => {
-        if $full || $self.$field != $default.$field {
-            $state.serialize_field(stringify!($field), &$self.$field)?;
-        }
-    };
-}
-
-macro_rules! merge_atom {
-    ($a:expr, $b:expr, $field:ident) => {
-        $a.$field = match (&$a.$field, &$b.$field) {
-            (Some(_), Some(rhs)) => Some(rhs.clone()),
-            (None, Some(rhs)) => Some(rhs.clone()),
-            (Some(lhs), None) => Some(lhs.clone()),
-            (None, None) => None,
-        };
-    };
-}
-
-macro_rules! merge_nested {
-    ($a:expr, $b:expr, $field:ident) => {
-        $a.$field = match (&mut $a.$field, &$b.$field) {
-            (Some(lhs), Some(rhs)) => {
-                lhs.merge(Some(rhs.clone()));
-                Some(lhs.clone())
-            }
-            (None, Some(rhs)) => Some(rhs.clone()),
-            (Some(lhs), None) => Some(lhs.clone()),
-            (None, None) => None,
-        };
-    };
-}
 
 fn is_relative<P: AsRef<Path>>(path: P) -> bool {
     let path_str = path.as_ref().to_str().unwrap_or("");
@@ -71,7 +38,7 @@ fn walk_directory(
     current_dir: &Path,
     globset: &globset::GlobSet,
     files: &mut Vec<PathBuf>,
-) -> Result<()> {
+) -> crate::Result<()> {
     for entry in fs::read_dir(current_dir).map_err(|e| TenxError::Io(e.to_string()))? {
         let entry = entry.map_err(|e| TenxError::Io(e.to_string()))?;
         let path = entry.path();
@@ -104,32 +71,65 @@ fn find_project_root(current_dir: &Path) -> PathBuf {
     current_dir.to_path_buf()
 }
 
+/// Deserialize a RON string into a Config.
+pub fn parse_config_file(ron_str: &str) -> crate::Result<ConfigFile> {
+    let options =
+        ron::Options::default().with_default_extension(ron::extensions::Extensions::IMPLICIT_SOME);
+    options
+        .from_str(ron_str)
+        .map_err(|e| TenxError::Internal(format!("Failed to parse RON: {}", e)))
+}
+
 /// Loads the configuration by merging defaults, home, and local configuration files.
 /// Returns the complete Config object.
-pub fn load_config() -> Result<Config> {
-    let mut config = super::default_config();
-
+pub fn parse_config(
+    home_config: Option<String>,
+    local_config: Option<String>,
+) -> crate::Result<Config> {
+    let default_conf = super::default_config();
+    let mut cnf = ConfigFile::default();
     // Load from home config file
-    let home_config_path = home_config_dir().join(HOME_CONFIG_FILE);
-    if home_config_path.exists() {
-        let home_config_str = fs::read_to_string(&home_config_path)
-            .map_err(|e| TenxError::Config(format!("Failed to read home config file: {}", e)))?;
-        let home_config = Config::from_ron(&home_config_str)
+    if let Some(home_config_str) = home_config {
+        let home_config = parse_config_file(&home_config_str)
             .map_err(|e| TenxError::Config(format!("Failed to parse home config file: {}", e)))?;
-        config.merge(&home_config);
+        cnf = cnf.apply(home_config);
     }
 
     // Load from local config file
-    let project_root = config.project_root();
-    let local_config_path = project_root.join(LOCAL_CONFIG_FILE);
-    if local_config_path.exists() {
-        let local_config_str = fs::read_to_string(&local_config_path)
-            .map_err(|e| TenxError::Config(format!("Failed to read local config file: {}", e)))?;
-        let local_config = Config::from_ron(&local_config_str)
+    if let Some(local_config_str) = local_config {
+        let local_config = parse_config_file(&local_config_str)
             .map_err(|e| TenxError::Config(format!("Failed to parse local config file: {}", e)))?;
-        config.merge(&local_config);
+        cnf = cnf.apply(local_config);
     }
-    Ok(config)
+    Ok(cnf.build(default_conf))
+}
+
+/// Loads the configuration by merging defaults, home, and local configuration files.
+/// Returns the complete Config object.
+pub fn load_config() -> crate::Result<Config> {
+    let home_config_path = home_config_dir().join(HOME_CONFIG_FILE);
+    let home_config =
+        if home_config_path.exists() {
+            Some(fs::read_to_string(&home_config_path).map_err(|e| {
+                TenxError::Config(format!("Failed to read home config file: {}", e))
+            })?)
+        } else {
+            None
+        };
+
+    let default_conf = super::default_config();
+    let project_root = default_conf.project_root();
+    let local_config_path = project_root.join(LOCAL_CONFIG_FILE);
+    let local_config =
+        if local_config_path.exists() {
+            Some(fs::read_to_string(&local_config_path).map_err(|e| {
+                TenxError::Config(format!("Failed to read local config file: {}", e))
+            })?)
+        } else {
+            None
+        };
+
+    parse_config(home_config, local_config)
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -285,7 +285,7 @@ impl ModelConfig {
     }
 
     /// Converts ModelConfig to a Claude or OpenAi model.
-    pub fn to_model(&self, no_stream: bool) -> Result<model::Model> {
+    pub fn to_model(&self, no_stream: bool) -> crate::Result<model::Model> {
         match self {
             ModelConfig::Claude { api_model, key, .. } => {
                 if api_model.is_empty() {
@@ -396,32 +396,25 @@ pub struct Checks {
     pub only: Option<String>,
 }
 
+#[optional_struct]
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Models {
     /// Custom model configurations. Entries with the same name as a builtin will override the
     /// builtin.
     #[serde(default)]
-    pub custom: Option<Vec<ModelConfig>>,
+    pub custom: Vec<ModelConfig>,
 
     /// Built-in model configurations.
     #[serde(default)]
-    pub builtin: Option<Vec<ModelConfig>>,
+    pub builtin: Vec<ModelConfig>,
 
     /// The default model name.
     #[serde(default)]
-    pub default: Option<String>,
+    pub default: String,
 
     /// Disable streaming for all models
     #[serde(default)]
-    pub no_stream: Option<bool>,
-}
-
-impl Models {
-    pub fn merge(&mut self, other: &Models) {
-        merge_atom!(self, other, custom);
-        merge_atom!(self, other, builtin);
-        merge_atom!(self, other, default);
-    }
+    pub no_stream: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -499,51 +492,40 @@ impl CheckConfig {
     }
 }
 
-#[derive(Debug, Default, Clone, Deserialize)]
+#[optional_struct(ConfigFile)]
+#[derive(Debug, Default, Clone, Deserialize, Serialize)]
 pub struct Config {
     /// Model configuration
-    #[serde(default)]
+    #[optional_rename(OptionalModels)]
+    #[optional_wrap]
     pub models: Models,
 
-    /// The default dialect.
-    #[serde(default)]
-    pub default_dialect: ConfigDialect,
-
     /// Which files are included by default
-    #[serde(default)]
     pub include: Include,
 
     /// Glob patterns to exclude from the file list
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub exclude: Vec<String>,
 
     /// The directory to store session state.
-    #[serde(default)]
     /// The directory to store session state. Defaults to ~/.config/tenx/state
     pub session_store_dir: PathBuf,
 
     /// The number of times to retry a request.
-    #[serde(default)]
     pub retry_limit: usize,
 
     /// The tags dialect configuration.
-    #[serde(default)]
     pub tags: Tags,
 
     /// Operations that can be executed by the model.
-    #[serde(default)]
     pub ops: Ops,
 
     /// The default context configuration.
-    #[serde(default)]
     pub default_context: DefaultContext,
 
     /// Check configuration.
-    #[serde(default)]
     pub checks: Checks,
 
     /// Project root configuration.
-    #[serde(default)]
     pub project_root: ProjectRoot,
 
     /// Set a dummy model for end-to-end testing. Over-rides the configured model.
@@ -564,28 +546,6 @@ pub struct Config {
     pub(crate) test_cwd: Option<String>,
 }
 
-impl Serialize for Config {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let default = Config::default();
-        let mut state = serializer.serialize_struct("Config", 11)?;
-        serialize_if_different!(state, self.full, self, default, include);
-        serialize_if_different!(state, self.full, self, default, session_store_dir);
-        serialize_if_different!(state, self.full, self, default, retry_limit);
-        serialize_if_different!(state, self.full, self.checks, default.checks, no_pre);
-        serialize_if_different!(state, self.full, self, default, default_dialect);
-        serialize_if_different!(state, self.full, self, default, tags);
-        serialize_if_different!(state, self.full, self, default, ops);
-        serialize_if_different!(state, self.full, self, default, default_context);
-        serialize_if_different!(state, self.full, self, default, checks);
-        serialize_if_different!(state, self.full, self, default, project_root);
-        serialize_if_different!(state, self.full, self, default, models);
-        state.end()
-    }
-}
-
 impl Config {
     /// Returns all model configurations, with custom models overriding built-in models with the same name.
     pub fn model_confs(&self) -> Vec<ModelConfig> {
@@ -593,13 +553,11 @@ impl Config {
             .models
             .builtin
             .iter()
-            .flatten()
             .map(|m| (m.name().to_string(), m.clone()));
         let custom = self
             .models
             .custom
             .iter()
-            .flatten()
             .map(|m| (m.name().to_string(), m.clone()));
 
         let mut model_map: HashMap<String, ModelConfig> = builtin.collect();
@@ -608,7 +566,7 @@ impl Config {
         model_map.into_values().collect()
     }
 
-    pub fn cwd(&self) -> Result<PathBuf> {
+    pub fn cwd(&self) -> crate::Result<PathBuf> {
         if let Some(test_cwd) = &self.test_cwd {
             Ok(PathBuf::from(test_cwd))
         } else {
@@ -635,7 +593,7 @@ impl Config {
     }
 
     /// Converts a path relative to the root directory to an absolute path
-    pub fn abspath(&self, path: &Path) -> Result<PathBuf> {
+    pub fn abspath(&self, path: &Path) -> crate::Result<PathBuf> {
         let p = self.project_root().join(path);
         absolute(p.clone())
             .map_err(|e| TenxError::Internal(format!("could not absolute {}: {}", p.display(), e)))
@@ -648,7 +606,7 @@ impl Config {
     ///   current directory.
     /// - If the path is absolute, it will be returned as-is.
     /// - Otherwise, it will be resolved relative to the project root.
-    pub fn normalize_path<P: AsRef<Path>>(&self, path: P) -> Result<PathBuf> {
+    pub fn normalize_path<P: AsRef<Path>>(&self, path: P) -> crate::Result<PathBuf> {
         self.normalize_path_with_cwd(path, self.cwd()?)
     }
 
@@ -663,7 +621,7 @@ impl Config {
         &self,
         path: P,
         current_dir: Q,
-    ) -> Result<PathBuf> {
+    ) -> crate::Result<PathBuf> {
         let path = path.as_ref();
         if path.to_str().map_or(false, |s| s.contains('*')) {
             return Ok(path.to_path_buf());
@@ -694,7 +652,7 @@ impl Config {
     }
 
     /// Traverse the included files and return a list of files that match the given glob pattern.
-    pub fn match_files_with_glob(&self, pattern: &str) -> Result<Vec<PathBuf>> {
+    pub fn match_files_with_glob(&self, pattern: &str) -> crate::Result<Vec<PathBuf>> {
         let project_root = &self.project_root();
         let glob = Glob::new(pattern)
             .map_err(|e| TenxError::Internal(format!("Invalid glob pattern: {}", e)))?;
@@ -740,7 +698,7 @@ impl Config {
         Ok(matched_files)
     }
 
-    pub fn included_files(&self) -> Result<Vec<PathBuf>> {
+    pub fn included_files(&self) -> crate::Result<Vec<PathBuf>> {
         let project_root = self.project_root();
 
         // Build exclude globset
@@ -808,54 +766,12 @@ impl Config {
         self
     }
 
-    /// Deserialize a RON string into a Config.
-    pub fn from_ron(ron_str: &str) -> Result<Self> {
-        let options = ron::Options::default()
-            .with_default_extension(ron::extensions::Extensions::IMPLICIT_SOME);
-        options
-            .from_str(ron_str)
-            .map_err(|e| TenxError::Internal(format!("Failed to parse RON: {}", e)))
-    }
-
     /// Serialize the Config into a RON string.
-    pub fn to_ron(&self) -> Result<String> {
+    pub fn to_ron(&self) -> crate::Result<String> {
         let pretty_config = ron::ser::PrettyConfig::default()
             .extensions(ron::extensions::Extensions::IMPLICIT_SOME);
         ron::ser::to_string_pretty(self, pretty_config)
             .map_err(|e| TenxError::Internal(format!("Failed to serialize to RON: {}", e)))
-    }
-
-    /// Merge another Config into this one, with any values set in other overriding our values.
-    pub fn merge(&mut self, other: &Config) {
-        self.models.merge(&other.models);
-
-        let dflt = Config::default();
-        if other.include != dflt.include {
-            self.include = other.include.clone();
-        }
-        if !other.session_store_dir.as_os_str().is_empty()
-            && other.session_store_dir != dflt.session_store_dir
-        {
-            self.session_store_dir = other.session_store_dir.clone();
-        }
-        if other.retry_limit != dflt.retry_limit {
-            self.retry_limit = other.retry_limit;
-        }
-        if other.checks.no_pre != dflt.checks.no_pre {
-            self.checks.no_pre = other.checks.no_pre;
-        }
-        if other.default_dialect != dflt.default_dialect {
-            self.default_dialect = other.default_dialect.clone();
-        }
-        if other.tags != dflt.tags {
-            self.tags = other.tags.clone();
-        }
-        if other.ops != dflt.ops {
-            self.ops = other.ops.clone();
-        }
-        if other.default_context != dflt.default_context {
-            self.default_context = other.default_context.clone();
-        }
     }
 
     pub fn with_dummy_model(mut self, model: model::DummyModel) -> Self {
@@ -875,28 +791,28 @@ impl Config {
 
     /// Loads API keys from environment variables if they exist.
     pub fn load_env(mut self) -> Self {
-        if let Some(custom) = &self.models.custom {
-            self.models.custom = Some(custom.iter().map(|m| m.clone().load_env()).collect());
-        }
-        if let Some(builtin) = &self.models.builtin {
-            self.models.builtin = Some(builtin.iter().map(|m| m.clone().load_env()).collect());
-        }
+        self.models.custom = self
+            .models
+            .custom
+            .iter()
+            .map(|m| m.clone().load_env())
+            .collect();
+        self.models.builtin = self
+            .models
+            .builtin
+            .iter()
+            .map(|m| m.clone().load_env())
+            .collect();
         self
     }
 
     /// Returns the configured model.
-    pub fn active_model(&self) -> Result<crate::model::Model> {
+    pub fn active_model(&self) -> crate::Result<crate::model::Model> {
         if let Some(dummy_model) = &self.dummy_model {
             return Ok(model::Model::Dummy(dummy_model.clone()));
         }
 
-        let no_stream = self.models.no_stream.unwrap_or(false);
-
-        let name = self
-            .models
-            .default
-            .as_deref()
-            .ok_or_else(|| TenxError::Internal("No default model specified".to_string()))?;
+        let name = self.models.default.clone();
 
         let model_config = self
             .model_confs()
@@ -908,7 +824,7 @@ impl Config {
             ModelConfig::Claude { api_model, key, .. } => Ok(model::Model::Claude(model::Claude {
                 api_model: api_model.clone(),
                 anthropic_key: key.clone(),
-                streaming: !no_stream,
+                streaming: !self.models.no_stream,
             })),
             ModelConfig::OpenAi {
                 api_model,
@@ -921,25 +837,23 @@ impl Config {
                 api_model: api_model.clone(),
                 openai_key: key.clone(),
                 api_base: api_base.clone(),
-                streaming: can_stream && !no_stream,
+                streaming: can_stream && !self.models.no_stream,
                 no_system_prompt,
             })),
         }
     }
 
     /// Returns the configured dialect.
-    pub fn dialect(&self) -> Result<crate::dialect::Dialect> {
+    pub fn dialect(&self) -> crate::Result<crate::dialect::Dialect> {
         if let Some(dummy_dialect) = &self.dummy_dialect {
             return Ok(dialect::Dialect::Dummy(dummy_dialect.clone()));
         }
-        match self.default_dialect {
-            ConfigDialect::Tags => Ok(dialect::Dialect::Tags(dialect::Tags::new(
-                self.tags.smart,
-                self.tags.replace,
-                self.tags.udiff,
-                self.ops.edit,
-            ))),
-        }
+        Ok(dialect::Dialect::Tags(dialect::Tags::new(
+            self.tags.smart,
+            self.tags.replace,
+            self.tags.udiff,
+            self.ops.edit,
+        )))
     }
 
     /// Return all configured checks, even if disabled. Custom checks with the same name as builtin
@@ -1015,32 +929,6 @@ mod tests {
     }
 
     #[test]
-    fn test_include_serialization() {
-        let mut config = Config::default();
-        set_config!(
-            config,
-            include,
-            Include::Glob(vec!["*.rs".to_string(), "*.toml".to_string()])
-        );
-
-        let ron_str = config.to_ron().unwrap();
-
-        let deserialized_config = Config::from_ron(&ron_str).unwrap();
-
-        assert!(matches!(deserialized_config.include, Include::Glob(_)));
-        if let Include::Glob(patterns) = deserialized_config.include {
-            assert_eq!(patterns, vec!["*.rs".to_string(), "*.toml".to_string()]);
-        }
-
-        // Test default value (Git) is not serialized
-        let default_config = Config::default();
-        let default_ron_str = default_config.to_ron().unwrap();
-        let parsed_ron: ron::Value = ron::from_str(&default_ron_str).unwrap();
-        let struct_fields_str = format!("{:?}", parsed_ron);
-        assert!(!struct_fields_str.contains("include"));
-    }
-
-    #[test]
     fn test_session_store_dir_option() {
         let config = Config::default();
 
@@ -1081,7 +969,7 @@ mod tests {
     }
 
     #[test]
-    fn test_included_files() -> Result<()> {
+    fn test_included_files() -> crate::Result<()> {
         let temp_dir = TempDir::new()?;
         let root_path = temp_dir.path();
 
@@ -1154,7 +1042,7 @@ mod tests {
     }
 
     #[test]
-    fn test_match_files_with_glob() -> Result<()> {
+    fn test_match_files_with_glob() -> crate::Result<()> {
         use crate::testutils::test_project;
 
         let mut project = test_project();
@@ -1224,7 +1112,7 @@ mod tests {
     }
 
     #[test]
-    fn test_normalize_path_with_cwd() -> Result<()> {
+    fn test_normalize_path_with_cwd() -> crate::Result<()> {
         let project = testutils::test_project();
         project.create_file_tree(&[
             "file.txt",
@@ -1280,51 +1168,5 @@ mod tests {
         );
 
         Ok(())
-    }
-
-    #[test]
-    fn test_models_merge() {
-        // Test case 2: Merging Some into None fields
-        let mut models = Models::default();
-        models.merge(&Models {
-            custom: Some(vec![ModelConfig::Claude {
-                name: "test".to_string(),
-                api_model: "model1".to_string(),
-                key: "key1".to_string(),
-                key_env: "env1".to_string(),
-            }]),
-            builtin: Some(vec![]),
-            default: Some("test".to_string()),
-            no_stream: Some(true),
-        });
-        assert!(models.custom.is_some());
-        assert!(models.builtin.is_some());
-        assert_eq!(models.default.as_ref().unwrap(), "test");
-
-        // Test case 2: Merging Some into existing Some
-        let mut models = Models {
-            custom: Some(vec![ModelConfig::Claude {
-                name: "test1".to_string(),
-                api_model: "model1".to_string(),
-                key: "key1".to_string(),
-                key_env: "env1".to_string(),
-            }]),
-            builtin: None,
-            default: Some("test1".to_string()),
-            no_stream: None,
-        };
-        models.merge(&Models {
-            custom: Some(vec![ModelConfig::Claude {
-                name: "test2".to_string(),
-                api_model: "model2".to_string(),
-                key: "key2".to_string(),
-                key_env: "env2".to_string(),
-            }]),
-            builtin: None,
-            default: Some("test2".to_string()),
-            no_stream: Some(true),
-        });
-        assert_eq!(models.custom.as_ref().unwrap()[0].name(), "test2");
-        assert_eq!(models.default.as_ref().unwrap(), "test2");
     }
 }

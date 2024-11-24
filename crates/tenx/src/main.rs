@@ -331,11 +331,11 @@ fn load_config(cli: &Cli) -> Result<config::Config> {
     set_config!(config, tags.replace, cli.tags_replace);
     set_config!(config, tags.udiff, cli.tags_udiff);
     if let Some(model) = &cli.model {
-        config.models.default = Some(model.clone());
+        config.models.default = model.clone();
     }
     config.checks.no_pre = cli.no_pre_check;
     config.checks.only = cli.only_check.clone();
-    config.models.no_stream = Some(cli.no_stream);
+    config.models.no_stream = cli.no_stream;
 
     // Validate checks
     if let Some(name) = &cli.only_check {

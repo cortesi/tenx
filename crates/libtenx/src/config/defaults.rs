@@ -186,8 +186,8 @@ fn default_checks() -> Checks {
 pub fn default_config() -> Config {
     Config {
         models: Models {
-            default: Some("sonnet".to_string()),
-            builtin: Some(default_models()),
+            default: "sonnet".to_string(),
+            builtin: default_models(),
             ..Default::default()
         },
         include: Include::Git,

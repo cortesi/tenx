@@ -26,7 +26,7 @@ impl DummyUsage {
 }
 
 /// A dummy model for testing purposes.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DummyModel {
     model_response: Result<ModelResponse>,
 }
