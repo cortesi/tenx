@@ -335,7 +335,7 @@ fn load_config(cli: &Cli) -> Result<config::Config> {
     }
     config.checks.no_pre = cli.no_pre_check;
     config.checks.only = cli.only_check.clone();
-    config.no_stream = cli.no_stream;
+    config.set_no_stream(cli.no_stream);
 
     // Validate checks
     if let Some(name) = &cli.only_check {

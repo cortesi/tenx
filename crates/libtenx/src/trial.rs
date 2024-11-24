@@ -15,7 +15,7 @@ use tokio::sync::mpsc;
 use tracing::info;
 
 use crate::{
-    config::{Config, Include, ProjectRoot},
+    config::{Config, Include, Models, ProjectRoot},
     model::ModelProvider,
     Event, Result, Tenx, TenxError,
 };
@@ -260,7 +260,10 @@ impl Trial {
             include: Include::Glob(vec!["**/*".to_string()]),
             exclude: vec!["target/**".to_string()],
             retry_limit: 1,
-            no_stream: true, // We disable streaming for trials by default, because streaming messes up token counts
+            models: Some(Models {
+                no_stream: Some(true), // We disable streaming for trials by default, because streaming messes up token counts
+                ..Default::default()
+            }),
             ..Default::default()
         };
         Ok(config)

@@ -26,6 +26,31 @@ macro_rules! serialize_if_different {
     };
 }
 
+macro_rules! merge_atom {
+    ($a:expr, $b:expr, $field:ident) => {
+        $a.$field = match (&$a.$field, &$b.$field) {
+            (Some(_), Some(rhs)) => Some(rhs.clone()),
+            (None, Some(rhs)) => Some(rhs.clone()),
+            (Some(lhs), None) => Some(lhs.clone()),
+            (None, None) => None,
+        };
+    };
+}
+
+macro_rules! merge_nested {
+    ($a:expr, $b:expr, $field:ident) => {
+        $a.$field = match (&mut $a.$field, &$b.$field) {
+            (Some(lhs), Some(rhs)) => {
+                lhs.merge(Some(rhs.clone()));
+                Some(lhs.clone())
+            }
+            (None, Some(rhs)) => Some(rhs.clone()),
+            (Some(lhs), None) => Some(lhs.clone()),
+            (None, None) => None,
+        };
+    };
+}
+
 fn is_relative<P: AsRef<Path>>(path: P) -> bool {
     let path_str = path.as_ref().to_str().unwrap_or("");
     path_str.starts_with("./") || path_str.starts_with("../")
@@ -373,23 +398,22 @@ pub struct Checks {
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Models {
+    /// Custom model configurations. Entries with the same name as a builtin will override the
+    /// builtin.
     #[serde(default)]
     pub custom: Option<Vec<ModelConfig>>,
+
+    /// Built-in model configurations.
     #[serde(default)]
     pub builtin: Option<Vec<ModelConfig>>,
+
+    /// The default model name.
     #[serde(default)]
     pub default: Option<String>,
-}
 
-macro_rules! merge_atom {
-    ($a:expr, $b:expr, $field:ident) => {
-        $a.$field = match (&$a.$field, &$b.$field) {
-            (Some(_), Some(rhs)) => Some(rhs.clone()),
-            (None, Some(rhs)) => Some(rhs.clone()),
-            (Some(lhs), None) => Some(lhs.clone()),
-            (None, None) => None,
-        };
-    };
+    /// Disable streaming for all models
+    #[serde(default)]
+    pub no_stream: Option<bool>,
 }
 
 impl Models {
@@ -483,10 +507,6 @@ pub struct Config {
     #[serde(default)]
     pub models: Option<Models>,
 
-    /// Disable streaming for all models
-    #[serde(default)]
-    pub no_stream: bool,
-
     /// The default dialect.
     #[serde(default)]
     pub default_dialect: ConfigDialect,
@@ -569,6 +589,11 @@ impl Serialize for Config {
 }
 
 impl Config {
+    /// Sets the no_stream option for all models. Will initialize Config::models if needed.
+    pub fn set_no_stream(&mut self, no_stream: bool) {
+        self.models.get_or_insert_with(Models::default).no_stream = Some(no_stream);
+    }
+
     /// Sets the default model name in the configuration.
     pub fn set_default_model(&mut self, name: String) {
         if self.models.is_none() {
@@ -819,8 +844,10 @@ impl Config {
             .map_err(|e| TenxError::Internal(format!("Failed to serialize to RON: {}", e)))
     }
 
-    /// Merge another Config into this one, only overriding non-default values.
+    /// Merge another Config into this one, with any values set in other overriding our values.
     pub fn merge(&mut self, other: &Config) {
+        merge_nested!(self, other, models);
+
         let dflt = Config::default();
         if other.include != dflt.include {
             self.include = other.include.clone();
@@ -888,6 +915,9 @@ impl Config {
             .models
             .as_ref()
             .ok_or_else(|| TenxError::Internal("No models configured".to_string()))?;
+
+        let no_stream = models.no_stream.unwrap_or(false);
+
         let name = models
             .default
             .as_deref()
@@ -903,7 +933,7 @@ impl Config {
             ModelConfig::Claude { api_model, key, .. } => Ok(model::Model::Claude(model::Claude {
                 api_model: api_model.clone(),
                 anthropic_key: key.clone(),
-                streaming: !self.no_stream,
+                streaming: !no_stream,
             })),
             ModelConfig::OpenAi {
                 api_model,
@@ -916,7 +946,7 @@ impl Config {
                 api_model: api_model.clone(),
                 openai_key: key.clone(),
                 api_base: api_base.clone(),
-                streaming: can_stream && !self.no_stream,
+                streaming: can_stream && !no_stream,
                 no_system_prompt,
             })),
         }
@@ -1287,8 +1317,8 @@ mod tests {
                 key: "key1".to_string(),
                 key_env: "env1".to_string(),
             }]),
-            builtin: None,
             default: Some("test".to_string()),
+            ..Default::default()
         };
         models.merge(None);
         assert_eq!(models.custom.as_ref().unwrap().len(), 1);
@@ -1296,11 +1326,7 @@ mod tests {
         assert!(models.builtin.is_none());
 
         // Test case 2: Merging Some into None fields
-        let mut models = Models {
-            custom: None,
-            builtin: None,
-            default: None,
-        };
+        let mut models = Models::default();
         models.merge(Some(Models {
             custom: Some(vec![ModelConfig::Claude {
                 name: "test".to_string(),
@@ -1310,6 +1336,7 @@ mod tests {
             }]),
             builtin: Some(vec![]),
             default: Some("test".to_string()),
+            no_stream: Some(true),
         }));
         assert!(models.custom.is_some());
         assert!(models.builtin.is_some());
@@ -1325,6 +1352,7 @@ mod tests {
             }]),
             builtin: None,
             default: Some("test1".to_string()),
+            no_stream: None,
         };
         models.merge(Some(Models {
             custom: Some(vec![ModelConfig::Claude {
@@ -1335,6 +1363,7 @@ mod tests {
             }]),
             builtin: None,
             default: Some("test2".to_string()),
+            no_stream: Some(true),
         }));
         assert_eq!(models.custom.as_ref().unwrap()[0].name(), "test2");
         assert_eq!(models.default.as_ref().unwrap(), "test2");
