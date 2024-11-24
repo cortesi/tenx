@@ -185,11 +185,11 @@ fn default_checks() -> Checks {
 
 pub fn default_config() -> Config {
     Config {
-        models: Some(Models {
+        models: Models {
             default: Some("sonnet".to_string()),
             builtin: Some(default_models()),
             ..Default::default()
-        }),
+        },
         include: Include::Git,
         session_store_dir: home_config_dir().join("state"),
         retry_limit: DEFAULT_RETRY_LIMIT,

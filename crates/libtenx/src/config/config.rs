@@ -370,7 +370,7 @@ impl std::fmt::Display for Include {
         match self {
             Include::Git => write!(f, "git"),
             Include::Glob(patterns) => {
-                write!(f, "glob patterns:")?;
+                write!(f, "globs:")?;
                 for pattern in patterns {
                     write!(f, " {}", pattern)?;
                 }
@@ -417,12 +417,10 @@ pub struct Models {
 }
 
 impl Models {
-    pub fn merge(&mut self, other: Option<Models>) {
-        if let Some(other) = other {
-            merge_atom!(self, other, custom);
-            merge_atom!(self, other, builtin);
-            merge_atom!(self, other, default);
-        }
+    pub fn merge(&mut self, other: &Models) {
+        merge_atom!(self, other, custom);
+        merge_atom!(self, other, builtin);
+        merge_atom!(self, other, default);
     }
 }
 
@@ -505,7 +503,7 @@ impl CheckConfig {
 pub struct Config {
     /// Model configuration
     #[serde(default)]
-    pub models: Option<Models>,
+    pub models: Models,
 
     /// The default dialect.
     #[serde(default)]
@@ -589,42 +587,25 @@ impl Serialize for Config {
 }
 
 impl Config {
-    /// Sets the no_stream option for all models. Will initialize Config::models if needed.
-    pub fn set_no_stream(&mut self, no_stream: bool) {
-        self.models.get_or_insert_with(Models::default).no_stream = Some(no_stream);
-    }
-
-    /// Sets the default model name in the configuration.
-    pub fn set_default_model(&mut self, name: String) {
-        if self.models.is_none() {
-            self.models = Some(Models::default());
-        }
-        if let Some(models) = &mut self.models {
-            models.default = Some(name);
-        }
-    }
-
     /// Returns all model configurations, with custom models overriding built-in models with the same name.
     pub fn model_confs(&self) -> Vec<ModelConfig> {
-        if let Some(models) = &self.models {
-            let builtin = models
-                .builtin
-                .iter()
-                .flatten()
-                .map(|m| (m.name().to_string(), m.clone()));
-            let custom = models
-                .custom
-                .iter()
-                .flatten()
-                .map(|m| (m.name().to_string(), m.clone()));
+        let builtin = self
+            .models
+            .builtin
+            .iter()
+            .flatten()
+            .map(|m| (m.name().to_string(), m.clone()));
+        let custom = self
+            .models
+            .custom
+            .iter()
+            .flatten()
+            .map(|m| (m.name().to_string(), m.clone()));
 
-            let mut model_map: HashMap<String, ModelConfig> = builtin.collect();
-            model_map.extend(custom);
+        let mut model_map: HashMap<String, ModelConfig> = builtin.collect();
+        model_map.extend(custom);
 
-            model_map.into_values().collect()
-        } else {
-            Vec::new()
-        }
+        model_map.into_values().collect()
     }
 
     pub fn cwd(&self) -> Result<PathBuf> {
@@ -846,7 +827,7 @@ impl Config {
 
     /// Merge another Config into this one, with any values set in other overriding our values.
     pub fn merge(&mut self, other: &Config) {
-        merge_nested!(self, other, models);
+        self.models.merge(&other.models);
 
         let dflt = Config::default();
         if other.include != dflt.include {
@@ -894,13 +875,11 @@ impl Config {
 
     /// Loads API keys from environment variables if they exist.
     pub fn load_env(mut self) -> Self {
-        if let Some(models) = &mut self.models {
-            if let Some(custom) = &models.custom {
-                models.custom = Some(custom.iter().map(|m| m.clone().load_env()).collect());
-            }
-            if let Some(builtin) = &models.builtin {
-                models.builtin = Some(builtin.iter().map(|m| m.clone().load_env()).collect());
-            }
+        if let Some(custom) = &self.models.custom {
+            self.models.custom = Some(custom.iter().map(|m| m.clone().load_env()).collect());
+        }
+        if let Some(builtin) = &self.models.builtin {
+            self.models.builtin = Some(builtin.iter().map(|m| m.clone().load_env()).collect());
         }
         self
     }
@@ -911,14 +890,10 @@ impl Config {
             return Ok(model::Model::Dummy(dummy_model.clone()));
         }
 
-        let models = self
+        let no_stream = self.models.no_stream.unwrap_or(false);
+
+        let name = self
             .models
-            .as_ref()
-            .ok_or_else(|| TenxError::Internal("No models configured".to_string()))?;
-
-        let no_stream = models.no_stream.unwrap_or(false);
-
-        let name = models
             .default
             .as_deref()
             .ok_or_else(|| TenxError::Internal("No default model specified".to_string()))?;
@@ -1309,25 +1284,9 @@ mod tests {
 
     #[test]
     fn test_models_merge() {
-        // Test case 1: Merging with None
-        let mut models = Models {
-            custom: Some(vec![ModelConfig::Claude {
-                name: "test".to_string(),
-                api_model: "model1".to_string(),
-                key: "key1".to_string(),
-                key_env: "env1".to_string(),
-            }]),
-            default: Some("test".to_string()),
-            ..Default::default()
-        };
-        models.merge(None);
-        assert_eq!(models.custom.as_ref().unwrap().len(), 1);
-        assert_eq!(models.default.as_ref().unwrap(), "test");
-        assert!(models.builtin.is_none());
-
         // Test case 2: Merging Some into None fields
         let mut models = Models::default();
-        models.merge(Some(Models {
+        models.merge(&Models {
             custom: Some(vec![ModelConfig::Claude {
                 name: "test".to_string(),
                 api_model: "model1".to_string(),
@@ -1337,12 +1296,12 @@ mod tests {
             builtin: Some(vec![]),
             default: Some("test".to_string()),
             no_stream: Some(true),
-        }));
+        });
         assert!(models.custom.is_some());
         assert!(models.builtin.is_some());
         assert_eq!(models.default.as_ref().unwrap(), "test");
 
-        // Test case 3: Merging Some into existing Some
+        // Test case 2: Merging Some into existing Some
         let mut models = Models {
             custom: Some(vec![ModelConfig::Claude {
                 name: "test1".to_string(),
@@ -1354,7 +1313,7 @@ mod tests {
             default: Some("test1".to_string()),
             no_stream: None,
         };
-        models.merge(Some(Models {
+        models.merge(&Models {
             custom: Some(vec![ModelConfig::Claude {
                 name: "test2".to_string(),
                 api_model: "model2".to_string(),
@@ -1364,7 +1323,7 @@ mod tests {
             builtin: None,
             default: Some("test2".to_string()),
             no_stream: Some(true),
-        }));
+        });
         assert_eq!(models.custom.as_ref().unwrap()[0].name(), "test2");
         assert_eq!(models.default.as_ref().unwrap(), "test2");
     }

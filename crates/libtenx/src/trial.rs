@@ -217,7 +217,7 @@ impl Trial {
         conf.project_root = ProjectRoot::Path(temp_dir.path().join("project"));
 
         if let Some(m) = model {
-            conf.set_default_model(m);
+            conf.models.default = Some(m);
         }
 
         let model_name = conf.active_model()?.name();
@@ -260,10 +260,10 @@ impl Trial {
             include: Include::Glob(vec!["**/*".to_string()]),
             exclude: vec!["target/**".to_string()],
             retry_limit: 1,
-            models: Some(Models {
+            models: Models {
                 no_stream: Some(true), // We disable streaming for trials by default, because streaming messes up token counts
                 ..Default::default()
-            }),
+            },
             ..Default::default()
         };
         Ok(config)
