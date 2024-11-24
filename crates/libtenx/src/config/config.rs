@@ -813,7 +813,9 @@ impl Config {
 
     /// Serialize the Config into a RON string.
     pub fn to_ron(&self) -> Result<String> {
-        ron::ser::to_string_pretty(self, ron::ser::PrettyConfig::default())
+        let pretty_config = ron::ser::PrettyConfig::default()
+            .extensions(ron::extensions::Extensions::IMPLICIT_SOME);
+        ron::ser::to_string_pretty(self, pretty_config)
             .map_err(|e| TenxError::Internal(format!("Failed to serialize to RON: {}", e)))
     }
 
