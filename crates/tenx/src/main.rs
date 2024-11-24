@@ -1,4 +1,4 @@
-use std::{fs, path::PathBuf};
+use std::{fs, io::Read, path::PathBuf};
 
 use anyhow::{Context as AnyhowContext, Result};
 use clap::{CommandFactory, Parser, Subcommand};
@@ -172,6 +172,7 @@ enum Commands {
         prompt_file: Option<PathBuf>,
     },
     /// Print the current configuration
+    #[clap(alias = "config")]
     Conf {
         /// Output default configuration
         #[clap(long)]
@@ -535,7 +536,7 @@ async fn main() -> anyhow::Result<()> {
                             fs::read_to_string(path).context("Failed to read text file")?
                         } else {
                             let mut buffer = String::new();
-                            std::io::stdin().read_line(&mut buffer)?;
+                            std::io::stdin().read_to_string(&mut buffer)?;
                             buffer
                         };
                         let name = name.as_deref().unwrap_or("<anonymous>");
