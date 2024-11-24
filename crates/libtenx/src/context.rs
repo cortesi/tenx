@@ -146,10 +146,6 @@ impl ContextProvider for ProjectMap {
     async fn refresh(&mut self) -> Result<()> {
         Ok(())
     }
-
-    async fn needs_refresh(&self) -> bool {
-        true
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]

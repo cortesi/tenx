@@ -190,7 +190,7 @@ pub fn default_config() -> Config {
             builtin: default_models(),
             ..Default::default()
         },
-        default_context: DefaultContext {
+        context: ContextConfig {
             project_map: true,
             ..Default::default()
         },

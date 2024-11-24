@@ -127,6 +127,14 @@ enum ContextCommands {
         /// Items to add to context
         items: Vec<String>,
     },
+    /// Add text to context
+    Text {
+        /// Optional name for the text context
+        #[clap(long)]
+        name: Option<String>,
+        /// File to read text from (reads from stdin if not specified)
+        file: Option<String>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -191,7 +199,6 @@ enum Commands {
         pattern: Option<String>,
     },
     /// Start a new session and attempt to fix any pre check failures
-    /// Start a new session and attempt to fix any pre check failures
     Fix {
         /// Clear the current session, and use it to fix
         #[clap(long)]
@@ -212,7 +219,6 @@ enum Commands {
         #[clap(short, long)]
         full: bool,
     },
-    /// Create a new session
     /// Create a new session
     New,
     /// Print information about the current project
@@ -521,6 +527,17 @@ async fn main() -> anyhow::Result<()> {
                         for item in items {
                             session.add_context(Context::new_url(item));
                         }
+                    }
+                    ContextCommands::Text { name, file } => {
+                        let text = if let Some(path) = file {
+                            fs::read_to_string(path).context("Failed to read text file")?
+                        } else {
+                            let mut buffer = String::new();
+                            std::io::stdin().read_line(&mut buffer)?;
+                            buffer
+                        };
+                        let name = name.as_deref().unwrap_or("<anonymous>");
+                        session.add_context(Context::new_text(name, &text));
                     }
                 };
                 tx.refresh_needed_contexts(&mut session, &Some(sender.clone()))

@@ -129,7 +129,7 @@ pub fn load_config() -> crate::Result<Config> {
 #[optional_struct]
 #[derive(Default, Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub struct DefaultContext {
+pub struct ContextConfig {
     pub ruskel: Vec<String>,
     pub path: Vec<String>,
     pub project_map: bool,
@@ -465,9 +465,9 @@ pub struct Config {
     pub ops: Ops,
 
     /// The default context configuration.
-    #[optional_rename(OptionalDefaultContext)]
+    #[optional_rename(OptionalContextConfig)]
     #[optional_wrap]
-    pub default_context: DefaultContext,
+    pub context: ContextConfig,
 
     /// Check configuration.
     #[optional_rename(OptionalChecks)]

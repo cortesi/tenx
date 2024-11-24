@@ -32,17 +32,17 @@ impl Tenx {
         let mut session = Session::default();
 
         // Add path contexts
-        for path in &self.config.default_context.path {
+        for path in &self.config.context.path {
             session.add_context(Context::new_path(&self.config, path)?);
         }
 
         // Add ruskel contexts
-        for ruskel in &self.config.default_context.ruskel {
+        for ruskel in &self.config.context.ruskel {
             session.add_context(Context::new_ruskel(ruskel));
         }
 
         // Add project map if configured
-        if self.config.default_context.project_map {
+        if self.config.context.project_map {
             session.add_context(Context::new_project_map());
         }
 
@@ -57,7 +57,7 @@ impl Tenx {
         session: &mut Session,
         sender: &Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
-        let _block = EventBlock::start(&sender)?;
+        let _block = EventBlock::start(sender)?;
         let _block = EventBlock::context(sender)?;
         for context in session.contexts.iter_mut() {
             let _refresh_block = EventBlock::context_refresh(sender, &context.human())?;
@@ -72,7 +72,7 @@ impl Tenx {
         session: &mut Session,
         sender: &Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
-        let _block = EventBlock::start(&sender)?;
+        let _block = EventBlock::start(sender)?;
         let _block = EventBlock::context(sender)?;
         for context in session.contexts.iter_mut() {
             if context.needs_refresh().await {
