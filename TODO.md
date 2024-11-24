@@ -21,5 +21,6 @@ Bugs:
 
 Features:
 
+    - Plain-text context
     - custom system prompt additions
     - git diff context

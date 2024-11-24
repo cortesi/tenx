@@ -68,7 +68,7 @@ impl Tenx {
         if !contexts.is_empty() {
             let _block = EventBlock::context(sender)?;
             for mut context in contexts {
-                let _refresh_block = EventBlock::context_refresh(sender, context.name())?;
+                let _refresh_block = EventBlock::context_refresh(sender, &context.human())?;
                 context.refresh().await?;
                 total_added += context.count(&self.config, session)?;
                 session.add_context(context);
@@ -86,7 +86,7 @@ impl Tenx {
     ) -> Result<()> {
         let _block = EventBlock::context(sender)?;
         for context in session.contexts.iter_mut() {
-            let _refresh_block = EventBlock::context_refresh(sender, context.name())?;
+            let _refresh_block = EventBlock::context_refresh(sender, &context.human())?;
             context.refresh().await?;
         }
         Ok(())

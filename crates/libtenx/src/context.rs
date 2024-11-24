@@ -10,8 +10,8 @@ use crate::{config::Config, Result, Session, TenxError};
 pub struct ContextItem {
     /// The type of context.
     pub ty: String,
-    /// The name of the context.
-    pub name: String,
+    /// The source of the context.
+    pub source: String,
     /// The contents of the context.
     pub body: String,
 }
@@ -22,15 +22,13 @@ pub enum ContextType {
     Path,
     ProjectMap,
     Url,
+    Text,
 }
 
 #[async_trait]
 pub trait ContextProvider {
     /// Returns the type of the context provider.
     fn typ(&self) -> &ContextType;
-
-    /// Returns the name of the context provider.
-    fn name(&self) -> &str;
 
     /// Retrieves the context items for this provider.
     fn contexts(
@@ -70,10 +68,6 @@ impl ContextProvider for Ruskel {
         &ContextType::Ruskel
     }
 
-    fn name(&self) -> &str {
-        &self.name
-    }
-
     fn contexts(
         &self,
         _config: &crate::config::Config,
@@ -81,7 +75,7 @@ impl ContextProvider for Ruskel {
     ) -> Result<Vec<ContextItem>> {
         Ok(vec![ContextItem {
             ty: "ruskel".to_string(),
-            name: self.name.clone(),
+            source: self.name.clone(),
             body: self.content.clone(),
         }])
     }
@@ -118,10 +112,6 @@ impl ContextProvider for ProjectMap {
         &ContextType::ProjectMap
     }
 
-    fn name(&self) -> &str {
-        "project_map"
-    }
-
     fn contexts(&self, config: &Config, _: &Session) -> Result<Vec<ContextItem>> {
         let files = config.included_files()?;
         let body = files
@@ -132,7 +122,7 @@ impl ContextProvider for ProjectMap {
 
         Ok(vec![ContextItem {
             ty: "project_map".to_string(),
-            name: "project_map".to_string(),
+            source: "project_map".to_string(),
             body,
         }])
     }
@@ -179,13 +169,6 @@ impl ContextProvider for Path {
         &ContextType::Path
     }
 
-    fn name(&self) -> &str {
-        match &self.path_type {
-            PathType::SinglePath(path) => path,
-            PathType::Pattern(pattern) => pattern,
-        }
-    }
-
     fn contexts(
         &self,
         config: &crate::config::Config,
@@ -201,7 +184,7 @@ impl ContextProvider for Path {
             let body = fs::read_to_string(&abs_path)?;
             contexts.push(ContextItem {
                 ty: "file".to_string(),
-                name: file.to_string_lossy().into_owned(),
+                source: file.to_string_lossy().into_owned(),
                 body,
             });
         }
@@ -261,10 +244,6 @@ impl ContextProvider for Url {
         &ContextType::Url
     }
 
-    fn name(&self) -> &str {
-        &self.name
-    }
-
     fn contexts(
         &self,
         _config: &crate::config::Config,
@@ -272,7 +251,7 @@ impl ContextProvider for Url {
     ) -> Result<Vec<ContextItem>> {
         Ok(vec![ContextItem {
             ty: "url".to_string(),
-            name: self.name.clone(),
+            source: self.url.clone(),
             body: self.content.clone(),
         }])
     }
@@ -305,9 +284,60 @@ pub enum Context {
     Path(Path),
     ProjectMap(ProjectMap),
     Url(Url),
+    Text(Text),
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub struct Text {
+    name: String,
+    content: String,
+}
+
+impl Text {
+    pub(crate) fn new(name: String, content: String) -> Self {
+        Self { name, content }
+    }
+}
+
+#[async_trait]
+impl ContextProvider for Text {
+    fn typ(&self) -> &ContextType {
+        &ContextType::Text
+    }
+
+    fn contexts(
+        &self,
+        _config: &crate::config::Config,
+        _session: &Session,
+    ) -> Result<Vec<ContextItem>> {
+        Ok(vec![ContextItem {
+            ty: "text".to_string(),
+            source: self.name.clone(),
+            body: self.content.clone(),
+        }])
+    }
+
+    fn human(&self) -> String {
+        let lines = self.content.lines().count();
+        let chars = self.content.chars().count();
+        format!("text: {} ({} lines, {} chars)", self.name, lines, chars)
+    }
+
+    fn count(&self, _config: &crate::config::Config, _session: &Session) -> Result<usize> {
+        Ok(1)
+    }
+
+    async fn refresh(&mut self) -> Result<()> {
+        Ok(())
+    }
 }
 
 impl Context {
+    /// Creates a new Context for plain text content.
+    pub fn new_text(name: &str, content: &str) -> Self {
+        Context::Text(Text::new(name.to_string(), content.to_string()))
+    }
+
     /// Creates a new Context for a Ruskel document.
     pub fn new_ruskel(name: &str) -> Self {
         Context::Ruskel(Ruskel::new(name.to_string()))
@@ -337,15 +367,7 @@ impl ContextProvider for Context {
             Context::Path(g) => g.typ(),
             Context::ProjectMap(p) => p.typ(),
             Context::Url(u) => u.typ(),
-        }
-    }
-
-    fn name(&self) -> &str {
-        match self {
-            Context::Ruskel(r) => r.name(),
-            Context::Path(g) => g.name(),
-            Context::ProjectMap(p) => p.name(),
-            Context::Url(u) => u.name(),
+            Context::Text(t) => t.typ(),
         }
     }
 
@@ -359,6 +381,7 @@ impl ContextProvider for Context {
             Context::Path(g) => g.contexts(config, session),
             Context::ProjectMap(p) => p.contexts(config, session),
             Context::Url(u) => u.contexts(config, session),
+            Context::Text(t) => t.contexts(config, session),
         }
     }
 
@@ -368,6 +391,7 @@ impl ContextProvider for Context {
             Context::Path(g) => g.human(),
             Context::ProjectMap(p) => p.human(),
             Context::Url(u) => u.human(),
+            Context::Text(t) => t.human(),
         }
     }
 
@@ -377,6 +401,7 @@ impl ContextProvider for Context {
             Context::Path(g) => g.count(config, session),
             Context::ProjectMap(p) => p.count(config, session),
             Context::Url(u) => u.count(config, session),
+            Context::Text(t) => t.count(config, session),
         }
     }
 
@@ -386,6 +411,7 @@ impl ContextProvider for Context {
             Context::Path(g) => g.refresh().await,
             Context::ProjectMap(p) => p.refresh().await,
             Context::Url(u) => u.refresh().await,
+            Context::Text(t) => t.refresh().await,
         }
     }
 }
@@ -421,7 +447,7 @@ mod tests {
 
             let context = &contexts[0];
             assert_eq!(context.ty, "project_map");
-            assert_eq!(context.name, "project_map");
+            assert_eq!(context.source, "project_map");
 
             let mut actual_files: Vec<_> = context.body.lines().collect();
             actual_files.sort();
@@ -454,14 +480,14 @@ mod tests {
             let mut expected_files = vec!["src/main.rs", "src/lib.rs", "tests/test1.rs"];
             expected_files.sort();
 
-            let mut actual_files: Vec<_> = contexts.iter().map(|c| c.name.as_str()).collect();
+            let mut actual_files: Vec<_> = contexts.iter().map(|c| c.source.as_str()).collect();
             actual_files.sort();
 
             assert_eq!(actual_files, expected_files);
 
             for context in contexts {
                 assert_eq!(context.ty, "file");
-                assert_eq!(test_project.read(&context.name), context.body);
+                assert_eq!(test_project.read(&context.source), context.body);
             }
         } else {
             panic!("Expected ContextSpec::Path");
@@ -488,9 +514,9 @@ mod tests {
 
             assert_eq!(contexts.len(), 1);
             let context = &contexts[0];
-            assert_eq!(context.name, "src/main.rs");
+            assert_eq!(context.source, "src/main.rs");
             assert_eq!(context.ty, "file");
-            assert_eq!(test_project.read(&context.name), context.body);
+            assert_eq!(test_project.read(&context.source), context.body);
         } else {
             panic!("Expected ContextSpec::Path");
         }
@@ -507,9 +533,9 @@ mod tests {
 
             assert_eq!(contexts.len(), 1);
             let context = &contexts[0];
-            assert_eq!(context.name, "src/lib.rs");
+            assert_eq!(context.source, "src/lib.rs");
             assert_eq!(context.ty, "file");
-            assert_eq!(test_project.read(&context.name), context.body);
+            assert_eq!(test_project.read(&context.source), context.body);
         } else {
             panic!("Expected ContextSpec::Path");
         }
@@ -531,7 +557,7 @@ mod tests {
 
             assert_eq!(contexts.len(), 1);
             let context = &contexts[0];
-            assert_eq!(context.name, outside_file_path.to_str().unwrap());
+            assert_eq!(context.source, outside_file_path.to_str().unwrap());
             assert_eq!(context.ty, "file");
             assert_eq!(context.body, "Outside content");
         } else {
@@ -552,7 +578,7 @@ mod tests {
 
             assert_eq!(contexts.len(), 1);
             let context = &contexts[0];
-            assert_eq!(context.name, outside_file_path.to_str().unwrap());
+            assert_eq!(context.source, outside_file_path.to_str().unwrap());
             assert_eq!(context.ty, "file");
             assert_eq!(context.body, "Outside content");
         } else {

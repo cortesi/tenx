@@ -70,7 +70,7 @@ impl DialectProvider for Tags {
             for ctx in cspec.contexts(config, s)? {
                 let txt = format!(
                     "<item name=\"{}\" type=\"{:?}\">\n{}\n</item>\n",
-                    ctx.name, ctx.ty, ctx.body
+                    ctx.source, ctx.ty, ctx.body
                 );
                 rendered.push_str(&txt)
             }
