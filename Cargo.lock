@@ -4300,7 +4300,6 @@ dependencies = [
  "indoc",
  "libtenx",
  "pretty_assertions",
- "serde_json",
  "tempfile",
  "terminal_size",
  "textwrap",

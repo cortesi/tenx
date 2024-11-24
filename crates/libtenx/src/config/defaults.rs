@@ -136,7 +136,7 @@ fn default_checks() -> Checks {
                 globs: vec!["*.rs".to_string()],
                 default_off: false,
                 fail_on_stderr: false,
-                mode: ModeConfig::Both,
+                mode: CheckMode::Both,
             },
             CheckConfig {
                 name: "cargo-test".to_string(),
@@ -144,7 +144,7 @@ fn default_checks() -> Checks {
                 globs: vec!["*.rs".to_string()],
                 default_off: false,
                 fail_on_stderr: false,
-                mode: ModeConfig::Both,
+                mode: CheckMode::Both,
             },
             CheckConfig {
                 name: "cargo-clippy".to_string(),
@@ -152,7 +152,7 @@ fn default_checks() -> Checks {
                 globs: vec!["*.rs".to_string()],
                 default_off: true,
                 fail_on_stderr: true,
-                mode: ModeConfig::Both,
+                mode: CheckMode::Both,
             },
             CheckConfig {
                 name: "cargo-fmt".to_string(),
@@ -160,7 +160,7 @@ fn default_checks() -> Checks {
                 globs: vec!["*.rs".to_string()],
                 default_off: false,
                 fail_on_stderr: true,
-                mode: ModeConfig::Post,
+                mode: CheckMode::Post,
             },
             CheckConfig {
                 name: "ruff-check".to_string(),
@@ -168,7 +168,7 @@ fn default_checks() -> Checks {
                 globs: vec!["*.py".to_string()],
                 default_off: false,
                 fail_on_stderr: false,
-                mode: ModeConfig::Both,
+                mode: CheckMode::Both,
             },
             CheckConfig {
                 name: "ruff-format".to_string(),
@@ -176,7 +176,7 @@ fn default_checks() -> Checks {
                 globs: vec!["*.py".to_string()],
                 default_off: false,
                 fail_on_stderr: false,
-                mode: ModeConfig::Post,
+                mode: CheckMode::Post,
             },
         ],
         ..Default::default()
@@ -196,6 +196,10 @@ pub fn default_config() -> Config {
         },
         ops: Ops { edit: true },
         include: Include::Git,
+        tags: Tags {
+            replace: true,
+            ..Default::default()
+        },
         session_store_dir: home_config_dir().join("state"),
         retry_limit: DEFAULT_RETRY_LIMIT,
         checks: default_checks(),

@@ -311,7 +311,7 @@ pub struct Ops {
 }
 
 #[optional_struct]
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Tags {
     /// EXPERIMENTAL: enable smart change type
     pub smart: bool,
@@ -319,16 +319,6 @@ pub struct Tags {
     pub replace: bool,
     /// EXPERIMENTAL: enable udiff change type
     pub udiff: bool,
-}
-
-impl Default for Tags {
-    fn default() -> Self {
-        Self {
-            smart: false,
-            replace: true,
-            udiff: false,
-        }
-    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default, PartialEq)]
@@ -402,7 +392,7 @@ pub enum ProjectRoot {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
-pub enum ModeConfig {
+pub enum CheckMode {
     Pre,
     Post,
     #[default]
@@ -422,7 +412,7 @@ pub struct CheckConfig {
     /// Whether to treat any stderr output as a failure, regardless of exit code
     pub fail_on_stderr: bool,
     /// When this check should run
-    pub mode: ModeConfig,
+    pub mode: CheckMode,
 }
 
 impl CheckConfig {
@@ -435,9 +425,9 @@ impl CheckConfig {
             default_off: self.default_off,
             fail_on_stderr: self.fail_on_stderr,
             mode: match self.mode {
-                ModeConfig::Pre => crate::Mode::Pre,
-                ModeConfig::Post => crate::Mode::Post,
-                ModeConfig::Both => crate::Mode::Both,
+                CheckMode::Pre => crate::Mode::Pre,
+                CheckMode::Post => crate::Mode::Post,
+                CheckMode::Both => crate::Mode::Both,
             },
         }
     }
@@ -497,10 +487,6 @@ pub struct Config {
     /// Set a dummy dialect for end-to-end testing. Over-rides the configured dialect.
     #[serde(skip)]
     pub(crate) dummy_dialect: Option<dialect::DummyDialect>,
-
-    /// When true, serializes all fields regardless of default values.
-    #[serde(skip)]
-    pub(crate) full: bool,
 
     /// The current working directory when testing. We need this, because we can't change the CWD
     /// reliably in tests for reasons of concurrency.
@@ -720,12 +706,6 @@ impl Config {
             .into_iter()
             .filter(|path| !exclude_globset.is_match(path))
             .collect())
-    }
-
-    /// Sets the full serialization flag.
-    pub fn with_full(mut self, full: bool) -> Self {
-        self.full = full;
-        self
     }
 
     /// Serialize the Config into a RON string.

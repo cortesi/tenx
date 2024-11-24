@@ -11,7 +11,6 @@ use libtenx::{
     model::ModelProvider,
     Session, Tenx,
 };
-use serde_json::to_string_pretty;
 use tokio::sync::mpsc;
 use tracing_subscriber::util::SubscriberInitExt;
 
@@ -153,12 +152,6 @@ enum Commands {
     },
     /// Print the current configuration
     Conf {
-        /// Output as JSON instead of TOML
-        #[clap(long)]
-        json: bool,
-        /// Output full configuration
-        #[clap(long)]
-        full: bool,
         /// Output default configuration
         #[clap(long)]
         defaults: bool,
@@ -406,24 +399,13 @@ async fn main() -> anyhow::Result<()> {
                 }
                 Ok(())
             }
-            Commands::Conf {
-                json,
-                full,
-                defaults,
-            } => {
-                let mut conf = if *defaults {
+            Commands::Conf { defaults } => {
+                let conf = if *defaults {
                     config::Config::default()
                 } else {
                     config.clone()
                 };
-                if *full || *defaults {
-                    conf = conf.with_full(true);
-                }
-                if *json {
-                    println!("{}", to_string_pretty(&conf)?);
-                } else {
-                    println!("{}", conf.to_ron()?);
-                }
+                println!("{}", conf.to_ron()?);
                 Ok(()) as anyhow::Result<()>
             }
             Commands::Project => {
