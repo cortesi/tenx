@@ -375,7 +375,7 @@ async fn main() -> anyhow::Result<()> {
             }
             Commands::Conf { defaults } => {
                 let conf = if *defaults {
-                    config::Config::default()
+                    config::default_config()
                 } else {
                     config.clone()
                 };
