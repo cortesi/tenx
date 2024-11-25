@@ -187,11 +187,13 @@ impl Session {
         }
     }
 
-    /// Adds a new context to the session, ignoring duplicates.
+    /// Adds a new context to the session.
     ///
-    /// If a context with the same name and type already exists, it will not be added again.
+    /// If a context with the same name and type already exists, it will be replaced.
     pub fn add_context(&mut self, new_context: context::Context) {
-        if !self.contexts.contains(&new_context) {
+        if let Some(pos) = self.contexts.iter().position(|x| x == &new_context) {
+            self.contexts[pos] = new_context;
+        } else {
             self.contexts.push(new_context);
         }
     }

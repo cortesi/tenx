@@ -484,7 +484,7 @@ pub struct Config {
     /// Operations that can be executed by the model.
     #[optional_rename(OptionalDialect)]
     #[optional_wrap]
-    pub ops: Dialect,
+    pub dialect: Dialect,
 
     /// The default context configuration.
     #[optional_rename(OptionalContextConfig)]
@@ -815,7 +815,7 @@ impl Config {
             self.tags.smart,
             self.tags.replace,
             self.tags.udiff,
-            self.ops.edit,
+            self.dialect.edit,
         )))
     }
 

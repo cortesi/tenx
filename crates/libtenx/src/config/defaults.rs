@@ -194,7 +194,7 @@ pub fn default_config() -> Config {
             project_map: true,
             ..Default::default()
         },
-        ops: Dialect { edit: true },
+        dialect: Dialect { edit: true },
         project: ProjectConf {
             include: Include::Git,
             exclude: vec![],
