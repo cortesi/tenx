@@ -329,6 +329,7 @@ fn load_config(cli: &Cli) -> Result<config::Config> {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    sigpipe::reset();
     let cli = Cli::parse();
     let verbosity = if cli.quiet { 0 } else { cli.verbose };
     let config = load_config(&cli)?;
