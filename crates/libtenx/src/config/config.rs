@@ -310,9 +310,11 @@ pub enum ConfigDialect {
     Tags,
 }
 
+/// Settings related to the dialect we are using to communicate to models. For the moment, we have
+/// only one dialect, so this section is pretty simple.
 #[optional_struct]
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct Ops {
+pub struct Dialect {
     /// Allow the model to request to edit files in the project map
     pub edit: bool,
 }
@@ -480,9 +482,9 @@ pub struct Config {
     pub tags: Tags,
 
     /// Operations that can be executed by the model.
-    #[optional_rename(OptionalOps)]
+    #[optional_rename(OptionalDialect)]
     #[optional_wrap]
-    pub ops: Ops,
+    pub ops: Dialect,
 
     /// The default context configuration.
     #[optional_rename(OptionalContextConfig)]
