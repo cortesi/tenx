@@ -457,7 +457,8 @@ mod tests {
         ]);
 
         let mut config = test_project.config.clone();
-        config.include = Include::Glob(vec!["**/*.rs".to_string(), "**/Cargo.toml".to_string()]);
+        config.project.include =
+            Include::Glob(vec!["**/*.rs".to_string(), "**/Cargo.toml".to_string()]);
 
         let context_spec = Context::new_project_map();
         let mut expected_files = vec!["src/main.rs", "src/lib.rs", "tests/test1.rs", "Cargo.toml"];
@@ -491,7 +492,7 @@ mod tests {
         ]);
 
         let mut config = test_project.config.clone();
-        config.include = Include::Glob(vec!["**/*.rs".to_string()]);
+        config.project.include = Include::Glob(vec!["**/*.rs".to_string()]);
 
         let context_spec = Context::new_path(&config, "**/*.rs").unwrap();
         assert!(matches!(context_spec, Context::Path(_)));

@@ -389,7 +389,11 @@ async fn main() -> anyhow::Result<()> {
                     "project root:".blue().bold(),
                     project_root.display()
                 );
-                println!("{} {}", "include strategy:".blue().bold(), config.include);
+                println!(
+                    "{} {}",
+                    "include strategy:".blue().bold(),
+                    config.project.include
+                );
                 Ok(())
             }
             Commands::Files { pattern } => {

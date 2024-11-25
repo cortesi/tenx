@@ -11,6 +11,7 @@ Model response robustness:
     - Allow write_file to create files
     - Partial application of patches
     - Ignore <edit> requests for files that are already being edited
+    - Sometimes the models mix <edit> and <patch> requests. Make sure we do the right thing.
 
 
 Bugs:

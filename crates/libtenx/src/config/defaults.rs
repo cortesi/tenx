@@ -195,7 +195,11 @@ pub fn default_config() -> Config {
             ..Default::default()
         },
         ops: Ops { edit: true },
-        include: Include::Git,
+        project: ProjectConf {
+            include: Include::Git,
+            exclude: vec![],
+            root: ProjectRoot::Discover,
+        },
         tags: Tags {
             replace: true,
             ..Default::default()

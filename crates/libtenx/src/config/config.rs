@@ -351,6 +351,20 @@ impl std::fmt::Display for Include {
     }
 }
 
+/// Core project configuration.
+#[optional_struct]
+#[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ProjectConf {
+    /// Project root configuration.
+    pub root: ProjectRoot,
+
+    /// Which files are included by default
+    pub include: Include,
+
+    /// Glob patterns to exclude from the file list
+    pub exclude: Vec<String>,
+}
+
 #[optional_struct]
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Checks {
@@ -448,11 +462,10 @@ pub struct Config {
     #[optional_wrap]
     pub models: Models,
 
-    /// Which files are included by default
-    pub include: Include,
-
-    /// Glob patterns to exclude from the file list
-    pub exclude: Vec<String>,
+    /// Project configuration
+    #[optional_rename(OptionalProjectConf)]
+    #[optional_wrap]
+    pub project: ProjectConf,
 
     /// The directory to store session state.
     /// The directory to store session state. Defaults to ~/.config/tenx/state
@@ -536,7 +549,7 @@ impl Config {
     }
 
     pub fn project_root(&self) -> PathBuf {
-        match &self.project_root {
+        match &self.project.root {
             ProjectRoot::Discover => find_project_root(&self.cwd().unwrap_or_default()),
             ProjectRoot::Path(path) => path.clone(),
         }
@@ -658,7 +671,7 @@ impl Config {
 
         // Build exclude globset
         let mut exclude_builder = GlobSetBuilder::new();
-        for pattern in &self.exclude {
+        for pattern in &self.project.exclude {
             exclude_builder
                 .add(Glob::new(pattern).map_err(|e| TenxError::Internal(e.to_string()))?);
         }
@@ -667,7 +680,7 @@ impl Config {
             .map_err(|e| TenxError::Internal(e.to_string()))?;
 
         // Get initial file list
-        let initial_files = match &self.include {
+        let initial_files = match &self.project.include {
             Include::Git => {
                 let output = Command::new("git")
                     .arg("ls-files")
@@ -733,7 +746,7 @@ impl Config {
     }
 
     pub fn with_root<P: AsRef<Path>>(mut self, path: P) -> Self {
-        self.project_root = ProjectRoot::Path(path.as_ref().into());
+        self.project.root = ProjectRoot::Path(path.as_ref().into());
         self
     }
 
@@ -889,7 +902,7 @@ mod tests {
     fn test_config_roundtrip() -> crate::Result<()> {
         let mut config = default_config();
         config.retry_limit = 42;
-        config.exclude.push("*.test".to_string());
+        config.project.exclude.push("*.test".to_string());
 
         let ron = config.to_ron()?;
         let parsed = parse_config("", &ron)?;
@@ -908,8 +921,8 @@ mod tests {
         // Test that other values remain at default
         let default_config = default_config();
         assert_eq!(config.models, default_config.models);
-        assert_eq!(config.include, default_config.include);
-        assert_eq!(config.exclude, default_config.exclude);
+        assert_eq!(config.project.include, default_config.project.include);
+        assert_eq!(config.project.exclude, default_config.project.exclude);
 
         Ok(())
     }
@@ -977,9 +990,11 @@ mod tests {
         )?;
 
         let config = Config {
-            include: Include::Glob(vec!["*.rs".to_string(), "subdir/*.txt".to_string()]),
-            exclude: vec!["**/ignore.rs".to_string()],
-            project_root: ProjectRoot::Path(root_path.to_path_buf()),
+            project: ProjectConf {
+                include: Include::Glob(vec!["*.rs".to_string(), "subdir/*.txt".to_string()]),
+                exclude: vec!["**/ignore.rs".to_string()],
+                root: ProjectRoot::Path(root_path.to_path_buf()),
+            },
             ..Default::default()
         };
 
@@ -997,9 +1012,11 @@ mod tests {
 
         // Test with multiple exclude patterns
         let config_multi_exclude = Config {
-            include: Include::Glob(vec!["**/*.rs".to_string(), "**/*.txt".to_string()]),
-            exclude: vec!["**/ignore.rs".to_string(), "subdir/*.txt".to_string()],
-            project_root: ProjectRoot::Path(root_path.to_path_buf()),
+            project: ProjectConf {
+                include: Include::Glob(vec!["**/*.rs".to_string(), "**/*.txt".to_string()]),
+                exclude: vec!["**/ignore.rs".to_string(), "subdir/*.txt".to_string()],
+                root: ProjectRoot::Path(root_path.to_path_buf()),
+            },
             ..Default::default()
         };
 
@@ -1027,7 +1044,10 @@ mod tests {
         ));
 
         let config_path = Config {
-            project_root: ProjectRoot::Path(PathBuf::from("/custom/path")),
+            project: ProjectConf {
+                root: ProjectRoot::Path(PathBuf::from("/custom/path")),
+                ..Default::default()
+            },
             ..Default::default()
         };
         assert_eq!(config_path.project_root(), PathBuf::from("/custom/path"));
@@ -1045,7 +1065,7 @@ mod tests {
             "README.md",
         ]);
 
-        project.config.include =
+        project.config.project.include =
             Include::Glob(vec!["**/*.rs".to_string(), "README.md".to_string()]);
 
         // Test matching files from root directory
