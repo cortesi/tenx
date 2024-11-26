@@ -224,7 +224,7 @@ impl OpenAi {
 
 #[async_trait]
 impl ModelProvider for OpenAi {
-    fn name(&self) -> String {
+    fn api_model(&self) -> String {
         self.api_model.clone()
     }
 

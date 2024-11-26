@@ -48,8 +48,8 @@ impl Usage {
 /// Implemented by types that expose a prompt operation.
 #[async_trait]
 pub trait ModelProvider {
-    /// Returns the name of the model provider.
-    fn name(&self) -> String;
+    /// Returns underlying name of the model.
+    fn api_model(&self) -> String;
 
     /// Render and send a session to the model.
     async fn send(
@@ -72,11 +72,11 @@ pub enum Model {
 
 #[async_trait]
 impl ModelProvider for Model {
-    fn name(&self) -> String {
+    fn api_model(&self) -> String {
         match self {
-            Model::Claude(c) => c.name(),
-            Model::OpenAi(o) => o.name(),
-            Model::Dummy(d) => d.name(),
+            Model::Claude(c) => c.api_model(),
+            Model::OpenAi(o) => o.api_model(),
+            Model::Dummy(d) => d.api_model(),
         }
     }
 

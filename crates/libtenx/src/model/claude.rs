@@ -27,6 +27,8 @@ const MAX_TOKENS: u32 = 8192;
 /// - Edit the conversation to keep the most up-to-date editable files frontmost.
 #[derive(Default, Debug, Clone)]
 pub struct Claude {
+    /// The user facing name of the model
+    pub name: String,
     /// Upstream model name to use
     pub api_model: String,
     /// The Anthropic API key
@@ -207,7 +209,7 @@ impl Conversation<misanthropy::MessagesRequest> for Claude {
 
 #[async_trait::async_trait]
 impl ModelProvider for Claude {
-    fn name(&self) -> String {
+    fn api_model(&self) -> String {
         self.api_model.clone()
     }
 

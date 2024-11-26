@@ -260,7 +260,7 @@ impl Tenx {
         sender: Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
         let mut model = self.config.active_model()?;
-        let _block = EventBlock::prompt(&sender, &model.name())?;
+        let _block = EventBlock::prompt(&sender, &model.api_model())?;
         let resp = model.send(&self.config, session, sender).await?;
         if let Some(last_step) = session.last_step_mut() {
             last_step.model_response = Some(resp);
