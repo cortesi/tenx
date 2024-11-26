@@ -47,15 +47,44 @@ fn default_models() -> Vec<ModelConfig> {
     }
 
     if env::var(DEEPINFRA_API_KEY).is_ok() {
-        models.push(ModelConfig::OpenAi {
-            name: "qwen-coder".to_string(),
-            api_model: "Qwen/Qwen2.5-Coder-32B-Instruct".to_string(),
-            key: "".to_string(),
-            key_env: DEEPINFRA_API_KEY.to_string(),
-            api_base: DEEPINFRA_API_BASE.to_string(),
-            can_stream: true,
-            no_system_prompt: false,
-        });
+        models.extend_from_slice(&[
+            ModelConfig::OpenAi {
+                name: "qwen".to_string(),
+                api_model: "Qwen/Qwen2.5-32B-Instruct".to_string(),
+                key: "".to_string(),
+                key_env: DEEPINFRA_API_KEY.to_string(),
+                api_base: DEEPINFRA_API_BASE.to_string(),
+                can_stream: true,
+                no_system_prompt: false,
+            },
+            ModelConfig::OpenAi {
+                name: "llama-8b-turbo".to_string(),
+                api_model: "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo".to_string(),
+                key: "".to_string(),
+                key_env: DEEPINFRA_API_KEY.to_string(),
+                api_base: DEEPINFRA_API_BASE.to_string(),
+                can_stream: true,
+                no_system_prompt: false,
+            },
+            ModelConfig::OpenAi {
+                name: "llama-70b".to_string(),
+                api_model: "meta-llama/Meta-Llama-3.1-70B-Instruct".to_string(),
+                key: "".to_string(),
+                key_env: DEEPINFRA_API_KEY.to_string(),
+                api_base: DEEPINFRA_API_BASE.to_string(),
+                can_stream: true,
+                no_system_prompt: false,
+            },
+            ModelConfig::OpenAi {
+                name: "deepseek".to_string(),
+                api_model: "deepseek-ai/DeepSeek-V2.5".to_string(),
+                key: "".to_string(),
+                key_env: DEEPINFRA_API_KEY.to_string(),
+                api_base: DEEPINFRA_API_BASE.to_string(),
+                can_stream: true,
+                no_system_prompt: false,
+            },
+        ]);
     }
 
     if env::var(OPENAI_API_KEY).is_ok() {
