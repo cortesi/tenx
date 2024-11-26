@@ -218,7 +218,7 @@ impl Trial {
         let temp_dir = self.setup_temp_project()?;
         let mut conf = self.tenx_conf.clone();
         conf.session_store_dir = PathBuf::from("");
-        conf.project_root = ProjectRoot::Path(temp_dir.path().join("project"));
+        conf.project.root = ProjectRoot::Path(temp_dir.path().join("project"));
 
         if let Some(m) = model {
             conf.models.default = m;
@@ -261,7 +261,6 @@ impl Trial {
     /// if needed.
     fn default_config() -> Result<Config> {
         let mut config = default_config();
-        config.project.root = ProjectRoot::Discover;
         config.project.include = Include::Glob(vec!["**/*".to_string()]);
         config.project.exclude = vec!["target/**".to_string()];
         config.retry_limit = 1;

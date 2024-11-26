@@ -498,10 +498,6 @@ pub struct Config {
     #[optional_wrap]
     pub checks: Checks,
 
-    /// Project root configuration.
-    pub project_root: ProjectRoot,
-
-    //
     // Internal fields, not to be set in config
     //
     /// Set a dummy model for end-to-end testing. Over-rides the configured model.
@@ -898,12 +894,12 @@ mod tests {
     fn test_config_merge() -> crate::Result<()> {
         let parsed = parse_config(
             r#"(models: (default: "foo", no_stream: true))"#,
-            r#"(models: (default: "bar"), project_root: path("/foo"))"#,
+            r#"(models: (default: "bar"), project: ( root: path("/foo")))"#,
         )?;
         assert_eq!(parsed.models.default, "bar");
         assert!(parsed.models.no_stream);
         assert_eq!(
-            parsed.project_root,
+            parsed.project.root,
             ProjectRoot::Path(PathBuf::from("/foo"))
         );
         Ok(())
@@ -1050,7 +1046,7 @@ mod tests {
     fn test_project_root() {
         let config_discover = Config::default();
         assert!(matches!(
-            config_discover.project_root,
+            config_discover.project.root,
             ProjectRoot::Discover
         ));
 
