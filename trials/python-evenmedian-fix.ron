@@ -1,0 +1,18 @@
+(
+    project: "python/evenmedian",
+    desc: "Blindly fix a simple problem based on unit test failure.",
+    op: fix(
+        primpt: "Fix the test failure, but don't touch the unit tests.",
+    ),
+    config: (
+        checks: (
+            custom: [
+                (
+                    name: "pytest",
+                    command: "uv run pytest *.py",
+                    globs: ["**/*.py"],
+                ),
+            ]
+        )
+    )
+)

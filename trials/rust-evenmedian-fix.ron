@@ -1,6 +1,6 @@
 (
     project: "rust/evenmedian",
-    desc: "Blindly fix a simple problem based on unit test failure.",
+    desc: "A simple problem that won't be a simple recitation from memory, blind variation.",
     op: fix(
         primpt: "Fix the test failure, but don't touch the unit tests.",
     ),
