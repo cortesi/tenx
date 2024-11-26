@@ -272,12 +272,7 @@ impl ModelConfig {
     /// Converts ModelConfig to a Claude or OpenAi model.
     pub fn to_model(&self, no_stream: bool) -> crate::Result<model::Model> {
         match self {
-            ModelConfig::Claude {
-                name,
-                api_model,
-                key,
-                ..
-            } => {
+            ModelConfig::Claude { api_model, key, .. } => {
                 if api_model.is_empty() {
                     return Err(TenxError::Model("Empty API model name".into()));
                 }
@@ -285,7 +280,7 @@ impl ModelConfig {
                     return Err(TenxError::Model("Empty Anthropic API key".into()));
                 }
                 Ok(model::Model::Claude(model::Claude {
-                    name: name.clone(),
+                    name: self.name().to_string(),
                     api_model: api_model.clone(),
                     anthropic_key: key.clone(),
                     streaming: !no_stream,
@@ -299,6 +294,7 @@ impl ModelConfig {
                 no_system_prompt,
                 ..
             } => Ok(model::Model::OpenAi(model::OpenAi {
+                name: self.name().to_string(),
                 api_model: api_model.clone(),
                 openai_key: key.clone(),
                 api_base: api_base.clone(),
@@ -809,6 +805,7 @@ impl Config {
                 no_system_prompt,
                 ..
             } => Ok(model::Model::OpenAi(model::OpenAi {
+                name: name.clone(),
                 api_model: api_model.clone(),
                 openai_key: key.clone(),
                 api_base: api_base.clone(),

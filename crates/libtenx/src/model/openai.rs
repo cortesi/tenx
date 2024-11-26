@@ -34,6 +34,7 @@ pub const OPENAI_API_BASE: &str = "https://api.openai.com/v1";
 /// OpenAI model implementation
 #[derive(Default, Debug, Clone)]
 pub struct OpenAi {
+    pub name: String,
     pub api_model: String,
     pub openai_key: String,
     pub api_base: String,
