@@ -428,15 +428,23 @@ pub enum CheckMode {
 pub struct CheckConfig {
     /// Name of the validator for display and error reporting
     pub name: String,
+
     /// Shell command to execute, run with sh -c
     pub command: String,
+
     /// List of glob patterns to match against files for determining relevance
     pub globs: Vec<String>,
+
     /// Whether this validator defaults to off in the configuration
+    #[serde(default)]
     pub default_off: bool,
+
     /// Whether to treat any stderr output as a failure, regardless of exit code
+    #[serde(default)]
     pub fail_on_stderr: bool,
+
     /// When this check should run
+    #[serde(default)]
     pub mode: CheckMode,
 }
 
