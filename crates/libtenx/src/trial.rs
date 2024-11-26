@@ -108,8 +108,8 @@ pub struct TrialReport {
     pub tokens_out: u64,
     /// Number of patch errors
     pub error_patch: usize,
-    /// Number of validation errors
-    pub error_validation: usize,
+    /// Number of check errors
+    pub error_check: usize,
     /// Number of response parse errors
     pub error_response_parse: usize,
     /// Number of other errors
@@ -138,7 +138,7 @@ impl TrialReport {
         let failed = session.last_step_error().is_some();
 
         let mut error_patch = 0;
-        let mut error_validation = 0;
+        let mut error_check = 0;
         let mut error_response_parse = 0;
         let mut error_other = 0;
 
@@ -146,7 +146,7 @@ impl TrialReport {
             if let Some(err) = &step.err {
                 match err {
                     TenxError::Patch { .. } => error_patch += 1,
-                    TenxError::Check { .. } => error_validation += 1,
+                    TenxError::Check { .. } => error_check += 1,
                     TenxError::ResponseParse { .. } => error_response_parse += 1,
                     _ => error_other += 1,
                 }
@@ -161,7 +161,7 @@ impl TrialReport {
             tokens_in,
             tokens_out,
             error_patch,
-            error_validation,
+            error_check,
             error_response_parse,
             error_other,
             time_taken,

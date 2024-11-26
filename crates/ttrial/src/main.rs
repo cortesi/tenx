@@ -82,14 +82,14 @@ fn print_report_text(reports: &[TrialReport]) {
             "pass".green()
         };
         let errors = if report.error_patch > 0
-            || report.error_validation > 0
+            || report.error_check > 0
             || report.error_response_parse > 0
             || report.error_other > 0
         {
             format!(
-                " (patch:{},valid:{},parse:{},other:{})",
+                " (patch:{},check:{},parse:{},other:{})",
                 report.error_patch,
-                report.error_validation,
+                report.error_check,
                 report.error_response_parse,
                 report.error_other
             )
@@ -125,8 +125,8 @@ fn print_report_table(reports: &[TrialReport]) {
         let status = if report.failed { "fail" } else { "pass" };
 
         let mut errors = Vec::new();
-        if report.error_validation > 0 {
-            errors.push(format!("validation: {}", report.error_validation));
+        if report.error_check > 0 {
+            errors.push(format!("check: {}", report.error_check));
         }
         if report.error_patch > 0 {
             errors.push(format!("patch: {}", report.error_patch));
