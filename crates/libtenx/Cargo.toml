@@ -10,8 +10,6 @@ repository.workspace = true
 
 
 [dependencies]
-misanthropy = { path = "../../../misanthropy/crates/misanthropy" }
-libruskel = { path = "../../../ruskel/crates/libruskel" }
 
 tempfile = "3.11.0"
 thiserror = "2.0.3"
@@ -39,6 +37,8 @@ futures-util = "0.3.31"
 textwrap = "0.16"
 ron = "0.8.1"
 optional_struct = "0.5.2"
+libruskel = "0.0.8"
+misanthropy = "0.0.7"
 
 [dev-dependencies]
 indoc = "2.0.5"
