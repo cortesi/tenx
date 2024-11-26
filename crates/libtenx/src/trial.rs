@@ -16,7 +16,7 @@ use tokio::sync::mpsc;
 use tracing::info;
 
 use crate::{
-    config::{Config, ConfigFile, Include, Models, ProjectConf, ProjectRoot},
+    config::{default_config, Config, ConfigFile, Include, ProjectRoot},
     model::ModelProvider,
     Event, Result, Tenx, TenxError,
 };
@@ -260,19 +260,13 @@ impl Trial {
     /// Returns a default configuration for trials. These need to be over-ridden by the trial
     /// if needed.
     fn default_config() -> Result<Config> {
-        let config = Config {
-            project: ProjectConf {
-                include: Include::Glob(vec!["**/*".to_string()]),
-                exclude: vec!["target/**".to_string()],
-                root: ProjectRoot::Discover,
-            },
-            retry_limit: 1,
-            models: Models {
-                no_stream: true, // We disable streaming for trials by default, because streaming messes up token counts
-                ..Default::default()
-            },
-            ..Default::default()
-        };
+        let mut config = default_config();
+        config.project.root = ProjectRoot::Discover;
+        config.project.include = Include::Glob(vec!["**/*".to_string()]);
+        config.project.exclude = vec!["target/**".to_string()];
+        config.retry_limit = 1;
+        // We disable streaming for trials by default, because streaming messes up token counts
+        config.models.no_stream = true;
         Ok(config)
     }
 

@@ -48,6 +48,9 @@ impl Usage {
 /// Implemented by types that expose a prompt operation.
 #[async_trait]
 pub trait ModelProvider {
+    /// Returns user-facing name of the model.
+    fn name(&self) -> String;
+
     /// Returns underlying name of the model.
     fn api_model(&self) -> String;
 
@@ -72,6 +75,14 @@ pub enum Model {
 
 #[async_trait]
 impl ModelProvider for Model {
+    fn name(&self) -> String {
+        match self {
+            Model::Claude(c) => c.name(),
+            Model::OpenAi(o) => o.name(),
+            Model::Dummy(d) => d.name(),
+        }
+    }
+
     fn api_model(&self) -> String {
         match self {
             Model::Claude(c) => c.api_model(),

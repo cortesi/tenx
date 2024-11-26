@@ -50,6 +50,10 @@ impl Default for DummyModel {
 
 #[async_trait]
 impl ModelProvider for DummyModel {
+    fn name(&self) -> String {
+        "dummy".to_string()
+    }
+
     fn api_model(&self) -> String {
         "dummy".to_string()
     }

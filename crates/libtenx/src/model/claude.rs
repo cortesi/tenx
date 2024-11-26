@@ -209,6 +209,10 @@ impl Conversation<misanthropy::MessagesRequest> for Claude {
 
 #[async_trait::async_trait]
 impl ModelProvider for Claude {
+    fn name(&self) -> String {
+        self.name.clone()
+    }
+
     fn api_model(&self) -> String {
         self.api_model.clone()
     }
