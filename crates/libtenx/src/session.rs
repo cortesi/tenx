@@ -89,9 +89,9 @@ fn is_glob(s: &str) -> bool {
 /// A serializable session, which persists between invocations.
 #[derive(Debug, Deserialize, Serialize, Default)]
 pub struct Session {
-    steps: Vec<Step>,
-    pub(crate) contexts: Vec<context::Context>,
-    editable: Vec<PathBuf>,
+    pub steps: Vec<Step>,
+    pub editable: Vec<PathBuf>,
+    pub contexts: Vec<context::Context>,
 }
 
 impl Session {

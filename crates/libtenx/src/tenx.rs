@@ -27,28 +27,31 @@ impl Tenx {
     pub async fn new_session_from_cwd(
         &self,
         sender: &Option<mpsc::Sender<Event>>,
+        no_context: bool,
     ) -> Result<Session> {
         let _block = EventBlock::start(sender)?;
         let mut session = Session::default();
 
-        // Add path contexts
-        for path in &self.config.context.path {
-            session.add_context(Context::new_path(&self.config, path)?);
-        }
+        if !no_context {
+            // Add path contexts
+            for path in &self.config.context.path {
+                session.add_context(Context::new_path(&self.config, path)?);
+            }
 
-        // Add ruskel contexts
-        for ruskel in &self.config.context.ruskel {
-            session.add_context(Context::new_ruskel(ruskel));
-        }
+            // Add ruskel contexts
+            for ruskel in &self.config.context.ruskel {
+                session.add_context(Context::new_ruskel(ruskel));
+            }
 
-        // Add text contexts
-        for text in &self.config.context.text {
-            session.add_context(Context::new_text(&text.name, &text.content));
-        }
+            // Add text contexts
+            for text in &self.config.context.text {
+                session.add_context(Context::new_text(&text.name, &text.content));
+            }
 
-        // Add project map if configured
-        if self.config.context.project_map {
-            session.add_context(Context::new_project_map());
+            // Add project map if configured
+            if self.config.context.project_map {
+                session.add_context(Context::new_project_map());
+            }
         }
 
         // Refresh all contexts
@@ -311,6 +314,30 @@ impl Tenx {
 
 #[cfg(test)]
 mod tests {
+    #[tokio::test]
+    async fn test_new_session_with_no_context() {
+        use crate::config::{ContextConfig, TextContext};
+        let temp_dir = tempdir().unwrap();
+        let mut config = Config::default().with_root(temp_dir.path());
+
+        // Add just text context which doesn't require filesystem or parsing
+        config.context = ContextConfig {
+            ruskel: vec![],
+            path: vec![],
+            project_map: false,
+            text: vec![TextContext {
+                name: "test".to_string(),
+                content: "test content".to_string(),
+            }],
+        };
+        let tenx = Tenx::new(config);
+
+        let session = tenx.new_session_from_cwd(&None, true).await.unwrap();
+        assert!(session.contexts().is_empty());
+
+        let session = tenx.new_session_from_cwd(&None, false).await.unwrap();
+        assert!(!session.contexts().is_empty());
+    }
     use super::*;
 
     use crate::patch::{Change, Patch, WriteFile};
@@ -339,6 +366,7 @@ mod tests {
                 },
             ))
             .with_root(temp_dir.path());
+
         config.session_store_dir = temp_dir.path().join("sess");
         config.retry_limit = 1;
 

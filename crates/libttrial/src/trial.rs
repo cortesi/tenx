@@ -150,7 +150,7 @@ impl Trial {
         let model_name = conf.active_model()?.api_model();
         let tenx = Tenx::new(conf);
 
-        let mut session = tenx.new_session_from_cwd(&sender).await?;
+        let mut session = tenx.new_session_from_cwd(&sender, false).await?;
 
         info!("trial setup complete: {}", self.name);
         let result = match &self.trial_conf.op {

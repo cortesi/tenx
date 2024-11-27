@@ -206,6 +206,9 @@ enum Commands {
         /// Clear the current session, and use it to fix
         #[clap(long)]
         clear: bool,
+        /// Skip adding default context to new session
+        #[clap(long)]
+        no_ctx: bool,
         /// User prompt for the fix operation
         #[clap(long)]
         prompt: Option<String>,
@@ -223,7 +226,11 @@ enum Commands {
         full: bool,
     },
     /// Create a new session
-    New,
+    New {
+        /// Skip adding default context to new session
+        #[clap(long)]
+        no_ctx: bool,
+    },
     /// Print information about the current project
     Project,
     /// Start a new session, edit the prompt, and run it
@@ -231,6 +238,9 @@ enum Commands {
         /// Specifies files to edit
         #[clap(value_parser)]
         files: Vec<String>,
+        /// Skip adding default context to new session
+        #[clap(long)]
+        no_ctx: bool,
         /// User prompt for the edit operation
         #[clap(long)]
         prompt: Option<String>,
@@ -447,10 +457,13 @@ async fn main() -> anyhow::Result<()> {
             }
             Commands::Quick {
                 files,
+                no_ctx,
                 prompt,
                 prompt_file,
             } => {
-                let mut session = tx.new_session_from_cwd(&Some(sender.clone())).await?;
+                let mut session = tx
+                    .new_session_from_cwd(&Some(sender.clone()), *no_ctx)
+                    .await?;
                 for file in files {
                     session.add_editable(&config, file)?;
                 }
@@ -587,14 +600,17 @@ async fn main() -> anyhow::Result<()> {
                 tx.retry(&mut session, prompt, Some(sender.clone())).await?;
                 Ok(())
             }
-            Commands::New => {
-                let session = tx.new_session_from_cwd(&Some(sender.clone())).await?;
+            Commands::New { no_ctx } => {
+                let session = tx
+                    .new_session_from_cwd(&Some(sender.clone()), *no_ctx)
+                    .await?;
                 tx.save_session(&session)?;
                 println!("new session: {}", config.project_root().display());
                 Ok(())
             }
             Commands::Fix {
                 clear,
+                no_ctx,
                 prompt,
                 prompt_file,
                 edit,
@@ -604,7 +620,8 @@ async fn main() -> anyhow::Result<()> {
                     current_session.clear();
                     current_session
                 } else {
-                    tx.new_session_from_cwd(&Some(sender.clone())).await?
+                    tx.new_session_from_cwd(&Some(sender.clone()), *no_ctx)
+                        .await?
                 };
 
                 let prompt = if prompt.is_some() || prompt_file.is_some() || *edit {
