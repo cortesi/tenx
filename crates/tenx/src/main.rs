@@ -112,6 +112,8 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum ContextCommands {
+    /// Clear all context from the session
+    Clear,
     /// Add ruskel documentation to context
     Ruskel {
         /// Items to add to context
@@ -534,6 +536,10 @@ async fn main() -> anyhow::Result<()> {
             Commands::Context { command } => {
                 let mut session = tx.load_session()?;
                 match command {
+                    ContextCommands::Clear => {
+                        session.clear_ctx();
+                        println!("All context cleared from session");
+                    }
                     ContextCommands::Ruskel { items } => {
                         for item in items {
                             session.add_context(Context::new_ruskel(item));

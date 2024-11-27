@@ -95,6 +95,11 @@ pub struct Session {
 }
 
 impl Session {
+    /// Clears all contexts from the session.
+    pub fn clear_ctx(&mut self) {
+        self.contexts.clear();
+    }
+
     /// Updates the prompt at a specific step.
     pub fn update_prompt_at(&mut self, offset: usize, prompt: Prompt) -> Result<()> {
         if offset >= self.steps.len() {

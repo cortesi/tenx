@@ -81,11 +81,13 @@ impl Tenx {
         sender: &Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
         let _block = EventBlock::start(sender)?;
-        let _block = EventBlock::context(sender)?;
-        for context in session.contexts.iter_mut() {
-            if context.needs_refresh().await {
-                let _refresh_block = EventBlock::context_refresh(sender, &context.human())?;
-                context.refresh().await?;
+        if !session.contexts.is_empty() {
+            let _block = EventBlock::context(sender)?;
+            for context in session.contexts.iter_mut() {
+                if context.needs_refresh().await {
+                    let _refresh_block = EventBlock::context_refresh(sender, &context.human())?;
+                    context.refresh().await?;
+                }
             }
         }
         Ok(())
