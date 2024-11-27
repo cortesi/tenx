@@ -7,7 +7,6 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use fs_extra;
 use glob::glob;
 use optional_struct::*;
 use serde::Deserialize;
@@ -20,6 +19,8 @@ use libtenx::{
     model::ModelProvider,
     Event, Result, Session, Tenx, TenxError,
 };
+
+use crate::TrialReport;
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -89,84 +90,6 @@ pub struct Trial {
     pub base_dir: PathBuf,
     pub trial_conf: TrialConf,
     pub tenx_conf: Config,
-}
-
-/// A report about a trial execution.
-#[derive(Debug)]
-pub struct TrialReport {
-    /// Name of the trial
-    pub trial_name: String,
-    /// Name of the model used
-    pub model_name: String,
-    /// Whether the trial failed
-    pub failed: bool,
-    /// Number of steps taken
-    pub steps: usize,
-    /// Total tokens used in input
-    pub tokens_in: u64,
-    /// Total tokens used in output
-    pub tokens_out: u64,
-    /// Number of patch errors
-    pub error_patch: usize,
-    /// Number of check errors
-    pub error_check: usize,
-    /// Number of response parse errors
-    pub error_response_parse: usize,
-    /// Number of other errors
-    pub error_other: usize,
-    /// Total execution time in seconds
-    pub time_taken: f64,
-}
-
-impl TrialReport {
-    /// Computes a trial report from a session
-    pub fn from_session(
-        session: &Session,
-        trial_name: String,
-        model_name: String,
-        time_taken: f64,
-    ) -> Self {
-        let steps = session.steps().len();
-        let (tokens_in, tokens_out) = session
-            .steps()
-            .iter()
-            .filter_map(|step| step.model_response.as_ref()?.usage.as_ref())
-            .map(|usage| usage.totals())
-            .fold((0, 0), |(acc_in, acc_out), (in_, out)| {
-                (acc_in + in_, acc_out + out)
-            });
-        let failed = session.last_step_error().is_some();
-
-        let mut error_patch = 0;
-        let mut error_check = 0;
-        let mut error_response_parse = 0;
-        let mut error_other = 0;
-
-        for step in session.steps() {
-            if let Some(err) = &step.err {
-                match err {
-                    TenxError::Patch { .. } => error_patch += 1,
-                    TenxError::Check { .. } => error_check += 1,
-                    TenxError::ResponseParse { .. } => error_response_parse += 1,
-                    _ => error_other += 1,
-                }
-            }
-        }
-
-        TrialReport {
-            trial_name,
-            model_name,
-            failed,
-            steps,
-            tokens_in,
-            tokens_out,
-            error_patch,
-            error_check,
-            error_response_parse,
-            error_other,
-            time_taken,
-        }
-    }
 }
 
 impl Trial {
@@ -288,7 +211,7 @@ impl Trial {
 }
 
 /// Returns trials that match any of the provided patterns, without duplicates.
-pub fn list<P: AsRef<Path>>(base_dir: P, patterns: Option<&[&str]>) -> Result<Vec<Trial>> {
+pub fn list_trials<P: AsRef<Path>>(base_dir: P, patterns: Option<&[&str]>) -> Result<Vec<Trial>> {
     let mut trials = Vec::new();
     let fs_pattern = base_dir.as_ref().join("*.ron");
     let fs_pattern = fs_pattern.to_string_lossy();
@@ -350,31 +273,31 @@ mod tests {
         fs::write(dir.path().join("other.ron"), test_ron)?;
 
         // Test with no patterns
-        let trials = list(dir.path(), None)?;
+        let trials = list_trials(dir.path(), None)?;
         assert_eq!(trials.len(), 3);
         assert!(trials.iter().any(|t| t.name == "test1"));
         assert!(trials.iter().any(|t| t.name == "test2"));
         assert!(trials.iter().any(|t| t.name == "other"));
 
         // Test with single pattern
-        let trials = list(dir.path(), Some(&["test1"]))?;
+        let trials = list_trials(dir.path(), Some(&["test1"]))?;
         assert_eq!(trials.len(), 1);
         assert_eq!(trials[0].name, "test1");
 
         // Test with wildcard pattern
-        let trials = list(dir.path(), Some(&["test*"]))?;
+        let trials = list_trials(dir.path(), Some(&["test*"]))?;
         assert_eq!(trials.len(), 2);
         assert!(trials.iter().any(|t| t.name == "test1"));
         assert!(trials.iter().any(|t| t.name == "test2"));
 
         // Test with multiple patterns
-        let trials = list(dir.path(), Some(&["test1", "other"]))?;
+        let trials = list_trials(dir.path(), Some(&["test1", "other"]))?;
         assert_eq!(trials.len(), 2);
         assert!(trials.iter().any(|t| t.name == "test1"));
         assert!(trials.iter().any(|t| t.name == "other"));
 
         // Test with overlapping patterns
-        let trials = list(dir.path(), Some(&["test*", "test1"]))?;
+        let trials = list_trials(dir.path(), Some(&["test*", "test1"]))?;
         assert_eq!(trials.len(), 2);
         assert!(trials.iter().any(|t| t.name == "test1"));
         assert!(trials.iter().any(|t| t.name == "test2"));

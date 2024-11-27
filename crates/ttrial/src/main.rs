@@ -29,11 +29,11 @@ enum ReportFormat {
 
 /// Run a single trial and return its report
 async fn run_trial(
-    trial: &mut trial::Trial,
+    trial: &mut Trial,
     output_mode: &OutputMode,
     sender: &mpsc::Sender<libtenx::Event>,
     model_name: Option<String>,
-) -> anyhow::Result<(trial::TrialReport, libtenx::Session)> {
+) -> anyhow::Result<(TrialReport, libtenx::Session)> {
     trial.tenx_conf = trial.tenx_conf.clone().load_env();
 
     let progress = if matches!(output_mode, OutputMode::Sum) {
@@ -74,7 +74,7 @@ async fn run_trial(
 }
 
 /// Prints trial execution reports in a formatted output
-fn print_report_text(reports: &[trial::TrialReport]) {
+fn print_report_text(reports: &[TrialReport]) {
     for report in reports {
         let status = if report.failed {
             "fail".red()
@@ -110,7 +110,7 @@ fn print_report_text(reports: &[trial::TrialReport]) {
 }
 
 /// Prints trial execution reports in a table format
-fn print_report_table(reports: &[trial::TrialReport]) {
+fn print_report_table(reports: &[TrialReport]) {
     let mut table = Table::new();
     table.load_preset(UTF8_FULL).set_header(vec![
         Cell::new("model"),
@@ -258,7 +258,7 @@ async fn main() -> anyhow::Result<()> {
             } else {
                 Some(pattern_refs.as_slice())
             };
-            let mut trials = trial::list(&trials_path, pattern_slice)?;
+            let mut trials = list_trials(&trials_path, pattern_slice)?;
 
             if trials.is_empty() {
                 return Err(anyhow::anyhow!("No trials found matching patterns"));
@@ -319,7 +319,7 @@ async fn main() -> anyhow::Result<()> {
             } else {
                 Some(pattern_refs.as_slice())
             };
-            let trials = trial::list(&trials_path, pattern_slice)?;
+            let trials = list_trials(&trials_path, pattern_slice)?;
             for trial in trials {
                 println!("{}", trial.name.blue().bold());
                 if !trial.desc.is_empty() {
