@@ -15,10 +15,10 @@ use tempfile::TempDir;
 use tokio::sync::mpsc;
 use tracing::info;
 
-use crate::{
+use libtenx::{
     config::{default_config, Config, ConfigFile, Include, ProjectRoot},
     model::ModelProvider,
-    Event, Result, Tenx, TenxError,
+    Event, Result, Session, Tenx, TenxError,
 };
 
 #[derive(Debug, Clone, Deserialize)]
@@ -121,7 +121,7 @@ pub struct TrialReport {
 impl TrialReport {
     /// Computes a trial report from a session
     pub fn from_session(
-        session: &crate::Session,
+        session: &Session,
         trial_name: String,
         model_name: String,
         time_taken: f64,
@@ -212,7 +212,7 @@ impl Trial {
         &self,
         sender: Option<mpsc::Sender<Event>>,
         model: Option<String>,
-    ) -> Result<(TrialReport, crate::Session)> {
+    ) -> Result<(TrialReport, Session)> {
         use std::time::Instant;
         let start_time = Instant::now();
         let temp_dir = self.setup_temp_project()?;

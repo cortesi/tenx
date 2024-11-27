@@ -11,8 +11,8 @@ use libtenx::{
     self,
     event_consumers::{self, discard_events, output_logs, output_progress},
     model::ModelProvider,
-    trial::TrialReport,
 };
+use libttrial::*;
 
 #[derive(ValueEnum, Clone, Debug)]
 enum OutputMode {
@@ -29,11 +29,11 @@ enum ReportFormat {
 
 /// Run a single trial and return its report
 async fn run_trial(
-    trial: &mut libtenx::trial::Trial,
+    trial: &mut trial::Trial,
     output_mode: &OutputMode,
     sender: &mpsc::Sender<libtenx::Event>,
     model_name: Option<String>,
-) -> anyhow::Result<(TrialReport, libtenx::Session)> {
+) -> anyhow::Result<(trial::TrialReport, libtenx::Session)> {
     trial.tenx_conf = trial.tenx_conf.clone().load_env();
 
     let progress = if matches!(output_mode, OutputMode::Sum) {
@@ -74,7 +74,7 @@ async fn run_trial(
 }
 
 /// Prints trial execution reports in a formatted output
-fn print_report_text(reports: &[TrialReport]) {
+fn print_report_text(reports: &[trial::TrialReport]) {
     for report in reports {
         let status = if report.failed {
             "fail".red()
@@ -110,7 +110,7 @@ fn print_report_text(reports: &[TrialReport]) {
 }
 
 /// Prints trial execution reports in a table format
-fn print_report_table(reports: &[TrialReport]) {
+fn print_report_table(reports: &[trial::TrialReport]) {
     let mut table = Table::new();
     table.load_preset(UTF8_FULL).set_header(vec![
         Cell::new("model"),
@@ -258,7 +258,7 @@ async fn main() -> anyhow::Result<()> {
             } else {
                 Some(pattern_refs.as_slice())
             };
-            let mut trials = libtenx::trial::list(&trials_path, pattern_slice)?;
+            let mut trials = trial::list(&trials_path, pattern_slice)?;
 
             if trials.is_empty() {
                 return Err(anyhow::anyhow!("No trials found matching patterns"));
@@ -319,7 +319,7 @@ async fn main() -> anyhow::Result<()> {
             } else {
                 Some(pattern_refs.as_slice())
             };
-            let trials = libtenx::trial::list(&trials_path, pattern_slice)?;
+            let trials = trial::list(&trials_path, pattern_slice)?;
             for trial in trials {
                 println!("{}", trial.name.blue().bold());
                 if !trial.desc.is_empty() {

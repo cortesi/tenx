@@ -2824,6 +2824,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "libttrial"
+version = "0.0.1"
+dependencies = [
+ "fs_extra",
+ "glob",
+ "libtenx",
+ "optional_struct",
+ "ron",
+ "serde",
+ "tempfile",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "libz-sys"
 version = "1.1.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4664,6 +4679,7 @@ dependencies = [
  "comfy-table",
  "indicatif",
  "libtenx",
+ "libttrial",
  "textwrap",
  "tokio",
  "tracing-subscriber",

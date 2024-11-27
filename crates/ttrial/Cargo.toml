@@ -10,6 +10,7 @@ keywords.workspace = true
 
 [dependencies]
 libtenx = { path = "../libtenx" }
+libttrial = { path = "../libttrial" }
 anyhow = "1.0"
 clap = { version = "4.4", features = ["derive"] }
 colored = "2.0"

@@ -13,7 +13,6 @@ pub mod event_consumers;
 pub mod model;
 pub mod patch;
 pub mod prompt;
-pub mod trial;
 
 pub use checks::*;
 pub use error::{Result, TenxError};
