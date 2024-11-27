@@ -397,7 +397,7 @@ mod tests {
 
         session
             .steps_mut()
-            .push(Step::new(Prompt::User("test".into())));
+            .push(Step::new("test_model".into(), Prompt::User("test".into())));
         if let Some(step) = session.steps_mut().last_mut() {
             step.model_response = Some(response);
         }

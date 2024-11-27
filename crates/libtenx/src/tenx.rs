@@ -99,7 +99,8 @@ impl Tenx {
         let pre_result = self.run_pre_checks(session, &sender);
         let result = if let Err(e) = pre_result {
             let prompt = prompt.unwrap_or_else(|| "Please fix the following errors.".to_string());
-            session.add_prompt(Prompt::Auto(prompt))?;
+            let model = self.config.models.default.clone();
+            session.add_prompt(model, Prompt::Auto(prompt))?;
             if let Some(step) = session.last_step_mut() {
                 step.err = Some(e.clone());
             }
@@ -155,7 +156,8 @@ impl Tenx {
         sender: Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
         let _block = EventBlock::start(&sender)?;
-        session.add_prompt(Prompt::User(prompt))?;
+        let model = self.config.models.default.clone();
+        session.add_prompt(model, Prompt::User(prompt))?;
         self.process_prompt(session, sender.clone()).await
     }
 
@@ -212,7 +214,8 @@ impl Tenx {
                         "Retryable error (attempt {}/{}): {}",
                         retry_count, self.config.retry_limit, e
                     );
-                    session.add_prompt(Prompt::Auto(model_message.to_string()))?;
+                    let model = self.config.models.default.clone();
+                    session.add_prompt(model, Prompt::Auto(model_message.to_string()))?;
                     self.save_session(session)?;
                 } else {
                     debug!("Non-retryable error: {}", e);
@@ -345,7 +348,10 @@ mod tests {
 
         let mut session = Session::default();
         session
-            .add_prompt(Prompt::User("Test prompt".to_string()))
+            .add_prompt(
+                config.models.default.clone(),
+                Prompt::User("Test prompt".to_string()),
+            )
             .unwrap();
         session
             .add_editable_path(&config, test_file_path.clone())

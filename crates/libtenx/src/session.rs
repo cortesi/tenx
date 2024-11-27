@@ -31,6 +31,8 @@ pub enum Operation {
 /// A single step in the session - basically a prompt and a patch.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Step {
+    /// The name of the model used for this step
+    pub model: String,
     /// The prompt provided to the model
     pub prompt: Prompt,
     /// The response from the model
@@ -44,8 +46,9 @@ pub struct Step {
 
 impl Step {
     /// Creates a new Step with the given prompt.
-    pub fn new(prompt: Prompt) -> Self {
+    pub fn new(model: String, prompt: Prompt) -> Self {
         Step {
+            model,
             prompt,
             model_response: None,
             err: None,
@@ -161,7 +164,7 @@ impl Session {
     /// Adds a new step to the session, and sets the step prompt.
     ///
     /// Returns an error if the last step doesn't have either a patch or an error.
-    pub fn add_prompt(&mut self, prompt: Prompt) -> Result<()> {
+    pub fn add_prompt(&mut self, model: String, prompt: Prompt) -> Result<()> {
         if let Some(last_step) = self.steps.last() {
             if last_step.model_response.is_none() && last_step.err.is_none() {
                 return Err(TenxError::Internal(
@@ -169,17 +172,19 @@ impl Session {
                 ));
             }
         }
-        self.steps.push(Step::new(prompt));
+        self.steps.push(Step::new(model, prompt));
         Ok(())
     }
 
     /// Sets the prompt for the last step in the session.
     /// If there are no steps, it creates a new one.
-    pub fn set_last_prompt(&mut self, prompt: Prompt) -> Result<()> {
+    pub fn set_last_prompt(&mut self, model: String, prompt: Prompt) -> Result<()> {
         if self.steps.is_empty() {
-            self.steps.push(Step::new(prompt));
+            self.steps.push(Step::new(model, prompt));
             Ok(())
         } else if let Some(last_step) = self.steps.last_mut() {
+            last_step.prompt = prompt;
+            last_step.model = model;
             last_step.model_response = None;
             Ok(())
         } else {
@@ -269,7 +274,13 @@ impl Session {
             }
         }
         if had_edit {
-            self.add_prompt(Prompt::Auto("OK".into()))?;
+            // Use the same model as the current step for auto-prompts
+            let current_model = self
+                .steps
+                .last()
+                .map(|s| s.model.clone())
+                .unwrap_or_default();
+            self.add_prompt(current_model, Prompt::Auto("OK".into()))?;
         }
         Ok(())
     }
@@ -381,7 +392,7 @@ mod tests {
             };
             test_project
                 .session
-                .add_prompt(Prompt::User(format!("Prompt {}", i)))?;
+                .add_prompt("test_model".into(), Prompt::User(format!("Prompt {}", i)))?;
 
             let rollback_cache = [(PathBuf::from("test.txt"), test_project.read("test.txt"))]
                 .into_iter()
@@ -437,7 +448,7 @@ mod tests {
         // Step 0: Modify file1.txt through patch
         test_project
             .session
-            .add_prompt(Prompt::User("step0".into()))?;
+            .add_prompt("test_model".into(), Prompt::User("step0".into()))?;
         let step = test_project.session.steps.last_mut().unwrap();
         step.model_response = Some(ModelResponse {
             patch: Some(Patch {
@@ -454,7 +465,7 @@ mod tests {
         // Step 1: Request to edit file2.txt and modify file3.txt through patch
         test_project
             .session
-            .add_prompt(Prompt::User("step1".into()))?;
+            .add_prompt("test_model".into(), Prompt::User("step1".into()))?;
         let step = test_project.session.steps.last_mut().unwrap();
         step.model_response = Some(ModelResponse {
             patch: Some(Patch {
@@ -471,7 +482,7 @@ mod tests {
         // Step 2: Empty step (no modifications)
         test_project
             .session
-            .add_prompt(Prompt::User("step2".into()))?;
+            .add_prompt("test_model".into(), Prompt::User("step2".into()))?;
         let step = test_project.session.steps.last_mut().unwrap();
         step.model_response = Some(ModelResponse {
             patch: None,
@@ -521,7 +532,7 @@ mod tests {
         // Add a step with both a patch and an edit operation
         test_project
             .session
-            .add_prompt(Prompt::User("test prompt".into()))?;
+            .add_prompt("test_model".into(), Prompt::User("test prompt".into()))?;
         let step = test_project.session.steps.last_mut().unwrap();
         let patch = Patch {
             changes: vec![Change::Write(WriteFile {

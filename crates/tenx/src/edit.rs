@@ -144,9 +144,10 @@ mod tests {
     fn test_render_initial_text() {
         let mut session = Session::default();
         session
-            .add_prompt(Prompt::User(
-                "First prompt\nwith multiple lines".to_string(),
-            ))
+            .add_prompt(
+                "test_model".into(),
+                Prompt::User("First prompt\nwith multiple lines".to_string()),
+            )
             .unwrap();
         if let Some(step) = session.last_step_mut() {
             step.model_response = Some(libtenx::ModelResponse {
@@ -167,9 +168,10 @@ mod tests {
 
         // Add second step
         session
-            .add_prompt(Prompt::User(
-                "Second prompt\nstill multiple lines".to_string(),
-            ))
+            .add_prompt(
+                "test_model".into(),
+                Prompt::User("Second prompt\nstill multiple lines".to_string()),
+            )
             .unwrap();
         if let Some(step) = session.last_step_mut() {
             step.model_response = Some(libtenx::ModelResponse {

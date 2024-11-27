@@ -140,7 +140,10 @@ mod tests {
         let dialect = Dialect::Dummy(DummyDialect::default());
         let config = Config::default();
         let mut session = Session::default();
-        session.add_prompt(crate::prompt::Prompt::User("test prompt".to_string()))?;
+        session.add_prompt(
+            "test_model".into(),
+            crate::prompt::Prompt::User("test prompt".to_string()),
+        )?;
 
         build_conversation(&conversation, &mut req, &config, &session, &dialect)?;
 

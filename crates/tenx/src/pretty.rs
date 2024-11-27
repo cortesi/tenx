@@ -306,7 +306,7 @@ mod tests {
         let config = Config::default();
         let mut session = Session::default();
         session
-            .add_prompt(Prompt::User("Test prompt".to_string()))
+            .add_prompt("test_model".into(), Prompt::User("Test prompt".to_string()))
             .unwrap();
         let test_file_path = root_path.join("test_file.rs");
         std::fs::write(&test_file_path, "Test content").unwrap();
@@ -366,9 +366,10 @@ mod tests {
 
     #[test]
     fn test_render_step_editable() {
-        let step = Step::new(Prompt::User(
-            "Test prompt\nwith multiple\nlines".to_string(),
-        ));
+        let step = Step::new(
+            "test_model".into(),
+            Prompt::User("Test prompt\nwith multiple\nlines".to_string()),
+        );
         let full_result = render_step_prompt(&step, 80, true);
         assert!(full_result.contains("Test prompt"));
         assert!(full_result.contains("with multiple"));

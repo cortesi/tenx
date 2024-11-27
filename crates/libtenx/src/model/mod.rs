@@ -62,7 +62,8 @@ pub trait ModelProvider {
         sender: Option<mpsc::Sender<Event>>,
     ) -> Result<ModelResponse>;
 
-    /// Render a session for display to the user.
+    /// Render a session as it would be sent to the model. It's a requirement that this step be
+    /// able to render a sessio with no steps, that is, with the system prompt only.
     fn render(&self, config: &Config, session: &Session) -> Result<String>;
 }
 
