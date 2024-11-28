@@ -6,7 +6,10 @@ use std::{
 use fs_err as fs;
 use serde::{Deserialize, Serialize};
 
-use crate::{config, context, model::Usage, patch::Patch, prompt::Prompt, Result, TenxError};
+use crate::{
+    config, context, dialect::DialectProvider, model::Usage, patch::Patch, prompt::Prompt, Result,
+    TenxError,
+};
 
 /// A parsed model response
 #[derive(Debug, Deserialize, Serialize, Clone, Default, PartialEq, Eq)]
@@ -76,6 +79,61 @@ impl Step {
         self.err = None;
         Ok(())
     }
+}
+/// Represents statistics about a session's interaction with the model.
+#[derive(Debug, Default)]
+pub struct Stats {
+    pub words_sent: usize,
+    pub words_received: usize,
+}
+
+impl Session {
+    /// Computes statistics for the session by calculating words sent to and received from the model.
+    pub fn stats(&self, config: &config::Config) -> Result<Stats> {
+        let mut session_copy = Session::default();
+        let dialect_provider = config.dialect()?;
+
+        // Baseline for word count
+        let initial_output = dialect_provider.render_context(config, &session_copy)?;
+        let baseline_words = word_count(&initial_output);
+        let mut prev_words_sent = 0;
+        let mut prev_words_received = 0;
+
+        let mut total_words_sent = 0;
+        let mut total_words_received = 0;
+
+        for step in &self.steps {
+            // For each step, add the prompt and render
+            session_copy.add_prompt(step.model.clone(), step.prompt.clone())?;
+            let prompt_output = dialect_provider.render_step_request(config, &session_copy, 0)?;
+            let current_words_sent = word_count(&prompt_output);
+            total_words_sent += current_words_sent - prev_words_sent;
+            prev_words_sent = current_words_sent;
+
+            // Add the model response and render
+            if let Some(model_response) = &step.model_response {
+                session_copy.steps.last_mut().unwrap().model_response =
+                    Some(model_response.clone());
+                let response_output =
+                    dialect_provider.render_step_response(config, &session_copy, 0)?;
+                let current_words_received = word_count(&response_output);
+                total_words_received += current_words_received - prev_words_received;
+                prev_words_received = current_words_received;
+            }
+        }
+
+        // Deduct baseline words from total words sent
+        total_words_sent -= baseline_words;
+
+        Ok(Stats {
+            words_sent: total_words_sent,
+            words_received: total_words_received,
+        })
+    }
+}
+
+fn word_count(s: &str) -> usize {
+    s.split_whitespace().count()
 }
 
 /// Determines if a given string is a glob pattern or a rooted path.

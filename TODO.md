@@ -16,8 +16,8 @@ Bugs:
 
 Features:
 
-    - --no-context flag to disable default context if needed
     - command output context type
     - custom system prompt additions
     - git diff context
     - graceful error handling for contexts, e.g. unfetchable urls
+    - configurable modes with pre-defined models and contexts
