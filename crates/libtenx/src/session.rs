@@ -24,6 +24,49 @@ pub struct ModelResponse {
     pub usage: Option<Usage>,
 }
 
+#[test]
+fn test_session_stats() -> Result<()> {
+    // Create a test project and set up necessary files.
+    let test_project = crate::testutils::test_project();
+    test_project.create_file_tree(&["file1.txt", "file2.txt"]);
+    test_project.write("file1.txt", "initial content 1");
+    test_project.write("file2.txt", "initial content 2");
+
+    // Initialize a session and add steps with prompts and model responses.
+    let mut session = test_project.session;
+
+    session.add_prompt("test_model".into(), Prompt::User("prompt1".into()))?;
+    if let Some(step) = session.last_step_mut() {
+        step.model_response = Some(ModelResponse {
+            comment: Some("response1".into()),
+            patch: None,
+            operations: vec![],
+            usage: None,
+        });
+    }
+
+    session.add_prompt("test_model".into(), Prompt::User("prompt2".into()))?;
+    if let Some(step) = session.last_step_mut() {
+        step.model_response = Some(ModelResponse {
+            comment: Some("response2".into()),
+            patch: None,
+            operations: vec![],
+            usage: None,
+        });
+    }
+
+    // Calculate statistics and verify the values.
+    let stats = session.stats(&test_project.config)?;
+
+    // Assert that the words sent and words received are correctly calculated.
+    assert!(stats.words_sent > 0);
+    assert!(stats.words_received > 0);
+
+    println!("stats: {:?}", stats);
+
+    Ok(())
+}
+
 /// Operations requested by the model, other than patching.
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
 pub enum Operation {
