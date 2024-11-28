@@ -84,6 +84,15 @@ fn default_models() -> Vec<ModelConfig> {
                 can_stream: true,
                 no_system_prompt: false,
             },
+            ModelConfig::OpenAi {
+                name: "qwq".to_string(),
+                api_model: "Qwen/QwQ-32B-Preview".to_string(),
+                key: "".to_string(),
+                key_env: DEEPINFRA_API_KEY.to_string(),
+                api_base: DEEPINFRA_API_BASE.to_string(),
+                can_stream: true,
+                no_system_prompt: false,
+            },
         ]);
     }
 
