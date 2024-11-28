@@ -13,9 +13,11 @@ Model response robustness:
 Bugs:
     
     - retry doesn't work with fix
+    - improve words sent/received calculation
 
 Features:
 
+    - env variable to control default model
     - command output context type
     - custom system prompt additions
     - git diff context

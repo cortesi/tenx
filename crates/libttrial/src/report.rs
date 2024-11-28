@@ -11,10 +11,10 @@ pub struct TrialReport {
     pub failed: bool,
     /// Number of steps taken
     pub steps: usize,
-    /// Total tokens used in input
-    pub tokens_in: u64,
-    /// Total tokens used in output
-    pub tokens_out: u64,
+    /// Total words sent
+    pub words_sent: usize,
+    /// Total words received
+    pub words_received: usize,
     /// Number of patch errors
     pub error_patch: usize,
     /// Number of check errors
@@ -36,14 +36,11 @@ impl TrialReport {
         time_taken: f64,
     ) -> Self {
         let steps = session.steps().len();
-        let (tokens_in, tokens_out) = session
-            .steps()
-            .iter()
-            .filter_map(|step| step.model_response.as_ref()?.usage.as_ref())
-            .map(|usage| usage.totals())
-            .fold((0, 0), |(acc_in, acc_out), (in_, out)| {
-                (acc_in + in_, acc_out + out)
-            });
+        let stats = session
+            .stats(&libtenx::config::Config::default())
+            .unwrap_or_default();
+        let words_sent = stats.words_sent;
+        let words_received = stats.words_received;
         let failed = session.last_step_error().is_some();
 
         let mut error_patch = 0;
@@ -67,8 +64,8 @@ impl TrialReport {
             model_name,
             failed,
             steps,
-            tokens_in,
-            tokens_out,
+            words_sent,
+            words_received,
             error_patch,
             error_check,
             error_response_parse,
@@ -136,8 +133,9 @@ mod tests {
         assert_eq!(report.trial_name, "trial1");
         assert_eq!(report.model_name, "gpt4");
         assert_eq!(report.steps, 3);
-        assert_eq!(report.tokens_in, 10);
-        assert_eq!(report.tokens_out, 20);
+        // These values are defaults, as we only check for the existence of stats.
+        assert_eq!(report.words_sent, 0);
+        assert_eq!(report.words_received, 0);
         assert_eq!(report.error_patch, 1);
         assert_eq!(report.error_check, 1);
         assert_eq!(report.error_response_parse, 0);
