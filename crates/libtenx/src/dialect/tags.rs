@@ -237,6 +237,7 @@ impl DialectProvider for Tags {
             operations,
             usage: None,
             comment,
+            text: Some(response.to_string()),
         })
     }
 
@@ -348,6 +349,7 @@ mod tests {
             operations: vec![],
             usage: None,
             comment: Some("This is a comment.".to_string()),
+            text: Some(input.to_string()),
         };
 
         let result = d.parse(input).unwrap();
@@ -393,6 +395,7 @@ mod tests {
                 Operation::Edit(PathBuf::from("src/lib.rs")),
             ],
             usage: None,
+            text: Some("Test response".into()),
         };
 
         session

@@ -101,6 +101,7 @@ mod tests {
                     completion_tokens: Some(20),
                     total_tokens: Some(30),
                 })),
+                text: Some("test response".to_string()),
             });
         }
 

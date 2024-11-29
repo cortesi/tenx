@@ -95,6 +95,16 @@ fn print_steps(config: &Config, session: &Session, full: bool, width: usize) -> 
                 output.push_str(&wrapped_block(&comment_text, width, INDENT.len() * 3));
                 output.push('\n');
             }
+            if let Some(text) = &response.text {
+                output.push_str(&format!("{}{}\n", INDENT.repeat(2), "text:".blue().bold()));
+                let text_text = if full {
+                    text.clone()
+                } else {
+                    text.lines().next().unwrap_or("").to_string()
+                };
+                output.push_str(&wrapped_block(&text_text, width, INDENT.len() * 3));
+                output.push('\n');
+            }
 
             if !response.operations.is_empty() {
                 output.push_str(&format!(
@@ -337,6 +347,7 @@ mod tests {
                 operations: vec![],
                 usage: None,
                 comment: Some("Test comment".to_string()),
+                text: Some("Test comment".to_string()),
             });
         }
         let result = print_steps(&config, &session, false, 80);

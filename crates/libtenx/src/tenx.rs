@@ -365,6 +365,7 @@ mod tests {
                     }),
                     operations: vec![],
                     usage: None,
+                    text: Some("Test comment".to_string()),
                 },
             ))
             .with_root(temp_dir.path());

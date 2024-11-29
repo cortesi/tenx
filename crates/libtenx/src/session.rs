@@ -22,6 +22,8 @@ pub struct ModelResponse {
     pub operations: Vec<Operation>,
     /// Model-specific usage statistics
     pub usage: Option<Usage>,
+    /// The verbatim text response from the model
+    pub text: Option<String>,
 }
 
 #[test]
@@ -42,6 +44,7 @@ fn test_session_stats() -> Result<()> {
             patch: None,
             operations: vec![],
             usage: None,
+            text: Some("response1".into()),
         });
     }
 
@@ -52,6 +55,7 @@ fn test_session_stats() -> Result<()> {
             patch: None,
             operations: vec![],
             usage: None,
+            text: Some("response2".into()),
         });
     }
 
@@ -510,6 +514,7 @@ mod tests {
                     operations: vec![],
                     usage: None,
                     comment: Some(format!("Step {}", i)),
+                    text: Some(format!("Step {}", i)),
                 });
                 step.rollback_cache = rollback_cache;
                 step.apply(&test_project.config)?;
@@ -566,6 +571,7 @@ mod tests {
             operations: vec![],
             usage: None,
             comment: None,
+            text: None,
         });
 
         // Step 1: Request to edit file2.txt and modify file3.txt through patch
@@ -583,6 +589,7 @@ mod tests {
             operations: vec![Operation::Edit(PathBuf::from("file2.txt"))],
             usage: None,
             comment: None,
+            text: None,
         });
 
         // Step 2: Empty step (no modifications)
@@ -595,6 +602,7 @@ mod tests {
             operations: vec![],
             usage: None,
             comment: None,
+            text: None,
         });
 
         // Test 2: At step 0, no files should be editable (no previous step)
@@ -651,6 +659,7 @@ mod tests {
             operations: vec![Operation::Edit(PathBuf::from("new.txt"))],
             usage: None,
             comment: None,
+            text: None,
         });
         step.rollback_cache = [(PathBuf::from("test.txt"), "content".into())]
             .into_iter()

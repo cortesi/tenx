@@ -5,6 +5,7 @@ UX:
 Model response robustness:
     
     - Allow write_file to create files
+        - Ensure that newly created files are rolled back in rollback
     - Partial application of patches
     - Ignore <edit> requests for files that are already being edited
     - Sometimes the models mix <edit> and <patch> requests. Make sure we do the right thing.
@@ -17,6 +18,7 @@ Bugs:
 
 Features:
 
+    - reset --all to completely roll back a session
     - env variable to control default model
     - command output context type
     - custom system prompt additions
