@@ -201,6 +201,14 @@ enum Commands {
         /// Directory to save failed trial sessions to
         #[clap(long)]
         save_failures: Option<PathBuf>,
+
+        /// Skip printing the report
+        #[clap(long)]
+        no_report: bool,
+
+        /// Print detailed session information
+        #[clap(long)]
+        session: bool,
     },
     /// List all available trials (alias: ls)
     #[clap(alias = "ls")]
@@ -251,6 +259,8 @@ async fn main() -> anyhow::Result<()> {
             patterns,
             model,
             save_failures,
+            no_report,
+            session: session_flag,
         } => {
             let pattern_refs: Vec<&str> = patterns.iter().map(|s| s.as_str()).collect();
             let pattern_slice = if pattern_refs.is_empty() {
@@ -283,31 +293,42 @@ async fn main() -> anyhow::Result<()> {
                             store.save(&session_name, &session)?;
                         }
                     }
+                    if session_flag {
+                        println!("\n{}", "-".repeat(80));
+                        println!("Session for {} - {}:", report.model_name.blue(), trial.name);
+                        println!(
+                            "{}",
+                            libtenx::pretty::print_session(&trial.tenx_conf, &session, true)?
+                        );
+                    }
                     reports.push(report);
                 }
             }
 
-            match cli.report {
-                ReportFormat::Text => print_report_text(&reports),
-                ReportFormat::Table => print_report_table(&reports),
-            }
+            if !no_report {
+                match cli.report {
+                    ReportFormat::Text => print_report_text(&reports),
+                    ReportFormat::Table => print_report_table(&reports),
+                }
 
-            if reports.len() > 1 {
-                println!("\nSummary:");
-                let total = reports.len();
-                let failed = reports.iter().filter(|r| r.failed).count();
-                let total_time: f64 = reports.iter().map(|r| r.time_taken).sum();
-                let total_words_sent: usize = reports.iter().map(|r| r.words_sent).sum();
-                let total_words_received: usize = reports.iter().map(|r| r.words_received).sum();
+                if reports.len() > 1 {
+                    println!("\nSummary:");
+                    let total = reports.len();
+                    let failed = reports.iter().filter(|r| r.failed).count();
+                    let total_time: f64 = reports.iter().map(|r| r.time_taken).sum();
+                    let total_words_sent: usize = reports.iter().map(|r| r.words_sent).sum();
+                    let total_words_received: usize =
+                        reports.iter().map(|r| r.words_received).sum();
 
-                println!(
-                    "Ran {} trials in {:.1}s ({} failed)",
-                    total, total_time, failed
-                );
-                println!(
-                    "Total words: {} sent, {} received",
-                    total_words_sent, total_words_received
-                );
+                    println!(
+                        "Ran {} trials in {:.1}s ({} failed)",
+                        total, total_time, failed
+                    );
+                    println!(
+                        "Total words: {} sent, {} received",
+                        total_words_sent, total_words_received
+                    );
+                }
             }
 
             Ok(())
