@@ -1,7 +1,8 @@
-use colored::*;
-use libtenx::{
-    config::Config, context::ContextProvider, prompt::Prompt, Result, Session, TenxError,
+use crate::{
+    config::Config, context, context::ContextProvider, model, patch, prompt::Prompt, Operation,
+    Result, Session, Step, TenxError,
 };
+use colored::*;
 use textwrap::{wrap, Options};
 
 fn get_term_width() -> usize {
@@ -11,7 +12,7 @@ fn get_term_width() -> usize {
 }
 const INDENT: &str = "  ";
 
-fn format_usage(usage: &libtenx::model::Usage) -> String {
+fn format_usage(usage: &model::Usage) -> String {
     let values = usage.values();
     let mut keys: Vec<_> = values.keys().collect();
     keys.sort();
@@ -19,17 +20,6 @@ fn format_usage(usage: &libtenx::model::Usage) -> String {
         .map(|k| format!("{}: {}", k.blue().bold(), values.get(*k).unwrap()))
         .collect::<Vec<_>>()
         .join("\n")
-}
-
-/// Pretty prints the Session information.
-pub fn session(config: &Config, session: &Session, full: bool) -> Result<String> {
-    let width = get_term_width();
-    let mut output = String::new();
-    output.push_str(&print_session_info(config, session));
-    output.push_str(&print_context_specs(session));
-    output.push_str(&print_editables(config, session)?);
-    output.push_str(&print_steps(config, session, full, width)?);
-    Ok(output)
 }
 
 fn print_session_info(config: &Config, _: &Session) -> String {
@@ -114,7 +104,7 @@ fn print_steps(config: &Config, session: &Session, full: bool, width: usize) -> 
                 ));
                 for op in &response.operations {
                     match op {
-                        libtenx::Operation::Edit(path) => {
+                        Operation::Edit(path) => {
                             output.push_str(&format!(
                                 "{}- edit: {}\n",
                                 INDENT.repeat(3),
@@ -152,7 +142,7 @@ fn print_steps(config: &Config, session: &Session, full: bool, width: usize) -> 
     Ok(output)
 }
 
-fn render_step_prompt(step: &libtenx::Step, width: usize, full: bool) -> String {
+fn render_step_prompt(step: &Step, width: usize, full: bool) -> String {
     let prompt_header = format!("{}{}\n", INDENT.repeat(2), "prompt:".blue().bold());
     match &step.prompt {
         Prompt::User(text) => format!(
@@ -183,7 +173,7 @@ fn render_step_prompt(step: &libtenx::Step, width: usize, full: bool) -> String 
     }
 }
 
-fn print_patch(config: &Config, patch: &libtenx::patch::Patch, full: bool, width: usize) -> String {
+fn print_patch(config: &Config, patch: &patch::Patch, full: bool, width: usize) -> String {
     let mut output = String::new();
     output.push_str(&format!(
         "{}{}\n",
@@ -192,7 +182,7 @@ fn print_patch(config: &Config, patch: &libtenx::patch::Patch, full: bool, width
     ));
     for change in &patch.changes {
         match change {
-            libtenx::patch::Change::Write(w) => {
+            patch::Change::Write(w) => {
                 let file_path = config.relpath(&w.path).display().to_string().green().bold();
                 output.push_str(&format!("{}- {} (write)\n", INDENT.repeat(3), file_path));
                 if full {
@@ -200,14 +190,14 @@ fn print_patch(config: &Config, patch: &libtenx::patch::Patch, full: bool, width
                     output.push('\n');
                 }
             }
-            libtenx::patch::Change::UDiff(w) => {
+            patch::Change::UDiff(w) => {
                 output.push_str(&format!("{} udiff \n", INDENT.repeat(3)));
                 if full {
                     output.push_str(&wrapped_block(&w.patch, width, INDENT.len() * 4));
                     output.push('\n');
                 }
             }
-            libtenx::patch::Change::Replace(r) => {
+            patch::Change::Replace(r) => {
                 let file_path = config.relpath(&r.path).display().to_string().green().bold();
                 output.push_str(&format!("{}- {} (replace)\n", INDENT.repeat(3), file_path));
                 if full {
@@ -222,7 +212,7 @@ fn print_patch(config: &Config, patch: &libtenx::patch::Patch, full: bool, width
                     output.push('\n');
                 }
             }
-            libtenx::patch::Change::Smart(s) => {
+            patch::Change::Smart(s) => {
                 let file_path = config.relpath(&s.path).display().to_string().green().bold();
                 output.push_str(&format!("{}- {} (smart)\n", INDENT.repeat(3), file_path));
                 if full {
@@ -236,7 +226,7 @@ fn print_patch(config: &Config, patch: &libtenx::patch::Patch, full: bool, width
 }
 
 /// Pretty prints a TenxError with full details.
-pub fn full_error(error: &TenxError) -> String {
+fn full_error(error: &TenxError) -> String {
     match error {
         TenxError::Check { name, user, model } => {
             format!(
@@ -272,7 +262,7 @@ fn wrapped_block(text: &str, width: usize, indent: usize) -> String {
 }
 
 /// Pretty prints a context item with optional full detail
-fn print_context_item(item: &libtenx::context::ContextItem) -> String {
+fn print_context_item(item: &context::ContextItem) -> String {
     let mut output = String::new();
 
     output.push_str(&format!(
@@ -292,6 +282,17 @@ fn print_context_item(item: &libtenx::context::ContextItem) -> String {
     output
 }
 
+/// Pretty prints the Session information.
+pub fn print_session(config: &Config, session: &Session, full: bool) -> Result<String> {
+    let width = get_term_width();
+    let mut output = String::new();
+    output.push_str(&print_session_info(config, session));
+    output.push_str(&print_context_specs(session));
+    output.push_str(&print_editables(config, session)?);
+    output.push_str(&print_steps(config, session, full, width)?);
+    Ok(output)
+}
+
 /// Pretty prints all contexts in a session
 pub fn print_contexts(config: &Config, session: &Session) -> Result<String> {
     let mut output = String::new();
@@ -307,7 +308,7 @@ pub fn print_contexts(config: &Config, session: &Session) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use libtenx::{context::Context, patch::Patch, prompt::Prompt, Step, TenxError};
+    use crate::{context::Context, patch::Patch, prompt::Prompt, ModelResponse, Step, TenxError};
     use tempfile::TempDir;
 
     fn create_test_session() -> (TempDir, Session) {
@@ -340,7 +341,7 @@ mod tests {
         let config = Config::default();
         let (_temp_dir, mut session) = create_test_session();
         if let Some(step) = session.last_step_mut() {
-            step.model_response = Some(libtenx::ModelResponse {
+            step.model_response = Some(ModelResponse {
                 patch: Some(Patch {
                     ..Default::default()
                 }),

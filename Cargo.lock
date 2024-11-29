@@ -2816,6 +2816,7 @@ dependencies = [
  "serde_json",
  "serde_variant",
  "tempfile",
+ "termsize",
  "textwrap",
  "thiserror 2.0.3",
  "tokio",

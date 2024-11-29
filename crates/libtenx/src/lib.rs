@@ -12,6 +12,7 @@ pub mod dialect;
 pub mod event_consumers;
 pub mod model;
 pub mod patch;
+pub mod pretty;
 pub mod prompt;
 
 pub use checks::*;

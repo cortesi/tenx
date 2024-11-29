@@ -10,13 +10,12 @@ use libtenx::{
     dialect::DialectProvider,
     event_consumers,
     model::ModelProvider,
-    Session, Tenx,
+    pretty, Session, Tenx,
 };
 use tokio::sync::mpsc;
 use tracing_subscriber::util::SubscriberInitExt;
 
 mod edit;
-mod pretty;
 
 /// Gets the user's prompt from arguments or editor
 fn get_prompt(
@@ -513,7 +512,7 @@ async fn main() -> anyhow::Result<()> {
                 } else if *render {
                     println!("{}", model.render(&config, &session)?);
                 } else {
-                    println!("{}", pretty::session(&config, &session, *full)?);
+                    println!("{}", pretty::print_session(&config, &session, *full)?);
                 }
                 Ok(())
             }
