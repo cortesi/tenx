@@ -1,8 +1,11 @@
 use std::{fs, io::Read, path::PathBuf};
 
-use anyhow::{Context as AnyhowContext, Result};
+use anyhow::{anyhow, Context as AnyhowContext, Result};
 use clap::{CommandFactory, Parser, Subcommand};
 use colored::*;
+use tokio::sync::mpsc;
+use tracing_subscriber::util::SubscriberInitExt;
+
 use libtenx::{
     self,
     config::{self},
@@ -12,12 +15,25 @@ use libtenx::{
     model::ModelProvider,
     pretty, Session, Tenx,
 };
-use tokio::sync::mpsc;
-use tracing_subscriber::util::SubscriberInitExt;
 
 mod edit;
 
-/// Gets the user's prompt from arguments or editor
+fn add_files_to_session(
+    session: &mut Session,
+    config: &config::Config,
+    files: &[String],
+) -> Result<usize> {
+    let mut total = 0;
+    for file in files {
+        let added = session.add_editable(config, file)?;
+        if added == 0 {
+            return Err(anyhow!("glob did not match any files: {}", file));
+        }
+        total += added;
+    }
+    Ok(total)
+}
+
 fn get_prompt(
     prompt: &Option<String>,
     prompt_file: &Option<PathBuf>,
@@ -465,10 +481,7 @@ async fn main() -> anyhow::Result<()> {
                 let mut session = tx
                     .new_session_from_cwd(&Some(sender.clone()), *no_ctx)
                     .await?;
-                for file in files {
-                    session.add_editable(&config, file)?;
-                }
-
+                add_files_to_session(&mut session, &config, files)?;
                 let user_prompt = match get_prompt(prompt, prompt_file, &session, false)? {
                     Some(p) => p,
                     None => return Ok(()),
@@ -483,11 +496,9 @@ async fn main() -> anyhow::Result<()> {
                 prompt_file,
             } => {
                 let mut session = tx.load_session()?;
-
-                for f in files.clone().unwrap_or_default() {
-                    session.add_editable(&config, &f)?;
+                if let Some(files) = files {
+                    add_files_to_session(&mut session, &config, files)?;
                 }
-
                 let user_prompt = match get_prompt(prompt, prompt_file, &session, false)? {
                     Some(p) => p,
                     None => return Ok(()),
@@ -518,16 +529,7 @@ async fn main() -> anyhow::Result<()> {
             }
             Commands::Edit { files } => {
                 let mut session = tx.load_session()?;
-                let mut total = 0;
-
-                for file in files {
-                    let added = session.add_editable(&config, file)?;
-                    if added == 0 {
-                        return Err(anyhow::anyhow!("glob did not match any files"));
-                    }
-                    total += added;
-                }
-
+                let total = add_files_to_session(&mut session, &config, files)?;
                 println!("{} files added for editing", total);
                 tx.save_session(&session)?;
                 Ok(())
