@@ -172,10 +172,6 @@ struct Cli {
     #[clap(long, value_enum, default_value = "sum")]
     output: OutputMode,
 
-    /// Report format (text or table)
-    #[clap(long, value_enum, default_value = "table")]
-    report: ReportFormat,
-
     /// Path to trials directory
     #[clap(long)]
     trials: Option<PathBuf>,
@@ -190,6 +186,10 @@ enum Commands {
     Run {
         /// Optional glob patterns to filter trials
         patterns: Vec<String>,
+
+        /// Report format (text or table)
+        #[clap(long, value_enum, default_value = "table")]
+        report: ReportFormat,
 
         /// Override the models to use (can be specified multiple times)
         #[clap(long, num_args = 1)]
@@ -254,6 +254,7 @@ async fn main() -> anyhow::Result<()> {
     let result = match cli.command {
         Commands::Run {
             patterns,
+            report,
             model,
             save_failures,
             no_report,
@@ -303,7 +304,7 @@ async fn main() -> anyhow::Result<()> {
             }
 
             if !no_report {
-                match cli.report {
+                match report {
                     ReportFormat::Text => print_report_text(&reports),
                     ReportFormat::Table => print_report_table(&reports),
                 }

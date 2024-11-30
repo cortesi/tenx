@@ -21,6 +21,8 @@ pub struct TrialReport {
     pub error_other: usize,
     /// Total execution time in seconds
     pub time_taken: f64,
+    /// Total number of words received from the model
+    pub words_received: usize,
 }
 
 impl TrialReport {
@@ -38,6 +40,7 @@ impl TrialReport {
         let mut error_check = 0;
         let mut error_response_parse = 0;
         let mut error_other = 0;
+        let mut words_received = 0;
 
         for step in session.steps() {
             if let Some(err) = &step.err {
@@ -46,6 +49,11 @@ impl TrialReport {
                     TenxError::Check { .. } => error_check += 1,
                     TenxError::ResponseParse { .. } => error_response_parse += 1,
                     _ => error_other += 1,
+                }
+            }
+            if let Some(response) = &step.model_response {
+                if let Some(text) = &response.response_text {
+                    words_received += text.split_whitespace().count();
                 }
             }
         }
@@ -60,6 +68,7 @@ impl TrialReport {
             error_response_parse,
             error_other,
             time_taken,
+            words_received,
         }
     }
 }
