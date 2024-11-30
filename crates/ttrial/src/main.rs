@@ -88,7 +88,7 @@ fn print_report_table(reports: &[TrialReport]) {
         Cell::new("trial"),
         Cell::new("status"),
         Cell::new("time(s)"),
-        Cell::new("words (in/out)"),
+        Cell::new("words recv"),
         Cell::new("errors"),
     ]);
 
@@ -119,6 +119,7 @@ fn print_report_table(reports: &[TrialReport]) {
                 Color::Green
             }),
             Cell::new(format!("{:.1}", report.time_taken)),
+            Cell::new(report.words_received.to_string()),
             Cell::new(errors),
         ]);
     }

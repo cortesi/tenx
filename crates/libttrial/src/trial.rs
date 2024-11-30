@@ -147,7 +147,7 @@ impl Trial {
             conf.models.default = m;
         }
 
-        let model_name = conf.active_model()?.api_model();
+        let model = conf.active_model()?;
         let tenx = Tenx::new(conf);
 
         let mut session = tenx.new_session_from_cwd(&sender, false).await?;
@@ -175,7 +175,13 @@ impl Trial {
 
         let time_taken = start_time.elapsed().as_secs_f64();
         Ok((
-            TrialReport::from_session(&session, self.name.clone(), model_name, time_taken),
+            TrialReport::from_session(
+                &session,
+                self.name.clone(),
+                model.name(),
+                model.api_model(),
+                time_taken,
+            ),
             session,
         ))
     }

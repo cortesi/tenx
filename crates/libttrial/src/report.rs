@@ -7,6 +7,8 @@ pub struct TrialReport {
     pub trial_name: String,
     /// Name of the model used
     pub model_name: String,
+    /// API name of the model used
+    pub api_model_name: String,
     /// Whether the trial failed
     pub failed: bool,
     /// Number of steps taken
@@ -31,6 +33,7 @@ impl TrialReport {
         session: &Session,
         trial_name: String,
         model_name: String,
+        api_model_name: String,
         time_taken: f64,
     ) -> Self {
         let steps = session.steps().len();
@@ -61,6 +64,7 @@ impl TrialReport {
         TrialReport {
             trial_name,
             model_name,
+            api_model_name,
             failed,
             steps,
             error_patch,
@@ -126,8 +130,13 @@ mod tests {
             });
         }
 
-        let report =
-            TrialReport::from_session(&session, "trial1".to_string(), "gpt4".to_string(), 1.5);
+        let report = TrialReport::from_session(
+            &session,
+            "trial1".to_string(),
+            "gpt4".to_string(),
+            "api_name".to_string(),
+            1.5,
+        );
 
         assert_eq!(report.trial_name, "trial1");
         assert_eq!(report.model_name, "gpt4");

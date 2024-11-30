@@ -50,7 +50,7 @@ fn default_models() -> Vec<ModelConfig> {
         models.extend_from_slice(&[
             ModelConfig::OpenAi {
                 name: "qwen".to_string(),
-                api_model: "Qwen/Qwen2.5-32B-Instruct".to_string(),
+                api_model: "Qwen/Qwen2.5-Coder-32B-Instruct".to_string(),
                 key: "".to_string(),
                 key_env: DEEPINFRA_API_KEY.to_string(),
                 api_base: DEEPINFRA_API_BASE.to_string(),
