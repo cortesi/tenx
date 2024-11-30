@@ -11,10 +11,6 @@ pub struct TrialReport {
     pub failed: bool,
     /// Number of steps taken
     pub steps: usize,
-    /// Total words sent
-    pub words_sent: usize,
-    /// Total words received
-    pub words_received: usize,
     /// Number of patch errors
     pub error_patch: usize,
     /// Number of check errors
@@ -36,11 +32,6 @@ impl TrialReport {
         time_taken: f64,
     ) -> Self {
         let steps = session.steps().len();
-        let stats = session
-            .stats(&libtenx::config::Config::default())
-            .unwrap_or_default();
-        let words_sent = stats.words_sent;
-        let words_received = stats.words_received;
         let failed = session.last_step_error().is_some();
 
         let mut error_patch = 0;
@@ -64,8 +55,6 @@ impl TrialReport {
             model_name,
             failed,
             steps,
-            words_sent,
-            words_received,
             error_patch,
             error_check,
             error_response_parse,
@@ -101,7 +90,7 @@ mod tests {
                     completion_tokens: Some(20),
                     total_tokens: Some(30),
                 })),
-                text: Some("test response".to_string()),
+                response_text: Some("test response".to_string()),
             });
         }
 
@@ -135,8 +124,6 @@ mod tests {
         assert_eq!(report.model_name, "gpt4");
         assert_eq!(report.steps, 3);
         // These values are defaults, as we only check for the existence of stats.
-        assert_eq!(report.words_sent, 0);
-        assert_eq!(report.words_received, 0);
         assert_eq!(report.error_patch, 1);
         assert_eq!(report.error_check, 1);
         assert_eq!(report.error_response_parse, 0);

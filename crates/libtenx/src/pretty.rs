@@ -85,7 +85,7 @@ fn print_steps(config: &Config, session: &Session, full: bool, width: usize) -> 
                 output.push_str(&wrapped_block(&comment_text, width, INDENT.len() * 3));
                 output.push('\n');
             }
-            if let Some(text) = &response.text {
+            if let Some(text) = &response.response_text {
                 output.push_str(&format!("{}{}\n", INDENT.repeat(2), "text:".blue().bold()));
                 let text_text = if full {
                     text.clone()
@@ -348,7 +348,7 @@ mod tests {
                 operations: vec![],
                 usage: None,
                 comment: Some("Test comment".to_string()),
-                text: Some("Test comment".to_string()),
+                response_text: Some("Test comment".to_string()),
             });
         }
         let result = print_steps(&config, &session, false, 80);

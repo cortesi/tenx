@@ -6,10 +6,7 @@ use std::{
 use fs_err as fs;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    config, context, dialect::DialectProvider, model::Usage, patch::Patch, prompt::Prompt, Result,
-    TenxError,
-};
+use crate::{config, context, model::Usage, patch::Patch, prompt::Prompt, Result, TenxError};
 
 /// A parsed model response
 #[derive(Debug, Deserialize, Serialize, Clone, Default, PartialEq, Eq)]
@@ -23,52 +20,7 @@ pub struct ModelResponse {
     /// Model-specific usage statistics
     pub usage: Option<Usage>,
     /// The verbatim text response from the model
-    pub text: Option<String>,
-}
-
-#[test]
-fn test_session_stats() -> Result<()> {
-    // Create a test project and set up necessary files.
-    let test_project = crate::testutils::test_project();
-    test_project.create_file_tree(&["file1.txt", "file2.txt"]);
-    test_project.write("file1.txt", "initial content 1");
-    test_project.write("file2.txt", "initial content 2");
-
-    // Initialize a session and add steps with prompts and model responses.
-    let mut session = test_project.session;
-
-    session.add_prompt("test_model".into(), Prompt::User("prompt1".into()))?;
-    if let Some(step) = session.last_step_mut() {
-        step.model_response = Some(ModelResponse {
-            comment: Some("response1".into()),
-            patch: None,
-            operations: vec![],
-            usage: None,
-            text: Some("response1".into()),
-        });
-    }
-
-    session.add_prompt("test_model".into(), Prompt::User("prompt2".into()))?;
-    if let Some(step) = session.last_step_mut() {
-        step.model_response = Some(ModelResponse {
-            comment: Some("response2".into()),
-            patch: None,
-            operations: vec![],
-            usage: None,
-            text: Some("response2".into()),
-        });
-    }
-
-    // Calculate statistics and verify the values.
-    let stats = session.stats(&test_project.config)?;
-
-    // Assert that the words sent and words received are correctly calculated.
-    assert!(stats.words_sent > 0);
-    assert!(stats.words_received > 0);
-
-    println!("stats: {:?}", stats);
-
-    Ok(())
+    pub response_text: Option<String>,
 }
 
 /// Operations requested by the model, other than patching.
@@ -126,61 +78,6 @@ impl Step {
         self.err = None;
         Ok(())
     }
-}
-/// Represents statistics about a session's interaction with the model.
-#[derive(Debug, Default)]
-pub struct Stats {
-    pub words_sent: usize,
-    pub words_received: usize,
-}
-
-impl Session {
-    /// Computes statistics for the session by calculating words sent to and received from the model.
-    pub fn stats(&self, config: &config::Config) -> Result<Stats> {
-        let mut session_copy = Session::default();
-        let dialect_provider = config.dialect()?;
-
-        // Baseline for word count
-        let initial_output = dialect_provider.render_context(config, &session_copy)?;
-        let baseline_words = word_count(&initial_output);
-        let mut prev_words_sent = 0;
-        let mut prev_words_received = 0;
-
-        let mut total_words_sent = 0;
-        let mut total_words_received = 0;
-
-        for step in &self.steps {
-            // For each step, add the prompt and render
-            session_copy.add_prompt(step.model.clone(), step.prompt.clone())?;
-            let prompt_output = dialect_provider.render_step_request(config, &session_copy, 0)?;
-            let current_words_sent = word_count(&prompt_output);
-            total_words_sent += current_words_sent - prev_words_sent;
-            prev_words_sent = current_words_sent;
-
-            // Add the model response and render
-            if let Some(model_response) = &step.model_response {
-                session_copy.steps.last_mut().unwrap().model_response =
-                    Some(model_response.clone());
-                let response_output =
-                    dialect_provider.render_step_response(config, &session_copy, 0)?;
-                let current_words_received = word_count(&response_output);
-                total_words_received += current_words_received - prev_words_received;
-                prev_words_received = current_words_received;
-            }
-        }
-
-        // Deduct baseline words from total words sent
-        total_words_sent -= baseline_words;
-
-        Ok(Stats {
-            words_sent: total_words_sent,
-            words_received: total_words_received,
-        })
-    }
-}
-
-fn word_count(s: &str) -> usize {
-    s.split_whitespace().count()
 }
 
 /// Determines if a given string is a glob pattern or a rooted path.
@@ -514,7 +411,7 @@ mod tests {
                     operations: vec![],
                     usage: None,
                     comment: Some(format!("Step {}", i)),
-                    text: Some(format!("Step {}", i)),
+                    response_text: Some(format!("Step {}", i)),
                 });
                 step.rollback_cache = rollback_cache;
                 step.apply(&test_project.config)?;
@@ -571,7 +468,7 @@ mod tests {
             operations: vec![],
             usage: None,
             comment: None,
-            text: None,
+            response_text: None,
         });
 
         // Step 1: Request to edit file2.txt and modify file3.txt through patch
@@ -589,7 +486,7 @@ mod tests {
             operations: vec![Operation::Edit(PathBuf::from("file2.txt"))],
             usage: None,
             comment: None,
-            text: None,
+            response_text: None,
         });
 
         // Step 2: Empty step (no modifications)
@@ -602,7 +499,7 @@ mod tests {
             operations: vec![],
             usage: None,
             comment: None,
-            text: None,
+            response_text: None,
         });
 
         // Test 2: At step 0, no files should be editable (no previous step)
@@ -659,7 +556,7 @@ mod tests {
             operations: vec![Operation::Edit(PathBuf::from("new.txt"))],
             usage: None,
             comment: None,
-            text: None,
+            response_text: None,
         });
         step.rollback_cache = [(PathBuf::from("test.txt"), "content".into())]
             .into_iter()

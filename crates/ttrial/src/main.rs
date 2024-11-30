@@ -97,13 +97,11 @@ fn print_report_text(reports: &[TrialReport]) {
             String::new()
         };
         println!(
-            "{} - {}: {}, {:.1}s, words (sent/received): {}/{} {}",
+            "{} - {}: {}, {:.1}s, {}",
             report.model_name.blue(),
             report.trial_name,
             status,
             report.time_taken,
-            report.words_sent,
-            report.words_received,
             errors
         );
     }
@@ -148,7 +146,6 @@ fn print_report_table(reports: &[TrialReport]) {
                 Color::Green
             }),
             Cell::new(format!("{:.1}", report.time_taken)),
-            Cell::new(format!("{}/{}", report.words_sent, report.words_received)),
             Cell::new(errors),
         ]);
     }
@@ -316,17 +313,10 @@ async fn main() -> anyhow::Result<()> {
                     let total = reports.len();
                     let failed = reports.iter().filter(|r| r.failed).count();
                     let total_time: f64 = reports.iter().map(|r| r.time_taken).sum();
-                    let total_words_sent: usize = reports.iter().map(|r| r.words_sent).sum();
-                    let total_words_received: usize =
-                        reports.iter().map(|r| r.words_received).sum();
 
                     println!(
                         "Ran {} trials in {:.1}s ({} failed)",
                         total, total_time, failed
-                    );
-                    println!(
-                        "Total words: {} sent, {} received",
-                        total_words_sent, total_words_received
                     );
                 }
             }

@@ -198,13 +198,7 @@ impl OpenAi {
                 finish_reason: Some(FinishReason::Stop),
                 logprobs: None,
             }],
-            usage: Some(async_openai::types::CompletionUsage {
-                prompt_tokens: 0,
-                completion_tokens: 0,
-                total_tokens: 0,
-                completion_tokens_details: None,
-                prompt_tokens_details: None,
-            }),
+            usage: None,
         })
     }
 

@@ -155,7 +155,7 @@ mod tests {
                 operations: vec![],
                 usage: None,
                 comment: Some("First response\nalso with multiple lines".to_string()),
-                text: Some("First response\nalso with multiple lines".to_string()),
+                response_text: Some("First response\nalso with multiple lines".to_string()),
             });
         }
 
@@ -180,7 +180,7 @@ mod tests {
                 operations: vec![],
                 usage: None,
                 comment: Some("Second response\nyet more lines".to_string()),
-                text: Some("Second response\nyet more lines".to_string()),
+                response_text: Some("Second response\nyet more lines".to_string()),
             });
         }
 
