@@ -73,37 +73,10 @@ async fn run_trial(
     Ok((report, session))
 }
 
-/// Prints trial execution reports in a formatted output
+/// Prints trial execution reports in a text format
 fn print_report_text(reports: &[TrialReport]) {
     for report in reports {
-        let status = if report.failed {
-            "fail".red()
-        } else {
-            "pass".green()
-        };
-        let errors = if report.error_patch > 0
-            || report.error_check > 0
-            || report.error_response_parse > 0
-            || report.error_other > 0
-        {
-            format!(
-                " (patch:{},check:{},parse:{},other:{})",
-                report.error_patch,
-                report.error_check,
-                report.error_response_parse,
-                report.error_other
-            )
-        } else {
-            String::new()
-        };
-        println!(
-            "{} - {}: {}, {:.1}s, {}",
-            report.model_name.blue(),
-            report.trial_name,
-            status,
-            report.time_taken,
-            errors
-        );
+        println!("{:#?}", report);
     }
 }
 
