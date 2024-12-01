@@ -269,9 +269,12 @@ impl Tenx {
     ) -> Result<()> {
         let mut model = self.config.active_model()?;
         let _block = EventBlock::prompt(&sender, &model.name())?;
+        let start_time = std::time::Instant::now();
         let resp = model.send(&self.config, session, sender).await?;
+        let elapsed = start_time.elapsed().as_secs_f64();
         if let Some(last_step) = session.last_step_mut() {
             last_step.model_response = Some(resp);
+            last_step.response_time = Some(elapsed);
         }
         Ok(())
     }

@@ -57,6 +57,8 @@ pub struct Step {
     pub prompt: String,
     /// The response from the model
     pub model_response: Option<ModelResponse>,
+    /// Time taken in seconds to receive the complete model response
+    pub response_time: Option<f64>,
     /// An associated error, for instance an error processing a model response. This may be
     /// retryable, in which case a new step will be synthesized to go back to the model.
     pub err: Option<TenxError>,
@@ -72,6 +74,7 @@ impl Step {
             step_type,
             prompt,
             model_response: None,
+            response_time: None,
             err: None,
             rollback_cache: HashMap::new(),
         }
