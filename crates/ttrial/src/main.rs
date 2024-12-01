@@ -191,6 +191,11 @@ enum Commands {
         /// Optional glob patterns to filter trials
         patterns: Vec<String>,
     },
+    /// Generate a report from stored sessions
+    Report {
+        /// Directory containing stored sessions
+        store: PathBuf,
+    },
 }
 
 #[tokio::main]
@@ -230,6 +235,20 @@ async fn main() -> anyhow::Result<()> {
     }
 
     let result = match cli.command {
+        Commands::Report { store } => {
+            let store = SessionStore::open(store)?;
+            let sessions = store.list()?;
+            let mut reports = Vec::new();
+
+            for session_name in sessions {
+                let session = store.load(&session_name)?;
+                let report = TrialReport::from_session(&session, session_name)?;
+                reports.push(report);
+            }
+
+            print_report_table(&reports);
+            Ok(())
+        }
         Commands::Run {
             patterns,
             report,
