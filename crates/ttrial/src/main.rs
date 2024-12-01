@@ -11,6 +11,9 @@ use libtenx::{
     self,
     event_consumers::{self, discard_events, output_logs, output_progress},
     model::ModelProvider,
+    pretty,
+    session_store::SessionStore,
+    Event, Session,
 };
 use libttrial::*;
 
@@ -31,9 +34,9 @@ enum ReportFormat {
 async fn run_trial(
     trial: &mut Trial,
     output_mode: &OutputMode,
-    sender: &mpsc::Sender<libtenx::Event>,
+    sender: &mpsc::Sender<Event>,
     model_name: Option<String>,
-) -> anyhow::Result<(TrialReport, libtenx::Session)> {
+) -> anyhow::Result<(TrialReport, Session)> {
     trial.tenx_conf = trial.tenx_conf.clone().load_env();
 
     let progress = if matches!(output_mode, OutputMode::Sum) {
@@ -252,13 +255,18 @@ async fn main() -> anyhow::Result<()> {
             } else {
                 model.iter().map(Some).collect()
             };
+            let session_store = if let Some(save_dir) = &save {
+                Some(SessionStore::open(save_dir.clone())?)
+            } else {
+                None
+            };
+
             for model in models {
                 for trial in &mut trials {
                     let (report, session) =
                         run_trial(trial, &cli.output, &sender, model.cloned()).await?;
 
-                    if let Some(save_dir) = &save {
-                        let store = libtenx::session_store::SessionStore::open(save_dir.clone())?;
+                    if let Some(store) = &session_store {
                         let session_name = format!("{}-{}", report.model_name, trial.name);
                         store.save(&session_name, &session)?;
                     }
@@ -267,7 +275,7 @@ async fn main() -> anyhow::Result<()> {
                         println!("Session for {} - {}:", report.model_name.blue(), trial.name);
                         println!(
                             "{}",
-                            libtenx::pretty::print_session(&trial.tenx_conf, &session, true)?
+                            pretty::print_session(&trial.tenx_conf, &session, true)?
                         );
                     }
                     reports.push(report);
