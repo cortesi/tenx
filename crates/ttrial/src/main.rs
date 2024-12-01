@@ -87,7 +87,7 @@ fn print_report_table(reports: &[TrialReport]) {
         Cell::new("model"),
         Cell::new("trial"),
         Cell::new("status"),
-        Cell::new("time(s)"),
+        Cell::new("time (s)"),
         Cell::new("words recv"),
         Cell::new("errors"),
     ]);
