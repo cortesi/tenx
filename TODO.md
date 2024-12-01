@@ -1,6 +1,5 @@
 UX:
 
-    - Check each glob passed on the command-line to ensure it matches at least one file on disk
 
 Model response robustness:
     
@@ -14,7 +13,6 @@ Model response robustness:
 Bugs:
     
     - retry doesn't work with fix
-    - improve words sent/received calculation
 
 Features:
 

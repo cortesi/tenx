@@ -30,11 +30,19 @@ pub enum Operation {
     Edit(PathBuf),
 }
 
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
+pub enum StepType {
+    Prompt,
+    Auto,
+}
+
 /// A single step in the session - basically a prompt and a patch.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Step {
     /// The name of the model used for this step
     pub model: String,
+    /// The type of step
+    pub step_type: StepType,
     /// The prompt provided to the model
     pub prompt: Prompt,
     /// The response from the model
@@ -49,8 +57,13 @@ pub struct Step {
 impl Step {
     /// Creates a new Step with the given prompt.
     pub fn new(model: String, prompt: Prompt) -> Self {
+        let step_type = match prompt {
+            Prompt::User(_) => StepType::Prompt,
+            Prompt::Auto(_) => StepType::Auto,
+        };
         Step {
             model,
+            step_type,
             prompt,
             model_response: None,
             err: None,
