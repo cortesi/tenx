@@ -10,7 +10,6 @@ use indicatif::{ProgressBar, ProgressStyle};
 use libtenx::{
     self,
     event_consumers::{self, discard_events, output_logs, output_progress},
-    model::ModelProvider,
     pretty,
     session_store::SessionStore,
     Event, Session,
@@ -35,7 +34,7 @@ async fn run_trial(
     trial: &mut Trial,
     output_mode: &OutputMode,
     sender: &mpsc::Sender<Event>,
-    model_name: Option<String>,
+    model_name: String,
 ) -> anyhow::Result<(TrialReport, Session)> {
     trial.tenx_conf = trial.tenx_conf.clone().load_env();
 
@@ -46,14 +45,7 @@ async fn run_trial(
                 .template("{msg} {spinner:.blue} ")
                 .unwrap(),
         );
-        let display_name = match &model_name {
-            Some(m) => format!("{}: {}", m, trial.name),
-            None => format!(
-                "{}: {}",
-                trial.tenx_conf.active_model()?.api_model(),
-                trial.name
-            ),
-        };
+        let display_name = format!("{}: {}", model_name, trial.name);
         pb.set_message(display_name);
         pb.enable_steady_tick(std::time::Duration::from_millis(100));
         Some(pb)
@@ -61,7 +53,7 @@ async fn run_trial(
         None
     };
 
-    let session = trial.execute(Some(sender.clone()), model_name).await?;
+    let session = trial.execute(Some(sender.clone()), &model_name).await?;
     let report = TrialReport::from_session(&session, trial.name.clone())?;
 
     if let Some(pb) = progress {
@@ -184,6 +176,10 @@ enum Commands {
         /// Print detailed session information
         #[clap(long)]
         session: bool,
+
+        /// Resume trials by skipping those with existing saved sessions
+        #[clap(long)]
+        resume: bool,
     },
     /// List all available trials (alias: ls)
     #[clap(alias = "ls")]
@@ -254,6 +250,7 @@ async fn main() -> anyhow::Result<()> {
             report,
             model,
             save,
+            resume,
             no_report,
             session: session_flag,
         } => {
@@ -271,9 +268,9 @@ async fn main() -> anyhow::Result<()> {
 
             let mut reports = Vec::new();
             let models = if model.is_empty() {
-                vec![None]
+                vec![]
             } else {
-                model.iter().map(Some).collect()
+                model.iter().collect()
             };
             let session_store = if let Some(save_dir) = &save {
                 Some(SessionStore::open(save_dir.clone())?)
@@ -283,8 +280,17 @@ async fn main() -> anyhow::Result<()> {
 
             for model in models {
                 for trial in &mut trials {
+                    let session_name = format!("{}-{}", model, trial.name);
+                    if resume {
+                        if let Some(store) = &session_store {
+                            if store.list()?.contains(&session_name) {
+                                continue;
+                            }
+                        }
+                    }
+
                     let (report, session) =
-                        run_trial(trial, &cli.output, &sender, model.cloned()).await?;
+                        run_trial(trial, &cli.output, &sender, model.clone()).await?;
 
                     if let Some(store) = &session_store {
                         let session_name = format!("{}-{}", report.model_name, trial.name);

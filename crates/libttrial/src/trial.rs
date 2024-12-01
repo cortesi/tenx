@@ -131,16 +131,14 @@ impl Trial {
     pub async fn execute(
         &self,
         sender: Option<mpsc::Sender<Event>>,
-        model: Option<String>,
+        model: &str,
     ) -> Result<Session> {
         let temp_dir = self.setup_temp_project()?;
         let mut conf = self.tenx_conf.clone();
         conf.session_store_dir = PathBuf::from("");
         conf.project.root = ProjectRoot::Path(temp_dir.path().join("project"));
 
-        if let Some(m) = model {
-            conf.models.default = m;
-        }
+        conf.models.default = model.to_string();
 
         let _model = conf.active_model()?;
         let tenx = Tenx::new(conf);
