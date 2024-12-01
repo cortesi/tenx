@@ -32,8 +32,18 @@ pub enum Operation {
 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
 pub enum StepType {
-    Prompt,
+    /// A user code request
+    Code,
+
+    /// A fix request
+    Fix,
+
+    /// An automatically generated step. This might be needed if, for instance, the model asks to
+    /// edit a file, in order to mantain request/response sequencing.
     Auto,
+
+    /// A prompt generated to handle a retryable error
+    Error,
 }
 
 /// A single step in the session - basically a prompt and a patch.
@@ -415,7 +425,7 @@ mod tests {
             test_project.session.add_prompt(
                 "test_model".into(),
                 format!("Prompt {}", i),
-                StepType::Prompt,
+                StepType::Code,
             )?;
 
             let rollback_cache = [(PathBuf::from("test.txt"), test_project.read("test.txt"))]
@@ -473,7 +483,7 @@ mod tests {
         // Step 0: Modify file1.txt through patch
         test_project
             .session
-            .add_prompt("test_model".into(), "step0".into(), StepType::Prompt)?;
+            .add_prompt("test_model".into(), "step0".into(), StepType::Code)?;
         let step = test_project.session.steps.last_mut().unwrap();
         step.model_response = Some(ModelResponse {
             patch: Some(Patch {
@@ -491,7 +501,7 @@ mod tests {
         // Step 1: Request to edit file2.txt and modify file3.txt through patch
         test_project
             .session
-            .add_prompt("test_model".into(), "step1".into(), StepType::Prompt)?;
+            .add_prompt("test_model".into(), "step1".into(), StepType::Code)?;
         let step = test_project.session.steps.last_mut().unwrap();
         step.model_response = Some(ModelResponse {
             patch: Some(Patch {
@@ -509,7 +519,7 @@ mod tests {
         // Step 2: Empty step (no modifications)
         test_project
             .session
-            .add_prompt("test_model".into(), "step2".into(), StepType::Prompt)?;
+            .add_prompt("test_model".into(), "step2".into(), StepType::Code)?;
         let step = test_project.session.steps.last_mut().unwrap();
         step.model_response = Some(ModelResponse {
             patch: None,
@@ -561,7 +571,7 @@ mod tests {
         test_project.session.add_prompt(
             "test_model".into(),
             "test prompt".into(),
-            StepType::Prompt,
+            StepType::Code,
         )?;
         let step = test_project.session.steps.last_mut().unwrap();
         let patch = Patch {

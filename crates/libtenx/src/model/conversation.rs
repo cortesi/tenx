@@ -143,7 +143,7 @@ mod tests {
         session.add_prompt(
             "test_model".into(),
             "test prompt".to_string(),
-            crate::StepType::Prompt,
+            crate::StepType::Code,
         )?;
 
         build_conversation(&conversation, &mut req, &config, &session, &dialect)?;

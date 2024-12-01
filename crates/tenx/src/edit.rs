@@ -147,7 +147,7 @@ mod tests {
             .add_prompt(
                 "test_model".into(),
                 "First prompt\nwith multiple lines".to_string(),
-                StepType::Prompt,
+                StepType::Code,
             )
             .unwrap();
         if let Some(step) = session.last_step_mut() {
@@ -173,7 +173,7 @@ mod tests {
             .add_prompt(
                 "test_model".into(),
                 "Second prompt\nstill multiple lines".to_string(),
-                StepType::Prompt,
+                StepType::Code,
             )
             .unwrap();
         if let Some(step) = session.last_step_mut() {

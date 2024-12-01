@@ -104,7 +104,7 @@ impl Tenx {
         let result = if let Err(e) = pre_result {
             let prompt = prompt.unwrap_or_else(|| "Please fix the following errors.".to_string());
             let model = self.config.models.default.clone();
-            session.add_prompt(model, prompt, StepType::Auto)?;
+            session.add_prompt(model, prompt, StepType::Fix)?;
             if let Some(step) = session.last_step_mut() {
                 step.err = Some(e.clone());
             }
@@ -147,7 +147,7 @@ impl Tenx {
             step.rollback(&self.config)?;
             if let Some(p) = prompt {
                 step.prompt = p;
-                step.step_type = StepType::Prompt;
+                step.step_type = StepType::Code;
             }
         }
         self.process_prompt(session, sender.clone()).await
@@ -162,7 +162,7 @@ impl Tenx {
     ) -> Result<()> {
         let _block = EventBlock::start(&sender)?;
         let model = self.config.models.default.clone();
-        session.add_prompt(model, prompt, StepType::Prompt)?;
+        session.add_prompt(model, prompt, StepType::Code)?;
         self.process_prompt(session, sender.clone()).await
     }
 
@@ -220,7 +220,7 @@ impl Tenx {
                         retry_count, self.config.retry_limit, e
                     );
                     let model = self.config.models.default.clone();
-                    session.add_prompt(model, model_message.to_string(), StepType::Auto)?;
+                    session.add_prompt(model, model_message.to_string(), StepType::Error)?;
                     self.save_session(session)?;
                 } else {
                     debug!("Non-retryable error: {}", e);
@@ -382,7 +382,7 @@ mod tests {
             .add_prompt(
                 config.models.default.clone(),
                 "Test prompt".to_string(),
-                StepType::Prompt,
+                StepType::Code,
             )
             .unwrap();
         session
