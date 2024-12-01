@@ -33,7 +33,6 @@ pub struct SessionStore {
 
 impl SessionStore {
     /// Creates a new StateStore with the specified base directory.
-    /// Creates a new StateStore with the specified base directory.
     pub fn open(base_dir: PathBuf) -> Result<Self> {
         fs::create_dir_all(&base_dir)?;
         Ok(Self { base_dir })
@@ -58,6 +57,27 @@ impl SessionStore {
     pub fn load<S: AsRef<str>>(&self, name: S) -> Result<Session> {
         let file_path = self.base_dir.join(name.as_ref());
         load_session(file_path)
+    }
+
+    /// Lists all sessions in the store.
+    pub fn list(&self) -> Result<Vec<String>> {
+        let mut sessions = Vec::new();
+        for entry in fs::read_dir(&self.base_dir)
+            .map_err(|e| TenxError::SessionStore(format!("Failed to read directory: {}", e)))?
+        {
+            let entry = entry
+                .map_err(|e| TenxError::SessionStore(format!("Failed to read entry: {}", e)))?;
+            if entry
+                .file_type()
+                .map_err(|e| TenxError::SessionStore(format!("Failed to get file type: {}", e)))?
+                .is_file()
+            {
+                if let Some(name) = entry.file_name().to_str() {
+                    sessions.push(name.to_string());
+                }
+            }
+        }
+        Ok(sessions)
     }
 }
 
@@ -85,7 +105,6 @@ mod tests {
                 root: ProjectRoot::Path(temp_dir.path().into()),
                 ..Default::default()
             },
-
             ..Default::default()
         };
 
@@ -93,9 +112,16 @@ mod tests {
 
         let state = Session::default();
         state_store.save_current(&config, &state).unwrap();
+        state_store.save("test_session", &state).unwrap();
 
         let name = path_to_filename(&config.project_root());
-        let _ = state_store.load(name)?;
+        let _ = state_store.load(&name)?;
+
+        let sessions = state_store.list()?;
+        assert_eq!(sessions.len(), 2);
+        assert!(sessions.contains(&name));
+        assert!(sessions.contains(&"test_session".to_string()));
+
         Ok(())
     }
 }
