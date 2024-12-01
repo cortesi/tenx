@@ -16,11 +16,8 @@ use tracing::info;
 
 use libtenx::{
     config::{default_config, Config, ConfigFile, Include, ProjectRoot},
-    model::ModelProvider,
     Event, Result, Session, Tenx, TenxError,
 };
-
-use crate::TrialReport;
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -135,7 +132,7 @@ impl Trial {
         &self,
         sender: Option<mpsc::Sender<Event>>,
         model: Option<String>,
-    ) -> Result<(TrialReport, Session)> {
+    ) -> Result<Session> {
         let temp_dir = self.setup_temp_project()?;
         let mut conf = self.tenx_conf.clone();
         conf.session_store_dir = PathBuf::from("");
@@ -145,7 +142,7 @@ impl Trial {
             conf.models.default = m;
         }
 
-        let model = conf.active_model()?;
+        let _model = conf.active_model()?;
         let tenx = Tenx::new(conf);
 
         let mut session = tenx.new_session_from_cwd(&sender, false).await?;
@@ -171,10 +168,7 @@ impl Trial {
             Err(e) => info!("trial failed: {}: {}", self.name, e),
         }
 
-        Ok((
-            TrialReport::from_session(&session, &tenx.config, self.name.clone(), model.name()),
-            session,
-        ))
+        Ok(session)
     }
 
     /// Returns a default configuration for trials. These need to be over-ridden by the trial

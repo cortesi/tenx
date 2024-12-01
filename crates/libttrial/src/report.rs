@@ -7,8 +7,6 @@ pub struct TrialReport {
     pub trial_name: String,
     /// Name of the model used
     pub model_name: String,
-    /// API name of the model used
-    pub api_model_name: String,
     /// Whether the trial failed
     pub failed: bool,
     /// Number of steps taken
@@ -29,19 +27,12 @@ pub struct TrialReport {
 
 impl TrialReport {
     /// Computes a trial report from a session
-    pub fn from_session(
-        session: &Session,
-        config: &libtenx::config::Config,
-        trial_name: String,
-        model_name: String,
-    ) -> Self {
-        let api_model_name = config
-            .get_model_conf(&model_name)
-            .map(|m| match m {
-                libtenx::config::ModelConfig::Claude { api_model, .. } => api_model.clone(),
-                libtenx::config::ModelConfig::OpenAi { api_model, .. } => api_model.clone(),
-            })
-            .unwrap_or_else(|| model_name.clone());
+    pub fn from_session(session: &Session, trial_name: String) -> libtenx::Result<Self> {
+        let steps_ref = session.steps();
+        let model_name = steps_ref
+            .first()
+            .map(|s| s.model.clone())
+            .ok_or_else(|| libtenx::TenxError::Internal("no steps in session".into()))?;
         let steps_ref = session.steps();
         let num_steps = steps_ref.len();
         let failed = session.last_step_error().is_some();
@@ -74,10 +65,9 @@ impl TrialReport {
             }
         }
 
-        TrialReport {
+        Ok(TrialReport {
             trial_name,
             model_name,
-            api_model_name,
             failed,
             steps: num_steps,
             error_patch,
@@ -86,7 +76,7 @@ impl TrialReport {
             error_other,
             total_response_time: steps_ref.iter().filter_map(|s| s.response_time).sum(),
             words_received,
-        }
+        })
     }
 }
 
@@ -144,12 +134,10 @@ mod tests {
             });
         }
 
-        let config = libtenx::config::default_config();
-        let report =
-            TrialReport::from_session(&session, &config, "trial1".to_string(), "gpt4".to_string());
+        let report = TrialReport::from_session(&session, "trial1".to_string()).unwrap();
 
         assert_eq!(report.trial_name, "trial1");
-        assert_eq!(report.model_name, "gpt4");
+        assert_eq!(report.model_name, "test_model");
         assert_eq!(report.steps, 3);
         // These values are defaults, as we only check for the existence of stats.
         assert_eq!(report.error_patch, 1);
@@ -188,9 +176,7 @@ mod tests {
             });
         }
 
-        let config = libtenx::config::default_config();
-        let report =
-            TrialReport::from_session(&session, &config, "trial1".to_string(), "gpt4".to_string());
+        let report = TrialReport::from_session(&session, "trial1".to_string()).unwrap();
 
         assert_eq!(
             report.error_check, 1,

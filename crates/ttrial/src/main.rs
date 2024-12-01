@@ -61,7 +61,8 @@ async fn run_trial(
         None
     };
 
-    let (report, session) = trial.execute(Some(sender.clone()), model_name).await?;
+    let session = trial.execute(Some(sender.clone()), model_name).await?;
+    let report = TrialReport::from_session(&session, trial.name.clone())?;
 
     if let Some(pb) = progress {
         pb.finish();
