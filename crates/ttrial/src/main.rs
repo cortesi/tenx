@@ -178,7 +178,7 @@ enum Commands {
         session: bool,
 
         /// Resume trials by skipping those with existing saved sessions
-        #[clap(long)]
+        #[clap(long, requires = "save")]
         resume: bool,
     },
     /// List all available trials (alias: ls)
