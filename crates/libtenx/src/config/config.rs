@@ -758,6 +758,13 @@ impl Config {
         self
     }
 
+    /// Returns the model configuration for the given model name, or None if not found.
+    pub fn get_model_conf<S: AsRef<str>>(&self, name: S) -> Option<ModelConfig> {
+        self.model_confs()
+            .into_iter()
+            .find(|m| m.name() == name.as_ref())
+    }
+
     /// Loads API keys from environment variables if they exist.
     pub fn load_env(mut self) -> Self {
         self.models.custom = self
@@ -894,7 +901,8 @@ impl Config {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::testutils;
+
+    use crate::testutils::{self, test_project};
 
     use tempfile::TempDir;
 
@@ -1070,8 +1078,6 @@ mod tests {
 
     #[test]
     fn test_match_files_with_glob() -> crate::Result<()> {
-        use crate::testutils::test_project;
-
         let mut project = test_project();
         project.create_file_tree(&[
             "src/file1.rs",

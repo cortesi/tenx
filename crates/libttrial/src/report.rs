@@ -31,10 +31,17 @@ impl TrialReport {
     /// Computes a trial report from a session
     pub fn from_session(
         session: &Session,
+        config: &libtenx::config::Config,
         trial_name: String,
         model_name: String,
-        api_model_name: String,
     ) -> Self {
+        let api_model_name = config
+            .get_model_conf(&model_name)
+            .map(|m| match m {
+                libtenx::config::ModelConfig::Claude { api_model, .. } => api_model.clone(),
+                libtenx::config::ModelConfig::OpenAi { api_model, .. } => api_model.clone(),
+            })
+            .unwrap_or_else(|| model_name.clone());
         let steps_ref = session.steps();
         let num_steps = steps_ref.len();
         let failed = session.last_step_error().is_some();
@@ -137,12 +144,9 @@ mod tests {
             });
         }
 
-        let report = TrialReport::from_session(
-            &session,
-            "trial1".to_string(),
-            "gpt4".to_string(),
-            "api_name".to_string(),
-        );
+        let config = libtenx::config::default_config();
+        let report =
+            TrialReport::from_session(&session, &config, "trial1".to_string(), "gpt4".to_string());
 
         assert_eq!(report.trial_name, "trial1");
         assert_eq!(report.model_name, "gpt4");
@@ -184,12 +188,9 @@ mod tests {
             });
         }
 
-        let report = TrialReport::from_session(
-            &session,
-            "trial1".to_string(),
-            "gpt4".to_string(),
-            "api_name".to_string(),
-        );
+        let config = libtenx::config::default_config();
+        let report =
+            TrialReport::from_session(&session, &config, "trial1".to_string(), "gpt4".to_string());
 
         assert_eq!(
             report.error_check, 1,

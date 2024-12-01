@@ -172,7 +172,7 @@ impl Trial {
         }
 
         Ok((
-            TrialReport::from_session(&session, self.name.clone(), model.name(), model.api_model()),
+            TrialReport::from_session(&session, &tenx.config, self.name.clone(), model.name()),
             session,
         ))
     }
