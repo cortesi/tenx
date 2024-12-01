@@ -34,7 +34,7 @@ async fn run_trial(
     trial: &mut Trial,
     output_mode: &OutputMode,
     sender: &mpsc::Sender<Event>,
-    model_name: String,
+    model_name: &str,
 ) -> anyhow::Result<(TrialReport, Session)> {
     trial.tenx_conf = trial.tenx_conf.clone().load_env();
 
@@ -53,7 +53,7 @@ async fn run_trial(
         None
     };
 
-    let session = trial.execute(Some(sender.clone()), &model_name).await?;
+    let session = trial.execute(Some(sender.clone()), model_name).await?;
     let report = TrialReport::from_session(&session, trial.name.clone())?;
 
     if let Some(pb) = progress {
@@ -284,13 +284,15 @@ async fn main() -> anyhow::Result<()> {
                     if resume {
                         if let Some(store) = &session_store {
                             if store.list()?.contains(&session_name) {
+                                if matches!(cli.output, OutputMode::Sum) {
+                                    println!("{}: {}\n    {}", model, trial.name, "skip".yellow());
+                                }
                                 continue;
                             }
                         }
                     }
 
-                    let (report, session) =
-                        run_trial(trial, &cli.output, &sender, model.clone()).await?;
+                    let (report, session) = run_trial(trial, &cli.output, &sender, model).await?;
 
                     if let Some(store) = &session_store {
                         let session_name = format!("{}-{}", report.model_name, trial.name);
@@ -314,7 +316,7 @@ async fn main() -> anyhow::Result<()> {
                     ReportFormat::Table => print_report_table(&reports),
                 }
 
-                if reports.len() > 1 {
+                if !reports.is_empty() && reports.len() > 1 {
                     println!("\nSummary:");
                     let total = reports.len();
                     let failed = reports.iter().filter(|r| r.failed).count();
