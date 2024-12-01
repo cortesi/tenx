@@ -169,9 +169,9 @@ enum Commands {
         #[clap(long, num_args = 1)]
         model: Vec<String>,
 
-        /// Directory to save failed trial sessions to
+        /// Directory to save all trial sessions to
         #[clap(long)]
-        save_failures: Option<PathBuf>,
+        save: Option<PathBuf>,
 
         /// Skip printing the report
         #[clap(long)]
@@ -230,7 +230,7 @@ async fn main() -> anyhow::Result<()> {
             patterns,
             report,
             model,
-            save_failures,
+            save,
             no_report,
             session: session_flag,
         } => {
@@ -257,13 +257,10 @@ async fn main() -> anyhow::Result<()> {
                     let (report, session) =
                         run_trial(trial, &cli.output, &sender, model.cloned()).await?;
 
-                    if report.failed {
-                        if let Some(failures_dir) = &save_failures {
-                            let store =
-                                libtenx::session_store::SessionStore::open(failures_dir.clone())?;
-                            let session_name = format!("{}-{}", report.model_name, trial.name);
-                            store.save(&session_name, &session)?;
-                        }
+                    if let Some(save_dir) = &save {
+                        let store = libtenx::session_store::SessionStore::open(save_dir.clone())?;
+                        let session_name = format!("{}-{}", report.model_name, trial.name);
+                        store.save(&session_name, &session)?;
                     }
                     if session_flag {
                         println!("\n{}", "-".repeat(80));
