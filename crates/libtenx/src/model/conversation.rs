@@ -142,7 +142,8 @@ mod tests {
         let mut session = Session::default();
         session.add_prompt(
             "test_model".into(),
-            crate::prompt::Prompt::User("test prompt".to_string()),
+            "test prompt".to_string(),
+            crate::StepType::Prompt,
         )?;
 
         build_conversation(&conversation, &mut req, &config, &session, &dialect)?;

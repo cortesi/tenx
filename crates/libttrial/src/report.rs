@@ -82,7 +82,7 @@ mod tests {
     use super::*;
     use libtenx::{
         model::{OpenAiUsage, Usage},
-        prompt::Prompt,
+        StepType,
     };
 
     #[test]
@@ -91,7 +91,7 @@ mod tests {
 
         // Add a successful step with token usage
         session
-            .add_prompt("test_model".into(), Prompt::User("test 1".to_string()))
+            .add_prompt("test_model".into(), "test 1".to_string(), StepType::Prompt)
             .unwrap();
         if let Some(step) = session.last_step_mut() {
             step.model_response = Some(libtenx::ModelResponse {
@@ -109,7 +109,7 @@ mod tests {
 
         // Add a step with a patch error
         session
-            .add_prompt("test_model".into(), Prompt::User("test 2".to_string()))
+            .add_prompt("test_model".into(), "test 2".to_string(), StepType::Prompt)
             .unwrap();
         if let Some(step) = session.last_step_mut() {
             step.err = Some(TenxError::Patch {
@@ -120,7 +120,7 @@ mod tests {
 
         // Add a step with a check error
         session
-            .add_prompt("test_model".into(), Prompt::User("test 3".to_string()))
+            .add_prompt("test_model".into(), "test 3".to_string(), StepType::Prompt)
             .unwrap();
         if let Some(step) = session.last_step_mut() {
             step.err = Some(TenxError::Check {

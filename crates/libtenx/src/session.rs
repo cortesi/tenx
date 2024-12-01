@@ -6,7 +6,7 @@ use std::{
 use fs_err as fs;
 use serde::{Deserialize, Serialize};
 
-use crate::{config, context, model::Usage, patch::Patch, prompt::Prompt, Result, TenxError};
+use crate::{config, context, model::Usage, patch::Patch, Result, TenxError};
 
 /// A parsed model response
 #[derive(Debug, Deserialize, Serialize, Clone, Default, PartialEq, Eq)]
@@ -44,7 +44,7 @@ pub struct Step {
     /// The type of step
     pub step_type: StepType,
     /// The prompt provided to the model
-    pub prompt: Prompt,
+    pub prompt: String,
     /// The response from the model
     pub model_response: Option<ModelResponse>,
     /// An associated error, for instance an error processing a model response. This may be
@@ -56,11 +56,7 @@ pub struct Step {
 
 impl Step {
     /// Creates a new Step with the given prompt.
-    pub fn new(model: String, prompt: Prompt) -> Self {
-        let step_type = match prompt {
-            Prompt::User(_) => StepType::Prompt,
-            Prompt::Auto(_) => StepType::Auto,
-        };
+    pub fn new(model: String, prompt: String, step_type: StepType) -> Self {
         Step {
             model,
             step_type,
@@ -116,7 +112,7 @@ impl Session {
     }
 
     /// Updates the prompt at a specific step.
-    pub fn update_prompt_at(&mut self, offset: usize, prompt: Prompt) -> Result<()> {
+    pub fn update_prompt_at(&mut self, offset: usize, prompt: String) -> Result<()> {
         if offset >= self.steps.len() {
             return Err(TenxError::Internal("Invalid step offset".into()));
         }
@@ -184,7 +180,7 @@ impl Session {
     /// Adds a new step to the session, and sets the step prompt.
     ///
     /// Returns an error if the last step doesn't have either a patch or an error.
-    pub fn add_prompt(&mut self, model: String, prompt: Prompt) -> Result<()> {
+    pub fn add_prompt(&mut self, model: String, prompt: String, step_type: StepType) -> Result<()> {
         if let Some(last_step) = self.steps.last() {
             if last_step.model_response.is_none() && last_step.err.is_none() {
                 return Err(TenxError::Internal(
@@ -192,19 +188,25 @@ impl Session {
                 ));
             }
         }
-        self.steps.push(Step::new(model, prompt));
+        self.steps.push(Step::new(model, prompt, step_type));
         Ok(())
     }
 
     /// Sets the prompt for the last step in the session.
     /// If there are no steps, it creates a new one.
-    pub fn set_last_prompt(&mut self, model: String, prompt: Prompt) -> Result<()> {
+    pub fn set_last_prompt(
+        &mut self,
+        model: String,
+        prompt: String,
+        step_type: StepType,
+    ) -> Result<()> {
         if self.steps.is_empty() {
-            self.steps.push(Step::new(model, prompt));
+            self.steps.push(Step::new(model, prompt, step_type));
             Ok(())
         } else if let Some(last_step) = self.steps.last_mut() {
             last_step.prompt = prompt;
             last_step.model = model;
+            last_step.step_type = step_type;
             last_step.model_response = None;
             Ok(())
         } else {
@@ -300,7 +302,7 @@ impl Session {
                 .last()
                 .map(|s| s.model.clone())
                 .unwrap_or_default();
-            self.add_prompt(current_model, Prompt::Auto("OK".into()))?;
+            self.add_prompt(current_model, "OK".into(), StepType::Auto)?;
         }
         Ok(())
     }
@@ -410,9 +412,11 @@ mod tests {
                     content: content.clone(),
                 })],
             };
-            test_project
-                .session
-                .add_prompt("test_model".into(), Prompt::User(format!("Prompt {}", i)))?;
+            test_project.session.add_prompt(
+                "test_model".into(),
+                format!("Prompt {}", i),
+                StepType::Prompt,
+            )?;
 
             let rollback_cache = [(PathBuf::from("test.txt"), test_project.read("test.txt"))]
                 .into_iter()
@@ -469,7 +473,7 @@ mod tests {
         // Step 0: Modify file1.txt through patch
         test_project
             .session
-            .add_prompt("test_model".into(), Prompt::User("step0".into()))?;
+            .add_prompt("test_model".into(), "step0".into(), StepType::Prompt)?;
         let step = test_project.session.steps.last_mut().unwrap();
         step.model_response = Some(ModelResponse {
             patch: Some(Patch {
@@ -487,7 +491,7 @@ mod tests {
         // Step 1: Request to edit file2.txt and modify file3.txt through patch
         test_project
             .session
-            .add_prompt("test_model".into(), Prompt::User("step1".into()))?;
+            .add_prompt("test_model".into(), "step1".into(), StepType::Prompt)?;
         let step = test_project.session.steps.last_mut().unwrap();
         step.model_response = Some(ModelResponse {
             patch: Some(Patch {
@@ -505,7 +509,7 @@ mod tests {
         // Step 2: Empty step (no modifications)
         test_project
             .session
-            .add_prompt("test_model".into(), Prompt::User("step2".into()))?;
+            .add_prompt("test_model".into(), "step2".into(), StepType::Prompt)?;
         let step = test_project.session.steps.last_mut().unwrap();
         step.model_response = Some(ModelResponse {
             patch: None,
@@ -554,9 +558,11 @@ mod tests {
         test_project.write("new.txt", "new content");
 
         // Add a step with both a patch and an edit operation
-        test_project
-            .session
-            .add_prompt("test_model".into(), Prompt::User("test prompt".into()))?;
+        test_project.session.add_prompt(
+            "test_model".into(),
+            "test prompt".into(),
+            StepType::Prompt,
+        )?;
         let step = test_project.session.steps.last_mut().unwrap();
         let patch = Patch {
             changes: vec![Change::Write(WriteFile {

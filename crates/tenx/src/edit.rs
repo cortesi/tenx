@@ -2,7 +2,7 @@ use anyhow::{Context as AnyhowContext, Result};
 use std::{fs, io::Write, process::Command};
 use tempfile::NamedTempFile;
 
-use libtenx::Session;
+use libtenx::{Session, StepType};
 
 /// Returns the user's preferred editor.
 fn get_editor() -> String {
@@ -18,7 +18,7 @@ fn render_step_commented(session: &libtenx::Session, step_offset: usize) -> Stri
     text.push_str(&format!("# Step {}\n", step_offset));
     text.push_str("# ====\n#\n");
     text.push_str("# Prompt:\n# -------\n");
-    for line in step.prompt.text().lines() {
+    for line in step.prompt.lines() {
         text.push_str(&format!("# {}\n", line));
     }
     if let Some(response) = &step.model_response {
@@ -55,7 +55,7 @@ fn render_initial_text(session: &libtenx::Session, retry: bool) -> Result<String
             anyhow::bail!("Cannot retry without at least one step");
         }
         let last = steps.last().unwrap();
-        text.push_str(last.prompt.text());
+        text.push_str(&last.prompt);
         text.push_str("\n\n");
         // Add all but the last step as comments
         for i in (0..steps.len() - 1).rev() {
@@ -111,7 +111,7 @@ pub fn edit_prompt(session: &Session, retry: bool) -> Result<Option<String>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use libtenx::{patch::Patch, prompt::Prompt};
+    use libtenx::patch::Patch;
 
     use indoc::indoc;
     use pretty_assertions::assert_eq;
@@ -146,7 +146,8 @@ mod tests {
         session
             .add_prompt(
                 "test_model".into(),
-                Prompt::User("First prompt\nwith multiple lines".to_string()),
+                "First prompt\nwith multiple lines".to_string(),
+                StepType::Prompt,
             )
             .unwrap();
         if let Some(step) = session.last_step_mut() {
@@ -171,7 +172,8 @@ mod tests {
         session
             .add_prompt(
                 "test_model".into(),
-                Prompt::User("Second prompt\nstill multiple lines".to_string()),
+                "Second prompt\nstill multiple lines".to_string(),
+                StepType::Prompt,
             )
             .unwrap();
         if let Some(step) = session.last_step_mut() {

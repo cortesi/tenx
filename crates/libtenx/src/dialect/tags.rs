@@ -108,10 +108,7 @@ impl DialectProvider for Tags {
             .get(offset)
             .ok_or_else(|| TenxError::Internal("Invalid prompt offset".into()))?;
         let mut rendered = String::new();
-        rendered.push_str(&format!(
-            "\n<prompt>\n{}\n</prompt>\n\n",
-            prompt.prompt.text()
-        ));
+        rendered.push_str(&format!("\n<prompt>\n{}\n</prompt>\n\n", &prompt.prompt));
         Ok(rendered)
     }
 
@@ -301,7 +298,7 @@ impl DialectProvider for Tags {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{prompt::Prompt, Step};
+    use crate::{Step, StepType};
 
     use indoc::indoc;
     use pretty_assertions::assert_eq;
@@ -398,9 +395,11 @@ mod tests {
             response_text: Some("Test response".into()),
         };
 
-        session
-            .steps_mut()
-            .push(Step::new("test_model".into(), Prompt::User("test".into())));
+        session.steps_mut().push(Step::new(
+            "test_model".into(),
+            "test".into(),
+            StepType::Prompt,
+        ));
         if let Some(step) = session.steps_mut().last_mut() {
             step.model_response = Some(response);
         }

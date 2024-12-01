@@ -6,9 +6,8 @@ use crate::{
     context::{Context, ContextProvider},
     events::*,
     model::ModelProvider,
-    prompt::Prompt,
     session_store::path_to_filename,
-    Result, Session, SessionStore, TenxError,
+    Result, Session, SessionStore, StepType, TenxError,
 };
 
 /// Tenx is an AI-driven coding assistant.
@@ -105,7 +104,7 @@ impl Tenx {
         let result = if let Err(e) = pre_result {
             let prompt = prompt.unwrap_or_else(|| "Please fix the following errors.".to_string());
             let model = self.config.models.default.clone();
-            session.add_prompt(model, Prompt::Auto(prompt))?;
+            session.add_prompt(model, prompt, StepType::Auto)?;
             if let Some(step) = session.last_step_mut() {
                 step.err = Some(e.clone());
             }
@@ -147,7 +146,8 @@ impl Tenx {
         if let Some(step) = session.last_step_mut() {
             step.rollback(&self.config)?;
             if let Some(p) = prompt {
-                step.prompt = Prompt::User(p);
+                step.prompt = p;
+                step.step_type = StepType::Prompt;
             }
         }
         self.process_prompt(session, sender.clone()).await
@@ -162,7 +162,7 @@ impl Tenx {
     ) -> Result<()> {
         let _block = EventBlock::start(&sender)?;
         let model = self.config.models.default.clone();
-        session.add_prompt(model, Prompt::User(prompt))?;
+        session.add_prompt(model, prompt, StepType::Prompt)?;
         self.process_prompt(session, sender.clone()).await
     }
 
@@ -220,7 +220,7 @@ impl Tenx {
                         retry_count, self.config.retry_limit, e
                     );
                     let model = self.config.models.default.clone();
-                    session.add_prompt(model, Prompt::Auto(model_message.to_string()))?;
+                    session.add_prompt(model, model_message.to_string(), StepType::Auto)?;
                     self.save_session(session)?;
                 } else {
                     debug!("Non-retryable error: {}", e);
@@ -381,7 +381,8 @@ mod tests {
         session
             .add_prompt(
                 config.models.default.clone(),
-                Prompt::User("Test prompt".to_string()),
+                "Test prompt".to_string(),
+                StepType::Prompt,
             )
             .unwrap();
         session

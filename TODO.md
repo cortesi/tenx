@@ -13,10 +13,12 @@ Model response robustness:
 Bugs:
     
     - retry doesn't work with fix
+    - retry doesn't work if the previous step had an error
 
 Features:
 
     - reset --all to completely roll back a session
+    - readonly: set a local file to be read-only
     - env variable to control default model
     - command output context type
     - custom system prompt additions

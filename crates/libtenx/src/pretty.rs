@@ -1,6 +1,6 @@
 use crate::{
-    config::Config, context, context::ContextProvider, model, patch, prompt::Prompt, Operation,
-    Result, Session, Step, TenxError,
+    config::Config, context, context::ContextProvider, model, patch, Operation, Result, Session,
+    Step, StepType, TenxError,
 };
 use colored::*;
 use textwrap::{wrap, Options};
@@ -144,18 +144,19 @@ fn print_steps(config: &Config, session: &Session, full: bool, width: usize) -> 
 
 fn render_step_prompt(step: &Step, width: usize, full: bool) -> String {
     let prompt_header = format!("{}{}\n", INDENT.repeat(2), "prompt:".blue().bold());
-    match &step.prompt {
-        Prompt::User(text) => format!(
+    let text = &step.prompt;
+    match step.step_type {
+        StepType::Prompt => format!(
             "{}{}",
             prompt_header,
             wrapped_block(text, width, INDENT.len() * 3)
         ),
-        Prompt::Auto(text) if full => format!(
+        StepType::Auto if full => format!(
             "{}{}",
             prompt_header,
             wrapped_block(text, width, INDENT.len() * 3)
         ),
-        Prompt::Auto(text) => {
+        StepType::Auto => {
             let lines: Vec<&str> = text.lines().collect();
             let first_line = lines.first().unwrap_or(&"");
             let remaining_lines = lines.len().saturating_sub(1);
@@ -308,7 +309,7 @@ pub fn print_contexts(config: &Config, session: &Session) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{context::Context, patch::Patch, prompt::Prompt, ModelResponse, Step, TenxError};
+    use crate::{context::Context, patch::Patch, ModelResponse, Step, TenxError};
     use tempfile::TempDir;
 
     fn create_test_session() -> (TempDir, Session) {
@@ -317,7 +318,11 @@ mod tests {
         let config = Config::default();
         let mut session = Session::default();
         session
-            .add_prompt("test_model".into(), Prompt::User("Test prompt".to_string()))
+            .add_prompt(
+                "test_model".into(),
+                "Test prompt".to_string(),
+                StepType::Prompt,
+            )
             .unwrap();
         let test_file_path = root_path.join("test_file.rs");
         std::fs::write(&test_file_path, "Test content").unwrap();
@@ -380,7 +385,8 @@ mod tests {
     fn test_render_step_editable() {
         let step = Step::new(
             "test_model".into(),
-            Prompt::User("Test prompt\nwith multiple\nlines".to_string()),
+            "Test prompt\nwith multiple\nlines".to_string(),
+            StepType::Prompt,
         );
         let full_result = render_step_prompt(&step, 80, true);
         assert!(full_result.contains("Test prompt"));
