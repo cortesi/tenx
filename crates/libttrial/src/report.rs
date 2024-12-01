@@ -21,8 +21,8 @@ pub struct TrialReport {
     pub error_response_parse: usize,
     /// Number of other errors
     pub error_other: usize,
-    /// Total execution time in seconds
-    pub time_taken: f64,
+    /// Total model response time in seconds
+    pub total_response_time: f64,
     /// Total number of words received from the model
     pub words_received: usize,
 }
@@ -34,7 +34,6 @@ impl TrialReport {
         trial_name: String,
         model_name: String,
         api_model_name: String,
-        time_taken: f64,
     ) -> Self {
         let steps_ref = session.steps();
         let num_steps = steps_ref.len();
@@ -78,7 +77,7 @@ impl TrialReport {
             error_check,
             error_response_parse,
             error_other,
-            time_taken,
+            total_response_time: steps_ref.iter().filter_map(|s| s.response_time).sum(),
             words_received,
         }
     }
@@ -101,6 +100,7 @@ mod tests {
             .add_prompt("test_model".into(), "test 1".to_string(), StepType::Code)
             .unwrap();
         if let Some(step) = session.last_step_mut() {
+            step.response_time = Some(1.5);
             step.model_response = Some(libtenx::ModelResponse {
                 comment: None,
                 patch: None,
@@ -142,7 +142,6 @@ mod tests {
             "trial1".to_string(),
             "gpt4".to_string(),
             "api_name".to_string(),
-            1.5,
         );
 
         assert_eq!(report.trial_name, "trial1");
@@ -153,7 +152,7 @@ mod tests {
         assert_eq!(report.error_check, 1);
         assert_eq!(report.error_response_parse, 0);
         assert_eq!(report.error_other, 0);
-        assert_eq!(report.time_taken, 1.5);
+        assert_eq!(report.total_response_time, 1.5);
         assert!(report.failed);
     }
 
@@ -190,7 +189,6 @@ mod tests {
             "trial1".to_string(),
             "gpt4".to_string(),
             "api_name".to_string(),
-            1.5,
         );
 
         assert_eq!(

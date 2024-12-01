@@ -136,8 +136,6 @@ impl Trial {
         sender: Option<mpsc::Sender<Event>>,
         model: Option<String>,
     ) -> Result<(TrialReport, Session)> {
-        use std::time::Instant;
-        let start_time = Instant::now();
         let temp_dir = self.setup_temp_project()?;
         let mut conf = self.tenx_conf.clone();
         conf.session_store_dir = PathBuf::from("");
@@ -173,15 +171,8 @@ impl Trial {
             Err(e) => info!("trial failed: {}: {}", self.name, e),
         }
 
-        let time_taken = start_time.elapsed().as_secs_f64();
         Ok((
-            TrialReport::from_session(
-                &session,
-                self.name.clone(),
-                model.name(),
-                model.api_model(),
-                time_taken,
-            ),
+            TrialReport::from_session(&session, self.name.clone(), model.name(), model.api_model()),
             session,
         ))
     }

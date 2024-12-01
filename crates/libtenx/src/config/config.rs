@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 
 use ron;
 
-use crate::{checks::Check, config::default_config, dialect, model, TenxError};
+use crate::{checks::Check, config::default_config, dialect, model, Mode, TenxError};
 
 pub const HOME_CONFIG_FILE: &str = "tenx.ron";
 pub const PROJECT_CONFIG_FILE: &str = ".tenx.ron";
@@ -458,9 +458,9 @@ impl CheckConfig {
             default_off: self.default_off,
             fail_on_stderr: self.fail_on_stderr,
             mode: match self.mode {
-                CheckMode::Pre => crate::Mode::Pre,
-                CheckMode::Post => crate::Mode::Post,
-                CheckMode::Both => crate::Mode::Both,
+                CheckMode::Pre => Mode::Pre,
+                CheckMode::Post => Mode::Post,
+                CheckMode::Both => Mode::Both,
             },
         }
     }
@@ -776,7 +776,7 @@ impl Config {
     }
 
     /// Returns the configured model.
-    pub fn active_model(&self) -> crate::Result<crate::model::Model> {
+    pub fn active_model(&self) -> crate::Result<model::Model> {
         if let Some(dummy_model) = &self.dummy_model {
             return Ok(model::Model::Dummy(dummy_model.clone()));
         }
@@ -820,7 +820,7 @@ impl Config {
     }
 
     /// Returns the configured dialect.
-    pub fn dialect(&self) -> crate::Result<crate::dialect::Dialect> {
+    pub fn dialect(&self) -> crate::Result<dialect::Dialect> {
         if let Some(dummy_dialect) = &self.dummy_dialect {
             return Ok(dialect::Dialect::Dummy(dummy_dialect.clone()));
         }

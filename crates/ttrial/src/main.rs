@@ -121,7 +121,7 @@ fn print_report_table(reports: &[TrialReport]) {
             } else {
                 Color::Green
             }),
-            Cell::new(format!("{:.1}", report.time_taken)),
+            Cell::new(format!("{:.1}", report.total_response_time)),
             Cell::new(report.words_received.to_string()),
             Cell::new(errors),
         ]);
@@ -292,7 +292,7 @@ async fn main() -> anyhow::Result<()> {
                     println!("\nSummary:");
                     let total = reports.len();
                     let failed = reports.iter().filter(|r| r.failed).count();
-                    let total_time: f64 = reports.iter().map(|r| r.time_taken).sum();
+                    let total_time: f64 = reports.iter().map(|r| r.total_response_time).sum();
 
                     println!(
                         "Ran {} trials in {:.1}s ({} failed)",
