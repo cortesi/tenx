@@ -213,6 +213,14 @@ impl ModelConfig {
         }
     }
 
+    /// Returns the API model identifier.
+    pub fn api_model(&self) -> &str {
+        match self {
+            ModelConfig::Claude { api_model, .. } => api_model,
+            ModelConfig::OpenAi { api_model, .. } => api_model,
+        }
+    }
+
     fn abbreviate_key(key: &str) -> String {
         if key.len() < 8 {
             key.to_string()

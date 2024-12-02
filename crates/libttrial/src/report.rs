@@ -8,6 +8,7 @@ pub struct TrialReport {
     /// The name of the model used for execution
     pub model_name: String,
     /// The iteration number (when a trial is run multiple times)
+    pub api_model: String,
     pub n: usize,
     /// True if any errors occurred during execution
     pub failed: bool,
@@ -29,25 +30,34 @@ pub struct TrialReport {
 
 impl TrialReport {
     /// Computes a trial report from a session
-    pub fn from_session(session: &Session, trial_name: &str, n: usize) -> Result<Self> {
-        let model_name = session
-            .steps()
-            .first()
+    pub fn from_session(
+        session: &Session,
+        trial_name: &str,
+        n: usize,
+        config: &libtenx::config::Config,
+    ) -> Result<Self> {
+        let model = session.steps().first().ok_or_else(|| {
+            TenxError::Internal("Cannot create trial report from empty session".to_string())
+        })?;
+
+        let model_name = model.model.clone();
+
+        let api_model = config
+            .get_model_conf(&model_name)
             .ok_or_else(|| {
-                TenxError::Internal("Cannot create trial report from empty session".to_string())
+                TenxError::Internal(format!("Model config not found for {}", model_name))
             })?
-            .model
-            .clone();
+            .api_model()
+            .to_string();
 
         let mut error_patch = 0;
         let mut error_check = 0;
         let mut error_response_parse = 0;
         let mut error_other = 0;
 
-        let mut failed = false;
+        let failed = session.last_step().and_then(|s| s.err.as_ref()).is_some();
         for step in session.steps() {
             if let Some(err) = &step.err {
-                failed = true;
                 match err {
                     TenxError::Patch { .. } => error_patch += 1,
                     TenxError::Check { .. } => error_check += 1,
@@ -70,6 +80,7 @@ impl TrialReport {
         Ok(TrialReport {
             trial_name: trial_name.to_string(),
             model_name,
+            api_model,
             n,
             failed,
             steps: session.steps().len(),

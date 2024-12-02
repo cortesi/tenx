@@ -4,8 +4,10 @@ cargo run --bin ttrial --  \
     run -n 3 \
     --resume \
     --save ./tmp/trial1 \
+    --model gpt4o \
     --model gpt4o-mini \
     --model haiku \
+    --model qwen \
     "*" 
 
 

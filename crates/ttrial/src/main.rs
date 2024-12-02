@@ -56,7 +56,7 @@ async fn run_trial(
     };
 
     let session = trial.execute(Some(sender.clone()), model_name).await?;
-    let report = TrialReport::from_session(&session, &trial.name, iteration)?;
+    let report = TrialReport::from_session(&session, &trial.name, iteration, &trial.tenx_conf)?;
 
     if let Some(pb) = progress {
         pb.finish();
@@ -77,6 +77,7 @@ fn sort_reports(reports: &mut [TrialReport]) {
         a.model_name
             .cmp(&b.model_name)
             .then(a.trial_name.cmp(&b.trial_name))
+            .then(a.n.cmp(&b.n))
     });
 }
 
@@ -95,6 +96,7 @@ fn print_report_table(reports: &mut [TrialReport]) {
     table.load_preset(UTF8_FULL).set_header(vec![
         Cell::new("model"),
         Cell::new("trial"),
+        Cell::new("n"),
         Cell::new("status"),
         Cell::new("steps"),
         Cell::new("time (s)"),
@@ -123,6 +125,7 @@ fn print_report_table(reports: &mut [TrialReport]) {
         table.add_row(vec![
             Cell::new(&report.model_name),
             Cell::new(&report.trial_name),
+            Cell::new(report.n.to_string()),
             Cell::new(status).fg(if report.failed {
                 Color::Red
             } else {
@@ -281,7 +284,12 @@ async fn main() -> anyhow::Result<()> {
                     .ok_or_else(|| anyhow::anyhow!("Invalid session name: {}", session_name))?;
 
                 let session = store.load(session_name.clone())?;
-                let report = TrialReport::from_session(&session, trial_name, iteration)?;
+                let report = TrialReport::from_session(
+                    &session,
+                    trial_name,
+                    iteration,
+                    &libtenx::config::load_config()?,
+                )?;
                 reports.push(report);
             }
 
