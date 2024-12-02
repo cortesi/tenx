@@ -55,7 +55,7 @@ async fn run_trial(
     };
 
     let session = trial.execute(Some(sender.clone()), model_name).await?;
-    let report = TrialReport::from_session(&session, trial.name.clone())?;
+    let report = TrialReport::from_session(&session, &trial.name)?;
 
     if let Some(pb) = progress {
         pb.finish();
@@ -249,8 +249,20 @@ async fn main() -> anyhow::Result<()> {
             let mut reports = Vec::new();
 
             for session_name in sessions {
-                let session = store.load(&session_name)?;
-                let report = TrialReport::from_session(&session, session_name)?;
+                // Strip the numeric suffix (e.g., "-1", "-2") from the session name
+                let trial_name = session_name
+                    .rfind('-')
+                    .and_then(|idx| {
+                        if session_name[idx + 1..].parse::<usize>().is_ok() {
+                            Some(&session_name[..idx])
+                        } else {
+                            None
+                        }
+                    })
+                    .unwrap_or(&session_name);
+
+                let session = store.load(session_name.clone())?;
+                let report = TrialReport::from_session(&session, trial_name)?;
                 reports.push(report);
             }
 

@@ -27,7 +27,7 @@ pub struct TrialReport {
 
 impl TrialReport {
     /// Computes a trial report from a session
-    pub fn from_session(session: &Session, trial_name: String) -> libtenx::Result<Self> {
+    pub fn from_session(session: &Session, trial_name: &str) -> libtenx::Result<Self> {
         let steps_ref = session.steps();
         let model_name = steps_ref
             .first()
@@ -66,7 +66,7 @@ impl TrialReport {
         }
 
         Ok(TrialReport {
-            trial_name,
+            trial_name: trial_name.to_string(),
             model_name,
             failed,
             steps: num_steps,
@@ -134,7 +134,7 @@ mod tests {
             });
         }
 
-        let report = TrialReport::from_session(&session, "trial1".to_string()).unwrap();
+        let report = TrialReport::from_session(&session, "trial1").unwrap();
 
         assert_eq!(report.trial_name, "trial1");
         assert_eq!(report.model_name, "test_model");
@@ -176,7 +176,7 @@ mod tests {
             });
         }
 
-        let report = TrialReport::from_session(&session, "trial1".to_string()).unwrap();
+        let report = TrialReport::from_session(&session, "trial1").unwrap();
 
         assert_eq!(
             report.error_check, 1,
