@@ -167,7 +167,11 @@ enum DialectCommands {
 #[derive(Subcommand)]
 enum Commands {
     /// Run check suite on the current session
-    Check,
+    Check {
+        /// Specifies files to edit
+        #[clap(value_parser)]
+        files: Option<Vec<String>>,
+    },
     /// List validators and their status
     Checks {
         /// Show all checks, including disabled
@@ -498,7 +502,13 @@ async fn main() -> anyhow::Result<()> {
                 prompt,
                 prompt_file,
             } => {
-                let mut session = tx.load_session()?;
+                let mut session = match tx.load_session() {
+                    Ok(sess) => sess,
+                    Err(_) => {
+                        println!("No existing session to check.");
+                        return Ok(());
+                    }
+                };
                 if let Some(files) = files {
                     add_files_to_session(&mut session, &config, files)?;
                 }
@@ -654,8 +664,11 @@ async fn main() -> anyhow::Result<()> {
                 println!("Session cleared");
                 Ok(())
             }
-            Commands::Check => {
+            Commands::Check { files } => {
                 let mut session = tx.load_session()?;
+                if let Some(files) = files {
+                    add_files_to_session(&mut session, &config, files)?;
+                }
                 tx.check(&mut session, &Some(sender.clone()))?;
                 Ok(())
             }
