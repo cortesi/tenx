@@ -70,15 +70,26 @@ async fn run_trial(
     Ok((report, session))
 }
 
+/// Sorts trial reports by model name first, then by trial name
+fn sort_reports(reports: &mut [TrialReport]) {
+    reports.sort_by(|a, b| {
+        a.model_name
+            .cmp(&b.model_name)
+            .then(a.trial_name.cmp(&b.trial_name))
+    });
+}
+
 /// Prints trial execution reports in a text format
-fn print_report_text(reports: &[TrialReport]) {
+fn print_report_text(reports: &mut [TrialReport]) {
+    sort_reports(reports);
     for report in reports {
         println!("{:#?}", report);
     }
 }
 
 /// Prints trial execution reports in a table format
-fn print_report_table(reports: &[TrialReport]) {
+fn print_report_table(reports: &mut [TrialReport]) {
+    sort_reports(reports);
     let mut table = Table::new();
     table.load_preset(UTF8_FULL).set_header(vec![
         Cell::new("model"),
@@ -271,7 +282,7 @@ async fn main() -> anyhow::Result<()> {
                 reports.push(report);
             }
 
-            print_report_table(&reports);
+            print_report_table(&mut reports);
             Ok(())
         }
         Commands::Run {
@@ -350,8 +361,8 @@ async fn main() -> anyhow::Result<()> {
 
             if !no_report && !reports.is_empty() {
                 match report {
-                    ReportFormat::Text => print_report_text(&reports),
-                    ReportFormat::Table => print_report_table(&reports),
+                    ReportFormat::Text => print_report_text(&mut reports),
+                    ReportFormat::Table => print_report_table(&mut reports),
                 }
 
                 println!("\nSummary:");
