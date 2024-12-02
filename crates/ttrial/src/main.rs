@@ -95,6 +95,7 @@ fn print_report_table(reports: &mut [TrialReport]) {
         Cell::new("model"),
         Cell::new("trial"),
         Cell::new("status"),
+        Cell::new("steps"),
         Cell::new("time (s)"),
         Cell::new("words recv"),
         Cell::new("errors"),
@@ -126,6 +127,7 @@ fn print_report_table(reports: &mut [TrialReport]) {
             } else {
                 Color::Green
             }),
+            Cell::new(report.steps.to_string()),
             Cell::new(format!("{:.1}", report.total_response_time)),
             Cell::new(report.words_received.to_string()),
             Cell::new(errors),

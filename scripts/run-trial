@@ -5,6 +5,7 @@ cargo run --bin ttrial --  \
     --resume \
     --save ./tmp/trial1 \
     --model gpt4o-mini \
-    rust-evenmedian \
+    --model haiku \
+    "*" 
 
 
