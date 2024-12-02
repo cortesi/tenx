@@ -13,21 +13,22 @@ help for details.
 
 ## Best Practices
 
-Trials are run frequently, and each trial is run for each model. Let's avoid
-making the full suite too expensive and slow to run. Keep your projects minimal
-by including only the files and dependencies necessary for the test. Each trial
-should be focused on testing a single specific feature or behavior, use clear
-and specific prompts, and have a short list of editable files. Don't add
-redundant trials or trials that test model behaviour that is too similar.
-
-Choose descriptive names for your trial files that clearly indicate what's
-being tested, and include a clear description in the `desc` field. This makes
-it easier to understand the purpose of each trial at a glance.
-
-Each trial should have a clear failure condition that can be reliably detected
-by a check, typically a unit test suite. Use retry limits to ensure that the
-trials fail conclusively if the model cannot produce the desired output
-promptly.
+- **Keep the test suite small**: Trials are run frequently, and each trial is
+  run for each model. Let's avoid making the full suite too expensive and slow
+  to run. Don't add redundant trials. Keep trial projects minimal by including
+  only the files and dependencies necessary for the test. 
+- **Keep trials focused**: Each trial should test a single behavior. Use clear
+  and specific prompts to elicit the behaviour, and describe what is being
+  tested in the trial desc attribute.
+- **Add rather than modify**: Prefer to add new trials rather than modify
+  existing ones - we will use trial output for comparisons with historical
+  results.
+- **Clear failure modes**: Each trial must have a clear failure condition that
+  can be reliably detected by a check, typically a unit test suite. 
+- **Bound models with retry limits**: Use retry limits to ensure that the
+  trials fail conclusively if the model cannot produce the desired output
+  promptly. Tests are run multiple times, so even a retry limit of 1 is
+  acceptable.
 
 
 ## Configuration Format

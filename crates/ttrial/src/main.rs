@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use textwrap::dedent;
 
 use clap::{Parser, Subcommand, ValueEnum};
 use colored::*;
@@ -194,6 +195,13 @@ enum Commands {
     },
 }
 
+/// Format a trial description by dedenting, reflowing, and trimming whitespace
+fn format_description(desc: &str) -> String {
+    let dedented = dedent(desc);
+    let trimmed = dedented.trim();
+    textwrap::fill(trimmed, 72)
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
@@ -342,7 +350,7 @@ async fn main() -> anyhow::Result<()> {
             for trial in trials {
                 println!("{}", trial.name.blue().bold());
                 if !trial.desc.is_empty() {
-                    let desc = textwrap::fill(&trial.desc, 72);
+                    let desc = format_description(&trial.desc);
                     for line in desc.lines() {
                         println!("    {}", line);
                     }

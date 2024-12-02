@@ -2,13 +2,14 @@
     project: "rust/gridarea-hard",
     desc: "
         A hard complexity algorithmic problem, requiring three simultaneous
-        easy solutions. The hardest part is the run-length encoded grid
-        representation. The models really should syntesize an intermediate 'get'
-        method to retrieve a cell status, which hugely simplifies the resulting
-        algorithm.
+        easy solutions. 
+
+        The hardest part is the run-length encoded grid representation. The
+        models really should syntesize an intermediate 'get' method to retrieve
+        a cell status, which hugely simplifies the resulting algorithm.
     ",
     op: code(
-        prompt: "Implement the Area trait for Grid and Sparse. Don't change the unit tests.",
+        prompt: "Implement the Area trait for Grid, Sparse and RunLength. Don't change the unit tests.",
         editable: ["**/code.rs"]
     ),
     config: (
