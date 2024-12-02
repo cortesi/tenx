@@ -2,20 +2,13 @@
 mod tests {
     use crate::code::*;
 
-    #[test]
-    fn test_area() {
-        let grid = Grid::new(vec![
-            vec![true, false, true],
-            vec![true, false, false],
-            vec![false, true, true],
-        ]);
-
+    fn tarea<T: Area>(instance: &T) {
         // Test border 0 (1x1 region)
-        let area = grid.area(1, 1, 0);
+        let area = instance.area(1, 1, 0);
         assert_eq!(area, vec![vec![false]]);
 
         // Test border 1 (3x3 region)
-        let area = grid.area(1, 1, 1);
+        let area = instance.area(1, 1, 1);
         assert_eq!(
             area,
             vec![
@@ -26,7 +19,7 @@ mod tests {
         );
 
         // Test wrapping at edges
-        let area = grid.area(2, 2, 1);
+        let area = instance.area(2, 2, 1);
         assert_eq!(
             area,
             vec![
@@ -37,7 +30,7 @@ mod tests {
         );
 
         // Test corner top-left
-        let area_top_left = grid.area(0, 0, 1);
+        let area_top_left = instance.area(0, 0, 1);
         assert_eq!(
             area_top_left,
             vec![
@@ -48,7 +41,7 @@ mod tests {
         );
 
         // Test corner bottom-right
-        let area_bottom_right = grid.area(2, 2, 1);
+        let area_bottom_right = instance.area(2, 2, 1);
         assert_eq!(
             area_bottom_right,
             vec![
@@ -59,7 +52,7 @@ mod tests {
         );
 
         // Test border 2 (5x5 region), focusing on wrapping
-        let area_wrapping = grid.area(0, 0, 2);
+        let area_wrapping = instance.area(0, 0, 2);
         assert_eq!(
             area_wrapping,
             vec![
@@ -70,5 +63,25 @@ mod tests {
                 vec![true, true, false, true, true],
             ]
         );
+    }
+
+    #[test]
+    fn test_grid_area() {
+        let grid = Grid::new(vec![
+            vec![true, false, true],
+            vec![true, false, false],
+            vec![false, true, true],
+        ]);
+        tarea(&grid);
+    }
+    #[test]
+
+    fn test_sparse_area() {
+        let s = Sparse::new(vec![
+            vec![true, false, true],
+            vec![true, false, false],
+            vec![false, true, true],
+        ]);
+        tarea(&s);
     }
 }
