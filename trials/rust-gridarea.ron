@@ -1,0 +1,14 @@
+(
+    project: "rust/gridarea",
+    desc: "A moderate complexity algorithmic problem.",
+    op: code(
+        prompt: "Implement the Area trait for Grid.",
+        editable: ["**/code.rs"]
+    ),
+    config: (
+        retry_limit: 10,
+        checks: (
+            no_pre: true
+        )
+    )
+)
