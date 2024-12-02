@@ -206,6 +206,20 @@ fn format_description(desc: &str) -> String {
     textwrap::fill(trimmed, 72)
 }
 
+/// Format a session name from components using colons as separators
+fn format_session_name(model: &str, trial: &str, iteration: usize) -> String {
+    format!("{}:{}:{}", model, trial, iteration + 1)
+}
+
+/// Parse a session name into its components, expecting colon separators
+fn parse_session_name(session_name: &str) -> Option<(&str, &str, usize)> {
+    let mut parts = session_name.rsplitn(2, ':');
+    let iteration = parts.next()?.parse::<usize>().ok()?.checked_sub(1)?;
+    let remainder = parts.next()?;
+    let parts = remainder.split_once(':')?;
+    Some((parts.0, parts.1, iteration))
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
@@ -249,17 +263,8 @@ async fn main() -> anyhow::Result<()> {
             let mut reports = Vec::new();
 
             for session_name in sessions {
-                // Strip the numeric suffix (e.g., "-1", "-2") from the session name
-                let trial_name = session_name
-                    .rfind('-')
-                    .and_then(|idx| {
-                        if session_name[idx + 1..].parse::<usize>().is_ok() {
-                            Some(&session_name[..idx])
-                        } else {
-                            None
-                        }
-                    })
-                    .unwrap_or(&session_name);
+                let (_, trial_name, _) = parse_session_name(&session_name)
+                    .ok_or_else(|| anyhow::anyhow!("Invalid session name: {}", session_name))?;
 
                 let session = store.load(session_name.clone())?;
                 let report = TrialReport::from_session(&session, trial_name)?;
@@ -306,7 +311,7 @@ async fn main() -> anyhow::Result<()> {
             for model in models {
                 for trial in &mut trials {
                     for i in 0..iterations {
-                        let session_name = format!("{}-{}-{}", model, trial.name, i + 1);
+                        let session_name = format_session_name(&model, &trial.name, i);
                         if resume {
                             if let Some(store) = &session_store {
                                 if store.list()?.contains(&session_name) {
