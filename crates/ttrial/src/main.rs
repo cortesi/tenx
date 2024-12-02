@@ -268,9 +268,9 @@ async fn main() -> anyhow::Result<()> {
 
             let mut reports = Vec::new();
             let models = if model.is_empty() {
-                vec![]
+                vec!["sonnet".to_string()]
             } else {
-                model.iter().collect()
+                model.to_vec()
             };
             let session_store = if let Some(save_dir) = &save {
                 Some(SessionStore::open(save_dir.clone())?)
@@ -292,7 +292,7 @@ async fn main() -> anyhow::Result<()> {
                         }
                     }
 
-                    let (report, session) = run_trial(trial, &cli.output, &sender, model).await?;
+                    let (report, session) = run_trial(trial, &cli.output, &sender, &model).await?;
 
                     if let Some(store) = &session_store {
                         let session_name = format!("{}-{}", report.model_name, trial.name);

@@ -74,8 +74,18 @@ mod tests {
         ]);
         tarea(&grid);
     }
-    #[test]
 
+    #[test]
+    fn test_runlength_area() {
+        let r = RunLength::new(vec![
+            vec![true, false, true],
+            vec![true, false, false],
+            vec![false, true, true],
+        ]);
+        tarea(&r);
+    }
+
+    #[test]
     fn test_sparse_area() {
         let s = Sparse::new(vec![
             vec![true, false, true],
