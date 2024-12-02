@@ -28,6 +28,89 @@ pub struct TrialReport {
     pub words_received: usize,
 }
 
+/// Aggregate performance metrics for a model across multiple trial runs.
+#[derive(Debug)]
+pub struct ModelScore {
+    /// Name of the model
+    pub model_name: String,
+    /// API model identifier
+    pub api_model: String,
+    /// Total number of trials run
+    pub total_trials: usize,
+    /// Number of failed trials
+    pub total_fails: usize,
+    /// Number of successful trials
+    pub total_succeeds: usize,
+    /// Total number of errors across all trials
+    pub total_errors: usize,
+    /// Number of patch application errors
+    pub error_patch: usize,
+    /// Number of check failures
+    pub error_check: usize,
+    /// Number of response parsing errors
+    pub error_response_parse: usize,
+    /// Number of other errors
+    pub error_other: usize,
+    /// Total number of words received from the model
+    pub total_words: usize,
+    /// Total time spent waiting for model responses
+    pub total_time: f64,
+}
+
+/// Create aggregate model scores from a sequence of trial reports.
+pub fn model_scores<'a>(reports: impl IntoIterator<Item = &'a TrialReport>) -> Vec<ModelScore> {
+    let mut scores = std::collections::HashMap::new();
+
+    for report in reports {
+        scores
+            .entry((report.model_name.clone(), report.api_model.clone()))
+            .or_insert_with(|| ModelScore::new(report.model_name.clone(), report.api_model.clone()))
+            .add_report(report);
+    }
+
+    scores.into_values().collect()
+}
+
+impl ModelScore {
+    /// Add a trial report to the model score
+    pub fn add_report(&mut self, report: &TrialReport) {
+        self.total_trials += 1;
+        if report.failed {
+            self.total_fails += 1;
+        } else {
+            self.total_succeeds += 1;
+        }
+        self.total_errors += report.error_patch
+            + report.error_check
+            + report.error_response_parse
+            + report.error_other;
+        self.error_patch += report.error_patch;
+        self.error_check += report.error_check;
+        self.error_response_parse += report.error_response_parse;
+        self.error_other += report.error_other;
+        self.total_words += report.words_received;
+        self.total_time += report.total_response_time;
+    }
+
+    /// Create a new ModelScore for a specific model
+    pub fn new(model_name: String, api_model: String) -> Self {
+        ModelScore {
+            model_name,
+            api_model,
+            total_trials: 0,
+            total_fails: 0,
+            total_succeeds: 0,
+            total_errors: 0,
+            error_patch: 0,
+            error_check: 0,
+            error_response_parse: 0,
+            error_other: 0,
+            total_words: 0,
+            total_time: 0.0,
+        }
+    }
+}
+
 impl TrialReport {
     /// Computes a trial report from a session
     pub fn from_session(
