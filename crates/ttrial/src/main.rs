@@ -36,6 +36,7 @@ async fn run_trial(
     output_mode: &OutputMode,
     sender: &mpsc::Sender<Event>,
     model_name: &str,
+    iteration: usize,
 ) -> anyhow::Result<(TrialReport, Session)> {
     trial.tenx_conf = trial.tenx_conf.clone().load_env();
 
@@ -55,7 +56,7 @@ async fn run_trial(
     };
 
     let session = trial.execute(Some(sender.clone()), model_name).await?;
-    let report = TrialReport::from_session(&session, &trial.name)?;
+    let report = TrialReport::from_session(&session, &trial.name, iteration)?;
 
     if let Some(pb) = progress {
         pb.finish();
@@ -276,11 +277,11 @@ async fn main() -> anyhow::Result<()> {
             let mut reports = Vec::new();
 
             for session_name in sessions {
-                let (_, trial_name, _) = parse_session_name(&session_name)
+                let (_, trial_name, iteration) = parse_session_name(&session_name)
                     .ok_or_else(|| anyhow::anyhow!("Invalid session name: {}", session_name))?;
 
                 let session = store.load(session_name.clone())?;
-                let report = TrialReport::from_session(&session, trial_name)?;
+                let report = TrialReport::from_session(&session, trial_name, iteration)?;
                 reports.push(report);
             }
 
@@ -343,7 +344,7 @@ async fn main() -> anyhow::Result<()> {
                         }
 
                         let (report, session) =
-                            run_trial(trial, &cli.output, &sender, &model).await?;
+                            run_trial(trial, &cli.output, &sender, &model, i).await?;
 
                         if let Some(store) = &session_store {
                             store.save(&session_name, &session)?;
