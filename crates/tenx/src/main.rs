@@ -235,6 +235,9 @@ enum Commands {
         /// Edit the prompt before fixing
         #[clap(long)]
         edit: bool,
+        /// Specifies files to edit
+        #[clap(value_parser)]
+        files: Option<Vec<String>>,
     },
     /// List configured models (alias: ls)
     Models {
@@ -621,6 +624,7 @@ async fn main() -> anyhow::Result<()> {
                 prompt,
                 prompt_file,
                 edit,
+                files,
             } => {
                 let mut session = if *clear {
                     let mut current_session = tx.load_session()?;
@@ -630,6 +634,10 @@ async fn main() -> anyhow::Result<()> {
                     tx.new_session_from_cwd(&Some(sender.clone()), *no_ctx)
                         .await?
                 };
+
+                if let Some(files) = files {
+                    add_files_to_session(&mut session, &config, files)?;
+                }
 
                 let prompt = if prompt.is_some() || prompt_file.is_some() || *edit {
                     get_prompt(prompt, prompt_file, &session, false)?
