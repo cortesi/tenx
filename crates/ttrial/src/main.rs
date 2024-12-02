@@ -181,6 +181,10 @@ enum Commands {
         /// Resume trials by skipping those with existing saved sessions
         #[clap(long, requires = "save")]
         resume: bool,
+
+        /// Number of times to run each trial
+        #[clap(short = 'n', long, default_value = "1")]
+        iterations: usize,
     },
     /// List all available trials (alias: ls)
     #[clap(alias = "ls")]
@@ -261,6 +265,7 @@ async fn main() -> anyhow::Result<()> {
             resume,
             no_report,
             session: session_flag,
+            iterations,
         } => {
             let pattern_refs: Vec<&str> = patterns.iter().map(|s| s.as_str()).collect();
             let pattern_slice = if pattern_refs.is_empty() {
@@ -288,53 +293,59 @@ async fn main() -> anyhow::Result<()> {
 
             for model in models {
                 for trial in &mut trials {
-                    let session_name = format!("{}-{}", model, trial.name);
-                    if resume {
-                        if let Some(store) = &session_store {
-                            if store.list()?.contains(&session_name) {
-                                if matches!(cli.output, OutputMode::Sum) {
-                                    println!("{}: {}\n    {}", model, trial.name, "skip".yellow());
+                    for i in 0..iterations {
+                        let session_name = format!("{}-{}-{}", model, trial.name, i + 1);
+                        if resume {
+                            if let Some(store) = &session_store {
+                                if store.list()?.contains(&session_name) {
+                                    if matches!(cli.output, OutputMode::Sum) {
+                                        println!(
+                                            "{}: {} ({})\n    {}",
+                                            model,
+                                            trial.name,
+                                            i + 1,
+                                            "skip".yellow()
+                                        );
+                                    }
+                                    continue;
                                 }
-                                continue;
                             }
                         }
-                    }
 
-                    let (report, session) = run_trial(trial, &cli.output, &sender, &model).await?;
+                        let (report, session) =
+                            run_trial(trial, &cli.output, &sender, &model).await?;
 
-                    if let Some(store) = &session_store {
-                        let session_name = format!("{}-{}", report.model_name, trial.name);
-                        store.save(&session_name, &session)?;
+                        if let Some(store) = &session_store {
+                            store.save(&session_name, &session)?;
+                        }
+                        if session_flag {
+                            println!("\n{}", "-".repeat(80));
+                            println!("Session for {} - {}:", report.model_name.blue(), trial.name);
+                            println!(
+                                "{}",
+                                pretty::print_session(&trial.tenx_conf, &session, true)?
+                            );
+                        }
+                        reports.push(report);
                     }
-                    if session_flag {
-                        println!("\n{}", "-".repeat(80));
-                        println!("Session for {} - {}:", report.model_name.blue(), trial.name);
-                        println!(
-                            "{}",
-                            pretty::print_session(&trial.tenx_conf, &session, true)?
-                        );
-                    }
-                    reports.push(report);
                 }
             }
 
-            if !no_report {
+            if !no_report && !reports.is_empty() {
                 match report {
                     ReportFormat::Text => print_report_text(&reports),
                     ReportFormat::Table => print_report_table(&reports),
                 }
 
-                if !reports.is_empty() && reports.len() > 1 {
-                    println!("\nSummary:");
-                    let total = reports.len();
-                    let failed = reports.iter().filter(|r| r.failed).count();
-                    let total_time: f64 = reports.iter().map(|r| r.total_response_time).sum();
+                println!("\nSummary:");
+                let total = reports.len();
+                let failed = reports.iter().filter(|r| r.failed).count();
+                let total_time: f64 = reports.iter().map(|r| r.total_response_time).sum();
 
-                    println!(
-                        "Ran {} trials in {:.1}s ({} failed)",
-                        total, total_time, failed
-                    );
-                }
+                println!(
+                    "Ran {} trials in {:.1}s ({} failed)",
+                    total, total_time, failed
+                );
             }
 
             Ok(())

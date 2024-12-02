@@ -1,0 +1,10 @@
+#!/bin/sh
+
+cargo run --bin ttrial --  \
+    run -n 3 \
+    --resume \
+    --save ./tmp/trial1 \
+    --model gpt4o-mini \
+    rust-evenmedian \
+
+
