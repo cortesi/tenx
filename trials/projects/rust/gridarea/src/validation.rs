@@ -1,13 +1,39 @@
 #[cfg(test)]
 mod tests {
-    // use crate::code::evenmedian;
+    use crate::code::*;
 
-    // #[test]
-    // fn test_evenmedian() {
-    //     assert_eq!(evenmedian(&[1, 2, 3, 4, 5]), 3); // median of [1,3,5]
-    //     assert_eq!(evenmedian(&[]), 0); // empty slice
-    //     assert_eq!(evenmedian(&[42]), 42); // single element
-    //     assert_eq!(evenmedian(&[2, 9, 4]), 3); // median of [2,4]
-    //     assert_eq!(evenmedian(&[1, 0, 5, 0, 9]), 5); // median of [1,5,9]
-    // }
+    #[test]
+    fn test_area() {
+        let grid = Grid::new(vec![
+            vec![true, false, true],
+            vec![false, true, false],
+            vec![true, false, true],
+        ]);
+
+        // Test border 0 (1x1 region)
+        let area = grid.area(1, 1, 0);
+        assert_eq!(area, vec![vec![true]]);
+
+        // Test border 1 (3x3 region)
+        let area = grid.area(1, 1, 1);
+        assert_eq!(
+            area,
+            vec![
+                vec![true, false, true],
+                vec![false, true, false],
+                vec![true, false, true],
+            ]
+        );
+
+        // Test wrapping at edges
+        let area = grid.area(2, 2, 1);
+        assert_eq!(
+            area,
+            vec![
+                vec![true, false, false],
+                vec![false, true, true],
+                vec![false, true, true],
+            ]
+        );
+    }
 }
