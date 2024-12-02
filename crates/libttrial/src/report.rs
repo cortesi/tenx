@@ -176,3 +176,145 @@ impl TrialReport {
         })
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_model_score_new() {
+        let score = ModelScore::new("gpt-4".to_string(), "gpt-4-0613".to_string());
+        assert_eq!(score.model_name, "gpt-4");
+        assert_eq!(score.api_model, "gpt-4-0613");
+        assert_eq!(score.total_trials, 0);
+        assert_eq!(score.total_fails, 0);
+        assert_eq!(score.total_succeeds, 0);
+        assert_eq!(score.total_errors, 0);
+        assert_eq!(score.error_patch, 0);
+        assert_eq!(score.error_check, 0);
+        assert_eq!(score.error_response_parse, 0);
+        assert_eq!(score.error_other, 0);
+        assert_eq!(score.total_words, 0);
+        assert_eq!(score.total_time, 0.0);
+    }
+
+    #[test]
+    fn test_model_score_add_report() {
+        let mut score = ModelScore::new("gpt-4".to_string(), "gpt-4-0613".to_string());
+
+        let report1 = TrialReport {
+            trial_name: "test1".to_string(),
+            model_name: "gpt-4".to_string(),
+            api_model: "gpt-4-0613".to_string(),
+            n: 1,
+            failed: false,
+            steps: 3,
+            error_patch: 0,
+            error_check: 0,
+            error_response_parse: 0,
+            error_other: 0,
+            total_response_time: 1.5,
+            words_received: 100,
+        };
+
+        let report2 = TrialReport {
+            trial_name: "test2".to_string(),
+            model_name: "gpt-4".to_string(),
+            api_model: "gpt-4-0613".to_string(),
+            n: 2,
+            failed: true,
+            steps: 2,
+            error_patch: 1,
+            error_check: 1,
+            error_response_parse: 0,
+            error_other: 1,
+            total_response_time: 2.0,
+            words_received: 150,
+        };
+
+        score.add_report(&report1);
+        assert_eq!(score.total_trials, 1);
+        assert_eq!(score.total_succeeds, 1);
+        assert_eq!(score.total_fails, 0);
+        assert_eq!(score.total_words, 100);
+        assert_eq!(score.total_time, 1.5);
+
+        score.add_report(&report2);
+        assert_eq!(score.total_trials, 2);
+        assert_eq!(score.total_succeeds, 1);
+        assert_eq!(score.total_fails, 1);
+        assert_eq!(score.error_patch, 1);
+        assert_eq!(score.error_check, 1);
+        assert_eq!(score.error_other, 1);
+        assert_eq!(score.total_errors, 3);
+        assert_eq!(score.total_words, 250);
+        assert_eq!(score.total_time, 3.5);
+    }
+
+    #[test]
+    fn test_model_scores() {
+        let reports = vec![
+            TrialReport {
+                trial_name: "test1".to_string(),
+                model_name: "gpt-4".to_string(),
+                api_model: "gpt-4-0613".to_string(),
+                n: 1,
+                failed: false,
+                steps: 2,
+                error_patch: 0,
+                error_check: 0,
+                error_response_parse: 0,
+                error_other: 0,
+                total_response_time: 1.0,
+                words_received: 100,
+            },
+            TrialReport {
+                trial_name: "test2".to_string(),
+                model_name: "claude".to_string(),
+                api_model: "claude-2".to_string(),
+                n: 1,
+                failed: true,
+                steps: 3,
+                error_patch: 1,
+                error_check: 0,
+                error_response_parse: 0,
+                error_other: 0,
+                total_response_time: 2.0,
+                words_received: 150,
+            },
+            TrialReport {
+                trial_name: "test3".to_string(),
+                model_name: "gpt-4".to_string(),
+                api_model: "gpt-4-0613".to_string(),
+                n: 2,
+                failed: true,
+                steps: 1,
+                error_patch: 0,
+                error_check: 1,
+                error_response_parse: 0,
+                error_other: 0,
+                total_response_time: 1.5,
+                words_received: 75,
+            },
+        ];
+
+        let scores = model_scores(reports.iter());
+        assert_eq!(scores.len(), 2);
+
+        let gpt4_score = scores.iter().find(|s| s.model_name == "gpt-4").unwrap();
+        assert_eq!(gpt4_score.total_trials, 2);
+        assert_eq!(gpt4_score.total_succeeds, 1);
+        assert_eq!(gpt4_score.total_fails, 1);
+        assert_eq!(gpt4_score.error_check, 1);
+        assert_eq!(gpt4_score.total_words, 175);
+        assert_eq!(gpt4_score.total_time, 2.5);
+
+        let claude_score = scores.iter().find(|s| s.model_name == "claude").unwrap();
+        assert_eq!(claude_score.total_trials, 1);
+        assert_eq!(claude_score.total_succeeds, 0);
+        assert_eq!(claude_score.total_fails, 1);
+        assert_eq!(claude_score.error_patch, 1);
+        assert_eq!(claude_score.total_words, 150);
+        assert_eq!(claude_score.total_time, 2.0);
+    }
+}
