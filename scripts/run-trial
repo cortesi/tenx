@@ -1,13 +1,18 @@
 #!/bin/sh
 
-cargo run --bin ttrial --  \
+cargo run --release --bin ttrial --  \
     run -n 3 \
     --resume \
     --save ./tmp/trial1 \
+    --model deepseek \
     --model gpt4o \
     --model gpt4o-mini \
+    --model sonnet \
     --model haiku \
     --model qwen \
+    --model llama-70b \
+    --model grok \
+    --model llama-8b-turbo \
     "*" 
 
 

@@ -214,6 +214,11 @@ enum Commands {
         /// Directory containing stored sessions
         store: PathBuf,
     },
+    /// Generate aggregate model scores from stored sessions
+    Score {
+        /// Directory containing stored sessions
+        store: PathBuf,
+    },
 }
 
 /// Format a trial description by dedenting, reflowing, and trimming whitespace
@@ -271,6 +276,55 @@ async fn main() -> anyhow::Result<()> {
             "Trials directory does not exist: {}",
             trials_path.display()
         ));
+    }
+
+    /// Prints model scores in a table format
+    fn print_score_table(scores: &[ModelScore]) {
+        let mut table = Table::new();
+        table.load_preset(UTF8_FULL).set_header(vec![
+            Cell::new("model"),
+            Cell::new("api model"),
+            Cell::new("trials"),
+            Cell::new("success %"),
+            Cell::new("errors"),
+            Cell::new("time (s)"),
+            Cell::new("words"),
+        ]);
+
+        for score in scores {
+            let mut errors = Vec::new();
+            if score.error_check > 0 {
+                errors.push(format!("check: {}", score.error_check));
+            }
+            if score.error_patch > 0 {
+                errors.push(format!("patch: {}", score.error_patch));
+            }
+            if score.error_response_parse > 0 {
+                errors.push(format!("parse: {}", score.error_response_parse));
+            }
+            if score.error_other > 0 {
+                errors.push(format!("other: {}", score.error_other));
+            }
+            let errors = errors.join("\n");
+
+            let success_rate = if score.total_trials > 0 {
+                (score.total_succeeds as f64 / score.total_trials as f64) * 100.0
+            } else {
+                0.0
+            };
+
+            table.add_row(vec![
+                Cell::new(&score.model_name),
+                Cell::new(&score.api_model),
+                Cell::new(score.total_trials.to_string()),
+                Cell::new(format!("{:.1}%", success_rate)),
+                Cell::new(errors),
+                Cell::new(format!("{:.1}", score.total_time)),
+                Cell::new(score.total_words.to_string()),
+            ]);
+        }
+
+        println!("{table}");
     }
 
     let result = match cli.command {
@@ -406,6 +460,29 @@ async fn main() -> anyhow::Result<()> {
                     }
                 }
             }
+            Ok(())
+        }
+        Commands::Score { store } => {
+            let store = SessionStore::open(store)?;
+            let sessions = store.list()?;
+            let mut reports = Vec::new();
+
+            for session_name in sessions {
+                let (_, trial_name, iteration) = parse_session_name(&session_name)
+                    .ok_or_else(|| anyhow::anyhow!("Invalid session name: {}", session_name))?;
+
+                let session = store.load(session_name.clone())?;
+                let report = TrialReport::from_session(
+                    &session,
+                    trial_name,
+                    iteration,
+                    &libtenx::config::load_config()?,
+                )?;
+                reports.push(report);
+            }
+
+            let scores = model_scores(&reports);
+            print_score_table(&scores);
             Ok(())
         }
     };

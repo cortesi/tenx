@@ -17,6 +17,9 @@ const OPENAI_GPT4O_MINI: &str = "gpt-4o-mini";
 const DEEPINFRA_API_KEY: &str = "DEEPINFRA_API_KEY";
 const DEEPINFRA_API_BASE: &str = "https://api.deepinfra.com/v1/openai";
 
+const DEEPSEEK_API_KEY: &str = "DEEPSEEK_API_KEY";
+const DEEPSEEK_API_BASE: &str = "https://api.deepseek.com";
+
 const XAI_API_KEY: &str = "XAI_API_KEY";
 const XAI_API_BASE: &str = "https://api.x.ai/v1";
 const XAI_DEFAULT_GROK: &str = "grok-beta";
@@ -45,6 +48,17 @@ fn default_models() -> Vec<ModelConfig> {
             },
         ]);
     }
+    if env::var(DEEPSEEK_API_KEY).is_ok() {
+        models.push(ModelConfig::OpenAi {
+            name: "deepseek".to_string(),
+            api_model: "deepseek-chat".to_string(),
+            key: "".to_string(),
+            key_env: DEEPSEEK_API_KEY.to_string(),
+            api_base: DEEPSEEK_API_BASE.to_string(),
+            can_stream: true,
+            no_system_prompt: false,
+        })
+    }
 
     if env::var(DEEPINFRA_API_KEY).is_ok() {
         models.extend_from_slice(&[
@@ -69,15 +83,6 @@ fn default_models() -> Vec<ModelConfig> {
             ModelConfig::OpenAi {
                 name: "llama-70b".to_string(),
                 api_model: "meta-llama/Meta-Llama-3.1-70B-Instruct".to_string(),
-                key: "".to_string(),
-                key_env: DEEPINFRA_API_KEY.to_string(),
-                api_base: DEEPINFRA_API_BASE.to_string(),
-                can_stream: true,
-                no_system_prompt: false,
-            },
-            ModelConfig::OpenAi {
-                name: "deepseek".to_string(),
-                api_model: "deepseek-ai/DeepSeek-V2.5".to_string(),
                 key: "".to_string(),
                 key_env: DEEPINFRA_API_KEY.to_string(),
                 api_base: DEEPINFRA_API_BASE.to_string(),

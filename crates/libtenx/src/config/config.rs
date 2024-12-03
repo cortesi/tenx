@@ -547,7 +547,9 @@ impl Config {
         let mut model_map: HashMap<String, ModelConfig> = builtin.collect();
         model_map.extend(custom);
 
-        model_map.into_values().collect()
+        let mut models: Vec<ModelConfig> = model_map.into_values().collect();
+        models.sort_by(|a, b| a.name().cmp(b.name()));
+        models
     }
 
     pub fn cwd(&self) -> crate::Result<PathBuf> {
