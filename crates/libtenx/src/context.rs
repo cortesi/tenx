@@ -7,7 +7,8 @@ use crate::{config::Config, session::Session, Result, TenxError};
 
 /// An individual context item.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
-/// Represents a single piece of context information that can be included in a prompt.
+/// Represents a single piece of context information to include in a prompt. Each ContextProvider
+/// can provide multiple ContextItems.
 pub struct ContextItem {
     /// The type of context.
     pub ty: String,
@@ -17,22 +18,11 @@ pub struct ContextItem {
     pub body: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub enum ContextType {
-    Ruskel,
-    Path,
-    ProjectMap,
-    Url,
-    Text,
-}
-
+/// A trait for context providers that can be used to generate context items for a prompt.
 #[async_trait]
 pub trait ContextProvider {
-    /// Returns the type of the context provider.
-    fn typ(&self) -> &ContextType;
-
     /// Retrieves the context items for this provider.
-    fn contexts(
+    fn context_items(
         &self,
         config: &crate::config::Config,
         session: &Session,
@@ -70,11 +60,7 @@ impl Ruskel {
 
 #[async_trait]
 impl ContextProvider for Ruskel {
-    fn typ(&self) -> &ContextType {
-        &ContextType::Ruskel
-    }
-
-    fn contexts(
+    fn context_items(
         &self,
         _config: &crate::config::Config,
         _session: &Session,
@@ -119,11 +105,7 @@ impl ProjectMap {
 
 #[async_trait]
 impl ContextProvider for ProjectMap {
-    fn typ(&self) -> &ContextType {
-        &ContextType::ProjectMap
-    }
-
-    fn contexts(&self, config: &Config, _: &Session) -> Result<Vec<ContextItem>> {
+    fn context_items(&self, config: &Config, _: &Session) -> Result<Vec<ContextItem>> {
         let files = config.included_files()?;
         let body = files
             .iter()
@@ -152,7 +134,7 @@ impl ContextProvider for ProjectMap {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
-pub enum PathType {
+enum PathType {
     SinglePath(String),
     Pattern(String),
 }
@@ -177,11 +159,7 @@ impl Path {
 
 #[async_trait]
 impl ContextProvider for Path {
-    fn typ(&self) -> &ContextType {
-        &ContextType::Path
-    }
-
-    fn contexts(
+    fn context_items(
         &self,
         config: &crate::config::Config,
         _session: &Session,
@@ -253,11 +231,7 @@ impl Url {
 
 #[async_trait]
 impl ContextProvider for Url {
-    fn typ(&self) -> &ContextType {
-        &ContextType::Url
-    }
-
-    fn contexts(
+    fn context_items(
         &self,
         _config: &crate::config::Config,
         _session: &Session,
@@ -319,11 +293,7 @@ impl Text {
 
 #[async_trait]
 impl ContextProvider for Text {
-    fn typ(&self) -> &ContextType {
-        &ContextType::Text
-    }
-
-    fn contexts(
+    fn context_items(
         &self,
         _config: &crate::config::Config,
         _session: &Session,
@@ -379,27 +349,17 @@ impl Context {
 
 #[async_trait]
 impl ContextProvider for Context {
-    fn typ(&self) -> &ContextType {
-        match self {
-            Context::Ruskel(r) => r.typ(),
-            Context::Path(g) => g.typ(),
-            Context::ProjectMap(p) => p.typ(),
-            Context::Url(u) => u.typ(),
-            Context::Text(t) => t.typ(),
-        }
-    }
-
-    fn contexts(
+    fn context_items(
         &self,
         config: &crate::config::Config,
         session: &Session,
     ) -> Result<Vec<ContextItem>> {
         match self {
-            Context::Ruskel(r) => r.contexts(config, session),
-            Context::Path(g) => g.contexts(config, session),
-            Context::ProjectMap(p) => p.contexts(config, session),
-            Context::Url(u) => u.contexts(config, session),
-            Context::Text(t) => t.contexts(config, session),
+            Context::Ruskel(r) => r.context_items(config, session),
+            Context::Path(g) => g.context_items(config, session),
+            Context::ProjectMap(p) => p.context_items(config, session),
+            Context::Url(u) => u.context_items(config, session),
+            Context::Text(t) => t.context_items(config, session),
         }
     }
 
@@ -471,7 +431,7 @@ mod tests {
         expected_files.sort();
 
         if let Context::ProjectMap(map) = context_spec {
-            let contexts = map.contexts(&config, &test_project.session).unwrap();
+            let contexts = map.context_items(&config, &test_project.session).unwrap();
             assert_eq!(contexts.len(), 1);
 
             let context = &contexts[0];
@@ -504,7 +464,7 @@ mod tests {
         assert!(matches!(context_spec, Context::Path(_)));
 
         if let Context::Path(path) = context_spec {
-            let contexts = path.contexts(&config, &test_project.session).unwrap();
+            let contexts = path.context_items(&config, &test_project.session).unwrap();
 
             let mut expected_files = vec!["src/main.rs", "src/lib.rs", "tests/test1.rs"];
             expected_files.sort();
@@ -539,7 +499,7 @@ mod tests {
         assert!(matches!(context_spec, Context::Path(_)));
 
         if let Context::Path(path) = context_spec {
-            let contexts = path.contexts(&config, &test_project.session).unwrap();
+            let contexts = path.context_items(&config, &test_project.session).unwrap();
 
             assert_eq!(contexts.len(), 1);
             let context = &contexts[0];
@@ -557,7 +517,7 @@ mod tests {
 
         if let Context::Path(path) = context_spec {
             let contexts = path
-                .contexts(&config_in_src, &test_project.session)
+                .context_items(&config_in_src, &test_project.session)
                 .unwrap();
 
             assert_eq!(contexts.len(), 1);
@@ -582,7 +542,7 @@ mod tests {
         assert!(matches!(context_spec, Context::Path(_)));
 
         if let Context::Path(path) = context_spec {
-            let contexts = path.contexts(&config, &test_project.session).unwrap();
+            let contexts = path.context_items(&config, &test_project.session).unwrap();
 
             assert_eq!(contexts.len(), 1);
             let context = &contexts[0];
@@ -602,7 +562,7 @@ mod tests {
 
         if let Context::Path(path) = relative_context_spec {
             let contexts = path
-                .contexts(&config_with_outside_cwd, &test_project.session)
+                .context_items(&config_with_outside_cwd, &test_project.session)
                 .unwrap();
 
             assert_eq!(contexts.len(), 1);

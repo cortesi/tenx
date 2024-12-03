@@ -302,7 +302,7 @@ pub fn print_session(config: &Config, session: &Session, full: bool) -> Result<S
 pub fn print_contexts(config: &Config, session: &Session) -> Result<String> {
     let mut output = String::new();
     for context in session.contexts() {
-        let items = context.contexts(config, &Session::default())?;
+        let items = context.context_items(config, &Session::default())?;
         if let Some(item) = items.into_iter().next() {
             output.push_str(&print_context_item(&item));
         }

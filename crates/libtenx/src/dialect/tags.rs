@@ -68,7 +68,7 @@ impl DialectProvider for Tags {
         let mut rendered = String::new();
         rendered.push_str("<context>\n");
         for cspec in s.contexts() {
-            for ctx in cspec.contexts(config, s)? {
+            for ctx in cspec.context_items(config, s)? {
                 let txt = format!(
                     "<item name=\"{}\" type=\"{:?}\">\n{}\n</item>\n",
                     ctx.source, ctx.ty, ctx.body

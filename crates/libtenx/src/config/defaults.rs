@@ -227,6 +227,8 @@ fn default_checks() -> Checks {
     }
 }
 
+/// Constructs the Tenx default configuration. This takes into account the presence of various API
+/// keys in env variables and sets up the default models accordingly.
 pub fn default_config() -> Config {
     Config {
         models: Models {

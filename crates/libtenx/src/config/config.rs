@@ -367,10 +367,10 @@ impl std::fmt::Display for Include {
     }
 }
 
-/// Core project configuration.
+/// Project configuration.
 #[optional_struct]
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
-/// Core project configuration including root directory and file inclusion rules.
+/// Project configuration including root directory and file inclusion rules.
 pub struct Project {
     /// Project root configuration.
     pub root: Root,

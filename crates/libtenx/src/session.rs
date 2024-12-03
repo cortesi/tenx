@@ -402,7 +402,7 @@ mod tests {
 
         if let context::Context::Path(glob_context) = &test_project.session.contexts[0] {
             let context_items = glob_context
-                .contexts(&test_project.config, &test_project.session)
+                .context_items(&test_project.config, &test_project.session)
                 .unwrap();
             assert_eq!(context_items[0].body, "content");
         } else {
