@@ -279,13 +279,26 @@ async fn main() -> anyhow::Result<()> {
     }
 
     /// Prints model scores in a table format
-    fn print_score_table(scores: &[ModelScore]) {
+    fn print_score_table(mut scores: Vec<ModelScore>) {
+        scores.sort_by(|a, b| {
+            let a_success = if a.total_trials > 0 {
+                (a.total_succeeds as f64 / a.total_trials as f64) * 100.0
+            } else {
+                0.0
+            };
+            let b_success = if b.total_trials > 0 {
+                (b.total_succeeds as f64 / b.total_trials as f64) * 100.0
+            } else {
+                0.0
+            };
+            b_success.partial_cmp(&a_success).unwrap()
+        });
         let mut table = Table::new();
         table.load_preset(UTF8_FULL).set_header(vec![
+            Cell::new("score"),
             Cell::new("model"),
             Cell::new("api model"),
             Cell::new("trials"),
-            Cell::new("success %"),
             Cell::new("errors"),
             Cell::new("time (s)"),
             Cell::new("words"),
@@ -314,10 +327,10 @@ async fn main() -> anyhow::Result<()> {
             };
 
             table.add_row(vec![
+                Cell::new(format!("{:.1}%", success_rate)),
+                Cell::new(score.total_trials.to_string()),
                 Cell::new(&score.model_name),
                 Cell::new(&score.api_model),
-                Cell::new(score.total_trials.to_string()),
-                Cell::new(format!("{:.1}%", success_rate)),
                 Cell::new(errors),
                 Cell::new(format!("{:.1}", score.total_time)),
                 Cell::new(score.total_words.to_string()),
@@ -482,7 +495,7 @@ async fn main() -> anyhow::Result<()> {
             }
 
             let scores = model_scores(&reports);
-            print_score_table(&scores);
+            print_score_table(scores);
             Ok(())
         }
     };
