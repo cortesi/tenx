@@ -53,7 +53,7 @@ fn get_prompt(
 #[derive(Parser)]
 #[clap(name = "tenx")]
 #[clap(author = "Aldo Cortesi")]
-#[clap(version = "0.1.0")]
+#[clap(version = env!("CARGO_PKG_VERSION"))]
 #[clap(max_term_width = 80)]
 #[clap(about = "AI-powered coding assistant", long_about = None)]
 struct Cli {

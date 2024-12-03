@@ -144,7 +144,7 @@ fn print_report_table(reports: &mut [TrialReport]) {
 #[derive(Parser)]
 #[clap(name = "ttrial")]
 #[clap(author = "Aldo Cortesi")]
-#[clap(version = "0.1.0")]
+#[clap(version = env!("CARGO_PKG_VERSION"))]
 #[clap(max_term_width = 80)]
 #[clap(about = "AI-powered coding assistant trial runner", long_about = None)]
 struct Cli {
