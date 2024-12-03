@@ -328,9 +328,9 @@ async fn main() -> anyhow::Result<()> {
 
             table.add_row(vec![
                 Cell::new(format!("{:.1}%", success_rate)),
-                Cell::new(score.total_trials.to_string()),
                 Cell::new(&score.model_name),
                 Cell::new(&score.api_model),
+                Cell::new(score.total_trials.to_string()),
                 Cell::new(errors),
                 Cell::new(format!("{:.1}", score.total_time)),
                 Cell::new(score.total_words.to_string()),

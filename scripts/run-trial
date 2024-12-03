@@ -13,6 +13,7 @@ cargo run --release --bin ttrial --  \
     --model llama-70b \
     --model grok \
     --model llama-8b-turbo \
+    --model o1-mini \
     "*" 
 
 
