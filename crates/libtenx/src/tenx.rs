@@ -4,7 +4,7 @@ use tracing::{debug, warn};
 use crate::{
     config::Config,
     context::{Context, ContextProvider},
-    events::*,
+    events::{send_event, Event, EventBlock},
     model::ModelProvider,
     session::{Session, StepType},
     session_store::{path_to_filename, SessionStore},

@@ -1,10 +1,10 @@
 [package]
 name = "tenx"
 edition = "2021"
+description = "An AI-assisted coding tool"
 
 version.workspace = true
 authors.workspace = true
-description.workspace = true
 license.workspace = true
 repository.workspace = true
 

@@ -1,10 +1,10 @@
 [package]
 name = "libtenx"
 edition = "2021"
+description ="A library for building AI-assisted coding tools, with session management, patch validation, and multiple model support."
 
 version.workspace = true
 authors.workspace = true
-description.workspace = true
 license.workspace = true
 repository.workspace = true
 

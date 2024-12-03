@@ -5,6 +5,7 @@ use tokio::sync::mpsc;
 
 use crate::{Result, TenxError};
 
+/// Log levels used in events to indicate severity.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum LogLevel {
     Error,
@@ -26,6 +27,7 @@ pub fn send_event(sender: &Option<mpsc::Sender<Event>>, event: Event) -> Result<
 
 // The events are listed below roughly in the order they are expected to occur
 
+/// Events emitted during execution to track progress and provide feedback.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Event {
     /// The pre check suite has started
@@ -67,11 +69,13 @@ pub enum Event {
 
     /// The command has started
     Start,
+
     /// The command has finished successfully
     Finish,
 
     /// A log message with a specified log level
     Log(LogLevel, String),
+
     /// A retryable error has occurred
     Retry {
         /// An error to display to the user

@@ -1,3 +1,6 @@
+//! A library for building AI-assisted coding tools, with session management, patch validation,
+//! and multiple model support.
+
 mod checks;
 mod error;
 mod tenx;
