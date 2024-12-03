@@ -84,7 +84,7 @@ impl SessionStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::{ProjectConf, ProjectRoot};
+    use crate::config::{Project, Root};
     use tempfile::TempDir;
 
     #[test]
@@ -101,8 +101,8 @@ mod tests {
     fn test_state_store() -> Result<()> {
         let temp_dir = TempDir::new().unwrap();
         let config = Config {
-            project: ProjectConf {
-                root: ProjectRoot::Path(temp_dir.path().into()),
+            project: Project {
+                root: Root::Path(temp_dir.path().into()),
                 ..Default::default()
             },
             ..Default::default()

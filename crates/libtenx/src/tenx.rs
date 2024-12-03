@@ -322,12 +322,12 @@ impl Tenx {
 mod tests {
     #[tokio::test]
     async fn test_new_session_with_no_context() {
-        use crate::config::{ContextConfig, TextContext};
+        use crate::config::{Context, TextContext};
         let temp_dir = tempdir().unwrap();
         let mut config = Config::default().with_root(temp_dir.path());
 
         // Add just text context which doesn't require filesystem or parsing
-        config.context = ContextConfig {
+        config.context = Context {
             ruskel: vec![],
             path: vec![],
             project_map: false,

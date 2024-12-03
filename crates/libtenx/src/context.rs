@@ -7,6 +7,7 @@ use crate::{config::Config, session::Session, Result, TenxError};
 
 /// An individual context item.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+/// Represents a single piece of context information that can be included in a prompt.
 pub struct ContextItem {
     /// The type of context.
     pub ty: String,
@@ -52,6 +53,7 @@ pub trait ContextProvider {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+/// A context provider that generates Rust API documentation using Ruskel.
 pub struct Ruskel {
     name: String,
     content: String,
@@ -106,6 +108,7 @@ impl ContextProvider for Ruskel {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+/// A context provider that represents the project's file structure.
 pub struct ProjectMap;
 
 impl ProjectMap {
@@ -155,6 +158,7 @@ pub enum PathType {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+/// A context provider that handles file paths, either single files or glob patterns.
 pub struct Path {
     path_type: PathType,
 }
@@ -224,6 +228,7 @@ impl ContextProvider for Path {
 /// A specification for reference material included in the prompt. This may be turned into actual
 /// Context objects with the ContextProvider::contexts() method.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+/// A context provider that fetches content from a remote URL.
 pub struct Url {
     name: String,
     url: String,
@@ -300,6 +305,7 @@ pub enum Context {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+/// A context provider for raw text content.
 pub struct Text {
     name: String,
     content: String,

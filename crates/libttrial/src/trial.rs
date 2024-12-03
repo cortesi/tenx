@@ -15,7 +15,7 @@ use tokio::sync::mpsc;
 use tracing::info;
 
 use libtenx::{
-    config::{default_config, Config, ConfigFile, Include, ProjectRoot},
+    config::{default_config, Config, ConfigFile, Include, Root},
     events::Event,
     session::Session,
     Result, Tenx, TenxError,
@@ -138,7 +138,7 @@ impl Trial {
         let temp_dir = self.setup_temp_project()?;
         let mut conf = self.tenx_conf.clone();
         conf.session_store_dir = PathBuf::from("");
-        conf.project.root = ProjectRoot::Path(temp_dir.path().join("project"));
+        conf.project.root = Root::Path(temp_dir.path().join("project"));
 
         conf.models.default = model.to_string();
 

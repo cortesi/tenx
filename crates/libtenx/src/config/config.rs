@@ -27,8 +27,8 @@ fn is_relative<P: AsRef<Path>>(path: P) -> bool {
     path_str.starts_with("./") || path_str.starts_with("../")
 }
 
-/// Returns the path to the configuration directory.
-pub fn home_config_dir() -> PathBuf {
+/// The path to the user's home configuration directory for tenx.
+pub(crate) fn home_config_dir() -> PathBuf {
     dirs::home_dir()
         .expect("Failed to get home directory")
         .join(".config")
@@ -76,7 +76,7 @@ fn find_project_root(current_dir: &Path) -> PathBuf {
 }
 
 /// Deserialize a RON string into a ConfigFile.
-pub fn parse_config_file(ron_str: &str) -> crate::Result<ConfigFile> {
+fn parse_config_file(ron_str: &str) -> crate::Result<ConfigFile> {
     let options =
         ron::Options::default().with_default_extension(ron::extensions::Extensions::IMPLICIT_SOME);
     options
@@ -86,7 +86,7 @@ pub fn parse_config_file(ron_str: &str) -> crate::Result<ConfigFile> {
 
 /// Loads the configuration by merging defaults, home, and local configuration files.
 /// Returns the complete Config object.
-pub fn parse_config(home_config: &str, project_config: &str) -> crate::Result<Config> {
+fn parse_config(home_config: &str, project_config: &str) -> crate::Result<Config> {
     let default_conf = default_config();
     let mut cnf = ConfigFile::default();
 
@@ -106,8 +106,8 @@ pub fn parse_config(home_config: &str, project_config: &str) -> crate::Result<Co
     Ok(cnf.build(default_conf))
 }
 
-/// Loads the configuration by merging defaults, home, and local configuration files.
-/// Returns the complete Config object.
+/// Loads the Tenx configuration by merging defaults, home, and local configuration files. Returns
+/// the complete Config object.
 pub fn load_config() -> crate::Result<Config> {
     let home_config_path = home_config_dir().join(HOME_CONFIG_FILE);
     let home_config = if home_config_path.exists() {
@@ -130,16 +130,19 @@ pub fn load_config() -> crate::Result<Config> {
     parse_config(&home_config, &project_config)
 }
 
+/// A named block of text to include as context in model interactions.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub struct TextContext {
     pub name: String,
     pub content: String,
 }
 
+/// Configuration for what context to include in model interactions.
 #[optional_struct]
 #[derive(Default, Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub struct ContextConfig {
+/// Defines which context is included in model interactions.
+pub struct Context {
     pub ruskel: Vec<String>,
     pub path: Vec<String>,
     pub project_map: bool,
@@ -148,7 +151,8 @@ pub struct ContextConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum ModelConfig {
+/// Configuration for a specific model provider (Claude or OpenAI).
+pub enum Model {
     Claude {
         /// The name of the model.
         name: String,
@@ -177,16 +181,16 @@ pub enum ModelConfig {
     },
 }
 
-impl ModelConfig {
+impl Model {
     /// Loads API key from environment if key is empty and key_env is specified.
     pub fn load_env(mut self) -> Self {
         match self {
-            ModelConfig::Claude {
+            Model::Claude {
                 ref mut key,
                 ref key_env,
                 ..
             }
-            | ModelConfig::OpenAi {
+            | Model::OpenAi {
                 ref mut key,
                 ref key_env,
                 ..
@@ -204,24 +208,24 @@ impl ModelConfig {
     /// Returns the name of the configured model.
     pub fn name(&self) -> &str {
         match self {
-            ModelConfig::Claude { name, .. } => name,
-            ModelConfig::OpenAi { name, .. } => name,
+            Model::Claude { name, .. } => name,
+            Model::OpenAi { name, .. } => name,
         }
     }
 
     /// Returns the kind of model (e.g. "claude").
     pub fn kind(&self) -> &'static str {
         match self {
-            ModelConfig::Claude { .. } => "claude",
-            ModelConfig::OpenAi { .. } => "openai",
+            Model::Claude { .. } => "claude",
+            Model::OpenAi { .. } => "openai",
         }
     }
 
     /// Returns the API model identifier.
     pub fn api_model(&self) -> &str {
         match self {
-            ModelConfig::Claude { api_model, .. } => api_model,
-            ModelConfig::OpenAi { api_model, .. } => api_model,
+            Model::Claude { api_model, .. } => api_model,
+            Model::OpenAi { api_model, .. } => api_model,
         }
     }
 
@@ -236,7 +240,7 @@ impl ModelConfig {
     /// Returns a string representation of the model configuration.
     pub fn text_config(&self, verbose: bool) -> String {
         match self {
-            ModelConfig::Claude {
+            Model::Claude {
                 api_model,
                 key,
                 key_env,
@@ -254,7 +258,7 @@ impl ModelConfig {
                 ]
                 .join("\n")
             }
-            ModelConfig::OpenAi {
+            Model::OpenAi {
                 api_base,
                 api_model,
                 key,
@@ -284,7 +288,7 @@ impl ModelConfig {
     /// Converts ModelConfig to a Claude or OpenAi model.
     pub fn to_model(&self, no_stream: bool) -> crate::Result<model::Model> {
         match self {
-            ModelConfig::Claude { api_model, key, .. } => {
+            Model::Claude { api_model, key, .. } => {
                 if api_model.is_empty() {
                     return Err(TenxError::Model("Empty API model name".into()));
                 }
@@ -298,7 +302,7 @@ impl ModelConfig {
                     streaming: !no_stream,
                 }))
             }
-            ModelConfig::OpenAi {
+            Model::OpenAi {
                 api_model,
                 key,
                 api_base,
@@ -317,17 +321,11 @@ impl ModelConfig {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
-#[serde(rename_all = "snake_case")]
-pub enum ConfigDialect {
-    #[default]
-    Tags,
-}
-
 /// Settings related to the dialect we are using to communicate to models. For the moment, we have
 /// only one dialect, so this section is pretty simple.
 #[optional_struct]
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+/// Settings related to the dialect used for model communication.
 pub struct Dialect {
     /// Allow the model to request to edit files in the project map
     pub edit: bool,
@@ -335,6 +333,7 @@ pub struct Dialect {
 
 #[optional_struct]
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+/// Configuration for the tags dialect feature set.
 pub struct Tags {
     /// EXPERIMENTAL: enable smart change type
     pub smart: bool,
@@ -346,6 +345,7 @@ pub struct Tags {
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default, PartialEq)]
 #[serde(rename_all = "snake_case")]
+/// Specifies which files to include in the project.
 pub enum Include {
     #[default]
     Git,
@@ -370,9 +370,10 @@ impl std::fmt::Display for Include {
 /// Core project configuration.
 #[optional_struct]
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct ProjectConf {
+/// Core project configuration including root directory and file inclusion rules.
+pub struct Project {
     /// Project root configuration.
-    pub root: ProjectRoot,
+    pub root: Root,
 
     /// Which files are included by default
     pub include: Include,
@@ -383,6 +384,7 @@ pub struct ProjectConf {
 
 #[optional_struct]
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+/// Configuration for checks.
 pub struct Checks {
     #[serde(default)]
     pub custom: Vec<CheckConfig>,
@@ -400,15 +402,16 @@ pub struct Checks {
 
 #[optional_struct]
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+/// Configuration for available models.
 pub struct Models {
     /// Custom model configurations. Entries with the same name as a builtin will override the
     /// builtin.
     #[serde(default)]
-    pub custom: Vec<ModelConfig>,
+    pub custom: Vec<Model>,
 
     /// Built-in model configurations.
     #[serde(default)]
-    pub builtin: Vec<ModelConfig>,
+    pub builtin: Vec<Model>,
 
     /// The default model name.
     #[serde(default)]
@@ -421,7 +424,8 @@ pub struct Models {
 
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum ProjectRoot {
+/// Specifies how to determine the project root directory.
+pub enum Root {
     #[default]
     Discover,
     Path(PathBuf),
@@ -429,6 +433,7 @@ pub enum ProjectRoot {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
+/// When a check should run - before changes, after changes, or both.
 pub enum CheckMode {
     Pre,
     Post,
@@ -437,6 +442,7 @@ pub enum CheckMode {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+/// Configuration for a specific check.
 pub struct CheckConfig {
     /// Name of the validator for display and error reporting
     pub name: String,
@@ -480,6 +486,7 @@ impl CheckConfig {
 
 #[optional_struct(ConfigFile)]
 #[derive(Debug, Default, Clone, Deserialize, Serialize, PartialEq)]
+/// Primary configuration struct containing all settings.
 pub struct Config {
     /// Model configuration
     #[optional_rename(OptionalModels)]
@@ -487,9 +494,9 @@ pub struct Config {
     pub models: Models,
 
     /// Project configuration
-    #[optional_rename(OptionalProjectConf)]
+    #[optional_rename(OptionalProject)]
     #[optional_wrap]
-    pub project: ProjectConf,
+    pub project: Project,
 
     /// The directory to store session state.
     /// The directory to store session state. Defaults to ~/.config/tenx/state
@@ -509,9 +516,9 @@ pub struct Config {
     pub dialect: Dialect,
 
     /// The default context configuration.
-    #[optional_rename(OptionalContextConfig)]
+    #[optional_rename(OptionalContext)]
     #[optional_wrap]
-    pub context: ContextConfig,
+    pub context: Context,
 
     /// Check configuration.
     #[optional_rename(OptionalChecks)]
@@ -536,7 +543,7 @@ pub struct Config {
 
 impl Config {
     /// Returns all model configurations, with custom models overriding built-in models with the same name.
-    pub fn model_confs(&self) -> Vec<ModelConfig> {
+    pub fn model_confs(&self) -> Vec<Model> {
         let builtin = self
             .models
             .builtin
@@ -548,10 +555,10 @@ impl Config {
             .iter()
             .map(|m| (m.name().to_string(), m.clone()));
 
-        let mut model_map: HashMap<String, ModelConfig> = builtin.collect();
+        let mut model_map: HashMap<String, Model> = builtin.collect();
         model_map.extend(custom);
 
-        let mut models: Vec<ModelConfig> = model_map.into_values().collect();
+        let mut models: Vec<Model> = model_map.into_values().collect();
         models.sort_by(|a, b| a.name().cmp(b.name()));
         models
     }
@@ -572,8 +579,8 @@ impl Config {
 
     pub fn project_root(&self) -> PathBuf {
         match &self.project.root {
-            ProjectRoot::Discover => find_project_root(&self.cwd().unwrap_or_default()),
-            ProjectRoot::Path(path) => path.clone(),
+            Root::Discover => find_project_root(&self.cwd().unwrap_or_default()),
+            Root::Path(path) => path.clone(),
         }
     }
 
@@ -768,12 +775,12 @@ impl Config {
     }
 
     pub fn with_root<P: AsRef<Path>>(mut self, path: P) -> Self {
-        self.project.root = ProjectRoot::Path(path.as_ref().into());
+        self.project.root = Root::Path(path.as_ref().into());
         self
     }
 
     /// Returns the model configuration for the given model name, or None if not found.
-    pub fn get_model_conf<S: AsRef<str>>(&self, name: S) -> Option<ModelConfig> {
+    pub fn get_model_conf<S: AsRef<str>>(&self, name: S) -> Option<Model> {
         self.model_confs()
             .into_iter()
             .find(|m| m.name() == name.as_ref())
@@ -811,7 +818,7 @@ impl Config {
             .ok_or_else(|| TenxError::Internal(format!("Model {} not found", name)))?;
 
         match model_config {
-            ModelConfig::Claude {
+            Model::Claude {
                 name,
                 api_model,
                 key,
@@ -822,7 +829,7 @@ impl Config {
                 anthropic_key: key.clone(),
                 streaming: !self.models.no_stream,
             })),
-            ModelConfig::OpenAi {
+            Model::OpenAi {
                 api_model,
                 key,
                 api_base,
@@ -928,10 +935,7 @@ mod tests {
         )?;
         assert_eq!(parsed.models.default, "bar");
         assert!(parsed.models.no_stream);
-        assert_eq!(
-            parsed.project.root,
-            ProjectRoot::Path(PathBuf::from("/foo"))
-        );
+        assert_eq!(parsed.project.root, Root::Path(PathBuf::from("/foo")));
         Ok(())
     }
 
@@ -1027,10 +1031,10 @@ mod tests {
         )?;
 
         let config = Config {
-            project: ProjectConf {
+            project: Project {
                 include: Include::Glob(vec!["*.rs".to_string(), "subdir/*.txt".to_string()]),
                 exclude: vec!["**/ignore.rs".to_string()],
-                root: ProjectRoot::Path(root_path.to_path_buf()),
+                root: Root::Path(root_path.to_path_buf()),
             },
             ..Default::default()
         };
@@ -1049,10 +1053,10 @@ mod tests {
 
         // Test with multiple exclude patterns
         let config_multi_exclude = Config {
-            project: ProjectConf {
+            project: Project {
                 include: Include::Glob(vec!["**/*.rs".to_string(), "**/*.txt".to_string()]),
                 exclude: vec!["**/ignore.rs".to_string(), "subdir/*.txt".to_string()],
-                root: ProjectRoot::Path(root_path.to_path_buf()),
+                root: Root::Path(root_path.to_path_buf()),
             },
             ..Default::default()
         };
@@ -1075,14 +1079,11 @@ mod tests {
     #[test]
     fn test_project_root() {
         let config_discover = Config::default();
-        assert!(matches!(
-            config_discover.project.root,
-            ProjectRoot::Discover
-        ));
+        assert!(matches!(config_discover.project.root, Root::Discover));
 
         let config_path = Config {
-            project: ProjectConf {
-                root: ProjectRoot::Path(PathBuf::from("/custom/path")),
+            project: Project {
+                root: Root::Path(PathBuf::from("/custom/path")),
                 ..Default::default()
             },
             ..Default::default()

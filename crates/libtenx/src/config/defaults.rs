@@ -30,18 +30,18 @@ const GOOGLEAI_API_BASE: &str = "https://generativelanguage.googleapis.com/v1bet
 const GOOGLEAI_GEMINI_EXP: &str = "gemini-exp-1114";
 
 /// Returns the default set of model configurations based on available API keys
-fn default_models() -> Vec<ModelConfig> {
+fn default_models() -> Vec<Model> {
     let mut models = Vec::new();
 
     if env::var(ANTHROPIC_API_KEY).is_ok() {
         models.extend_from_slice(&[
-            ModelConfig::Claude {
+            Model::Claude {
                 name: "sonnet".to_string(),
                 api_model: ANTHROPIC_CLAUDE_SONNET.to_string(),
                 key: "".to_string(),
                 key_env: ANTHROPIC_API_KEY.to_string(),
             },
-            ModelConfig::Claude {
+            Model::Claude {
                 name: "haiku".to_string(),
                 api_model: ANTHROPIC_CLAUDE_HAIKU.to_string(),
                 key: "".to_string(),
@@ -50,7 +50,7 @@ fn default_models() -> Vec<ModelConfig> {
         ]);
     }
     if env::var(DEEPSEEK_API_KEY).is_ok() {
-        models.push(ModelConfig::OpenAi {
+        models.push(Model::OpenAi {
             name: "deepseek".to_string(),
             api_model: "deepseek-chat".to_string(),
             key: "".to_string(),
@@ -63,7 +63,7 @@ fn default_models() -> Vec<ModelConfig> {
 
     if env::var(DEEPINFRA_API_KEY).is_ok() {
         models.extend_from_slice(&[
-            ModelConfig::OpenAi {
+            Model::OpenAi {
                 name: "qwen".to_string(),
                 api_model: "Qwen/Qwen2.5-Coder-32B-Instruct".to_string(),
                 key: "".to_string(),
@@ -72,7 +72,7 @@ fn default_models() -> Vec<ModelConfig> {
                 can_stream: true,
                 no_system_prompt: false,
             },
-            ModelConfig::OpenAi {
+            Model::OpenAi {
                 name: "llama-8b-turbo".to_string(),
                 api_model: "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo".to_string(),
                 key: "".to_string(),
@@ -81,7 +81,7 @@ fn default_models() -> Vec<ModelConfig> {
                 can_stream: true,
                 no_system_prompt: false,
             },
-            ModelConfig::OpenAi {
+            Model::OpenAi {
                 name: "llama-70b".to_string(),
                 api_model: "meta-llama/Meta-Llama-3.1-70B-Instruct".to_string(),
                 key: "".to_string(),
@@ -90,7 +90,7 @@ fn default_models() -> Vec<ModelConfig> {
                 can_stream: true,
                 no_system_prompt: false,
             },
-            ModelConfig::OpenAi {
+            Model::OpenAi {
                 name: "qwq".to_string(),
                 api_model: "Qwen/QwQ-32B-Preview".to_string(),
                 key: "".to_string(),
@@ -104,7 +104,7 @@ fn default_models() -> Vec<ModelConfig> {
 
     if env::var(OPENAI_API_KEY).is_ok() {
         models.extend_from_slice(&[
-            ModelConfig::OpenAi {
+            Model::OpenAi {
                 name: "o1".to_string(),
                 api_model: OPENAI_GPT_O1_PREVIEW.to_string(),
                 key: "".to_string(),
@@ -113,7 +113,7 @@ fn default_models() -> Vec<ModelConfig> {
                 can_stream: false,
                 no_system_prompt: true,
             },
-            ModelConfig::OpenAi {
+            Model::OpenAi {
                 name: "o1-mini".to_string(),
                 api_model: OPENAI_GPT_O1_MINI.to_string(),
                 key: "".to_string(),
@@ -122,7 +122,7 @@ fn default_models() -> Vec<ModelConfig> {
                 can_stream: false,
                 no_system_prompt: true,
             },
-            ModelConfig::OpenAi {
+            Model::OpenAi {
                 name: "gpt4o".to_string(),
                 api_model: OPENAI_GPT4O.to_string(),
                 key: "".to_string(),
@@ -131,7 +131,7 @@ fn default_models() -> Vec<ModelConfig> {
                 can_stream: true,
                 no_system_prompt: false,
             },
-            ModelConfig::OpenAi {
+            Model::OpenAi {
                 name: "gpt4o-mini".to_string(),
                 api_model: OPENAI_GPT4O_MINI.to_string(),
                 key: "".to_string(),
@@ -144,7 +144,7 @@ fn default_models() -> Vec<ModelConfig> {
     }
 
     if env::var(XAI_API_KEY).is_ok() {
-        models.push(ModelConfig::OpenAi {
+        models.push(Model::OpenAi {
             name: "grok".to_string(),
             api_model: XAI_DEFAULT_GROK.to_string(),
             key: "".to_string(),
@@ -156,7 +156,7 @@ fn default_models() -> Vec<ModelConfig> {
     }
 
     if env::var(GOOGLEAI_API_KEY).is_ok() {
-        models.push(ModelConfig::OpenAi {
+        models.push(Model::OpenAi {
             name: "gemini".to_string(),
             api_model: GOOGLEAI_GEMINI_EXP.to_string(),
             key: "".to_string(),
@@ -234,15 +234,15 @@ pub fn default_config() -> Config {
             builtin: default_models(),
             ..Default::default()
         },
-        context: ContextConfig {
+        context: Context {
             project_map: true,
             ..Default::default()
         },
         dialect: Dialect { edit: true },
-        project: ProjectConf {
+        project: Project {
             include: Include::Git,
             exclude: vec![],
-            root: ProjectRoot::Discover,
+            root: Root::Discover,
         },
         tags: Tags {
             replace: true,
