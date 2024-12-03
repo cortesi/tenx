@@ -7,7 +7,7 @@ use tracing::Subscriber;
 use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::{fmt, EnvFilter};
 
-use crate::{Event, LogLevel};
+use crate::events::{Event, LogLevel};
 
 const SPINNER_STRINGS: &[&str] = &["▹▹▹▹▹", "▸▹▹▹▹", "▹▸▹▹▹", "▹▹▸▹▹", "▹▹▹▸▹", "▹▹▹▹▸"];
 

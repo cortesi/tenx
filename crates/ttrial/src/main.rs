@@ -11,9 +11,10 @@ use indicatif::{ProgressBar, ProgressStyle};
 use libtenx::{
     self,
     event_consumers::{self, discard_events, output_logs, output_progress},
+    events::Event,
     pretty,
+    session::Session,
     session_store::SessionStore,
-    Event, Session,
 };
 use libttrial::*;
 

@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use crate::{config::Config, Session};
+use crate::{config::Config, session::Session};
 use fs_err as fs;
 use std::path::Path;
 use tempfile::{tempdir, TempDir};

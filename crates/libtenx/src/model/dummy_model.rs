@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
 use super::ModelProvider;
-use crate::{config::Config, events::Event, ModelResponse, Result, Session};
+use crate::{config::Config, events::Event, session::ModelResponse, session::Session, Result};
 
 use std::collections::HashMap;
 

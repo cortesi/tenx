@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use fs_err as fs;
 
-use crate::{config::Config, Result, Session, TenxError};
+use crate::{config::Config, session::Session, Result, TenxError};
 
 /// Normalizes a path for use as a filename by replacing problematic characters.
 pub fn path_to_filename(path: &Path) -> String {

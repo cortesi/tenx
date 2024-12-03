@@ -6,8 +6,9 @@ use crate::{
     context::{Context, ContextProvider},
     events::*,
     model::ModelProvider,
-    session_store::path_to_filename,
-    Result, Session, SessionStore, StepType, TenxError,
+    session::{Session, StepType},
+    session_store::{path_to_filename, SessionStore},
+    Result, TenxError,
 };
 
 /// Tenx is an AI-driven coding assistant.
@@ -346,7 +347,7 @@ mod tests {
     use super::*;
 
     use crate::patch::{Change, Patch, WriteFile};
-    use crate::ModelResponse;
+    use crate::session::ModelResponse;
 
     use fs_err as fs;
     use std::path::PathBuf;

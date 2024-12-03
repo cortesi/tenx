@@ -14,7 +14,8 @@ use crate::{
     model::conversation::{build_conversation, Conversation, ACK, EDITABLE_LEADIN},
     model::ModelProvider,
     session::ModelResponse,
-    Result, Session, TenxError,
+    session::Session,
+    Result, TenxError,
 };
 
 const MAX_TOKENS: u32 = 8192;

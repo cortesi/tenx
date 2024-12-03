@@ -1,7 +1,8 @@
 use crate::{
     config::Config,
     dialect::{Dialect, DialectProvider},
-    Result, Session,
+    session::Session,
+    Result,
 };
 
 pub const EDITABLE_LEADIN: &str = "Here are the editable files.";
@@ -68,6 +69,7 @@ where
 mod tests {
     use super::*;
     use crate::dialect::DummyDialect;
+    use crate::session::StepType;
 
     #[derive(Debug, PartialEq, Clone)]
     enum Message {
@@ -143,7 +145,7 @@ mod tests {
         session.add_prompt(
             "test_model".into(),
             "test prompt".to_string(),
-            crate::StepType::Code,
+            StepType::Code,
         )?;
 
         build_conversation(&conversation, &mut req, &config, &session, &dialect)?;

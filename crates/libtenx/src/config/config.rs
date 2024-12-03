@@ -13,7 +13,11 @@ use serde::{Deserialize, Serialize};
 
 use ron;
 
-use crate::{checks::Check, config::default_config, dialect, model, Mode, TenxError};
+use crate::{
+    checks::{Check, Mode},
+    config::default_config,
+    dialect, model, TenxError,
+};
 
 pub const HOME_CONFIG_FILE: &str = "tenx.ron";
 pub const PROJECT_CONFIG_FILE: &str = ".tenx.ron";

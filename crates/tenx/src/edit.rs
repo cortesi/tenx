@@ -2,7 +2,8 @@ use anyhow::{Context as AnyhowContext, Result};
 use std::{fs, io::Write, process::Command};
 use tempfile::NamedTempFile;
 
-use libtenx::Session;
+use libtenx::session::ModelResponse;
+use libtenx::session::Session;
 
 /// Returns the user's preferred editor.
 fn get_editor() -> String {
@@ -10,7 +11,7 @@ fn get_editor() -> String {
 }
 
 /// Renders a step as a comment.
-fn render_step_commented(session: &libtenx::Session, step_offset: usize) -> String {
+fn render_step_commented(session: &Session, step_offset: usize) -> String {
     let mut text = String::new();
     let steps = session.steps();
     let step = &steps[step_offset];
@@ -46,7 +47,7 @@ fn comment_all_steps(session: &Session) -> String {
 }
 
 /// Renders the initial text for the user to edit.
-fn render_initial_text(session: &libtenx::Session, retry: bool) -> Result<String> {
+fn render_initial_text(session: &Session, retry: bool) -> Result<String> {
     let mut text = String::new();
     let steps = session.steps();
 
@@ -112,7 +113,7 @@ pub fn edit_prompt(session: &Session, retry: bool) -> Result<Option<String>> {
 mod tests {
     use super::*;
 
-    use libtenx::{patch::Patch, StepType};
+    use libtenx::{patch::Patch, session::StepType};
 
     use indoc::indoc;
     use pretty_assertions::assert_eq;
@@ -152,7 +153,7 @@ mod tests {
             )
             .unwrap();
         if let Some(step) = session.last_step_mut() {
-            step.model_response = Some(libtenx::ModelResponse {
+            step.model_response = Some(ModelResponse {
                 patch: Some(Patch { changes: vec![] }),
                 operations: vec![],
                 usage: None,
@@ -178,7 +179,7 @@ mod tests {
             )
             .unwrap();
         if let Some(step) = session.last_step_mut() {
-            step.model_response = Some(libtenx::ModelResponse {
+            step.model_response = Some(ModelResponse {
                 patch: Some(Patch { changes: vec![] }),
                 operations: vec![],
                 usage: None,

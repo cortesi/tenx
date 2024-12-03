@@ -4,7 +4,11 @@ mod dummy_dialect;
 mod tags;
 mod xmlish;
 
-use crate::{config::Config, ModelResponse, Result, Session};
+use crate::{
+    config::Config,
+    session::{ModelResponse, Session},
+    Result,
+};
 
 pub use dummy_dialect::*;
 pub use tags::*;

@@ -17,14 +17,14 @@ use tracing::trace;
 use crate::{
     config::Config,
     dialect::{Dialect, DialectProvider},
-    events::Event,
+    events::{send_event, Event},
     model::{
         conversation::{build_conversation, Conversation, ACK, EDITABLE_LEADIN},
         ModelProvider,
     },
-    send_event,
     session::ModelResponse,
-    Result, Session, TenxError,
+    session::Session,
+    Result, TenxError,
 };
 
 use std::collections::HashMap;

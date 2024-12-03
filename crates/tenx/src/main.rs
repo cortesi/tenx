@@ -13,7 +13,9 @@ use libtenx::{
     dialect::DialectProvider,
     event_consumers,
     model::ModelProvider,
-    pretty, Session, Tenx,
+    pretty,
+    session::Session,
+    Tenx,
 };
 
 mod edit;

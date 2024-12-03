@@ -8,7 +8,8 @@ use crate::{
     config::Config,
     context::ContextProvider,
     patch::{Change, Patch, Replace, Smart, UDiff, WriteFile},
-    ModelResponse, Operation, Result, Session, TenxError,
+    session::{ModelResponse, Operation, Session},
+    Result, TenxError,
 };
 use fs_err as fs;
 
@@ -298,7 +299,7 @@ impl DialectProvider for Tags {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Step, StepType};
+    use crate::session::{Step, StepType};
 
     use indoc::indoc;
     use pretty_assertions::assert_eq;

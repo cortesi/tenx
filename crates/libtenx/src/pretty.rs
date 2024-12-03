@@ -1,6 +1,10 @@
 use crate::{
-    config::Config, context, context::ContextProvider, model, patch, Operation, Result, Session,
-    Step, StepType, TenxError,
+    config::Config,
+    context,
+    context::ContextProvider,
+    model, patch,
+    session::{Operation, Session, Step, StepType},
+    Result, TenxError,
 };
 use colored::*;
 use textwrap::{wrap, Options};
@@ -309,7 +313,12 @@ pub fn print_contexts(config: &Config, session: &Session) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{context::Context, patch::Patch, ModelResponse, Step, TenxError};
+    use crate::{
+        context::Context,
+        patch::Patch,
+        session::{ModelResponse, Step},
+        TenxError,
+    };
     use tempfile::TempDir;
 
     fn create_test_session() -> (TempDir, Session) {

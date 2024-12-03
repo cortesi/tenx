@@ -1,6 +1,6 @@
 use std::process::Command;
 
-use crate::{config::Config, Result, Session, TenxError};
+use crate::{config::Config, session::Session, Result, TenxError};
 
 pub enum Runnable {
     Ok,

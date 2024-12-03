@@ -3,7 +3,7 @@ use fs_err as fs;
 use libruskel::Ruskel as LibRuskel;
 use serde::{Deserialize, Serialize};
 
-use crate::{config::Config, Result, Session, TenxError};
+use crate::{config::Config, session::Session, Result, TenxError};
 
 /// An individual context item.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]

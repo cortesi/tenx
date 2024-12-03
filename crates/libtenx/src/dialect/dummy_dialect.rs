@@ -1,4 +1,6 @@
-use crate::{config::Config, dialect::DialectProvider, ModelResponse, Result, Session};
+use crate::{
+    config::Config, dialect::DialectProvider, session::ModelResponse, session::Session, Result,
+};
 use std::path::PathBuf;
 
 /// A dummy dialect for testing purposes.

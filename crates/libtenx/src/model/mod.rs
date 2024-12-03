@@ -11,7 +11,12 @@ pub use claude::{Claude, ClaudeUsage};
 pub use dummy_model::{DummyModel, DummyUsage};
 pub use openai::{OpenAi, OpenAiUsage};
 
-use crate::{config::Config, events::Event, session::ModelResponse, Result, Session};
+use crate::{
+    config::Config,
+    events::Event,
+    session::{ModelResponse, Session},
+    Result,
+};
 
 use std::collections::HashMap;
 
