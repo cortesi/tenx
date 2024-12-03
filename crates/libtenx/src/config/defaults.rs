@@ -8,6 +8,7 @@ const ANTHROPIC_API_KEY: &str = "ANTHROPIC_API_KEY";
 const ANTHROPIC_CLAUDE_SONNET: &str = "claude-3-5-sonnet-latest";
 const ANTHROPIC_CLAUDE_HAIKU: &str = "claude-3-5-haiku-latest";
 
+const OPENAI_API_BASE: &str = "https://api.openai.com/v1";
 const OPENAI_API_KEY: &str = "OPENAI_API_KEY";
 const OPENAI_GPT_O1_PREVIEW: &str = "o1-preview";
 const OPENAI_GPT_O1_MINI: &str = "o1-mini";
@@ -108,7 +109,7 @@ fn default_models() -> Vec<ModelConfig> {
                 api_model: OPENAI_GPT_O1_PREVIEW.to_string(),
                 key: "".to_string(),
                 key_env: OPENAI_API_KEY.to_string(),
-                api_base: crate::model::OPENAI_API_BASE.to_string(),
+                api_base: OPENAI_API_BASE.to_string(),
                 can_stream: false,
                 no_system_prompt: true,
             },
@@ -117,7 +118,7 @@ fn default_models() -> Vec<ModelConfig> {
                 api_model: OPENAI_GPT_O1_MINI.to_string(),
                 key: "".to_string(),
                 key_env: OPENAI_API_KEY.to_string(),
-                api_base: crate::model::openai::OPENAI_API_BASE.to_string(),
+                api_base: OPENAI_API_BASE.to_string(),
                 can_stream: false,
                 no_system_prompt: true,
             },
@@ -126,7 +127,7 @@ fn default_models() -> Vec<ModelConfig> {
                 api_model: OPENAI_GPT4O.to_string(),
                 key: "".to_string(),
                 key_env: OPENAI_API_KEY.to_string(),
-                api_base: crate::model::openai::OPENAI_API_BASE.to_string(),
+                api_base: OPENAI_API_BASE.to_string(),
                 can_stream: true,
                 no_system_prompt: false,
             },
@@ -135,7 +136,7 @@ fn default_models() -> Vec<ModelConfig> {
                 api_model: OPENAI_GPT4O_MINI.to_string(),
                 key: "".to_string(),
                 key_env: OPENAI_API_KEY.to_string(),
-                api_base: crate::model::openai::OPENAI_API_BASE.to_string(),
+                api_base: OPENAI_API_BASE.to_string(),
                 can_stream: true,
                 no_system_prompt: false,
             },

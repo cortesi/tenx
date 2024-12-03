@@ -29,8 +29,6 @@ use crate::{
 
 use std::collections::HashMap;
 
-pub const OPENAI_API_BASE: &str = "https://api.openai.com/v1";
-
 /// OpenAI model implementation
 #[derive(Default, Debug, Clone)]
 pub struct OpenAi {
