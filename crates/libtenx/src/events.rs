@@ -1,3 +1,4 @@
+//! Events emitted by Tenx during operation, for display to users.
 use heck::ToSnakeCase;
 use serde::{Deserialize, Serialize};
 use serde_variant::to_variant_name;

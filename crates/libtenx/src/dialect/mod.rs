@@ -1,3 +1,4 @@
+//! Traits and implementations for different styles of interaction with models.
 use std::path::PathBuf;
 
 mod dummy_dialect;
@@ -15,11 +16,12 @@ pub use tags::*;
 
 /// A dialect encapsulates a particular style of interaction with a model. It defines the system
 /// prompt, how to render a user's prompt, and how to parse a model's response.
+/// A trait defining the behavior of a dialect, including rendering and parsing capabilities.
 pub trait DialectProvider {
-    /// Return the name of this dialect
+    /// Return the name of this dialect.
     fn name(&self) -> &'static str;
 
-    /// Return the system prompt for this dialect
+    /// Return the system prompt for this dialect.
     fn system(&self) -> String;
 
     /// Render the immutable context to be sent to the model. This is included once in the
@@ -55,12 +57,14 @@ pub trait DialectProvider {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+/// Represents different dialects for interacting with models.
 pub enum Dialect {
     Tags(Tags),
     Dummy(DummyDialect),
 }
 
 impl DialectProvider for Dialect {
+    /// Return the name of this dialect.
     fn name(&self) -> &'static str {
         match self {
             Dialect::Tags(t) => t.name(),
@@ -68,6 +72,7 @@ impl DialectProvider for Dialect {
         }
     }
 
+    /// Return the system prompt for this dialect.
     fn system(&self) -> String {
         match self {
             Dialect::Tags(t) => t.system(),
@@ -75,6 +80,7 @@ impl DialectProvider for Dialect {
         }
     }
 
+    /// Render the immutable context to be sent to the model.
     fn render_context(&self, config: &Config, s: &Session) -> Result<String> {
         match self {
             Dialect::Tags(t) => t.render_context(config, s),
@@ -106,6 +112,7 @@ impl DialectProvider for Dialect {
         }
     }
 
+    /// Parse a model's response into concrete operations.
     fn parse(&self, txt: &str) -> Result<ModelResponse> {
         match self {
             Dialect::Tags(t) => t.parse(txt),

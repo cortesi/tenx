@@ -19,6 +19,7 @@ const REPLACE: &str = include_str!("./tags-replace.txt");
 const UDIFF: &str = include_str!("./tags-udiff.txt");
 const EDIT: &str = include_str!("./tags-edit.txt");
 
+/// Tenx's primary code generation dialect, which uses XML-ish tags as the basic communication format with models.
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct Tags {
     pub smart: bool,

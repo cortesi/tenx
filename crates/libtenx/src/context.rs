@@ -1,3 +1,9 @@
+/*!
+Traits and implementations for including immutable reference material in model interactions. Each
+context provider implements the `ContextProvider` trait and can generate one or more ContextItems
+which are included in prompts.
+*/
+
 use async_trait::async_trait;
 use fs_err as fs;
 use libruskel::Ruskel as LibRuskel;
@@ -30,9 +36,6 @@ pub trait ContextProvider {
 
     /// Returns a human-readable representation of the context provider.
     fn human(&self) -> String;
-
-    /// Counts the number of context items for this provider.
-    fn count(&self, config: &crate::config::Config, session: &Session) -> Result<usize>;
 
     /// Refreshes the content of the context provider.
     async fn refresh(&mut self) -> Result<()>;
@@ -74,10 +77,6 @@ impl ContextProvider for Ruskel {
 
     fn human(&self) -> String {
         format!("ruskel: {}", self.name)
-    }
-
-    fn count(&self, _config: &crate::config::Config, _session: &Session) -> Result<usize> {
-        Ok(1)
     }
 
     async fn refresh(&mut self) -> Result<()> {
@@ -122,10 +121,6 @@ impl ContextProvider for ProjectMap {
 
     fn human(&self) -> String {
         "project_map".to_string()
-    }
-
-    fn count(&self, config: &Config, _: &Session) -> Result<usize> {
-        Ok(config.included_files()?.len())
     }
 
     async fn refresh(&mut self) -> Result<()> {
@@ -188,16 +183,6 @@ impl ContextProvider for Path {
         }
     }
 
-    fn count(&self, config: &crate::config::Config, _: &Session) -> Result<usize> {
-        match &self.path_type {
-            PathType::SinglePath(_) => Ok(1),
-            PathType::Pattern(pattern) => {
-                let matched_files = config.match_files_with_glob(pattern)?;
-                Ok(matched_files.len())
-            }
-        }
-    }
-
     async fn refresh(&mut self) -> Result<()> {
         Ok(())
     }
@@ -247,10 +232,6 @@ impl ContextProvider for Url {
         format!("url: {}", self.name)
     }
 
-    fn count(&self, _config: &crate::config::Config, _session: &Session) -> Result<usize> {
-        Ok(1)
-    }
-
     async fn refresh(&mut self) -> Result<()> {
         let client = reqwest::Client::new();
         self.content = client
@@ -269,12 +250,18 @@ impl ContextProvider for Url {
     }
 }
 
+/// A context provider that produces reference material for model interactions.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub enum Context {
+    /// API documentation generated using Ruskel
     Ruskel(Ruskel),
+    /// One or more files matched by a path or glob pattern
     Path(Path),
+    /// A list of all files in the project
     ProjectMap(ProjectMap),
+    /// Content fetched from a remote URL
     Url(Url),
+    /// Raw text content provided directly
     Text(Text),
 }
 
@@ -309,10 +296,6 @@ impl ContextProvider for Text {
         let lines = self.content.lines().count();
         let chars = self.content.chars().count();
         format!("text: {} ({} lines, {} chars)", self.name, lines, chars)
-    }
-
-    fn count(&self, _config: &crate::config::Config, _session: &Session) -> Result<usize> {
-        Ok(1)
     }
 
     async fn refresh(&mut self) -> Result<()> {
@@ -370,16 +353,6 @@ impl ContextProvider for Context {
             Context::ProjectMap(p) => p.human(),
             Context::Url(u) => u.human(),
             Context::Text(t) => t.human(),
-        }
-    }
-
-    fn count(&self, config: &crate::config::Config, session: &Session) -> Result<usize> {
-        match self {
-            Context::Ruskel(r) => r.count(config, session),
-            Context::Path(g) => g.count(config, session),
-            Context::ProjectMap(p) => p.count(config, session),
-            Context::Url(u) => u.count(config, session),
-            Context::Text(t) => t.count(config, session),
         }
     }
 

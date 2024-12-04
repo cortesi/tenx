@@ -1,3 +1,4 @@
+//! Helpers for consuming and displaying events
 use colored::*;
 use indicatif::{ProgressBar, ProgressStyle};
 use std::time::Duration;
