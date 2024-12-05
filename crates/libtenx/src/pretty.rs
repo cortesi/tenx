@@ -1,3 +1,4 @@
+//! Pretty-printing functionality for various Tenx objects.
 use crate::{
     config::Config,
     context,

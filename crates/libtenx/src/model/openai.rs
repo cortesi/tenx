@@ -114,6 +114,7 @@ impl Conversation<CreateChatCompletionRequest> for OpenAi {
     }
 }
 
+/// OpenAI-specific usage information.
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
 pub struct OpenAiUsage {
     pub prompt_tokens: Option<u32>,

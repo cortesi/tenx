@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::{Result, TenxError};
 
+/// An operation that replaces once occurrence of a string with another.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Replace {
     pub path: PathBuf,

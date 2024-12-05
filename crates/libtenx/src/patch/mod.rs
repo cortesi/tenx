@@ -1,3 +1,4 @@
+//! Patch operations that modify files in the project.
 mod replace;
 mod smart;
 mod udiff;

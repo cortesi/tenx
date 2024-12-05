@@ -2,7 +2,6 @@ use anyhow::{Context as AnyhowContext, Result};
 use std::{fs, io::Write, process::Command};
 use tempfile::NamedTempFile;
 
-use libtenx::session::ModelResponse;
 use libtenx::session::Session;
 
 /// Returns the user's preferred editor.
@@ -113,7 +112,10 @@ pub fn edit_prompt(session: &Session, retry: bool) -> Result<Option<String>> {
 mod tests {
     use super::*;
 
-    use libtenx::{patch::Patch, session::StepType};
+    use libtenx::{
+        patch::Patch,
+        session::{ModelResponse, StepType},
+    };
 
     use indoc::indoc;
     use pretty_assertions::assert_eq;

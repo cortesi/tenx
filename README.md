@@ -15,11 +15,10 @@ cargo install tenx
 
 - AI-assisted code editing and generation
 - Session-based workflow for organized development
-- Preflight validation to ensure the project is consistent before prompting
-- Post-patch validation of AI changes, with automated retry on failure
-- Auto-formatting of AI changes
+- Preflight checks to ensure the project is consistent before prompting
+- Post-patch checks, with automated model feedback and retry on failure
 - Undo, retry and re-edit steps in the session
-- First-class Rust support
+- First-class support for Rust
     - Pre and post-patch validation with `cargo check` and `cargo test`
     - Formatting with `cargo fmt`
     - Include documentation for any crate (local or from crates.io)
@@ -27,74 +26,26 @@ cargo install tenx
 - Built on **libtenx**, a Rust library for building AI-assisted coding tools.
 
 
-## Glossary
-
-- **Sessions**: Changesets workspaces, unique to the working directory
-- **Context**: Extra info for the AI to improve understanding and output.
-  Examples include:
-  - API documentation from Ruskel
-  - Local files of any kind
-- **Editables**: Files the AI can modify during a session
-- **Step**: A single interaction within a session, consisting of a prompt, the
-  AI's response, and any resulting changes to editable files
-
-
-## Rust Support
-
-Tenx is built from the ground up with Rust in mind, using advanced tools and
-techniques to supercharge AI-assisted Rust development.
-
-
-### Ruskel Integration
-
-Tenx uses Ruskel to generate skeletonized versions of Rust crates. This gives
-the AI a simplified, single-page view of complex Rust codebases, boosting
-context understanding and code generation accuracy.
-
-### Rust Checks
-
-To ensure top-notch AI-generated Rust code, Tenx uses specialized Rust
-validators:
-
-- **CargoChecker**: Runs `cargo check` to verify code compilation
-- **CargoTester**: Executes the project's test suite to catch regressions
-
-These validators work with Rust's powerful type system to catch issues early in
-the dev process.
-
-## Configuration
-
-Tenx uses a flexible configuration system with multiple levels:
-
-1. **Global Configuration**: Located at `~/.config/tenx/tenx.toml`
-2. **Project-specific Configuration**: `.tenx.toml` in the project root
-3. **Environment Variables**: e.g., `ANTHROPIC_API_KEY`
-4. **Command-line Arguments**: Overrides for specific runs
-
-Configuration files use TOML format. The project-specific config overrides the
-global config, and command-line arguments take highest precedence.
-
-```toml
-anthropic_key = "your-api-key-here"
-retry_limit = 5
-default_model = "claude"
-```
-
-Use `tenx conf` to view your current configuration and `tenx conf --defaults` to see all available options.
-
-
-## Development
-
-### Ethos
+## Ethos
 
 - Built with an uncompromsing focus on expert developers and power users
 - Tracks whatever the best current coding models are (currently Claude 3.5 Sonnet)
 
-### Next up
+
+## Future
 
 - Named sessions
 - System prompt customization
-- Support for more AI models (OpenAI, DeepSeek)
 - Git commit dialect
 - Neovim plugin based on libtenx
+
+
+## Related Projects
+
+- [misanthropy](https://github.com/cortesi/misanthropy) - Complete bindings to the Anthropic API. Built with Tenx.
+- [ruskel](https://github.com/cortesi/ruskel) - One-page outlines of Rust
+  crates, used by Tenx to include Rust documentation for prompts. Built with Tenx.
+- [aider](https://github.com/Aider-AI/aider) - Pair programming for your
+  terminal. A coding tool with a very similar structure to Tenx, but much
+  further along. If you're looking for a mature tool, this is the one to try.
 

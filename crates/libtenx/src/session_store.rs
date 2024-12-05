@@ -1,8 +1,8 @@
-use std::path::{Path, PathBuf};
-
-use fs_err as fs;
+//! Session persistence module, handling storage and retrieval of sessions.
 
 use crate::{config::Config, session::Session, Result, TenxError};
+use fs_err as fs;
+use std::path::{Path, PathBuf};
 
 /// Normalizes a path for use as a filename by replacing problematic characters.
 pub fn path_to_filename(path: &Path) -> String {
@@ -26,7 +26,10 @@ pub fn load_session<P: AsRef<Path>>(path: P) -> Result<Session> {
         .map_err(|e| TenxError::SessionStore(format!("Failed to parse session: {}", e)))
 }
 
-/// Manages the storage and retrieval of State objects.
+/// Manages persistent storage and retrieval of Session objects.
+///
+/// Sessions are stored in a directory structure, with each session serialized to JSON.
+/// The store provides methods to save, load, and list available sessions.
 pub struct SessionStore {
     base_dir: PathBuf,
 }

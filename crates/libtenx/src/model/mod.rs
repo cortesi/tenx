@@ -1,7 +1,12 @@
+//! Model abstractions and implementations for interacting with AI language models.
+//!
+//! This module provides traits and implementations for different AI model providers,
+//! along with usage tracking and response handling.
+
 mod claude;
 mod conversation;
 mod dummy_model;
-pub mod openai;
+mod openai;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -70,6 +75,7 @@ pub trait ModelProvider {
     fn render(&self, config: &Config, session: &Session) -> Result<String>;
 }
 
+/// Available model implementations that can be used for AI interactions.
 #[derive(Debug, Clone)]
 pub enum Model {
     Claude(Claude),

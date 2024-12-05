@@ -620,7 +620,7 @@ impl Config {
         current_dir: Q,
     ) -> crate::Result<PathBuf> {
         let path = path.as_ref();
-        if path.to_str().map_or(false, |s| s.contains('*')) {
+        if path.to_str().is_some_and(|s| s.contains('*')) {
             return Ok(path.to_path_buf());
         }
 
