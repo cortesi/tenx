@@ -678,8 +678,18 @@ async fn main() -> anyhow::Result<()> {
                 if let Some(files) = files {
                     add_files_to_session(&mut session, &config, files)?;
                 }
-                tx.check(&mut session, &Some(sender.clone()))?;
-                Ok(())
+                match tx.check(&mut session, &Some(sender.clone())) {
+                    Ok(_) => Ok(()),
+                    Err(e) => match e {
+                        libtenx::TenxError::Check { name, user, model } => Err(anyhow!(
+                            "Check '{}' failed: {}\nfull output:\n{}",
+                            name,
+                            user,
+                            model
+                        )),
+                        other => Err(other.into()),
+                    },
+                }
             }
             Commands::Refresh => {
                 let mut session = tx.load_session()?;
