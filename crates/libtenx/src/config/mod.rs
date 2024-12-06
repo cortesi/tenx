@@ -6,7 +6,7 @@ mod defaults;
 
 pub use config::{
     load_config, CheckConfig, Checks, Config, ConfigFile, Context, Dialect, Include, Model, Models,
-    Project, Root, Tags, TextContext,
+    Project, Tags, TextContext,
 };
 
 pub use defaults::*;

@@ -121,7 +121,7 @@ mod tests {
 
     fn test_config() -> Config {
         let mut config = Config::default();
-        config.project.root = crate::config::Root::Path(".".into());
+        config.project.root = ".".into();
         config
     }
 

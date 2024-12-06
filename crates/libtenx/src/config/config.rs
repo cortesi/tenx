@@ -60,21 +60,6 @@ fn walk_directory(
     Ok(())
 }
 
-/// Finds the root directory based on a specified working directory, git repo root, or .tenx.conf
-/// file.
-fn find_project_root(current_dir: &Path) -> PathBuf {
-    let mut dir = current_dir.to_path_buf();
-    loop {
-        if dir.join(".git").is_dir() || dir.join(PROJECT_CONFIG_FILE).is_file() {
-            return dir;
-        }
-        if !dir.pop() {
-            break;
-        }
-    }
-    current_dir.to_path_buf()
-}
-
 /// Deserialize a RON string into a ConfigFile.
 fn parse_config_file(ron_str: &str) -> crate::Result<ConfigFile> {
     let options =
@@ -86,8 +71,12 @@ fn parse_config_file(ron_str: &str) -> crate::Result<ConfigFile> {
 
 /// Loads the configuration by merging defaults, home, and local configuration files.
 /// Returns the complete Config object.
-fn parse_config(home_config: &str, project_config: &str) -> crate::Result<Config> {
-    let default_conf = default_config();
+fn parse_config(
+    home_config: &str,
+    project_config: &str,
+    current_dir: &Path,
+) -> crate::Result<Config> {
+    let default_conf = default_config(current_dir);
     let mut cnf = ConfigFile::default();
 
     // Load from home config file
@@ -108,7 +97,7 @@ fn parse_config(home_config: &str, project_config: &str) -> crate::Result<Config
 
 /// Loads the Tenx configuration by merging defaults, home, and local configuration files. Returns
 /// the complete Config object.
-pub fn load_config() -> crate::Result<Config> {
+pub fn load_config(current_dir: &Path) -> crate::Result<Config> {
     let home_config_path = home_config_dir().join(HOME_CONFIG_FILE);
     let home_config = if home_config_path.exists() {
         fs::read_to_string(&home_config_path)
@@ -117,7 +106,7 @@ pub fn load_config() -> crate::Result<Config> {
         String::new()
     };
 
-    let default_conf = default_config();
+    let default_conf = default_config(current_dir);
     let project_root = default_conf.project_root();
     let project_config_path = project_root.join(PROJECT_CONFIG_FILE);
     let project_config = if project_config_path.exists() {
@@ -127,7 +116,7 @@ pub fn load_config() -> crate::Result<Config> {
         String::new()
     };
 
-    parse_config(&home_config, &project_config)
+    parse_config(&home_config, &project_config, current_dir)
 }
 
 /// A named block of text to include as context in model interactions.
@@ -373,7 +362,7 @@ impl std::fmt::Display for Include {
 /// Project configuration including root directory and file inclusion rules.
 pub struct Project {
     /// Project root configuration.
-    pub root: Root,
+    pub root: PathBuf,
 
     /// Which files are included by default
     pub include: Include,
@@ -420,15 +409,6 @@ pub struct Models {
     /// Disable streaming for all models
     #[serde(default)]
     pub no_stream: bool,
-}
-
-#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-/// Specifies how to determine the project root directory.
-pub enum Root {
-    #[default]
-    Discover,
-    Path(PathBuf),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
@@ -578,9 +558,10 @@ impl Config {
     }
 
     pub fn project_root(&self) -> PathBuf {
-        match &self.project.root {
-            Root::Discover => find_project_root(&self.cwd().unwrap_or_default()),
-            Root::Path(path) => path.clone(),
+        if self.project.root.to_string_lossy().is_empty() {
+            ".".into()
+        } else {
+            self.project.root.clone()
         }
     }
 
@@ -775,7 +756,7 @@ impl Config {
     }
 
     pub fn with_root<P: AsRef<Path>>(mut self, path: P) -> Self {
-        self.project.root = Root::Path(path.as_ref().into());
+        self.project.root = path.as_ref().into();
         self
     }
 
@@ -929,24 +910,28 @@ mod tests {
 
     #[test]
     fn test_config_merge() -> crate::Result<()> {
+        let current_dir = std::env::current_dir()?;
         let parsed = parse_config(
             r#"(models: (default: "foo", no_stream: true))"#,
-            r#"(models: (default: "bar"), project: ( root: path("/foo")))"#,
+            r#"(models: (default: "bar"), project: ( root: "/foo"))"#,
+            &current_dir,
         )?;
         assert_eq!(parsed.models.default, "bar");
         assert!(parsed.models.no_stream);
-        assert_eq!(parsed.project.root, Root::Path(PathBuf::from("/foo")));
+        assert_eq!(parsed.project.root, PathBuf::from("/foo"));
         Ok(())
     }
 
     #[test]
     fn test_config_roundtrip() -> crate::Result<()> {
-        let mut config = default_config();
+        let current_dir = std::env::current_dir()?;
+        let mut config = default_config(&current_dir);
         config.retry_limit = 42;
         config.project.exclude.push("*.test".to_string());
 
         let ron = config.to_ron()?;
-        let parsed = parse_config("", &ron)?;
+        let current_dir = std::env::current_dir()?;
+        let parsed = parse_config("", &ron, &current_dir)?;
 
         assert_eq!(parsed, config);
         Ok(())
@@ -956,11 +941,12 @@ mod tests {
     fn test_parse_config_value() -> crate::Result<()> {
         // Test loading a config with a custom retry_limit
         let test_config = r#"(retry_limit: 10)"#;
-        let config = parse_config("", test_config)?;
+        let current_dir = std::env::current_dir()?;
+        let config = parse_config("", test_config, &current_dir)?;
         assert_eq!(config.retry_limit, 10);
 
         // Test that other values remain at default
-        let default_config = default_config();
+        let default_config = default_config(&std::env::current_dir()?);
         assert_eq!(config.models, default_config.models);
         assert_eq!(config.project.include, default_config.project.include);
         assert_eq!(config.project.exclude, default_config.project.exclude);
@@ -1034,7 +1020,7 @@ mod tests {
             project: Project {
                 include: Include::Glob(vec!["*.rs".to_string(), "subdir/*.txt".to_string()]),
                 exclude: vec!["**/ignore.rs".to_string()],
-                root: Root::Path(root_path.to_path_buf()),
+                root: root_path.to_path_buf(),
             },
             ..Default::default()
         };
@@ -1056,7 +1042,7 @@ mod tests {
             project: Project {
                 include: Include::Glob(vec!["**/*.rs".to_string(), "**/*.txt".to_string()]),
                 exclude: vec!["**/ignore.rs".to_string(), "subdir/*.txt".to_string()],
-                root: Root::Path(root_path.to_path_buf()),
+                root: root_path.to_path_buf(),
             },
             ..Default::default()
         };
@@ -1078,12 +1064,9 @@ mod tests {
 
     #[test]
     fn test_project_root() {
-        let config_discover = Config::default();
-        assert!(matches!(config_discover.project.root, Root::Discover));
-
         let config_path = Config {
             project: Project {
-                root: Root::Path(PathBuf::from("/custom/path")),
+                root: PathBuf::from("/custom/path"),
                 ..Default::default()
             },
             ..Default::default()

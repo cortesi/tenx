@@ -1,4 +1,5 @@
 use std::env;
+use std::path::{Path, PathBuf};
 
 use super::config::*;
 
@@ -28,6 +29,21 @@ const XAI_DEFAULT_GROK: &str = "grok-beta";
 // const GOOGLEAI_API_KEY: &str = "GOOGLEAI_API_KEY";
 // const GOOGLEAI_API_BASE: &str = "https://generativelanguage.googleapis.com/v1beta/openai";
 // const GOOGLEAI_GEMINI_EXP: &str = "gemini-exp-1114";
+
+/// Finds the root directory based on a specified working directory, git repo root, or .tenx.conf
+/// file.
+fn find_project_root(current_dir: &Path) -> PathBuf {
+    let mut dir = current_dir.to_path_buf();
+    loop {
+        if dir.join(".git").is_dir() || dir.join(PROJECT_CONFIG_FILE).is_file() {
+            return dir;
+        }
+        if !dir.pop() {
+            break;
+        }
+    }
+    current_dir.to_path_buf()
+}
 
 /// Returns the default set of model configurations based on available API keys
 fn default_models() -> Vec<Model> {
@@ -232,7 +248,7 @@ fn default_checks() -> Checks {
 
 /// Constructs the Tenx default configuration. This takes into account the presence of various API
 /// keys in env variables and sets up the default models accordingly.
-pub fn default_config() -> Config {
+pub fn default_config<P: AsRef<Path>>(current_dir: P) -> Config {
     Config {
         models: Models {
             default: "sonnet".to_string(),
@@ -247,7 +263,7 @@ pub fn default_config() -> Config {
         project: Project {
             include: Include::Git,
             exclude: vec![],
-            root: Root::Discover,
+            root: find_project_root(current_dir.as_ref()),
         },
         tags: Tags {
             replace: true,

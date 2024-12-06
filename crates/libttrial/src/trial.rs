@@ -15,7 +15,7 @@ use tokio::sync::mpsc;
 use tracing::info;
 
 use libtenx::{
-    config::{default_config, Config, ConfigFile, Include, Root},
+    config::{default_config, Config, ConfigFile, Include},
     events::Event,
     session::Session,
     Result, Tenx, TenxError,
@@ -138,7 +138,7 @@ impl Trial {
         let temp_dir = self.setup_temp_project()?;
         let mut conf = self.tenx_conf.clone();
         conf.session_store_dir = PathBuf::from("");
-        conf.project.root = Root::Path(temp_dir.path().join("project"));
+        conf.project.root = temp_dir.path().join("project");
 
         conf.models.default = model.to_string();
 
@@ -174,7 +174,8 @@ impl Trial {
     /// Returns a default configuration for trials. These need to be over-ridden by the trial
     /// if needed.
     fn default_config() -> Result<Config> {
-        let mut config = default_config();
+        let cwd = std::env::current_dir()?;
+        let mut config = default_config(&cwd);
         config.project.include = Include::Glob(vec!["**/*".to_string()]);
         config.project.exclude = vec!["target/**".to_string()];
         config.retry_limit = 1;

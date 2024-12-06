@@ -315,7 +315,8 @@ enum Commands {
 
 /// Creates a Config from disk and CLI arguments
 fn load_config(cli: &Cli) -> Result<config::Config> {
-    let mut config = config::load_config()?;
+    let current_dir = std::env::current_dir()?;
+    let mut config = config::load_config(&current_dir)?;
 
     macro_rules! set_config {
         ($config:expr, $($field:ident).+, $value:expr) => {
@@ -411,7 +412,7 @@ async fn main() -> anyhow::Result<()> {
             }
             Commands::Conf { defaults } => {
                 let conf = if *defaults {
-                    config::default_config()
+                    config::default_config(std::env::current_dir()?)
                 } else {
                     config.clone()
                 };

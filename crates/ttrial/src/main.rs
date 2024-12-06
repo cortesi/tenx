@@ -352,12 +352,9 @@ async fn main() -> anyhow::Result<()> {
                     .ok_or_else(|| anyhow::anyhow!("Invalid session name: {}", session_name))?;
 
                 let session = store.load(session_name.clone())?;
-                let report = TrialReport::from_session(
-                    &session,
-                    trial_name,
-                    iteration,
-                    &libtenx::config::load_config()?,
-                )?;
+                let current_dir = std::env::current_dir()?;
+                let config = libtenx::config::load_config(&current_dir)?;
+                let report = TrialReport::from_session(&session, trial_name, iteration, &config)?;
                 reports.push(report);
             }
 
@@ -490,7 +487,7 @@ async fn main() -> anyhow::Result<()> {
                     &session,
                     trial_name,
                     iteration,
-                    &libtenx::config::load_config()?,
+                    &libtenx::config::load_config(&std::env::current_dir()?)?,
                 )?;
                 reports.push(report);
             }
