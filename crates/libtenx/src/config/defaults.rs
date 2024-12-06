@@ -30,12 +30,17 @@ const XAI_DEFAULT_GROK: &str = "grok-beta";
 // const GOOGLEAI_API_BASE: &str = "https://generativelanguage.googleapis.com/v1beta/openai";
 // const GOOGLEAI_GEMINI_EXP: &str = "gemini-exp-1114";
 
+/// Returns true if the directory is a git repository
+fn is_git_repo(dir: &Path) -> bool {
+    dir.join(".git").is_dir()
+}
+
 /// Finds the root directory based on a specified working directory, git repo root, or .tenx.conf
 /// file.
 fn find_project_root(current_dir: &Path) -> PathBuf {
     let mut dir = current_dir.to_path_buf();
     loop {
-        if dir.join(".git").is_dir() || dir.join(PROJECT_CONFIG_FILE).is_file() {
+        if is_git_repo(&dir) || dir.join(PROJECT_CONFIG_FILE).is_file() {
             return dir;
         }
         if !dir.pop() {
@@ -260,10 +265,17 @@ pub fn default_config<P: AsRef<Path>>(current_dir: P) -> Config {
             ..Default::default()
         },
         dialect: Dialect { edit: true },
-        project: Project {
-            include: vec![Include::Git],
-            exclude: vec![],
-            root: find_project_root(current_dir.as_ref()),
+        project: {
+            let root = find_project_root(current_dir.as_ref());
+            Project {
+                include: if is_git_repo(&root) {
+                    vec![Include::Git]
+                } else {
+                    vec![]
+                },
+                exclude: vec![],
+                root,
+            }
         },
         tags: Tags {
             replace: true,

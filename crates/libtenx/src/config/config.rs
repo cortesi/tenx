@@ -731,11 +731,6 @@ impl Config {
             all_files.extend(files);
         }
 
-        // If no include rules specified, default to git
-        if all_files.is_empty() {
-            all_files.extend(self.get_git_files()?);
-        }
-
         // Filter out excluded files and sort
         let mut files: Vec<_> = all_files
             .into_iter()
