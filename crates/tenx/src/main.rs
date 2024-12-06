@@ -429,7 +429,13 @@ async fn main() -> anyhow::Result<()> {
                 println!(
                     "{} {}",
                     "include strategy:".blue().bold(),
-                    config.project.include
+                    config
+                        .project
+                        .include
+                        .iter()
+                        .map(|i| i.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
                 );
                 Ok(())
             }

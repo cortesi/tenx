@@ -383,7 +383,7 @@ mod tests {
         test_project.create_file_tree(&["test.txt"]);
         test_project.write("test.txt", "content");
 
-        test_project.config.project.include = config::Include::Glob(vec!["**/*".to_string()]);
+        test_project.config.project.include = vec![config::Include::Glob("**/*".to_string())];
 
         let context1 = context::Context::Path(
             context::Path::new(&test_project.config, "test.txt".to_string()).unwrap(),

@@ -176,7 +176,7 @@ impl Trial {
     fn default_config() -> Result<Config> {
         let cwd = std::env::current_dir()?;
         let mut config = default_config(&cwd);
-        config.project.include = Include::Glob(vec!["**/*".to_string()]);
+        config.project.include = vec![Include::Glob("**/*".to_string())];
         config.project.exclude = vec!["target/**".to_string()];
         config.retry_limit = 1;
         // We disable streaming for trials by default, because streaming messes up token counts

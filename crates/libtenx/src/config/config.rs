@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     env, fs,
     path::{absolute, Path, PathBuf},
     process::Command,
@@ -332,26 +332,20 @@ pub struct Tags {
     pub udiff: bool,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, Default, PartialEq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Default)]
 #[serde(rename_all = "snake_case")]
 /// Specifies which files to include in the project.
 pub enum Include {
     #[default]
     Git,
-    Glob(Vec<String>),
+    Glob(String),
 }
 
 impl std::fmt::Display for Include {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Include::Git => write!(f, "git"),
-            Include::Glob(patterns) => {
-                write!(f, "globs:")?;
-                for pattern in patterns {
-                    write!(f, " {}", pattern)?;
-                }
-                Ok(())
-            }
+            Include::Glob(pattern) => write!(f, "glob: {}", pattern),
         }
     }
 }
@@ -364,8 +358,9 @@ pub struct Project {
     /// Project root configuration.
     pub root: PathBuf,
 
-    /// Which files are included by default
-    pub include: Include,
+    /// File inclusion rules - files matching any rule are included
+    #[serde(default)]
+    pub include: Vec<Include>,
 
     /// Glob patterns to exclude from the file list
     pub exclude: Vec<String>,
@@ -676,8 +671,45 @@ impl Config {
         Ok(matched_files)
     }
 
-    pub fn project_files(&self) -> crate::Result<Vec<PathBuf>> {
+    fn get_git_files(&self) -> crate::Result<Vec<PathBuf>> {
         let project_root = self.project_root();
+        let output = Command::new("git")
+            .arg("ls-files")
+            .current_dir(&project_root)
+            .output()
+            .map_err(|e| TenxError::Internal(format!("Failed to execute git ls-files: {}", e)))?;
+
+        if !output.status.success() {
+            return Err(TenxError::Internal(
+                "git ls-files command failed".to_string(),
+            ));
+        }
+
+        let files = String::from_utf8(output.stdout).map_err(|e| {
+            TenxError::Internal(format!("Failed to parse git ls-files output: {}", e))
+        })?;
+
+        Ok(files
+            .lines()
+            .map(|line| PathBuf::from(line.trim()))
+            .collect())
+    }
+
+    fn get_glob_files(&self, pattern: &str) -> crate::Result<Vec<PathBuf>> {
+        let project_root = self.project_root();
+        let mut builder = GlobSetBuilder::new();
+        builder.add(Glob::new(pattern).map_err(|e| TenxError::Internal(e.to_string()))?);
+        let globset = builder
+            .build()
+            .map_err(|e| TenxError::Internal(e.to_string()))?;
+
+        let mut included_files = Vec::new();
+        walk_directory(&project_root, &project_root, &globset, &mut included_files)?;
+        Ok(included_files)
+    }
+
+    pub fn project_files(&self) -> crate::Result<Vec<PathBuf>> {
+        let _project_root = self.project_root();
 
         // Build exclude globset
         let mut exclude_builder = GlobSetBuilder::new();
@@ -689,53 +721,28 @@ impl Config {
             .build()
             .map_err(|e| TenxError::Internal(e.to_string()))?;
 
-        // Get initial file list
-        let initial_files = match &self.project.include {
-            Include::Git => {
-                let output = Command::new("git")
-                    .arg("ls-files")
-                    .current_dir(&project_root)
-                    .output()
-                    .map_err(|e| {
-                        TenxError::Internal(format!("Failed to execute git ls-files: {}", e))
-                    })?;
+        // Get all included files
+        let mut all_files = HashSet::new();
+        for include in &self.project.include {
+            let files = match include {
+                Include::Git => self.get_git_files()?,
+                Include::Glob(pattern) => self.get_glob_files(pattern)?,
+            };
+            all_files.extend(files);
+        }
 
-                if !output.status.success() {
-                    return Err(TenxError::Internal(
-                        "git ls-files command failed".to_string(),
-                    ));
-                }
+        // If no include rules specified, default to git
+        if all_files.is_empty() {
+            all_files.extend(self.get_git_files()?);
+        }
 
-                let files = String::from_utf8(output.stdout).map_err(|e| {
-                    TenxError::Internal(format!("Failed to parse git ls-files output: {}", e))
-                })?;
-
-                files
-                    .lines()
-                    .map(|line| PathBuf::from(line.trim()))
-                    .collect::<Vec<_>>()
-            }
-            Include::Glob(patterns) => {
-                let mut builder = GlobSetBuilder::new();
-                for pattern in patterns {
-                    builder
-                        .add(Glob::new(pattern).map_err(|e| TenxError::Internal(e.to_string()))?);
-                }
-                let globset = builder
-                    .build()
-                    .map_err(|e| TenxError::Internal(e.to_string()))?;
-
-                let mut included_files = Vec::new();
-                walk_directory(&project_root, &project_root, &globset, &mut included_files)?;
-                included_files
-            }
-        };
-
-        // Filter out excluded files
-        Ok(initial_files
+        // Filter out excluded files and sort
+        let mut files: Vec<_> = all_files
             .into_iter()
             .filter(|path| !exclude_globset.is_match(path))
-            .collect())
+            .collect();
+        files.sort();
+        Ok(files)
     }
 
     /// Serialize the Config into a RON string.
@@ -1018,7 +1025,10 @@ mod tests {
 
         let config = Config {
             project: Project {
-                include: Include::Glob(vec!["*.rs".to_string(), "subdir/*.txt".to_string()]),
+                include: vec![
+                    Include::Glob("*.rs".to_string()),
+                    Include::Glob("subdir/*.txt".to_string()),
+                ],
                 exclude: vec!["**/ignore.rs".to_string()],
                 root: root_path.to_path_buf(),
             },
@@ -1040,7 +1050,10 @@ mod tests {
         // Test with multiple exclude patterns
         let config_multi_exclude = Config {
             project: Project {
-                include: Include::Glob(vec!["**/*.rs".to_string(), "**/*.txt".to_string()]),
+                include: vec![
+                    Include::Glob("**/*.rs".to_string()),
+                    Include::Glob("**/*.txt".to_string()),
+                ],
                 exclude: vec!["**/ignore.rs".to_string(), "subdir/*.txt".to_string()],
                 root: root_path.to_path_buf(),
             },
@@ -1084,8 +1097,10 @@ mod tests {
             "README.md",
         ]);
 
-        project.config.project.include =
-            Include::Glob(vec!["**/*.rs".to_string(), "README.md".to_string()]);
+        project.config.project.include = vec![
+            Include::Glob("**/*.rs".to_string()),
+            Include::Glob("README.md".to_string()),
+        ];
 
         // Test matching files from root directory
         let matched_files = project.config.match_files_with_glob("src/**/*.rs")?;

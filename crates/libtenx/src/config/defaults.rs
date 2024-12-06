@@ -261,7 +261,7 @@ pub fn default_config<P: AsRef<Path>>(current_dir: P) -> Config {
         },
         dialect: Dialect { edit: true },
         project: Project {
-            include: Include::Git,
+            include: vec![Include::Git],
             exclude: vec![],
             root: find_project_root(current_dir.as_ref()),
         },
