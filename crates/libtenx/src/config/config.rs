@@ -653,7 +653,7 @@ impl Config {
         let project_root = &self.project_root();
         let glob = Glob::new(pattern)
             .map_err(|e| TenxError::Internal(format!("Invalid glob pattern: {}", e)))?;
-        let included_files = self.included_files()?;
+        let included_files = self.project_files()?;
 
         let current_dir = self.cwd()?;
 
@@ -695,7 +695,7 @@ impl Config {
         Ok(matched_files)
     }
 
-    pub fn included_files(&self) -> crate::Result<Vec<PathBuf>> {
+    pub fn project_files(&self) -> crate::Result<Vec<PathBuf>> {
         let project_root = self.project_root();
 
         // Build exclude globset
@@ -1039,7 +1039,7 @@ mod tests {
             ..Default::default()
         };
 
-        let mut included_files = config.included_files()?;
+        let mut included_files = config.project_files()?;
         included_files.sort();
 
         let mut expected_files = vec![
@@ -1061,7 +1061,7 @@ mod tests {
             ..Default::default()
         };
 
-        let mut included_files = config_multi_exclude.included_files()?;
+        let mut included_files = config_multi_exclude.project_files()?;
         included_files.sort();
 
         let mut expected_files = vec![

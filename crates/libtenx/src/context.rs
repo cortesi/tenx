@@ -105,7 +105,7 @@ impl ProjectMap {
 #[async_trait]
 impl ContextProvider for ProjectMap {
     fn context_items(&self, config: &Config, _: &Session) -> Result<Vec<ContextItem>> {
-        let files = config.included_files()?;
+        let files = config.project_files()?;
         let body = files
             .iter()
             .map(|p| p.to_string_lossy().to_string())

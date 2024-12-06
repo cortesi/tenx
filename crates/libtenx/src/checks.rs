@@ -92,7 +92,7 @@ impl Check {
     /// editables, those are used, otherwise falls back to all included files from config.
     pub fn is_relevant(&self, config: &Config, state: &Session) -> Result<bool> {
         let paths = if state.editable().is_empty() {
-            config.included_files()?
+            config.project_files()?
         } else {
             state.editable().to_vec()
         };

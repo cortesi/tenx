@@ -6,6 +6,7 @@
 
 A sharp command-line tool for AI-assisted coding.
 
+
 ```bash
 cargo install tenx
 ```
@@ -13,23 +14,20 @@ cargo install tenx
 
 ## Features
 
-- AI-assisted code editing and generation
-- Session-based workflow for organized development
-- Preflight checks to ensure the project is consistent before prompting
-- Post-patch checks, with automated model feedback and retry on failure
-- Undo, retry and re-edit steps in the session
-- First-class support for Rust
-    - Pre and post-patch validation with `cargo check` and `cargo test`
-    - Formatting with `cargo fmt`
-    - Include documentation for any crate (local or from crates.io)
-      using [Ruskel](https://github.com/cortesi/ruskel).
+- AI-assisted code editing and generation.
+- Session-based workflow for organized development.
+- Preflight checks to ensure the project is consistent before prompting.
+- Post-patch checks, with automated model feedback and retry on failure.
+- Undo, retry and re-edit steps in the session.
 - Built on **libtenx**, a Rust library for building AI-assisted coding tools.
 
 
 ## Ethos
 
-- Built with an uncompromsing focus on expert developers and power users
-- Tracks whatever the best current coding models are (currently Claude 3.5 Sonnet)
+- Built with an uncompromsing focus on expert developers and power users.
+- Supports all practically useful coding models are.
+- Benchmarked rigorously to track the performance of our system prompt and
+  interaction protocol against all current models.
 
 
 ## Future

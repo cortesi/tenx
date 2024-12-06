@@ -436,7 +436,7 @@ async fn main() -> anyhow::Result<()> {
                 let files = if let Some(p) = pattern {
                     config.match_files_with_glob(p)?
                 } else {
-                    config.included_files()?
+                    config.project_files()?
                 };
                 for file in files {
                     println!("{}", file.display());
