@@ -113,12 +113,9 @@ pub async fn output_progress(
 
     let mut current_spinner: Option<ProgressBar> = None;
 
-    fn manage_spinner<F>(spinner: &mut Option<ProgressBar>, f: F)
-    where
-        F: FnOnce(&ProgressBar),
-    {
+    fn finish_spinner(spinner: &mut Option<ProgressBar>) {
         if let Some(s) = spinner.take() {
-            f(&s);
+            s.finish();
         }
     }
 
@@ -140,7 +137,7 @@ pub async fn output_progress(
         tokio::select! {
             Some(event) = receiver.recv() => {
                 if let Some(header) = event.header_message() {
-                    manage_spinner(&mut current_spinner, |s| s.finish());
+                    finish_spinner(&mut current_spinner);
                     println!("{}", header.blue());
                 } else if let Some(progress_event) = event.progress_event() {
                     start_new_spinner(
@@ -151,8 +148,12 @@ pub async fn output_progress(
                 }
 
                 match event {
+                    Event::Interact => {
+                        finish_spinner(&mut current_spinner);
+                        println!("{}", "getting user input...".blue());
+                    }
                     Event::Retry{ref user, ref model} => {
-                        manage_spinner(&mut current_spinner, |s| s.finish());
+                        finish_spinner(&mut current_spinner);
                         println!("{:>width$}{}", "", format!("retrying: {}", user).yellow(), width=spinner_indent);
                         if verbosity > 0 {
                             let wrapped = textwrap::indent(
@@ -164,22 +165,22 @@ pub async fn output_progress(
                         }
                     }
                     Event::Fatal(ref message) => {
-                        manage_spinner(&mut current_spinner, |s| s.finish());
+                        finish_spinner(&mut current_spinner);
                         println!("{:>width$}{}", "", format!("fatal: {}", message).red(), width=spinner_indent);
                     }
                     Event::Snippet(ref chunk) => {
-                        manage_spinner(&mut current_spinner, |s| s.finish());
+                        finish_spinner(&mut current_spinner);
                         print!("{}", chunk);
                     }
                     Event::ModelResponse(ref text) => {
-                        manage_spinner(&mut current_spinner, |s| s.finish());
+                        finish_spinner(&mut current_spinner);
                         print!("{}", text);
                     }
                     Event::Finish => {
-                        manage_spinner(&mut current_spinner, |s| s.finish());
+                        finish_spinner(&mut current_spinner);
                     }
                     Event::PromptEnd(_) => {
-                        manage_spinner(&mut current_spinner, |s| s.finish());
+                        finish_spinner(&mut current_spinner);
                         println!("\n");
                     }
                     _ => {}
@@ -190,5 +191,5 @@ pub async fn output_progress(
         }
     }
 
-    manage_spinner(&mut current_spinner, |s| s.finish());
+    finish_spinner(&mut current_spinner);
 }

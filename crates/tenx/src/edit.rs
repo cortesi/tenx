@@ -1,8 +1,9 @@
 use anyhow::{Context as AnyhowContext, Result};
 use std::{fs, io::Write, process::Command};
 use tempfile::NamedTempFile;
+use tokio::sync::mpsc;
 
-use libtenx::session::Session;
+use libtenx::{events::Event, session::Session};
 
 /// Returns the user's preferred editor.
 fn get_editor() -> (String, Vec<String>) {
@@ -90,7 +91,14 @@ fn parse_edited_text(input: &str) -> String {
 }
 
 /// Opens an editor for the user to input their prompt.
-pub fn edit_prompt(session: &Session, retry: bool) -> Result<Option<String>> {
+pub fn edit_prompt(
+    session: &Session,
+    retry: bool,
+    event_sender: &Option<mpsc::Sender<Event>>,
+) -> Result<Option<String>> {
+    if let Some(sender) = event_sender {
+        let _ = sender.try_send(Event::Interact);
+    }
     let mut temp_file = NamedTempFile::new()?;
     let initial_text = render_initial_text(session, retry)?;
     temp_file.write_all(initial_text.as_bytes())?;
@@ -98,11 +106,12 @@ pub fn edit_prompt(session: &Session, retry: bool) -> Result<Option<String>> {
     temp_file.as_file().sync_all()?;
 
     let initial_content = fs::read_to_string(temp_file.path())?;
+
     let (editor, args) = get_editor();
     let mut cmd = Command::new(editor);
     cmd.args(args);
     cmd.arg(temp_file.path());
-    cmd.status().context("Failed to open editor")?;
+    let _status = cmd.status().context("Failed to open editor")?;
 
     // Re-read the file after editing
     let edited_content = fs::read_to_string(temp_file.path())?;

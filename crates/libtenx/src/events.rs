@@ -74,6 +74,10 @@ pub enum Event {
     /// The command has finished successfully
     Finish,
 
+    /// Notify the output subsystem that user interaction is a bout to start.
+    /// This is needed in some cases to, for instance, stop a spinner.
+    Interact,
+
     /// A log message with a specified log level
     Log(LogLevel, String),
 

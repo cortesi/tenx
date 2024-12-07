@@ -12,6 +12,7 @@ use libtenx::{
     context::Context,
     dialect::DialectProvider,
     event_consumers,
+    events::Event,
     model::ModelProvider,
     pretty,
     session::Session,
@@ -41,6 +42,7 @@ fn get_prompt(
     prompt_file: &Option<PathBuf>,
     session: &Session,
     retry: bool,
+    event_sender: &Option<mpsc::Sender<Event>>,
 ) -> Result<Option<String>> {
     if let Some(p) = prompt {
         Ok(Some(p.clone()))
@@ -48,7 +50,7 @@ fn get_prompt(
         let prompt_content = fs::read_to_string(file_path).context("Failed to read prompt file")?;
         Ok(Some(prompt_content))
     } else {
-        Ok(edit::edit_prompt(session, retry)?)
+        Ok(edit::edit_prompt(session, retry, event_sender)?)
     }
 }
 
@@ -498,7 +500,13 @@ async fn main() -> anyhow::Result<()> {
                     .new_session_from_cwd(&Some(sender.clone()), *no_ctx)
                     .await?;
                 add_files_to_session(&mut session, &config, files)?;
-                let user_prompt = match get_prompt(prompt, prompt_file, &session, false)? {
+                let user_prompt = match get_prompt(
+                    prompt,
+                    prompt_file,
+                    &session,
+                    false,
+                    &Some(sender.clone()),
+                )? {
                     Some(p) => p,
                     None => return Ok(()),
                 };
@@ -521,7 +529,13 @@ async fn main() -> anyhow::Result<()> {
                 if let Some(files) = files {
                     add_files_to_session(&mut session, &config, files)?;
                 }
-                let user_prompt = match get_prompt(prompt, prompt_file, &session, false)? {
+                let user_prompt = match get_prompt(
+                    prompt,
+                    prompt_file,
+                    &session,
+                    false,
+                    &Some(sender.clone()),
+                )? {
                     Some(p) => p,
                     None => return Ok(()),
                 };
@@ -621,7 +635,7 @@ async fn main() -> anyhow::Result<()> {
                 tx.reset(&mut session, offset)?;
 
                 let prompt = if *edit || prompt.is_some() || prompt_file.is_some() {
-                    get_prompt(prompt, prompt_file, &session, true)?
+                    get_prompt(prompt, prompt_file, &session, true, &Some(sender.clone()))?
                 } else {
                     None
                 };
@@ -659,7 +673,7 @@ async fn main() -> anyhow::Result<()> {
                 }
 
                 let prompt = if prompt.is_some() || prompt_file.is_some() || *edit {
-                    get_prompt(prompt, prompt_file, &session, false)?
+                    get_prompt(prompt, prompt_file, &session, false, &Some(sender.clone()))?
                 } else {
                     None
                 };
