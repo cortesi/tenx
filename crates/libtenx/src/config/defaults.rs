@@ -112,6 +112,15 @@ fn default_models() -> Vec<Model> {
                 no_system_prompt: false,
             },
             Model::OpenAi {
+                name: "llama33-70b".to_string(),
+                api_model: "meta-llama/Llama-3.3-70B-Instruct".to_string(),
+                key: "".to_string(),
+                key_env: DEEPINFRA_API_KEY.to_string(),
+                api_base: DEEPINFRA_API_BASE.to_string(),
+                can_stream: true,
+                no_system_prompt: false,
+            },
+            Model::OpenAi {
                 name: "qwq".to_string(),
                 api_model: "Qwen/QwQ-32B-Preview".to_string(),
                 key: "".to_string(),
