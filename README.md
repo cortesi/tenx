@@ -11,30 +11,36 @@ A sharp command-line tool for AI-assisted coding.
 cargo install tenx
 ```
 
+📘 [Tenx Manual](https://cortesi.github.io/tenx-manual/overview.html)
+
 
 ## Features
 
 - AI-assisted code editing and generation.
 - Session-based workflow for organized development.
 - Preflight checks to ensure the project is consistent before prompting.
-- Post-patch checks, with automated model feedback and retry on failure.
+- Post-patch checks with automated model feedback and retry on failure.
 - Undo, retry and re-edit steps in the session.
 - Built on **libtenx**, a Rust library for building AI-assisted coding tools.
 
 
 ## Ethos
 
-- Built with an uncompromsing focus on expert developers and power users.
-- Supports all practically useful coding models are.
-- Benchmarked rigorously to track the performance of our system prompt and
+- Built with an uncompromsing focus on expert developers.
+- Rigorous benchmarks to track the performance of our system prompt and
   interaction protocol against all current models.
+- Supports all practically useful models.
 
 
-## Future
+## Next up
 
-- Named sessions
+The first relese of tenx is a minimal viable product. The next steps are:
+
+- Improved sessions and session management
 - System prompt customization
-- Git commit dialect
+- More models (Gemini)
+- Git commit dialect to generate commit messages
+- Imrovements to our prompts and dialects, driven by benchmarks
 - Neovim plugin based on libtenx
 
 
@@ -46,4 +52,3 @@ cargo install tenx
 - [aider](https://github.com/Aider-AI/aider) - Pair programming for your
   terminal. A coding tool with a very similar structure to Tenx, but much
   further along. If you're looking for a mature tool, this is the one to try.
-
