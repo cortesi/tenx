@@ -5,8 +5,12 @@ use tempfile::NamedTempFile;
 use libtenx::session::Session;
 
 /// Returns the user's preferred editor.
-fn get_editor() -> String {
-    std::env::var("EDITOR").unwrap_or_else(|_| "vim".to_string())
+fn get_editor() -> (String, Vec<String>) {
+    let editor_str = std::env::var("EDITOR").unwrap_or_else(|_| "vim".to_string());
+    let mut parts = editor_str.split_whitespace();
+    let command = parts.next().unwrap_or("vim").to_string();
+    let args: Vec<String> = parts.map(|s| s.to_string()).collect();
+    (command, args)
 }
 
 /// Renders a step as a comment.
@@ -91,16 +95,18 @@ pub fn edit_prompt(session: &Session, retry: bool) -> Result<Option<String>> {
     let initial_text = render_initial_text(session, retry)?;
     temp_file.write_all(initial_text.as_bytes())?;
     temp_file.flush()?;
-    let initial_metadata = temp_file.as_file().metadata()?;
-    let editor = get_editor();
-    Command::new(editor)
-        .arg(temp_file.path())
-        .status()
-        .context("Failed to open editor")?;
-    let final_metadata = temp_file.as_file().metadata()?;
-    if final_metadata.modified()? > initial_metadata.modified()? {
-        let edited_content =
-            fs::read_to_string(temp_file.path()).context("Failed to read temporary file")?;
+    temp_file.as_file().sync_all()?;
+
+    let initial_content = fs::read_to_string(temp_file.path())?;
+    let (editor, args) = get_editor();
+    let mut cmd = Command::new(editor);
+    cmd.args(args);
+    cmd.arg(temp_file.path());
+    cmd.status().context("Failed to open editor")?;
+
+    // Re-read the file after editing
+    let edited_content = fs::read_to_string(temp_file.path())?;
+    if edited_content != initial_content {
         let prompt = parse_edited_text(&edited_content);
         Ok(Some(prompt))
     } else {
