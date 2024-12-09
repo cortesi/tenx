@@ -97,8 +97,8 @@ struct Cli {
     #[clap(long)]
     no_stream: bool,
 
-    /// Force colored output
-    #[clap(long, conflicts_with = "no_color")]
+    /// Force colored output (env: TENX_COLOR)
+    #[clap(long, conflicts_with = "no_color", env = "TENX_COLOR")]
     color: bool,
 
     /// Disable colored output
