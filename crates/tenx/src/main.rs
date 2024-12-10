@@ -97,7 +97,7 @@ struct Cli {
     #[clap(long)]
     no_stream: bool,
 
-    /// Force colored output (env: TENX_COLOR)
+    /// Force colored output
     #[clap(long, conflicts_with = "no_color", env = "TENX_COLOR")]
     color: bool,
 
@@ -105,18 +105,18 @@ struct Cli {
     #[clap(long)]
     no_color: bool,
 
-    /// Smart mode for the Tags dialect
-    #[clap(long)]
-    tags_smart: Option<bool>,
-
-    /// Replace mode for the Tags dialect
-    #[clap(long)]
-    tags_replace: Option<bool>,
-
-    /// Udiff mode for the Tags dialect
-    #[clap(long)]
-    tags_udiff: Option<bool>,
-
+    // FIXME: Disable these for now
+    // /// Smart mode for the Tags dialect
+    // #[clap(long)]
+    // tags_smart: Option<bool>,
+    //
+    // /// Replace mode for the Tags dialect
+    // #[clap(long)]
+    // tags_replace: Option<bool>,
+    //
+    // /// Udiff mode for the Tags dialect
+    // #[clap(long)]
+    // tags_udiff: Option<bool>,
     /// Enable a specific check
     #[clap(long)]
     check: Vec<String>,
@@ -247,7 +247,7 @@ enum Commands {
         #[clap(value_parser)]
         files: Option<Vec<String>>,
     },
-    /// List configured models (alias: ls)
+    /// List configured models
     Models {
         /// Show full configuration details
         #[clap(short, long)]
@@ -332,9 +332,9 @@ fn load_config(cli: &Cli) -> Result<config::Config> {
     config = config.load_env();
     set_config!(config, session_store_dir, cli.session_store_dir.clone());
     set_config!(config, retry_limit, cli.retry_limit);
-    set_config!(config, tags.smart, cli.tags_smart);
-    set_config!(config, tags.replace, cli.tags_replace);
-    set_config!(config, tags.udiff, cli.tags_udiff);
+    // set_config!(config, tags.smart, cli.tags_smart);
+    // set_config!(config, tags.replace, cli.tags_replace);
+    // set_config!(config, tags.udiff, cli.tags_udiff);
     if let Some(model) = &cli.model {
         config.models.default = model.clone();
     }
