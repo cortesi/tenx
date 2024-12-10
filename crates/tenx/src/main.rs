@@ -422,23 +422,7 @@ async fn main() -> anyhow::Result<()> {
                 Ok(()) as anyhow::Result<()>
             }
             Commands::Project => {
-                let project_root = config.project_root();
-                println!(
-                    "{} {}",
-                    "project root:".blue().bold(),
-                    project_root.display()
-                );
-                println!(
-                    "{} {}",
-                    "include strategy:".blue().bold(),
-                    config
-                        .project
-                        .include
-                        .iter()
-                        .map(|i| i.to_string())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                );
+                print!("{}", pretty::print_project(&config));
                 Ok(())
             }
             Commands::Files { pattern } => {

@@ -27,13 +27,24 @@ fn format_usage(usage: &model::Usage) -> String {
         .join("\n")
 }
 
+/// Converts a path to use ~ for paths under the user's home directory
+fn display_path_with_home(path: &std::path::Path) -> String {
+    if let Ok(home) = std::env::var("HOME") {
+        let home_path = std::path::Path::new(&home);
+        if let Ok(rel_path) = path.strip_prefix(home_path) {
+            format!("~/{}", rel_path.display())
+        } else {
+            path.display().to_string()
+        }
+    } else {
+        path.display().to_string()
+    }
+}
+
 fn print_session_info(config: &Config, _: &Session) -> String {
     let mut output = String::new();
-    output.push_str(&format!(
-        "{} {}\n",
-        "root:".blue().bold(),
-        config.project_root().display()
-    ));
+    let display_path = display_path_with_home(&config.project_root());
+    output.push_str(&format!("{} {}\n", "root:".blue().bold(), display_path));
     output
 }
 
@@ -297,6 +308,29 @@ pub fn print_session(config: &Config, session: &Session, full: bool) -> Result<S
     output.push_str(&print_editables(config, session)?);
     output.push_str(&print_steps(config, session, full, width)?);
     Ok(output)
+}
+
+/// Pretty prints project information
+pub fn print_project(config: &Config) -> String {
+    let mut output = String::new();
+    let display_path = display_path_with_home(&config.project_root());
+    output.push_str(&format!(
+        "{} {}\n",
+        "project root:".blue().bold(),
+        display_path
+    ));
+    output.push_str(&format!(
+        "{} {}\n",
+        "include strategy:".blue().bold(),
+        config
+            .project
+            .include
+            .iter()
+            .map(|i| i.to_string())
+            .collect::<Vec<_>>()
+            .join(", ")
+    ));
+    output
 }
 
 /// Pretty prints all contexts in a session
