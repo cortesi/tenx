@@ -55,17 +55,16 @@ impl Tenx {
         }
 
         // Refresh all contexts
-        self.refresh_contexts(&mut session, sender).await?;
+        self.refresh_contexts_inner(&mut session, sender).await?;
         Ok(session)
     }
 
-    /// Refreshes all contexts in the session.
-    pub async fn refresh_contexts(
+    /// Refreshes all contexts in the session, but don't create a new event block.
+    async fn refresh_contexts_inner(
         &self,
         session: &mut Session,
         sender: &Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
-        let _block = EventBlock::start(sender)?;
         if session.contexts.is_empty() {
             return Ok(());
         }
@@ -76,6 +75,16 @@ impl Tenx {
             context.refresh().await?;
         }
         Ok(())
+    }
+
+    /// Refreshes all contexts in the session.
+    pub async fn refresh_contexts(
+        &self,
+        session: &mut Session,
+        sender: &Option<mpsc::Sender<Event>>,
+    ) -> Result<()> {
+        let _block = EventBlock::start(sender)?;
+        self.refresh_contexts_inner(session, sender).await
     }
 
     /// Refreshes only contexts that need refreshing according to their needs_refresh() method.
