@@ -8,14 +8,15 @@ use crate::{
     Result, TenxError,
 };
 use colored::*;
-use textwrap::{wrap, Options};
+use textwrap::{indent, wrap, Options};
+
+const INDENT: &str = "  ";
 
 fn get_term_width() -> usize {
     termsize::get()
         .map(|size| size.cols as usize)
         .unwrap_or(120)
 }
-const INDENT: &str = "  ";
 
 fn format_usage(usage: &model::Usage) -> String {
     let values = usage.values();
@@ -53,7 +54,7 @@ fn print_context_specs(session: &Session) -> String {
     if !session.contexts().is_empty() {
         output.push_str(&format!("{}\n", "context:".blue().bold()));
         for context in session.contexts() {
-            output.push_str(&format!("{}- {}\n", INDENT, context.human().blue().bold()));
+            output.push_str(&format!("{}- {}\n", INDENT, context.human()));
         }
     }
     output
@@ -303,10 +304,17 @@ fn print_context_item(item: &context::ContextItem) -> String {
 pub fn print_session(config: &Config, session: &Session, full: bool) -> Result<String> {
     let width = get_term_width();
     let mut output = String::new();
-    output.push_str(&print_session_info(config, session));
-    output.push_str(&print_context_specs(session));
-    output.push_str(&print_editables(config, session)?);
-    output.push_str(&print_steps(config, session, full, width)?);
+    output.push_str(&format!("{}\n", "session:".blue().bold()));
+    output.push_str(&indent(
+        &format!(
+            "{}{}{}{}",
+            print_session_info(config, session),
+            print_context_specs(session),
+            print_editables(config, session)?,
+            print_steps(config, session, full, width - INDENT.len())?
+        ),
+        INDENT,
+    ));
     Ok(output)
 }
 

@@ -632,7 +632,8 @@ async fn main() -> anyhow::Result<()> {
                     .new_session_from_cwd(&Some(sender.clone()), *no_ctx)
                     .await?;
                 tx.save_session(&session)?;
-                println!("new session: {}", config.project_root().display());
+
+                println!("{}", pretty::print_session(&config, &session, false)?);
                 Ok(())
             }
             Commands::Fix {

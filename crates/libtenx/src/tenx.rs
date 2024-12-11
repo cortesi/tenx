@@ -66,6 +66,10 @@ impl Tenx {
         sender: &Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
         let _block = EventBlock::start(sender)?;
+        if session.contexts.is_empty() {
+            return Ok(());
+        }
+
         let _block = EventBlock::context(sender)?;
         for context in session.contexts.iter_mut() {
             let _refresh_block = EventBlock::context_refresh(sender, &context.human())?;
@@ -320,6 +324,16 @@ impl Tenx {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
+    use std::path::PathBuf;
+
+    use crate::patch::{Change, Patch, WriteFile};
+    use crate::session::ModelResponse;
+
+    use fs_err as fs;
+    use tempfile::tempdir;
+
     #[tokio::test]
     async fn test_new_session_with_no_context() {
         use crate::config::{Context, TextContext};
@@ -344,15 +358,6 @@ mod tests {
         let session = tenx.new_session_from_cwd(&None, false).await.unwrap();
         assert!(!session.contexts().is_empty());
     }
-    use super::*;
-
-    use crate::patch::{Change, Patch, WriteFile};
-    use crate::session::ModelResponse;
-
-    use fs_err as fs;
-    use std::path::PathBuf;
-
-    use tempfile::tempdir;
 
     #[tokio::test]
     async fn test_tenx_process_prompt() {

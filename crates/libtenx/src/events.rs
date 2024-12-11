@@ -111,7 +111,7 @@ impl Event {
     pub fn header_message(&self) -> Option<String> {
         match self {
             Event::ApplyPatch => Some("applying patch".to_string()),
-            Event::ContextStart => Some("context".to_string()),
+            Event::ContextStart => Some("preparing context".to_string()),
             Event::PreCheckStart => Some("pre check".to_string()),
             Event::PostCheckStart => Some("post check".to_string()),
             Event::PromptStart(n) => Some(format!("prompting {}", n)),
