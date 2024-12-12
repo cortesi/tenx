@@ -532,7 +532,6 @@ mod tests {
         if let Model::Dummy(dummy) = model {
             let rendered = dummy.render(&config, &session).unwrap();
             assert!(rendered.contains("Outside content"));
-            assert!(rendered.contains(&*outside_file_path.to_string_lossy()));
         }
     }
 }

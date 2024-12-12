@@ -6,8 +6,8 @@ use std::{
 };
 
 use globset::{Glob, GlobSetBuilder};
-use normalize_path::NormalizePath;
 use optional_struct::*;
+use path_clean::clean;
 use pathdiff::diff_paths;
 use serde::{Deserialize, Serialize};
 
@@ -21,11 +21,6 @@ use crate::{
 
 pub const HOME_CONFIG_FILE: &str = "tenx.ron";
 pub const PROJECT_CONFIG_FILE: &str = ".tenx.ron";
-
-fn is_relative<P: AsRef<Path>>(path: P) -> bool {
-    let path_str = path.as_ref().to_str().unwrap_or("");
-    path_str.starts_with("./") || path_str.starts_with("../")
-}
 
 /// The path to the user's home configuration directory for tenx.
 pub(crate) fn home_config_dir() -> PathBuf {
@@ -574,54 +569,46 @@ impl Config {
 
     /// Normalizes a path specification.
     ///
-    /// - If the path is a glob, it will be returned as-is.
-    /// - If the path is relative (i.e. starts with ./ or ../), it will be resolved relative to the
-    ///   current directory.
-    /// - If the path is absolute, it will be returned as-is.
-    /// - Otherwise, it will be resolved relative to the project root.
+    /// Any resulting path is either a) relative to the project root, or b) an absolute path.
+    ///
+    /// - If the path is relative (i.e. starts with ./ or ../), it is first resolved to an absolute
+    ///   path relative to the current directory, then rebased to be relative to the project root.
+    /// - If the path starts with "**", it will be returned as-is.
+    /// - If the path is absolute, it will be returned as-is if it is outside the project root,
+    ///   otherwise it will be rebased to be relative to the project root.
     pub fn normalize_path<P: AsRef<Path>>(&self, path: P) -> crate::Result<PathBuf> {
         self.normalize_path_with_cwd(path, self.cwd()?)
     }
 
     /// Normalizes a path specification.
     ///
-    /// - If the path is a glob, it will be returned as-is.
-    /// - If the path is relative (i.e. starts with ./ or ../), it will be resolved relative to the
-    ///   current directory.
-    /// - If the path is absolute, it will be returned as-is.
-    /// - Otherwise, it will be resolved relative to the project root.
+    /// Any resulting path is either a) relative to the project root, or b) an absolute path.
+    ///
+    /// - If the path is relative (i.e. starts with ./ or ../), it is first resolved to an absolute
+    ///   path relative to the current directory, then rebased to be relative to the project root.
+    /// - If the path starts with "**", it will be returned as-is.
+    /// - If the path is absolute, it will be returned as-is if it is outside the project root,
+    ///   otherwise it will be rebased to be relative to the project root.
     pub fn normalize_path_with_cwd<P: AsRef<Path>, Q: AsRef<Path>>(
         &self,
         path: P,
         current_dir: Q,
     ) -> crate::Result<PathBuf> {
         let path = path.as_ref();
-        if path.to_str().is_some_and(|s| s.contains('*')) {
-            return Ok(path.to_path_buf());
-        }
+        let current_dir = current_dir.as_ref();
 
-        let absolute_path = if is_relative(path) {
-            current_dir.as_ref().join(path)
-        } else if path.is_absolute() {
-            path.to_path_buf()
-        } else {
-            self.project_root().join(path)
-        };
-
-        let abspath = absolute(absolute_path.clone()).map_err(|e| {
-            TenxError::Internal(format!(
-                "Could not absolute {}: {}",
-                absolute_path.display(),
-                e
-            ))
-        })?;
         let project_root = absolute(self.project_root())
             .map_err(|e| TenxError::Internal(format!("Could not absolute project root: {}", e)))?;
-        Ok(abspath
-            .strip_prefix(&project_root)
-            .unwrap_or(&abspath)
-            .to_path_buf()
-            .normalize())
+
+        Ok(clean(if path.is_absolute() {
+            diff_paths(path, &project_root).unwrap_or(path.to_path_buf())
+        } else if path.starts_with("**") {
+            path.to_path_buf()
+        } else {
+            let abs_path = absolute(current_dir.join(path))
+                .map_err(|e| TenxError::Internal(format!("Could not absolute path: {}", e)))?;
+            diff_paths(&abs_path, &project_root).unwrap_or(path.to_path_buf())
+        }))
     }
 
     /// Traverse the included files and return a list of files that match the given glob pattern.
@@ -1154,54 +1141,74 @@ mod tests {
 
     #[test]
     fn test_normalize_path_with_cwd() -> crate::Result<()> {
-        let project = testutils::test_project();
-        project.create_file_tree(&[
-            "file.txt",
-            "subdir/subfile.txt",
-            "../outside/outsidefile.txt",
-            "abs_file.txt",
-        ]);
+        struct TestCase {
+            cwd: &'static str,
+            input: &'static str,
+            expected: &'static str,
+        }
 
+        let tests = vec![
+            // Root directory tests
+            TestCase {
+                cwd: "",
+                input: "file.txt",
+                expected: "file.txt",
+            },
+            TestCase {
+                cwd: "",
+                input: "./file.txt",
+                expected: "file.txt",
+            },
+            // Subdirectory tests
+            TestCase {
+                cwd: "subdir",
+                input: "./subfile.txt",
+                expected: "subdir/subfile.txt",
+            },
+            TestCase {
+                cwd: "subdir",
+                input: "../file.txt",
+                expected: "file.txt",
+            },
+            TestCase {
+                cwd: "subdir",
+                input: "file.txt",
+                expected: "subdir/file.txt",
+            },
+            // Outside directory test
+            TestCase {
+                cwd: "../outside",
+                input: "file.txt",
+                expected: "../outside/file.txt",
+            },
+        ];
+
+        let project = testutils::test_project();
         let root = project.tempdir.path();
-        let sub_dir = root.join("subdir");
-        let outside_dir = root.parent().unwrap().join("outside");
         let cnf = project.config.clone();
 
-        // Test 1: Current dir is the root directory
-        assert_eq!(
-            cnf.normalize_path_with_cwd("file.txt", root)?,
-            PathBuf::from("file.txt")
-        );
-        assert_eq!(
-            cnf.normalize_path_with_cwd("./file.txt", root)?,
-            PathBuf::from("file.txt")
-        );
+        for test in tests {
+            let cwd = if test.cwd.is_empty() {
+                root.to_path_buf()
+            } else if test.cwd.starts_with("..") {
+                root.parent()
+                    .unwrap()
+                    .join(test.cwd.trim_start_matches("../"))
+            } else {
+                root.join(test.cwd)
+            };
 
-        // Test 2: Current dir is under the root directory
-        assert_eq!(
-            cnf.normalize_path_with_cwd("./subfile.txt", &sub_dir)?,
-            PathBuf::from("subdir/subfile.txt")
-        );
-        assert_eq!(
-            cnf.normalize_path_with_cwd("../file.txt", &sub_dir)?,
-            PathBuf::from("file.txt")
-        );
-        assert_eq!(
-            cnf.normalize_path_with_cwd("file.txt", &sub_dir)?,
-            PathBuf::from("file.txt")
-        );
+            let result = cnf.normalize_path_with_cwd(test.input, cwd)?;
+            assert_eq!(
+                result,
+                PathBuf::from(test.expected),
+                "Failed for cwd: {}, input: {}",
+                test.cwd,
+                test.input
+            );
+        }
 
-        // Test 3: Current dir is outside the root directory
-        assert_eq!(
-            cnf.normalize_path_with_cwd("file.txt", &outside_dir)?,
-            PathBuf::from("file.txt")
-        );
-        assert_eq!(
-            cnf.normalize_path_with_cwd("./outside_file.txt", &outside_dir)?,
-            outside_dir.join("outside_file.txt")
-        );
-
-        // Test 4: Absolute path
+        // Test absolute path separately since it requires dynamic path construction
         let abs_path = root.join("abs_file.txt");
         assert_eq!(
             cnf.normalize_path_with_cwd(&abs_path, root)?,

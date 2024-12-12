@@ -40,6 +40,7 @@ optional_struct = "0.5.2"
 libruskel = "0.0.8"
 misanthropy = "0.0.7"
 termsize = "0.1.9"
+path-clean = "1.0.1"
 
 [dev-dependencies]
 indoc = "2.0.5"
