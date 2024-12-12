@@ -3,7 +3,10 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
 use super::ModelProvider;
-use crate::{config::Config, events::Event, session::ModelResponse, session::Session, Result};
+use crate::{
+    config::Config, dialect::DialectProvider, events::Event, session::ModelResponse,
+    session::Session, Result,
+};
 
 use std::collections::HashMap;
 
@@ -69,7 +72,25 @@ impl ModelProvider for DummyModel {
         Ok(resp)
     }
 
-    fn render(&self, _conf: &Config, _session: &Session) -> Result<String> {
-        Ok("Dummy model render".to_string())
+    fn render(&self, config: &Config, session: &Session) -> Result<String> {
+        let dialect = config.dialect()?;
+        let mut out = String::new();
+
+        // Add immutable context
+        out.push_str("=== Context ===\n");
+        out.push_str(&dialect.render_context(config, session)?);
+        out.push('\n');
+
+        // Add request context
+        for (i, step) in session.steps().iter().enumerate() {
+            out.push_str(&format!("=== Step {} ===\n", i));
+            out.push_str(&dialect.render_step_request(config, session, i)?);
+            if let Some(_response) = &step.model_response {
+                out.push_str(&dialect.render_step_response(config, session, i)?);
+            }
+            out.push('\n');
+        }
+
+        Ok(out)
     }
 }
