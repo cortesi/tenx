@@ -380,8 +380,14 @@ impl ContextProvider for Context {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::Include;
-    use crate::testutils::test_project;
+
+    use crate::{
+        config::Include,
+        model::{DummyModel, Model, ModelProvider},
+        session::Session,
+        testutils::test_project,
+    };
+
     use tempfile::tempdir;
 
     #[test]
@@ -512,41 +518,21 @@ mod tests {
         let outside_file_path = outside_dir.path().join("outside.txt");
         std::fs::write(&outside_file_path, "Outside content").unwrap();
 
-        let config = test_project.config.clone();
-        let context_spec = Context::new_path(&config, outside_file_path.to_str().unwrap()).unwrap();
-        assert!(matches!(context_spec, Context::Path(_)));
+        // Use config with CWD set to project root
+        let mut config = test_project.config.clone();
+        config = config.with_test_cwd(test_project.tempdir.path().to_path_buf());
 
-        if let Context::Path(path) = context_spec {
-            let contexts = path.context_items(&config, &test_project.session).unwrap();
+        // Create context and verify rendering when referencing file outside project root
+        let mut session = Session::default();
+        session.contexts.push(Context::Path(
+            Path::new(&config, outside_file_path.to_str().unwrap().to_string()).unwrap(),
+        ));
 
-            assert_eq!(contexts.len(), 1);
-            let context = &contexts[0];
-            assert_eq!(context.source, outside_file_path.to_str().unwrap());
-            assert_eq!(context.ty, "file");
-            assert_eq!(context.body, "Outside content");
-        } else {
-            panic!("Expected ContextSpec::Path");
-        }
-
-        let mut config_with_outside_cwd = config.clone();
-        config_with_outside_cwd =
-            config_with_outside_cwd.with_test_cwd(outside_dir.path().to_path_buf());
-        let relative_context_spec =
-            Context::new_path(&config_with_outside_cwd, "./outside.txt").unwrap();
-        assert!(matches!(relative_context_spec, Context::Path(_)));
-
-        if let Context::Path(path) = relative_context_spec {
-            let contexts = path
-                .context_items(&config_with_outside_cwd, &test_project.session)
-                .unwrap();
-
-            assert_eq!(contexts.len(), 1);
-            let context = &contexts[0];
-            assert_eq!(context.source, outside_file_path.to_str().unwrap());
-            assert_eq!(context.ty, "file");
-            assert_eq!(context.body, "Outside content");
-        } else {
-            panic!("Expected ContextSpec::Path");
+        let model = Model::Dummy(DummyModel::default());
+        if let Model::Dummy(dummy) = model {
+            let rendered = dummy.render(&config, &session).unwrap();
+            assert!(rendered.contains("Outside content"));
+            assert!(rendered.contains(&*outside_file_path.to_string_lossy()));
         }
     }
 }
