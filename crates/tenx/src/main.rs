@@ -74,7 +74,7 @@ struct Cli {
     logs: bool,
 
     /// Model to use (overrides default_model in config)
-    #[clap(long)]
+    #[clap(long, env = "TENX_MODEL")]
     model: Option<String>,
 
     /// Session storage directory (~/.config/tenx/state by default)
