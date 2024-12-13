@@ -138,6 +138,8 @@ enum ContextCommands {
         /// Items to add to context
         items: Vec<String>,
     },
+    /// Refresh all contexts in the current session
+    Refresh,
     /// Add files to context
     File {
         /// Items to add to context
@@ -276,8 +278,6 @@ enum Commands {
         #[clap(long)]
         prompt_file: Option<PathBuf>,
     },
-    /// Refresh all contexts in the current session
-    Refresh,
     /// Reset the session to a specific step, undoing changes
     Reset {
         /// The step offset to reset to
@@ -324,9 +324,9 @@ fn load_config(cli: &Cli) -> Result<config::Config> {
         ($config:expr, $($field:ident).+, $value:expr) => {
             if let Some(val) = $value {
                 $config.$($field).+ = val;
+                    }
+                }
             }
-        };
-    }
 
     // Apply CLI arguments
     config = config.load_env();
@@ -566,6 +566,12 @@ async fn main() -> anyhow::Result<()> {
                             session.add_context(Context::new_ruskel(item));
                         }
                     }
+                    ContextCommands::Refresh => {
+                        tx.refresh_contexts(&mut session, &Some(sender.clone()))
+                            .await?;
+                        tx.save_session(&session)?;
+                        println!("Contexts refreshed.");
+                    }
                     ContextCommands::File { items } => {
                         for item in items {
                             session.add_context(Context::new_path(&config, item)?);
@@ -689,13 +695,6 @@ async fn main() -> anyhow::Result<()> {
                         other => Err(other.into()),
                     },
                 }
-            }
-            Commands::Refresh => {
-                let mut session = tx.load_session()?;
-                tx.refresh_contexts(&mut session, &Some(sender.clone()))
-                    .await?;
-                tx.save_session(&session)?;
-                Ok(())
             }
         },
         None => {
