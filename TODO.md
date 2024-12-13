@@ -12,11 +12,13 @@ Model response robustness:
 
 Bugs:
     
+    - --no-check flag seems not to work
+    - check order needs to be maintained
     - retry doesn't work with fix
     - retry doesn't work if the previous step had an error
 
 Features:
-
+    
     - reset --all to completely roll back a session
     - readonly: set a local file to be read-only
     - env variable to control default model
