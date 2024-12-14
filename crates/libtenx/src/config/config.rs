@@ -831,23 +831,35 @@ impl Config {
     }
 
     /// Return all configured checks, even if disabled. Custom checks with the same name as builtin
-    /// checks replace the builtin checks.
+    /// checks replace the builtin checks. Order is preserved, with custom checks appearing in their
+    /// original position if they override a builtin check.
     pub fn all_checks(&self) -> Vec<Check> {
-        let builtin = self
-            .checks
-            .builtin
-            .iter()
-            .map(|c| (c.name.clone(), c.to_check()));
-        let custom = self
+        let custom_map: HashMap<_, _> = self
             .checks
             .custom
             .iter()
-            .map(|c| (c.name.clone(), c.to_check()));
+            .map(|c| (c.name.clone(), c))
+            .collect();
 
-        let mut check_map: HashMap<String, Check> = builtin.collect();
-        check_map.extend(custom);
+        let mut checks = Vec::new();
 
-        check_map.into_values().collect()
+        // First add all builtin checks, replacing with custom if they exist
+        for check in &self.checks.builtin {
+            if let Some(custom) = custom_map.get(&check.name) {
+                checks.push(custom.to_check());
+            } else {
+                checks.push(check.to_check());
+            }
+        }
+
+        // Then add any remaining custom checks that didn't override builtins
+        for check in &self.checks.custom {
+            if !self.checks.builtin.iter().any(|b| b.name == check.name) {
+                checks.push(check.to_check());
+            }
+        }
+
+        checks
     }
 
     /// Get a check by name
