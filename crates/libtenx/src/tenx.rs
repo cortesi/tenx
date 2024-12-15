@@ -1,7 +1,9 @@
+use std::path::PathBuf;
 use tokio::sync::mpsc;
 use tracing::{debug, warn};
 
 use crate::{
+    checks::Mode,
     config::Config,
     context::{Context, ContextProvider},
     events::{send_event, Event, EventBlock},
@@ -186,9 +188,54 @@ impl Tenx {
         self.save_session(session)
     }
 
-    pub fn check(&self, session: &mut Session, sender: &Option<mpsc::Sender<Event>>) -> Result<()> {
+    pub fn check(
+        &self,
+        session: Option<&Session>,
+        sender: &Option<mpsc::Sender<Event>>,
+    ) -> Result<()> {
         let _block = EventBlock::start(sender)?;
-        self.run_pre_checks(session, sender)
+        self.run_checks(session, Mode::Both, sender)
+    }
+
+    /// Run checks based on an optional session and an optional mode filter.
+    fn run_checks(
+        &self,
+        session: Option<&Session>,
+        mode_filter: Mode,
+        sender: &Option<mpsc::Sender<Event>>,
+    ) -> Result<()> {
+        let paths = if let Some(session) = session {
+            if session.editable().is_empty() {
+                self.config.project_files()?
+            } else {
+                session.editable().to_vec()
+            }
+        } else {
+            self.config.project_files()?
+        };
+
+        self.check_paths(
+            &paths.iter().map(PathBuf::from).collect(),
+            mode_filter,
+            sender,
+        )
+    }
+
+    /// Run checks on a given set of paths with a mode filter.
+    fn check_paths(
+        &self,
+        paths: &Vec<PathBuf>,
+        mode_filter: Mode,
+        sender: &Option<mpsc::Sender<Event>>,
+    ) -> Result<()> {
+        for c in self.config.enabled_checks() {
+            let is_mode_match = c.mode == mode_filter || c.mode == Mode::Both;
+            if is_mode_match && c.is_relevant(paths)? {
+                let _check_block = EventBlock::validator(sender, &c.name)?;
+                c.check(&self.config)?;
+            }
+        }
+        Ok(())
     }
 
     /// Common logic for processing a prompt and updating the state. The prompt that will be
@@ -298,24 +345,7 @@ impl Tenx {
         session: &mut Session,
         sender: &Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
-        if self.config.checks.no_pre {
-            return Ok(());
-        }
-
-        let paths = if session.editable().is_empty() {
-            self.config.project_files()?
-        } else {
-            session.editable().to_vec()
-        };
-
-        let _block = EventBlock::pre_check(sender)?;
-        for c in self.config.enabled_checks() {
-            if c.mode.is_pre() && c.is_relevant(&paths)? {
-                let _check_block = EventBlock::validator(sender, &c.name)?;
-                c.check(&self.config)?;
-            }
-        }
-        Ok(())
+        self.run_checks(Some(session), Mode::Pre, sender)
     }
 
     fn run_post_checks(
@@ -323,22 +353,13 @@ impl Tenx {
         session: &mut Session,
         sender: &Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
-        let paths = if session.editable().is_empty() {
-            self.config.project_files()?
-        } else {
-            session.editable().to_vec()
-        };
-
-        if let Some(last_step) = session.steps().last() {
-            if last_step.model_response.is_some() {
-                let _block = EventBlock::post_patch(sender)?;
-                for c in self.config.enabled_checks() {
-                    if c.mode.is_post() && c.is_relevant(&paths)? {
-                        let _check_block = EventBlock::validator(sender, &c.name)?;
-                        c.check(&self.config)?;
-                    }
-                }
-            }
+        if session
+            .steps()
+            .last()
+            .and_then(|s| s.model_response.as_ref())
+            .is_some()
+        {
+            self.run_checks(Some(session), Mode::Post, sender)?
         }
         Ok(())
     }

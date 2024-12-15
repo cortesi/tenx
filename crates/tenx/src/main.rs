@@ -683,7 +683,7 @@ async fn main() -> anyhow::Result<()> {
                 if let Some(files) = files {
                     add_files_to_session(&mut session, &config, files)?;
                 }
-                match tx.check(&mut session, &Some(sender.clone())) {
+                match tx.check(Some(&session), &Some(sender.clone())) {
                     Ok(_) => Ok(()),
                     Err(e) => match e {
                         libtenx::TenxError::Check { name, user, model } => Err(anyhow!(

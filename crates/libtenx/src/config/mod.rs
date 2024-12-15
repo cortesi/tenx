@@ -1,7 +1,7 @@
 //! Tenx configuration structure, plus serialization and deserialization from the standard config
 //! format.
 #[allow(clippy::module_inception)]
-mod config;
+pub mod config;
 mod defaults;
 
 pub use config::{
