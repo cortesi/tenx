@@ -188,30 +188,22 @@ impl Tenx {
         self.save_session(session)
     }
 
-    pub fn check(
-        &self,
-        session: Option<&Session>,
-        sender: &Option<mpsc::Sender<Event>>,
-    ) -> Result<()> {
+    pub fn check(&self, paths: Vec<PathBuf>, sender: &Option<mpsc::Sender<Event>>) -> Result<()> {
         let _block = EventBlock::start(sender)?;
-        self.run_checks(session, Mode::Both, sender)
+        self.check_paths(&paths, Mode::Both, sender)
     }
 
     /// Run checks based on an optional session and an optional mode filter.
     fn run_checks(
         &self,
-        session: Option<&Session>,
+        session: &Session,
         mode_filter: Mode,
         sender: &Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
-        let paths = if let Some(session) = session {
-            if session.editable().is_empty() {
-                self.config.project_files()?
-            } else {
-                session.editable().to_vec()
-            }
-        } else {
+        let paths = if session.editable().is_empty() {
             self.config.project_files()?
+        } else {
+            session.editable().to_vec()
         };
 
         self.check_paths(
@@ -345,7 +337,7 @@ impl Tenx {
         session: &mut Session,
         sender: &Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
-        self.run_checks(Some(session), Mode::Pre, sender)
+        self.run_checks(session, Mode::Pre, sender)
     }
 
     fn run_post_checks(
@@ -359,7 +351,7 @@ impl Tenx {
             .and_then(|s| s.model_response.as_ref())
             .is_some()
         {
-            self.run_checks(Some(session), Mode::Post, sender)?
+            self.run_checks(session, Mode::Post, sender)?
         }
         Ok(())
     }

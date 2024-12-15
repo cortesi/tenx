@@ -172,9 +172,9 @@ enum DialectCommands {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Run check suite on the current session
+    /// Run check suite all project files, or a subet
     Check {
-        /// Specifies files to edit
+        /// Files to check, glob patterns accepted
         #[clap(value_parser)]
         files: Option<Vec<String>>,
     },
@@ -188,7 +188,7 @@ enum Commands {
     Clear,
     /// Make an AI-assisted change using the current session
     Code {
-        /// Specifies files to edit
+        /// Specifies files to edit, glob patterns accepted
         #[clap(value_parser)]
         files: Option<Vec<String>>,
         /// User prompt for the edit operation
@@ -219,7 +219,7 @@ enum Commands {
     },
     /// Add editable files to a session
     Edit {
-        /// Specifies files to edit
+        /// Specifies files to edit, glob patterns accepted
         #[clap(value_parser)]
         files: Vec<String>,
     },
@@ -245,7 +245,7 @@ enum Commands {
         /// Edit the prompt before fixing
         #[clap(long)]
         edit: bool,
-        /// Specifies files to edit
+        /// Specifies files to edit, glob patterns accepted
         #[clap(value_parser)]
         files: Option<Vec<String>>,
     },
@@ -265,7 +265,7 @@ enum Commands {
     Project,
     /// Start a new session, edit the prompt, and run it
     Quick {
-        /// Specifies files to edit
+        /// Specifies files to edit, glob patterns accepted
         #[clap(value_parser)]
         files: Vec<String>,
         /// Skip adding default context to new session
@@ -283,7 +283,6 @@ enum Commands {
         /// The step offset to reset to
         step_offset: usize,
     },
-    /// Retry a prompt
     /// Retry a prompt
     Retry {
         /// The step offset to retry from
@@ -679,11 +678,17 @@ async fn main() -> anyhow::Result<()> {
                 Ok(())
             }
             Commands::Check { files } => {
-                let mut session = tx.load_session()?;
-                if let Some(files) = files {
-                    add_files_to_session(&mut session, &config, files)?;
-                }
-                match tx.check(Some(&session), &Some(sender.clone())) {
+                let paths = if let Some(files) = files {
+                    let mut matched = Vec::new();
+                    for pattern in files {
+                        let glob_matches = config.match_files_with_glob(pattern)?;
+                        matched.extend(glob_matches);
+                    }
+                    matched
+                } else {
+                    config.project_files()?
+                };
+                match tx.check(paths, &Some(sender.clone())) {
                     Ok(_) => Ok(()),
                     Err(e) => match e {
                         libtenx::TenxError::Check { name, user, model } => Err(anyhow!(
