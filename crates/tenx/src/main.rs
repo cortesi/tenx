@@ -205,7 +205,7 @@ enum Commands {
         #[clap(long)]
         defaults: bool,
     },
-    /// Add items to context (alias: ctx)
+    /// Context commands (alias: ctx)
     #[clap(alias = "ctx")]
     Context {
         #[clap(subcommand)]

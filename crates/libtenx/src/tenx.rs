@@ -301,11 +301,18 @@ impl Tenx {
         if self.config.checks.no_pre {
             return Ok(());
         }
+
+        let paths = if session.editable().is_empty() {
+            self.config.project_files()?
+        } else {
+            session.editable().to_vec()
+        };
+
         let _block = EventBlock::pre_check(sender)?;
         for c in self.config.enabled_checks() {
-            if c.mode.is_pre() && c.is_relevant(&self.config, session)? {
+            if c.mode.is_pre() && c.is_relevant(&paths)? {
                 let _check_block = EventBlock::validator(sender, &c.name)?;
-                c.check(&self.config, session)?;
+                c.check(&self.config)?;
             }
         }
         Ok(())
@@ -316,13 +323,19 @@ impl Tenx {
         session: &mut Session,
         sender: &Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
+        let paths = if session.editable().is_empty() {
+            self.config.project_files()?
+        } else {
+            session.editable().to_vec()
+        };
+
         if let Some(last_step) = session.steps().last() {
             if last_step.model_response.is_some() {
                 let _block = EventBlock::post_patch(sender)?;
                 for c in self.config.enabled_checks() {
-                    if c.mode.is_post() && c.is_relevant(&self.config, session)? {
+                    if c.mode.is_post() && c.is_relevant(&paths)? {
                         let _check_block = EventBlock::validator(sender, &c.name)?;
-                        c.check(&self.config, session)?;
+                        c.check(&self.config)?;
                     }
                 }
             }

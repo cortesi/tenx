@@ -1,6 +1,7 @@
+use std::path::PathBuf;
 use std::process::Command;
 
-use crate::{config::Config, session::Session, Result, TenxError};
+use crate::{config::Config, Result, TenxError};
 
 pub enum Runnable {
     Ok,
@@ -52,7 +53,7 @@ pub struct Check {
 }
 
 impl Check {
-    pub fn check(&self, config: &Config, _state: &Session) -> Result<()> {
+    pub fn check(&self, config: &Config) -> Result<()> {
         let output = Command::new("sh")
             .arg("-c")
             .arg(&self.command)
@@ -88,15 +89,8 @@ impl Check {
         Ok(false)
     }
 
-    /// Is a check relevant based on its glob patterns and the files to check? If the session has
-    /// editables, those are used, otherwise falls back to all included files from config.
-    pub fn is_relevant(&self, config: &Config, state: &Session) -> Result<bool> {
-        let paths = if state.editable().is_empty() {
-            config.project_files()?
-        } else {
-            state.editable().to_vec()
-        };
-
+    /// Is a check relevant based on its glob patterns and the files to check?
+    pub fn is_relevant(&self, paths: &Vec<PathBuf>) -> Result<bool> {
         for path in paths {
             let path_str = path.to_str().unwrap_or_default();
             if self.match_globs(path_str, &self.globs)? {
@@ -142,19 +136,6 @@ mod tests {
         assert!(!check.match_globs("README.md", &patterns).unwrap());
     }
 
-    fn setup_test_session(paths: &[&str]) -> (Config, Session) {
-        let config = test_config();
-        let editables: Vec<_> = paths.iter().map(std::path::PathBuf::from).collect();
-        // Access the private field through serde
-        let session: Session = serde_json::from_str(&format!(
-            r#"{{"editable":{:?},"steps":[],"contexts":[]}}"#,
-            editables
-        ))
-        .expect("Failed to create test session");
-        eprintln!("Created session with editables: {:?}", session.editable());
-        (config, session)
-    }
-
     #[test]
     fn test_shell_success() {
         let shell = Check {
@@ -166,8 +147,8 @@ mod tests {
             mode: Mode::Both,
         };
 
-        let (config, session) = setup_test_session(&[]);
-        let result = shell.check(&config, &session);
+        let config = test_config();
+        let result = shell.check(&config);
         assert!(result.is_ok());
     }
 
@@ -182,8 +163,8 @@ mod tests {
             mode: super::Mode::Both,
         };
 
-        let (config, session) = setup_test_session(&[]);
-        let result = shell.check(&config, &session);
+        let config = test_config();
+        let result = shell.check(&config);
         assert!(result.is_err());
 
         match result {
