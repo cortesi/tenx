@@ -1,5 +1,5 @@
 [![Crates.io](https://img.shields.io/crates/v/tenx.svg)](https://crates.io/crates/tenx)
-[![Docs](https://docs.rs/tenx/badge.svg)](https://docs.rs/libtenx)
+[![Docs](https://img.shields.io/docsrs/libtenx)](https://docs.rs/libtenx)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
 # Tenx
