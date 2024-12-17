@@ -13,6 +13,9 @@ cargo install tenx
 
 📘 [Tenx Manual](https://cortesi.github.io/tenx-manual/overview.html)
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/cortesi/tenx/master/.assets/quickstart_quick.gif">
+</p>
 
 ## Features
 
