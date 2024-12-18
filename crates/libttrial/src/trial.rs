@@ -139,8 +139,8 @@ impl Trial {
         let mut conf = self.tenx_conf.clone();
         conf.session_store_dir = PathBuf::from("");
         conf.project.root = temp_dir.path().join("project");
-
         conf.models.default = model.to_string();
+        conf = conf.with_cwd(temp_dir.path().to_path_buf());
 
         let _model = conf.active_model()?;
         let tenx = Tenx::new(conf);

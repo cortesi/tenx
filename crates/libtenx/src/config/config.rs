@@ -508,7 +508,7 @@ pub struct Config {
     /// The current working directory when testing. We need this, because we can't change the CWD
     /// reliably in tests for reasons of concurrency.
     #[serde(skip)]
-    pub(crate) test_cwd: Option<String>,
+    pub(crate) cwd: Option<PathBuf>,
 }
 
 impl Config {
@@ -534,7 +534,7 @@ impl Config {
     }
 
     pub fn cwd(&self) -> crate::Result<PathBuf> {
-        if let Some(test_cwd) = &self.test_cwd {
+        if let Some(test_cwd) = &self.cwd {
             Ok(PathBuf::from(test_cwd))
         } else {
             env::current_dir()
@@ -542,8 +542,9 @@ impl Config {
         }
     }
 
-    pub fn with_test_cwd(mut self, path: PathBuf) -> Self {
-        self.test_cwd = Some(path.to_string_lossy().into_owned());
+    /// Sets the current working directory, so we don't consult the environment
+    pub fn with_cwd(mut self, path: PathBuf) -> Self {
+        self.cwd = Some(path);
         self
     }
 

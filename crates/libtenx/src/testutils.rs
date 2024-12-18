@@ -37,7 +37,7 @@ pub fn test_project() -> TestProject {
 
     let config = Config::default()
         .with_root(&tempdir_path)
-        .with_test_cwd(tempdir_path);
+        .with_cwd(tempdir_path);
 
     let session = Session::default();
 
@@ -69,7 +69,7 @@ impl TestProject {
     /// * `path` - A path (relative to the temporary directory) to set as the new working directory.
     pub fn set_cwd<P: AsRef<Path>>(&mut self, path: P) {
         let new_cwd = self.tempdir.path().join(path);
-        self.config = std::mem::take(&mut self.config).with_test_cwd(new_cwd);
+        self.config = std::mem::take(&mut self.config).with_cwd(new_cwd);
     }
 
     /// Writes content to a file in the mock project's temporary directory.

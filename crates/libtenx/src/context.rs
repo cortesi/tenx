@@ -492,7 +492,7 @@ mod tests {
         }
 
         let mut config_in_src = test_project.config.clone();
-        config_in_src = config_in_src.with_test_cwd(test_project.tempdir.path().join("src"));
+        config_in_src = config_in_src.with_cwd(test_project.tempdir.path().join("src"));
         let context_spec = Context::new_path(&config_in_src, "./lib.rs").unwrap();
         assert!(matches!(context_spec, Context::Path(_)));
 
@@ -520,7 +520,7 @@ mod tests {
 
         // Use config with CWD set to project root
         let mut config = test_project.config.clone();
-        config = config.with_test_cwd(test_project.tempdir.path().to_path_buf());
+        config = config.with_cwd(test_project.tempdir.path().to_path_buf());
 
         // Create context and verify rendering when referencing file outside project root
         let mut session = Session::default();
