@@ -1,4 +1,6 @@
 UX:
+    
+    - arguments to tenx edit should be mandatory
 
 
 Model response robustness:
@@ -13,7 +15,6 @@ Model response robustness:
 Bugs:
     
     - --no-check flag seems not to work
-    - check order needs to be maintained
     - retry doesn't work with fix
     - retry doesn't work if the previous step had an error
 

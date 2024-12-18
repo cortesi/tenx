@@ -48,7 +48,7 @@ pub enum StepType {
 }
 
 /// A single step in the session - basically a prompt and a patch.
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Step {
     /// The name of the model used for this step
     pub model: String,
@@ -103,19 +103,16 @@ impl Step {
     }
 }
 
-/// Determines if a given string is a glob pattern or a rooted path.
-///
-/// Returns false if the string starts with "./", indicating a rooted path.
-/// Returns true otherwise, suggesting it might be a glob pattern.
+/// Determines if a given string is a glob pattern or a path.
 fn is_glob(s: &str) -> bool {
-    !s.starts_with("./")
+    s.contains('*') || s.contains('?')
 }
 
 /// A serializable session, which persists between invocations.
-#[derive(Debug, Deserialize, Serialize, Default)]
+#[derive(Debug, Deserialize, Serialize, Default, Clone)]
 pub struct Session {
+    editable: Vec<PathBuf>,
     pub steps: Vec<Step>,
-    pub editable: Vec<PathBuf>,
     pub contexts: Vec<context::Context>,
 }
 
@@ -163,18 +160,23 @@ impl Session {
         &self.contexts
     }
 
-    /// Returns the relative paths of the editables for this session.
-    pub fn editable(&self) -> &Vec<PathBuf> {
-        &self.editable
+    /// Returns the relative paths of the editables for this session in sorted order.
+    pub fn editables(&self) -> Vec<PathBuf> {
+        let mut paths = self.editable.clone();
+        paths.sort();
+        paths
     }
 
-    /// Returns the absolute paths of the editables for this session.
+    /// Returns the absolute paths of the editables for this session in sorted order.
     pub fn abs_editables(&self, config: &config::Config) -> Result<Vec<PathBuf>> {
-        self.editable
+        let mut paths: Vec<PathBuf> = self
+            .editable
             .clone()
             .iter()
             .map(|p| config.abspath(p))
-            .collect()
+            .collect::<Result<Vec<PathBuf>>>()?;
+        paths.sort();
+        Ok(paths)
     }
 
     /// Does this session have a pending prompt?
@@ -376,6 +378,63 @@ mod tests {
         context::ContextProvider,
         patch::{Change, Patch, WriteFile},
     };
+
+    #[test]
+    fn test_add_editable() -> Result<()> {
+        let test_project = crate::testutils::test_project();
+        test_project.create_file_tree(&["foo.txt", "dir_a/bar.txt", "dir_b/baz.txt"]);
+
+        struct TestCase {
+            name: &'static str,
+            cwd: &'static str,
+            editable: &'static str,
+            expected: Vec<PathBuf>,
+        }
+
+        let mut tests = vec![
+            TestCase {
+                name: "simple file path",
+                cwd: "",
+                editable: "./foo.txt",
+                expected: vec![PathBuf::from("foo.txt")],
+            },
+            TestCase {
+                name: "relative path to subdirectory",
+                cwd: "dir_a",
+                editable: "./bar.txt",
+                expected: vec![PathBuf::from("dir_a/bar.txt")],
+            },
+            TestCase {
+                name: "relative path between directories",
+                cwd: "dir_a",
+                editable: "../dir_b/baz.txt",
+                expected: vec![PathBuf::from("dir_b/baz.txt")],
+            },
+            TestCase {
+                name: "relative path to parent directory",
+                cwd: "dir_a",
+                editable: "../foo.txt",
+                expected: vec![PathBuf::from("foo.txt")],
+            },
+            TestCase {
+                name: "simple file glob",
+                cwd: "",
+                editable: "foo.*",
+                expected: vec![PathBuf::from("foo.txt")],
+            },
+        ];
+        tests.reverse();
+
+        for t in tests.iter() {
+            let mut sess = test_project.session.clone();
+            let cwd = test_project.tempdir.path().join(t.cwd);
+            let config = test_project.config.clone().with_cwd(cwd);
+            sess.add_editable(&config, t.editable)?;
+            assert_eq!(sess.editables(), t.expected, "test case: {}", t.name);
+        }
+
+        Ok(())
+    }
 
     #[test]
     fn test_add_context_ignores_duplicates() {

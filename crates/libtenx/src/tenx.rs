@@ -200,10 +200,10 @@ impl Tenx {
         mode_filter: Mode,
         sender: &Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
-        let paths = if session.editable().is_empty() {
+        let paths = if session.editables().is_empty() {
             self.config.project_files()?
         } else {
-            session.editable().to_vec()
+            session.editables().to_vec()
         };
 
         self.check_paths(

@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use crate::{config::Config, session::Session};
+use crate::{config, session::Session};
 use fs_err as fs;
 use std::path::Path;
 use tempfile::{tempdir, TempDir};
@@ -20,7 +20,7 @@ pub fn create_file_tree(dir: &Path, paths: &[&str]) -> std::io::Result<()> {
 /// A structure representing a mock project for testing purposes.
 pub struct TestProject {
     /// The configuration for the mock project.
-    pub config: Config,
+    pub config: config::Config,
     /// The session associated with the mock project.
     pub session: Session,
     /// A temporary directory for the mock project.
@@ -35,14 +35,18 @@ pub fn test_project() -> TestProject {
     let tempdir = tempdir().unwrap();
     let tempdir_path = tempdir.path().to_path_buf();
 
-    let config = Config::default()
+    let mut cnf = config::Config::default()
         .with_root(&tempdir_path)
         .with_cwd(tempdir_path);
+
+    cnf.project
+        .include
+        .push(config::Include::Glob("**".to_string()));
 
     let session = Session::default();
 
     TestProject {
-        config,
+        config: cnf,
         session,
         tempdir,
     }
