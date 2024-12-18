@@ -8,17 +8,8 @@ pub enum TenxError {
     #[error("config error: {0}")]
     Config(String),
 
-    #[error("Failed to render query: {0}")]
-    Render(String),
-
     #[error("Io error: {0}")]
     Io(String),
-
-    #[error("No paths provided")]
-    NoPathsProvided,
-
-    #[error("Workspace error: {0}")]
-    Workspace(String),
 
     #[error("Model error: {0}")]
     Model(String),
@@ -31,10 +22,7 @@ pub enum TenxError {
         model: String,
     },
 
-    #[error("Error applying change: {0}")]
-    Change(String),
-
-    #[error("Resolution error: {0}")]
+    #[error("Error resolving context: {0}")]
     Resolve(String),
 
     #[error("{0}")]
