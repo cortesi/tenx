@@ -14,6 +14,9 @@ pub enum TenxError {
     #[error("Model error: {0}")]
     Model(String),
 
+    #[error("{msg}: {path}")]
+    NotFound { msg: String, path: String },
+
     #[error("Error parsing response from model: {user}")]
     ResponseParse {
         /// A friendly error message for the user

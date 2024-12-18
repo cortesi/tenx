@@ -248,6 +248,13 @@ impl Session {
         path: P,
     ) -> Result<usize> {
         let normalized_path = config.normalize_path(path)?;
+        if !config.project_files()?.contains(&normalized_path) {
+            return Err(TenxError::NotFound {
+                msg: "Path not included in project".to_string(),
+                path: normalized_path.display().to_string(),
+            });
+        }
+
         if !self.editable.contains(&normalized_path) {
             self.editable.push(normalized_path);
             Ok(1)
