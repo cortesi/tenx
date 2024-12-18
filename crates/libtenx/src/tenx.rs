@@ -337,7 +337,11 @@ impl Tenx {
         session: &mut Session,
         sender: &Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
-        self.run_checks(session, Mode::Pre, sender)
+        if !self.config.checks.no_pre {
+            self.run_checks(session, Mode::Pre, sender)
+        } else {
+            Ok(())
+        }
     }
 
     fn run_post_checks(
