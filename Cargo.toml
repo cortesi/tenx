@@ -1,5 +1,5 @@
 [workspace.package]
-version = "0.0.3"
+version = "0.0.4"
 edition = "2021"
 authors = ["Aldo Cortesi <aldo@corte.si>"]
 description = "An AI-assisted coding tool"
@@ -13,5 +13,5 @@ resolver = "2"
 members = ["crates/*"]
 
 [workspace.dependencies]
-libtenx = { version = "0.0.3", path = "crates/libtenx" }
+libtenx = { version = "0.0.4", path = "crates/libtenx" }
 libruskel = { version = "0.0.9" }

@@ -41,7 +41,6 @@ The first relese of tenx is a minimal viable product. The next steps are:
 
 - Improved sessions and session management
 - System prompt customization
-- More models (Gemini)
 - Git commit dialect to generate commit messages
 - Imrovements to our prompts and dialects, driven by benchmarks
 - Neovim plugin based on libtenx

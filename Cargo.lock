@@ -3057,7 +3057,7 @@ dependencies = [
 
 [[package]]
 name = "libtenx"
-version = "0.0.3"
+version = "0.0.4"
 dependencies = [
  "async-openai",
  "async-trait",
@@ -3099,7 +3099,7 @@ dependencies = [
 
 [[package]]
 name = "libttrial"
-version = "0.0.3"
+version = "0.0.4"
 dependencies = [
  "fs_extra",
  "glob",
@@ -4697,7 +4697,7 @@ dependencies = [
 
 [[package]]
 name = "tenx"
-version = "0.0.3"
+version = "0.0.4"
 dependencies = [
  "anyhow",
  "clap",
@@ -5120,7 +5120,7 @@ checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 
 [[package]]
 name = "ttrial"
-version = "0.0.3"
+version = "0.0.4"
 dependencies = [
  "anyhow",
  "clap",
