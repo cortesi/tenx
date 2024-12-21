@@ -31,3 +31,4 @@ Features:
     - git diff context
     - graceful error handling for contexts, e.g. unfetchable urls
     - configurable modes with pre-defined models and contexts
+    - deal with rate limits gracefully

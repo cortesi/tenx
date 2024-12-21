@@ -1,6 +1,8 @@
 #!/bin/sh
 
 cargo run --release --bin ttrial --  \
+    --output logs \
+    -vvvv \
     run -n 3 \
     --resume \
     --save ./tmp/trial1 \
@@ -16,7 +18,7 @@ cargo run --release --bin ttrial --  \
     --model o1-mini \
     --model llama33-70b \
     --model o1 \
-    --model gemini-flash-exp \
+    --model groq-llama33-70b \
     "*" 
 
 
