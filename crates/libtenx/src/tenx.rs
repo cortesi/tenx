@@ -422,8 +422,8 @@ mod tests {
         config.retry_limit = 1;
         config
             .project
-            .include
-            .push(crate::config::Include::Glob("**".to_string()));
+            .globs
+            .push("**".to_string());
 
         let tenx = Tenx::new(config.clone());
         let test_file_path = temp_dir.path().join("test.txt");

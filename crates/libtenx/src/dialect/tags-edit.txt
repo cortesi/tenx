@@ -23,6 +23,8 @@ You can request multiple files to edit by placing each file on a sperate line:
 The user will respond in the next turn with the full contents of the file in an
 <editable> tag. 
 
+- The paths in the <edit> tag must exactly match the paths in the <project_map>
+  tag.
 - You must request to edit a file if it is not already provided in an
   <editable> tag and you need to change  or view its contents. 
 - If no <editable> files are provided you should always request files to view

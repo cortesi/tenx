@@ -1,11 +1,10 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     env, fs,
     path::{absolute, Path, PathBuf},
-    process::Command,
 };
 
-use globset::{Glob, GlobSetBuilder};
+use globset::Glob;
 use optional_struct::*;
 use path_clean::clean;
 use pathdiff::diff_paths;
@@ -13,6 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use ron;
 
+use super::files;
 use crate::{
     checks::{Check, Mode},
     config::default_config,
@@ -28,31 +28,6 @@ pub(crate) fn home_config_dir() -> PathBuf {
         .expect("Failed to get home directory")
         .join(".config")
         .join("tenx")
-}
-
-/// Recursively walk a directory and collect files that match a glob pattern.
-/// Returns paths relative to the root directory.
-fn walk_directory(
-    root: &Path,
-    current_dir: &Path,
-    globset: &globset::GlobSet,
-    files: &mut Vec<PathBuf>,
-) -> crate::Result<()> {
-    for entry in fs::read_dir(current_dir).map_err(|e| TenxError::Io(e.to_string()))? {
-        let entry = entry.map_err(|e| TenxError::Io(e.to_string()))?;
-        let path = entry.path();
-        if path.is_dir() {
-            walk_directory(root, &path, globset, files)?;
-        } else {
-            let relative_path = path
-                .strip_prefix(root)
-                .map_err(|e| TenxError::Internal(format!("Path not under root: {}", e)))?;
-            if globset.is_match(relative_path) {
-                files.push(relative_path.to_path_buf());
-            }
-        }
-    }
-    Ok(())
 }
 
 /// Deserialize a RON string into a ConfigFile.
@@ -386,24 +361,6 @@ pub struct Tags {
     pub udiff: bool,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Default)]
-#[serde(rename_all = "snake_case")]
-/// Specifies which files to include in the project.
-pub enum Include {
-    #[default]
-    Git,
-    Glob(String),
-}
-
-impl std::fmt::Display for Include {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Include::Git => write!(f, "git"),
-            Include::Glob(pattern) => write!(f, "glob: {}", pattern),
-        }
-    }
-}
-
 /// Project configuration.
 #[optional_struct]
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -412,12 +369,10 @@ pub struct Project {
     /// Project root configuration.
     pub root: PathBuf,
 
-    /// File inclusion rules - files matching any rule are included
+    /// Glob patterns for file inclusion/exclusion. Patterns prefixed with "!" exclude matches.
+    /// For example: ["*.rs", "!test_*.rs"] includes all Rust files except test files.
     #[serde(default)]
-    pub include: Vec<Include>,
-
-    /// Glob patterns to exclude from the file list
-    pub exclude: Vec<String>,
+    pub globs: Vec<String>,
 }
 
 #[optional_struct]
@@ -718,73 +673,8 @@ impl Config {
         Ok(matched_files)
     }
 
-    fn get_git_files(&self) -> crate::Result<Vec<PathBuf>> {
-        let project_root = self.project_root();
-        let output = Command::new("git")
-            .arg("ls-files")
-            .current_dir(&project_root)
-            .output()
-            .map_err(|e| TenxError::Internal(format!("Failed to execute git ls-files: {}", e)))?;
-
-        if !output.status.success() {
-            return Err(TenxError::Internal(
-                "git ls-files command failed".to_string(),
-            ));
-        }
-
-        let files = String::from_utf8(output.stdout).map_err(|e| {
-            TenxError::Internal(format!("Failed to parse git ls-files output: {}", e))
-        })?;
-
-        Ok(files
-            .lines()
-            .map(|line| PathBuf::from(line.trim()))
-            .collect())
-    }
-
-    fn get_glob_files(&self, pattern: &str) -> crate::Result<Vec<PathBuf>> {
-        let project_root = self.project_root();
-        let mut builder = GlobSetBuilder::new();
-        builder.add(Glob::new(pattern).map_err(|e| TenxError::Internal(e.to_string()))?);
-        let globset = builder
-            .build()
-            .map_err(|e| TenxError::Internal(e.to_string()))?;
-
-        let mut included_files = Vec::new();
-        walk_directory(&project_root, &project_root, &globset, &mut included_files)?;
-        Ok(included_files)
-    }
-
     pub fn project_files(&self) -> crate::Result<Vec<PathBuf>> {
-        let _project_root = self.project_root();
-
-        // Build exclude globset
-        let mut exclude_builder = GlobSetBuilder::new();
-        for pattern in &self.project.exclude {
-            exclude_builder
-                .add(Glob::new(pattern).map_err(|e| TenxError::Internal(e.to_string()))?);
-        }
-        let exclude_globset = exclude_builder
-            .build()
-            .map_err(|e| TenxError::Internal(e.to_string()))?;
-
-        // Get all included files
-        let mut all_files = HashSet::new();
-        for include in &self.project.include {
-            let files = match include {
-                Include::Git => self.get_git_files()?,
-                Include::Glob(pattern) => self.get_glob_files(pattern)?,
-            };
-            all_files.extend(files);
-        }
-
-        // Filter out excluded files and sort
-        let mut files: Vec<_> = all_files
-            .into_iter()
-            .filter(|path| !exclude_globset.is_match(path))
-            .collect();
-        files.sort();
-        Ok(files)
+        files::walk_project(&self.project)
     }
 
     /// Serialize the Config into a RON string.
@@ -1000,7 +890,7 @@ mod tests {
         let current_dir = std::env::current_dir()?;
         let mut config = default_config(&current_dir);
         config.retry_limit = 42;
-        config.project.exclude.push("*.test".to_string());
+        config.project.globs.push("!*.test".to_string());
 
         let ron = config.to_ron()?;
         let current_dir = std::env::current_dir()?;
@@ -1021,8 +911,7 @@ mod tests {
         // Test that other values remain at default
         let default_config = default_config(&std::env::current_dir()?);
         assert_eq!(config.models, default_config.models);
-        assert_eq!(config.project.include, default_config.project.include);
-        assert_eq!(config.project.exclude, default_config.project.exclude);
+        assert_eq!(config.project.globs, default_config.project.globs);
 
         Ok(())
     }
@@ -1091,12 +980,12 @@ mod tests {
 
         let config = Config {
             project: Project {
-                include: vec![
-                    Include::Glob("*.rs".to_string()),
-                    Include::Glob("subdir/*.txt".to_string()),
-                ],
-                exclude: vec!["**/ignore.rs".to_string()],
                 root: root_path.to_path_buf(),
+                globs: vec![
+                    "**/*.rs".to_string(),
+                    "subdir/*.txt".to_string(),
+                    "!**/ignore.rs".to_string(),
+                ],
             },
             ..Default::default()
         };
@@ -1116,12 +1005,13 @@ mod tests {
         // Test with multiple exclude patterns
         let config_multi_exclude = Config {
             project: Project {
-                include: vec![
-                    Include::Glob("**/*.rs".to_string()),
-                    Include::Glob("**/*.txt".to_string()),
-                ],
-                exclude: vec!["**/ignore.rs".to_string(), "subdir/*.txt".to_string()],
                 root: root_path.to_path_buf(),
+                globs: vec![
+                    "**/*.rs".to_string(),
+                    "**/*.txt".to_string(),
+                    "!**/ignore.rs".to_string(),
+                    "!subdir/*.txt".to_string(),
+                ],
             },
             ..Default::default()
         };
@@ -1162,11 +1052,6 @@ mod tests {
             "tests/test1.rs",
             "README.md",
         ]);
-
-        project.config.project.include = vec![
-            Include::Glob("**/*.rs".to_string()),
-            Include::Glob("README.md".to_string()),
-        ];
 
         // Test matching files from root directory
         let matched_files = project.config.match_files_with_glob("src/**/*.rs")?;
@@ -1302,3 +1187,4 @@ mod tests {
         Ok(())
     }
 }
+

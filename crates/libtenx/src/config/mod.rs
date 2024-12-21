@@ -3,10 +3,7 @@
 #[allow(clippy::module_inception)]
 pub mod config;
 mod defaults;
+mod files;
 
-pub use config::{
-    load_config, CheckConfig, Checks, Config, ConfigFile, Context, Dialect, Include, Model, Models,
-    Project, Tags, TextContext,
-};
-
+pub use config::*;
 pub use defaults::*;

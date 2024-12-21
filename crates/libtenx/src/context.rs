@@ -400,7 +400,6 @@ mod tests {
     use super::*;
 
     use crate::{
-        config::Include,
         model::{DummyModel, Model, ModelProvider},
         session::Session,
         testutils::test_project,
@@ -420,9 +419,9 @@ mod tests {
         ]);
 
         let mut config = test_project.config.clone();
-        config.project.include = vec![
-            Include::Glob("**/*.rs".to_string()),
-            Include::Glob("**/Cargo.toml".to_string()),
+        config.project.globs = vec![
+            "**/*.rs".to_string(),
+            "**/Cargo.toml".to_string(),
         ];
 
         let context_spec = Context::new_project_map();
@@ -457,7 +456,7 @@ mod tests {
         ]);
 
         let mut config = test_project.config.clone();
-        config.project.include = vec![Include::Glob("**/*.rs".to_string())];
+        config.project.globs = vec!["**/*.rs".to_string()];
 
         let context_spec = Context::new_path(&config, "**/*.rs").unwrap();
         assert!(matches!(context_spec, Context::Path(_)));

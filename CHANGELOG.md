@@ -6,4 +6,5 @@ v0.0.4:
 - ux: tenx edit args are now mandatory
 - bug: improve relative path handling
 - bug: fix --no-pre-check flag
+- bug: improve handling of duplicate contexts
 - many cleanups and small refactorings

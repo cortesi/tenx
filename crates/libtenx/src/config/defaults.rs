@@ -342,12 +342,7 @@ pub fn default_config<P: AsRef<Path>>(current_dir: P) -> Config {
         project: {
             let root = find_project_root(current_dir.as_ref());
             Project {
-                include: if is_git_repo(&root) {
-                    vec![Include::Git]
-                } else {
-                    vec![]
-                },
-                exclude: vec![],
+                globs: vec![],
                 root,
             }
         },
@@ -361,3 +356,4 @@ pub fn default_config<P: AsRef<Path>>(current_dir: P) -> Config {
         ..Default::default()
     }
 }
+

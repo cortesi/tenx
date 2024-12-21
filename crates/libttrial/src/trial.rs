@@ -15,7 +15,7 @@ use tokio::sync::mpsc;
 use tracing::info;
 
 use libtenx::{
-    config::{default_config, Config, ConfigFile, Include},
+    config::{default_config, Config, ConfigFile},
     events::Event,
     session::Session,
     Result, Tenx, TenxError,
@@ -177,8 +177,8 @@ impl Trial {
     fn default_config() -> Result<Config> {
         let cwd = std::env::current_dir()?;
         let mut config = default_config(&cwd);
-        config.project.include = vec![Include::Glob("**/*".to_string())];
-        config.project.exclude = vec!["target/**".to_string()];
+        config.project.globs = vec!["**/*".to_string()];
+        config.project.globs = vec!["!target/**".to_string()];
         config.retry_limit = 1;
         // We disable streaming for trials by default, because streaming messes up token counts
         config.models.no_stream = true;

@@ -333,7 +333,7 @@ pub fn print_project(config: &Config) -> String {
         "include strategy:".blue().bold(),
         config
             .project
-            .include
+            .globs
             .iter()
             .map(|i| i.to_string())
             .collect::<Vec<_>>()

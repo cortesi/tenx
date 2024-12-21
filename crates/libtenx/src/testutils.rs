@@ -40,8 +40,8 @@ pub fn test_project() -> TestProject {
         .with_cwd(tempdir_path);
 
     cnf.project
-        .include
-        .push(config::Include::Glob("**".to_string()));
+        .globs
+        .push("**".to_string());
 
     let session = Session::default();
 
