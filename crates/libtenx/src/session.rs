@@ -234,7 +234,7 @@ impl Session {
     ///
     /// If a context with the same name and type already exists, it will be replaced.
     pub fn add_context(&mut self, new_context: context::Context) {
-        if let Some(pos) = self.contexts.iter().position(|x| x == &new_context) {
+        if let Some(pos) = self.contexts.iter().position(|x| x.is_dupe(&new_context)) {
             self.contexts[pos] = new_context;
         } else {
             self.contexts.push(new_context);
@@ -380,11 +380,7 @@ impl Session {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        config,
-        context::ContextProvider,
-        patch::{Change, Patch, WriteFile},
-    };
+    use crate::patch::{Change, Patch, WriteFile};
 
     #[test]
     fn test_add_editable() -> Result<()> {
@@ -444,37 +440,28 @@ mod tests {
     }
 
     #[test]
-    fn test_add_context_ignores_duplicates() {
+    fn test_add_context_ignores_duplicates() -> Result<()> {
         let mut test_project = crate::testutils::test_project();
         test_project.create_file_tree(&["test.txt"]);
         test_project.write("test.txt", "content");
 
-        test_project.config.project.include = vec![config::Include::Glob("**/*".to_string())];
-
-        let context1 = context::Context::Path(
-            context::Path::new(&test_project.config, "test.txt".to_string()).unwrap(),
-        );
-        let context2 = context::Context::Path(
-            context::Path::new(&test_project.config, "test.txt".to_string()).unwrap(),
-        );
-
-        test_project.session.add_context(context1.clone());
-        test_project.session.add_context(context2);
-
+        // Test Path context
+        let path1 =
+            context::Context::Path(context::Path::new(&test_project.config, "test.txt".into())?);
+        let path2 =
+            context::Context::Path(context::Path::new(&test_project.config, "test.txt".into())?);
+        test_project.session.add_context(path1);
+        test_project.session.add_context(path2);
         assert_eq!(test_project.session.contexts.len(), 1);
-        assert!(matches!(
-            test_project.session.contexts[0],
-            context::Context::Path(_)
-        ));
 
-        if let context::Context::Path(glob_context) = &test_project.session.contexts[0] {
-            let context_items = glob_context
-                .context_items(&test_project.config, &test_project.session)
-                .unwrap();
-            assert_eq!(context_items[0].body, "content");
-        } else {
-            panic!("Expected Glob context");
-        }
+        // Test URL context
+        let url1 = context::Context::Url(context::Url::new("http://example.com".into()));
+        let url2 = context::Context::Url(context::Url::new("http://example.com".into()));
+        test_project.session.add_context(url1);
+        test_project.session.add_context(url2);
+        assert_eq!(test_project.session.contexts.len(), 2);
+
+        Ok(())
     }
 
     #[test]

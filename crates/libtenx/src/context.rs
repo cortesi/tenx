@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use crate::{config::Config, session::Session, Result, TenxError};
 
 /// An individual context item.
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 /// Represents a single piece of context information to include in a prompt. Each ContextProvider
 /// can provide multiple ContextItems.
 pub struct ContextItem {
@@ -22,6 +22,24 @@ pub struct ContextItem {
     pub source: String,
     /// The contents of the context.
     pub body: String,
+}
+
+impl Context {
+    /// Returns true if both contexts have the same name and type.
+    pub fn is_dupe(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Context::Ruskel(a), Context::Ruskel(b)) => a.name == b.name,
+            (Context::Path(a), Context::Path(b)) => match (&a.path_type, &b.path_type) {
+                (PathType::SinglePath(a), PathType::SinglePath(b)) => a == b,
+                (PathType::Pattern(a), PathType::Pattern(b)) => a == b,
+                _ => false,
+            },
+            (Context::ProjectMap(_), Context::ProjectMap(_)) => true,
+            (Context::Url(a), Context::Url(b)) => a.url == b.url,
+            (Context::Text(a), Context::Text(b)) => a.name == b.name,
+            _ => false,
+        }
+    }
 }
 
 /// A trait for context providers that can be used to generate context items for a prompt.
@@ -45,7 +63,7 @@ pub trait ContextProvider {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 /// A context provider that generates Rust API documentation using Ruskel.
 pub struct Ruskel {
     name: String,
@@ -92,7 +110,7 @@ impl ContextProvider for Ruskel {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 /// A context provider that represents the project's file structure.
 pub struct ProjectMap;
 
@@ -128,13 +146,13 @@ impl ContextProvider for ProjectMap {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 enum PathType {
     SinglePath(String),
     Pattern(String),
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 /// A context provider that handles file paths, either single files or glob patterns.
 pub struct Path {
     path_type: PathType,
@@ -251,7 +269,7 @@ impl ContextProvider for Url {
 }
 
 /// A context provider that produces reference material for model interactions.
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum Context {
     /// API documentation generated using Ruskel
     Ruskel(Ruskel),
