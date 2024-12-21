@@ -4,6 +4,6 @@
         ruskel: ["libtenx", "libttrial"]
     ),
     checks: (
-        // enable: ["cargo-clippy"]
+        enable: ["cargo-clippy"]
     )
 )

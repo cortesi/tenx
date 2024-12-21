@@ -220,7 +220,7 @@ enum Commands {
     /// Add editable files to a session
     Edit {
         /// Specifies files to edit, glob patterns accepted
-        #[clap(value_parser)]
+        #[clap(value_parser, required = true)]
         files: Vec<String>,
     },
     /// List files included in the project

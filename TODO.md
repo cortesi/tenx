@@ -1,7 +1,6 @@
 UX:
     
-    - arguments to tenx edit should be mandatory
-
+    - sort models for "tenx models"
 
 Model response robustness:
     
@@ -14,6 +13,7 @@ Model response robustness:
 
 Bugs:
     
+    - python tests in trials include a bunch of un-needed files in project map
     - --no-check flag seems not to work
     - retry doesn't work with fix
     - retry doesn't work if the previous step had an error
