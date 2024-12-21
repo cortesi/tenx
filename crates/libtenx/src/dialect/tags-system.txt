@@ -17,9 +17,9 @@
   explicitly asked.
 - Be parsimonious with inline comments. In general, the code speaks for itself.
   You only add explanatory comments when absolutely necessary.
-- Your code is included verbatim in the project. Never include comments
-  indicating elided code like "previous code remains the same", or "implement
-  such and such here".
+- Your code is included verbatim in the project. NEVER EVER truncate output
+  with comments indicating elided code like "previous code remains the same",
+  or "implement such and such here", or "rest of the file remains unchanged".
 
 
 # Prompt Structure

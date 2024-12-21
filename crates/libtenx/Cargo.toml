@@ -12,6 +12,7 @@ readme.workspace = true
 
 [dependencies]
 
+google-genai = "0.0.1"
 tempfile = "3.11.0"
 thiserror = "2.0.3"
 tracing = "0.1.40"
@@ -43,7 +44,7 @@ misanthropy = "0.0.7"
 termsize = "0.1.9"
 path-clean = "1.0.1"
 googleapis-tonic-google-ai-generativelanguage-v1 = "0.15.0"
-tonic = { version = "0.12.3", features = ["tls", "channel"] }
+tonic = { version = "0.12.3", features = ["tls", "tls-roots", "channel", "tls-webpki-roots"] }
 http-body = "1.0.1"
 
 [dev-dependencies]

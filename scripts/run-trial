@@ -16,6 +16,7 @@ cargo run --release --bin ttrial --  \
     --model o1-mini \
     --model llama33-70b \
     --model o1 \
+    --model gemini-flash-exp \
     "*" 
 
 

@@ -1,12 +1,7 @@
 //! This module implements the Google model provider for the tenx system.
 use std::collections::HashMap;
 
-use googleapis_tonic_google_ai_generativelanguage_v1::google::ai::generativelanguage::v1::{
-    self as gl, Part,
-};
-use http_body::Body;
-use tonic::{transport::Channel, Status};
-
+use google_genai::datatypes::{Content, GenerateContentReq, Part};
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tracing::trace;
@@ -21,20 +16,6 @@ use crate::{
     session::Session,
     Result, TenxError,
 };
-
-const MAX_TOKENS: i32 = 8192;
-
-impl From<tonic::transport::Error> for TenxError {
-    fn from(error: tonic::transport::Error) -> Self {
-        TenxError::Model(error.to_string())
-    }
-}
-
-impl From<Status> for TenxError {
-    fn from(error: Status) -> Self {
-        TenxError::Model(error.to_string())
-    }
-}
 
 /// A model that interacts with the Google Generative Language API. The general design of the model
 /// is to:
@@ -82,27 +63,28 @@ impl GoogleUsage {
 }
 
 impl Google {
-    async fn stream_response<T>(
+    async fn stream_response(
         &mut self,
-        client: &mut gl::generative_service_client::GenerativeServiceClient<T>,
-        req: gl::GenerateContentRequest,
+        params: GenerateContentReq,
         sender: Option<mpsc::Sender<Event>>,
-    ) -> Result<gl::GenerateContentResponse>
-    where
-        T: tonic::client::GrpcService<tonic::body::BoxBody>,
-        T::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
-        T::ResponseBody: Body<Data = tonic::codegen::Bytes> + Send + 'static,
-        <T::ResponseBody as Body>::Error: Into<Box<dyn std::error::Error + Send + Sync>> + Send,
-    {
-        let mut stream = client.stream_generate_content(req).await?.into_inner();
+    ) -> Result<google_genai::datatypes::GenerateContentResponse> {
+        use futures_util::StreamExt;
+        let mut stream = google_genai::generate_content_stream(&self.api_key, params)
+            .await
+            .map_err(|e| TenxError::Model(e.to_string()))?;
 
         let mut final_response = None;
-        while let Some(response) = stream.message().await? {
-            if let Some(candidate) = response.candidates.first() {
-                if let Some(content) = &candidate.content {
-                    for part in &content.parts {
-                        if let Some(gl::part::Data::Text(text)) = &part.data {
-                            send_event(&sender, Event::Snippet(text.clone()))?;
+        while let Some(response) = stream.next().await {
+            let response = response.map_err(|e| TenxError::Model(e.to_string()))?;
+            if let Some(candidates) = &response.candidates {
+                for candidate in candidates {
+                    if let Some(content) = &candidate.content {
+                        if let Some(parts) = &content.parts {
+                            for part in parts {
+                                if let Some(text) = &part.text {
+                                    send_event(&sender, Event::Snippet(text.clone()))?;
+                                }
+                            }
                         }
                     }
                 }
@@ -116,13 +98,17 @@ impl Google {
     fn extract_changes(
         &self,
         dialect: &Dialect,
-        response: &gl::GenerateContentResponse,
+        response: &google_genai::datatypes::GenerateContentResponse,
     ) -> Result<ModelResponse> {
-        if let Some(candidate) = response.candidates.first() {
-            if let Some(content) = &candidate.content {
-                for part in &content.parts {
-                    if let Some(gl::part::Data::Text(text)) = &part.data {
-                        return dialect.parse(text);
+        if let Some(candidates) = &response.candidates {
+            if let Some(candidate) = candidates.first() {
+                if let Some(content) = &candidate.content {
+                    if let Some(parts) = &content.parts {
+                        for part in parts {
+                            if let Some(text) = &part.text {
+                                return dialect.parse(text);
+                            }
+                        }
                     }
                 }
             }
@@ -135,61 +121,44 @@ impl Google {
         config: &Config,
         session: &Session,
         dialect: &Dialect,
-    ) -> Result<gl::GenerateContentRequest> {
+    ) -> Result<GenerateContentReq> {
         let mut messages = Vec::new();
         build_conversation(self, &mut messages, config, session, dialect)?;
-
-        Ok(gl::GenerateContentRequest {
-            model: self.api_model.clone(),
-            contents: messages,
-            safety_settings: Vec::new(),
-            generation_config: Some(gl::GenerationConfig {
-                max_output_tokens: Some(MAX_TOKENS),
-                temperature: Some(0.7),
-                top_p: Some(0.95),
-                top_k: Some(40),
-                candidate_count: Some(1),
-                stop_sequences: Vec::new(),
-                ..Default::default()
-            }),
-        })
+        Ok(GenerateContentReq::default()
+            .model(&self.api_model)
+            .contents(messages)
+            .system_instruction(
+                Content::default().parts(vec![Part::default().text(dialect.system())]),
+            ))
     }
 }
 
-impl Conversation<Vec<gl::Content>> for Google {
-    fn set_system_prompt(&self, messages: &mut Vec<gl::Content>, prompt: String) -> Result<()> {
-        messages.push(gl::Content {
-            parts: vec![Part {
-                data: Some(gl::part::Data::Text(prompt)),
-            }],
-            role: "system".to_string(),
-        });
+impl Conversation<Vec<Content>> for Google {
+    fn set_system_prompt(&self, _messages: &mut Vec<Content>, _prompt: String) -> Result<()> {
         Ok(())
     }
 
-    fn add_user_message(&self, messages: &mut Vec<gl::Content>, text: String) -> Result<()> {
-        messages.push(gl::Content {
-            parts: vec![Part {
-                data: Some(gl::part::Data::Text(text)),
-            }],
-            role: "user".to_string(),
-        });
+    fn add_user_message(&self, messages: &mut Vec<Content>, text: String) -> Result<()> {
+        messages.push(
+            Content::default()
+                .parts(vec![Part::default().text(text)])
+                .role("user"),
+        );
         Ok(())
     }
 
-    fn add_agent_message(&self, messages: &mut Vec<gl::Content>, text: &str) -> Result<()> {
-        messages.push(gl::Content {
-            parts: vec![Part {
-                data: Some(gl::part::Data::Text(text.to_string())),
-            }],
-            role: "assistant".to_string(),
-        });
+    fn add_agent_message(&self, messages: &mut Vec<Content>, text: &str) -> Result<()> {
+        messages.push(
+            Content::default()
+                .parts(vec![Part::default().text(text.to_string())])
+                .role("model"),
+        );
         Ok(())
     }
 
     fn add_editables(
         &self,
-        messages: &mut Vec<gl::Content>,
+        messages: &mut Vec<Content>,
         config: &Config,
         session: &Session,
         dialect: &Dialect,
@@ -239,32 +208,24 @@ impl ModelProvider for Google {
 
         let dialect = config.dialect()?;
         let req = self.request(config, session, &dialect)?;
-        trace!("Sending request: {:?}", req);
-
-        let channel = Channel::from_static("https://generativelanguage.googleapis.com")
-            .tls_config(tonic::transport::ClientTlsConfig::new())?
-            .connect()
-            .await?;
-        let api_key = self.api_key.clone();
-        let mut client = gl::generative_service_client::GenerativeServiceClient::with_interceptor(
-            channel,
-            move |mut req: tonic::Request<()>| {
-                req.metadata_mut()
-                    .insert("x-goog-api-key", api_key.parse().unwrap());
-                Ok(req)
-            },
-        );
+        trace!("Sending request: {:#?}", req);
 
         let resp = if self.streaming {
-            self.stream_response(&mut client, req.clone(), sender)
-                .await?
+            self.stream_response(req.clone(), sender).await?
         } else {
-            let resp = client.generate_content(req.clone()).await?.into_inner();
-            if let Some(candidate) = resp.candidates.first() {
-                if let Some(content) = &candidate.content {
-                    if let Some(part) = content.parts.first() {
-                        if let Some(gl::part::Data::Text(text)) = &part.data {
-                            send_event(&sender, Event::ModelResponse(text.clone()))?;
+            let resp = google_genai::generate_content(&self.api_key, req.clone())
+                .await
+                .map_err(|e| TenxError::Model(e.to_string()))?;
+
+            if let Some(candidates) = &resp.candidates {
+                if let Some(candidate) = candidates.first() {
+                    if let Some(content) = &candidate.content {
+                        if let Some(parts) = &content.parts {
+                            for part in parts {
+                                if let Some(text) = &part.text {
+                                    send_event(&sender, Event::ModelResponse(text.clone()))?;
+                                }
+                            }
                         }
                     }
                 }
@@ -272,14 +233,14 @@ impl ModelProvider for Google {
             resp
         };
 
-        trace!("Got response: {:?}", resp);
+        trace!("Got response: {:#?}", resp);
         let mut modresp = self.extract_changes(&dialect, &resp)?;
 
         if let Some(metadata) = resp.usage_metadata {
             modresp.usage = Some(super::Usage::Google(GoogleUsage {
-                input_tokens: Some(metadata.prompt_token_count as u32),
-                output_tokens: Some(metadata.candidates_token_count as u32),
-                total_tokens: Some(metadata.total_token_count as u32),
+                input_tokens: Some(metadata.prompt_token_count.unwrap_or(0) as u32),
+                output_tokens: Some(metadata.candidates_token_count.unwrap_or(0) as u32),
+                total_tokens: Some(metadata.total_token_count.unwrap_or(0) as u32),
             }));
         }
 

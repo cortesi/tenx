@@ -21,6 +21,7 @@ Bugs:
 
 Features:
     
+    - file append operation
     - git should include files in git and un-tracked files
     - reset --all to completely roll back a session
     - readonly: set a local file to be read-only
