@@ -17,9 +17,11 @@ Bugs:
     - --no-check flag seems not to work
     - retry doesn't work with fix
     - retry doesn't work if the previous step had an error
+    - it's possible to add the same ruskel module twice to context
 
 Features:
     
+    - git should include files in git and un-tracked files
     - reset --all to completely roll back a session
     - readonly: set a local file to be read-only
     - env variable to control default model

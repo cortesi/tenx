@@ -6,6 +6,7 @@
 mod claude;
 mod conversation;
 mod dummy_model;
+mod google;
 mod openai;
 
 use async_trait::async_trait;
@@ -14,6 +15,7 @@ use tokio::sync::mpsc;
 
 pub use claude::{Claude, ClaudeUsage};
 pub use dummy_model::{DummyModel, DummyUsage};
+pub use google::{Google, GoogleUsage};
 pub use openai::{OpenAi, OpenAiUsage};
 
 use crate::{
@@ -31,6 +33,7 @@ pub enum Usage {
     Claude(ClaudeUsage),
     OpenAi(OpenAiUsage),
     Dummy(DummyUsage),
+    Google(google::GoogleUsage),
 }
 
 impl Usage {
@@ -40,6 +43,7 @@ impl Usage {
             Usage::Claude(usage) => usage.values(),
             Usage::OpenAi(usage) => usage.values(),
             Usage::Dummy(usage) => usage.values(),
+            Usage::Google(usage) => usage.values(),
         }
     }
 
@@ -49,6 +53,7 @@ impl Usage {
             Usage::Claude(usage) => usage.totals(),
             Usage::OpenAi(usage) => usage.totals(),
             Usage::Dummy(usage) => usage.totals(),
+            Usage::Google(usage) => usage.totals(),
         }
     }
 }
@@ -81,6 +86,7 @@ pub enum Model {
     Claude(Claude),
     OpenAi(OpenAi),
     Dummy(DummyModel),
+    Google(google::Google),
 }
 
 #[async_trait]
@@ -90,6 +96,7 @@ impl ModelProvider for Model {
             Model::Claude(c) => c.name(),
             Model::OpenAi(o) => o.name(),
             Model::Dummy(d) => d.name(),
+            Model::Google(g) => g.name(),
         }
     }
 
@@ -98,6 +105,7 @@ impl ModelProvider for Model {
             Model::Claude(c) => c.api_model(),
             Model::OpenAi(o) => o.api_model(),
             Model::Dummy(d) => d.api_model(),
+            Model::Google(g) => g.api_model(),
         }
     }
 
@@ -111,6 +119,7 @@ impl ModelProvider for Model {
             Model::Claude(c) => c.send(config, session, sender).await,
             Model::OpenAi(o) => o.send(config, session, sender).await,
             Model::Dummy(d) => d.send(config, session, sender).await,
+            Model::Google(g) => g.send(config, session, sender).await,
         }
     }
 
@@ -119,6 +128,7 @@ impl ModelProvider for Model {
             Model::Claude(c) => c.render(config, session),
             Model::OpenAi(o) => o.render(config, session),
             Model::Dummy(d) => d.render(config, session),
+            Model::Google(g) => g.render(config, session),
         }
     }
 }

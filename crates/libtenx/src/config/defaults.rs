@@ -26,9 +26,9 @@ const XAI_API_KEY: &str = "XAI_API_KEY";
 const XAI_API_BASE: &str = "https://api.x.ai/v1";
 const XAI_DEFAULT_GROK: &str = "grok-beta";
 
-// const GOOGLEAI_API_KEY: &str = "GOOGLEAI_API_KEY";
-// const GOOGLEAI_API_BASE: &str = "https://generativelanguage.googleapis.com/v1beta/openai";
-// const GOOGLEAI_GEMINI_EXP: &str = "gemini-exp-1114";
+const GOOGLEAI_API_KEY: &str = "GOOGLEAI_API_KEY";
+const GOOGLEAI_API_BASE: &str = "https://generativelanguage.googleapis.com/v1beta/openai";
+const GOOGLEAI_GEMINI_EXP: &str = "gemini-exp-1114";
 
 /// Returns true if the directory is a git repository
 fn is_git_repo(dir: &Path) -> bool {
@@ -188,17 +188,15 @@ fn default_models() -> Vec<Model> {
     // FIXME: Disable Gemini for now - there's some weird issue with the API that might be an
     // incompatibility with the OpenAI library we're using.
     //
-    // if env::var(GOOGLEAI_API_KEY).is_ok() {
-    //     models.push(Model::OpenAi {
-    //         name: "gemini".to_string(),
-    //         api_model: GOOGLEAI_GEMINI_EXP.to_string(),
-    //         key: "".to_string(),
-    //         key_env: GOOGLEAI_API_KEY.to_string(),
-    //         api_base: GOOGLEAI_API_BASE.to_string(),
-    //         can_stream: false,
-    //         no_system_prompt: false,
-    //     });
-    // }
+    if env::var(GOOGLEAI_API_KEY).is_ok() {
+        models.push(Model::Google {
+            name: "gemini".to_string(),
+            api_model: GOOGLEAI_GEMINI_EXP.to_string(),
+            key: "".to_string(),
+            key_env: GOOGLEAI_API_KEY.to_string(),
+            can_stream: false,
+        });
+    }
 
     models
 }

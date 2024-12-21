@@ -399,7 +399,8 @@ async fn main() -> anyhow::Result<()> {
                 for model in &config.model_confs() {
                     match model {
                         libtenx::config::Model::Claude { .. }
-                        | libtenx::config::Model::OpenAi { .. } => {
+                        | libtenx::config::Model::OpenAi { .. }
+                        | libtenx::config::Model::Google { .. } => {
                             println!("{}", model.name().blue().bold());
                             println!("    kind: {}", model.kind());
                             for line in model.text_config(*full).lines() {

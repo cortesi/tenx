@@ -135,7 +135,7 @@ pub struct Context {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-/// Configuration for a specific model provider (Claude or OpenAI).
+/// Configuration for a specific model provider (Claude, OpenAI, or Google).
 pub enum Model {
     Claude {
         /// The name of the model.
@@ -163,6 +163,18 @@ pub enum Model {
         /// Whether the model supports a separate system prompt.
         no_system_prompt: bool,
     },
+    Google {
+        /// The name of the model.
+        name: String,
+        /// The API model identifier.
+        api_model: String,
+        /// The API key.
+        key: String,
+        /// The environment variable to load the API key from.
+        key_env: String,
+        /// Whether the model can stream responses.
+        can_stream: bool,
+    },
 }
 
 impl Model {
@@ -175,6 +187,11 @@ impl Model {
                 ..
             }
             | Model::OpenAi {
+                ref mut key,
+                ref key_env,
+                ..
+            }
+            | Model::Google {
                 ref mut key,
                 ref key_env,
                 ..
@@ -194,6 +211,7 @@ impl Model {
         match self {
             Model::Claude { name, .. } => name,
             Model::OpenAi { name, .. } => name,
+            Model::Google { name, .. } => name,
         }
     }
 
@@ -202,6 +220,7 @@ impl Model {
         match self {
             Model::Claude { .. } => "claude",
             Model::OpenAi { .. } => "openai",
+            Model::Google { .. } => "google",
         }
     }
 
@@ -210,6 +229,7 @@ impl Model {
         match self {
             Model::Claude { api_model, .. } => api_model,
             Model::OpenAi { api_model, .. } => api_model,
+            Model::Google { api_model, .. } => api_model,
         }
     }
 
@@ -266,10 +286,30 @@ impl Model {
                 ]
                 .join("\n")
             }
+            Model::Google {
+                api_model,
+                key,
+                key_env,
+                can_stream,
+                ..
+            } => {
+                let key = if verbose {
+                    key.clone()
+                } else {
+                    Self::abbreviate_key(key)
+                };
+                [
+                    format!("api_model = {}", api_model),
+                    format!("key = {}", key),
+                    format!("key_env = {}", key_env),
+                    format!("stream = {}", can_stream),
+                ]
+                .join("\n")
+            }
         }
     }
 
-    /// Converts ModelConfig to a Claude or OpenAi model.
+    /// Converts ModelConfig to a Claude, OpenAi, or Google model.
     pub fn to_model(&self, no_stream: bool) -> crate::Result<model::Model> {
         match self {
             Model::Claude { api_model, key, .. } => {
@@ -301,6 +341,25 @@ impl Model {
                 streaming: *can_stream && !no_stream,
                 no_system_prompt: *no_system_prompt,
             })),
+            Model::Google {
+                api_model,
+                key,
+                can_stream,
+                ..
+            } => {
+                if api_model.is_empty() {
+                    return Err(TenxError::Model("Empty API model name".into()));
+                }
+                if key.is_empty() {
+                    return Err(TenxError::Model("Empty Google API key".into()));
+                }
+                Ok(model::Model::Google(model::Google {
+                    name: self.name().to_string(),
+                    api_model: api_model.clone(),
+                    api_key: key.clone(),
+                    streaming: *can_stream && !no_stream,
+                }))
+            }
         }
     }
 }
@@ -814,6 +873,18 @@ impl Config {
                 api_base: api_base.clone(),
                 streaming: can_stream && !self.models.no_stream,
                 no_system_prompt,
+            })),
+            Model::Google {
+                name,
+                api_model,
+                key,
+                can_stream,
+                ..
+            } => Ok(model::Model::Google(model::Google {
+                name: name.clone(),
+                api_model: api_model.clone(),
+                api_key: key.clone(),
+                streaming: can_stream && !self.models.no_stream,
             })),
         }
     }

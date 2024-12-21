@@ -42,6 +42,9 @@ libruskel = { workspace=true }
 misanthropy = "0.0.7"
 termsize = "0.1.9"
 path-clean = "1.0.1"
+googleapis-tonic-google-ai-generativelanguage-v1 = "0.15.0"
+tonic = { version = "0.12.3", features = ["tls", "channel"] }
+http-body = "1.0.1"
 
 [dev-dependencies]
 indoc = "2.0.5"
