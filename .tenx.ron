@@ -1,5 +1,8 @@
 (
-    retry_limit: 18,
+    project: (
+        globs: [ "!**/*.gif"]
+    ),
+    retry_limit: 25,
     context: (
         ruskel: ["libtenx", "libttrial"]
     ),

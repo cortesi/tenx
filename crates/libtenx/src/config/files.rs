@@ -4,7 +4,8 @@ use ignore::{overrides::OverrideBuilder, WalkBuilder};
 
 use crate::{config::Project, TenxError};
 
-/// Walk project directory using ignore rules, returning all included files relative to project root.
+/// Walk project directory using ignore rules, returning all included files relative to project
+/// root.
 ///
 /// Applies project glob patterns and uses the ignore crate's functionality for respecting
 /// .gitignore and other ignore files. Glob patterns can be positive (include) or negative

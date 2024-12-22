@@ -177,8 +177,13 @@ impl Trial {
     fn default_config() -> Result<Config> {
         let cwd = std::env::current_dir()?;
         let mut config = default_config(&cwd);
-        config.project.globs = vec!["**/*".to_string()];
-        config.project.globs = vec!["!target/**".to_string()];
+        config.project.globs = vec![
+            "**/*".to_string(),
+            "!target/**".to_string(),
+            "!.venv/**".to_string(),
+            ".pytest/**".to_string(),
+            "__pycache__/**".to_string(),
+        ];
         config.retry_limit = 1;
         // We disable streaming for trials by default, because streaming messes up token counts
         config.models.no_stream = true;
@@ -429,3 +434,4 @@ mod tests {
         Ok(())
     }
 }
+

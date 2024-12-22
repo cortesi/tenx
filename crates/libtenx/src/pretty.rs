@@ -328,17 +328,19 @@ pub fn print_project(config: &Config) -> String {
         "project root:".blue().bold(),
         display_path
     ));
-    output.push_str(&format!(
-        "{} {}\n",
-        "include strategy:".blue().bold(),
-        config
-            .project
-            .globs
-            .iter()
-            .map(|i| i.to_string())
-            .collect::<Vec<_>>()
-            .join(", ")
-    ));
+    if !config.project.globs.is_empty() {
+        output.push_str(&format!(
+            "{} {}\n",
+            "globs:".blue().bold(),
+            config
+                .project
+                .globs
+                .iter()
+                .map(|i| i.to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        ));
+    }
     output
 }
 
@@ -447,3 +449,4 @@ mod tests {
         assert!(full_result.contains("lines"));
     }
 }
+
