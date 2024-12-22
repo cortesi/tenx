@@ -419,10 +419,7 @@ mod tests {
         ]);
 
         let mut config = test_project.config.clone();
-        config.project.globs = vec![
-            "**/*.rs".to_string(),
-            "**/Cargo.toml".to_string(),
-        ];
+        config.project.globs = vec!["**/*.rs".to_string(), "**/Cargo.toml".to_string()];
 
         let context_spec = Context::new_project_map();
         let mut expected_files = vec!["src/main.rs", "src/lib.rs", "tests/test1.rs", "Cargo.toml"];

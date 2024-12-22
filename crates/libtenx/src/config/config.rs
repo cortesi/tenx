@@ -13,11 +13,7 @@ use serde::{Deserialize, Serialize};
 use ron;
 
 use super::files;
-use crate::{
-    checks::{Check, Mode},
-    config::default_config,
-    dialect, model, TenxError,
-};
+use crate::{checks, config::default_config, dialect, model, TenxError};
 
 pub const HOME_CONFIG_FILE: &str = "tenx.ron";
 pub const PROJECT_CONFIG_FILE: &str = ".tenx.ron";
@@ -87,6 +83,25 @@ pub fn load_config(current_dir: &Path) -> crate::Result<Config> {
     };
 
     parse_config(&home_config, &project_config, current_dir)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+/// Match specification for a Mode over-ride.
+pub enum ModeSpec {
+    Name(String),
+    Globs(Vec<String>),
+}
+
+/// Mode over-ride configuration.
+#[optional_struct]
+#[derive(Default, Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub struct ModeConfig {
+    /// The default context configuration.
+    #[optional_rename(OptionalContext)]
+    #[optional_wrap]
+    pub context: Context,
 }
 
 /// A named block of text to include as context in model interactions.
@@ -453,17 +468,17 @@ pub struct CheckConfig {
 
 impl CheckConfig {
     /// Converts a CheckConfig to a concrete Check object.
-    pub fn to_check(&self) -> Check {
-        Check {
+    pub fn to_check(&self) -> checks::Check {
+        checks::Check {
             name: self.name.clone(),
             command: self.command.clone(),
             globs: self.globs.clone(),
             default_off: self.default_off,
             fail_on_stderr: self.fail_on_stderr,
             mode: match self.mode {
-                CheckMode::Pre => Mode::Pre,
-                CheckMode::Post => Mode::Post,
-                CheckMode::Both => Mode::Both,
+                CheckMode::Pre => checks::CheckMode::Pre,
+                CheckMode::Post => checks::CheckMode::Post,
+                CheckMode::Both => checks::CheckMode::Both,
             },
         }
     }
@@ -483,7 +498,6 @@ pub struct Config {
     #[optional_wrap]
     pub project: Project,
 
-    /// The directory to store session state.
     /// The directory to store session state. Defaults to ~/.config/tenx/state
     pub session_store_dir: PathBuf,
 
@@ -509,6 +523,9 @@ pub struct Config {
     #[optional_rename(OptionalChecks)]
     #[optional_wrap]
     pub checks: Checks,
+
+    /// Mode configuration
+    pub modes: HashMap<ModeSpec, ModeConfig>,
 
     // Internal fields, not to be set in config
     //
@@ -796,7 +813,7 @@ impl Config {
     /// Return all configured checks, even if disabled. Custom checks with the same name as builtin
     /// checks replace the builtin checks. Order is preserved, with custom checks appearing in their
     /// original position if they override a builtin check.
-    pub fn all_checks(&self) -> Vec<Check> {
+    pub fn all_checks(&self) -> Vec<checks::Check> {
         let custom_map: HashMap<_, _> = self
             .checks
             .custom
@@ -826,7 +843,7 @@ impl Config {
     }
 
     /// Get a check by name
-    pub fn get_check<S: AsRef<str>>(&self, name: S) -> Option<Check> {
+    pub fn get_check<S: AsRef<str>>(&self, name: S) -> Option<checks::Check> {
         self.all_checks()
             .into_iter()
             .find(|c| c.name == name.as_ref())
@@ -849,7 +866,7 @@ impl Config {
     }
 
     /// Return all enabled checks.
-    pub fn enabled_checks(&self) -> Vec<Check> {
+    pub fn enabled_checks(&self) -> Vec<checks::Check> {
         if let Some(only_check) = &self.checks.only {
             self.all_checks()
                 .into_iter()
@@ -874,11 +891,11 @@ mod tests {
 
     #[test]
     fn test_config_merge() -> crate::Result<()> {
-        let current_dir = std::env::current_dir()?;
+        let project = testutils::test_project();
         let parsed = parse_config(
             r#"(models: (default: "foo", no_stream: true))"#,
             r#"(models: (default: "bar"), project: ( root: "/foo"))"#,
-            &current_dir,
+            &project.config.cwd()?,
         )?;
         assert_eq!(parsed.models.default, "bar");
         assert!(parsed.models.no_stream);
@@ -888,8 +905,8 @@ mod tests {
 
     #[test]
     fn test_config_roundtrip() -> crate::Result<()> {
-        let current_dir = std::env::current_dir()?;
-        let mut config = default_config(&current_dir);
+        let project = testutils::test_project();
+        let mut config = default_config(&project.config.cwd()?);
         config.retry_limit = 42;
         config.project.globs.push("!*.test".to_string());
 
@@ -904,13 +921,14 @@ mod tests {
     #[test]
     fn test_parse_config_value() -> crate::Result<()> {
         // Test loading a config with a custom retry_limit
+        let project = testutils::test_project();
         let test_config = r#"(retry_limit: 10)"#;
-        let current_dir = std::env::current_dir()?;
-        let config = parse_config("", test_config, &current_dir)?;
+        let config = parse_config("", test_config, &project.config.cwd()?)?;
         assert_eq!(config.retry_limit, 10);
 
         // Test that other values remain at default
-        let default_config = default_config(&std::env::current_dir()?);
+        let project = testutils::test_project();
+        let default_config = default_config(&project.config.cwd()?);
         assert_eq!(config.models, default_config.models);
         assert_eq!(config.project.globs, default_config.project.globs);
 
@@ -1188,4 +1206,3 @@ mod tests {
         Ok(())
     }
 }
-

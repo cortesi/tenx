@@ -3,7 +3,7 @@ use tokio::sync::mpsc;
 use tracing::{debug, warn};
 
 use crate::{
-    checks::Mode,
+    checks::CheckMode,
     config::Config,
     context::{Context, ContextProvider},
     events::{send_event, Event, EventBlock},
@@ -190,14 +190,14 @@ impl Tenx {
 
     pub fn check(&self, paths: Vec<PathBuf>, sender: &Option<mpsc::Sender<Event>>) -> Result<()> {
         let _block = EventBlock::start(sender)?;
-        self.check_paths(&paths, Mode::Both, sender)
+        self.check_paths(&paths, CheckMode::Both, sender)
     }
 
     /// Run checks based on an optional session and an optional mode filter.
     fn run_checks(
         &self,
         session: &Session,
-        mode_filter: Mode,
+        mode_filter: CheckMode,
         sender: &Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
         let paths = if session.editables().is_empty() {
@@ -217,11 +217,11 @@ impl Tenx {
     fn check_paths(
         &self,
         paths: &Vec<PathBuf>,
-        mode_filter: Mode,
+        mode_filter: CheckMode,
         sender: &Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
         for c in self.config.enabled_checks() {
-            let is_mode_match = c.mode == mode_filter || c.mode == Mode::Both;
+            let is_mode_match = c.mode == mode_filter || c.mode == CheckMode::Both;
             if is_mode_match && c.is_relevant(paths)? {
                 let _check_block = EventBlock::validator(sender, &c.name)?;
                 c.check(&self.config)?;
@@ -338,7 +338,7 @@ impl Tenx {
         sender: &Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
         if !self.config.checks.no_pre {
-            self.run_checks(session, Mode::Pre, sender)
+            self.run_checks(session, CheckMode::Pre, sender)
         } else {
             Ok(())
         }
@@ -355,7 +355,7 @@ impl Tenx {
             .and_then(|s| s.model_response.as_ref())
             .is_some()
         {
-            self.run_checks(session, Mode::Post, sender)?
+            self.run_checks(session, CheckMode::Post, sender)?
         }
         Ok(())
     }
@@ -420,10 +420,7 @@ mod tests {
 
         config.session_store_dir = temp_dir.path().join("sess");
         config.retry_limit = 1;
-        config
-            .project
-            .globs
-            .push("**".to_string());
+        config.project.globs.push("**".to_string());
 
         let tenx = Tenx::new(config.clone());
         let test_file_path = temp_dir.path().join("test.txt");

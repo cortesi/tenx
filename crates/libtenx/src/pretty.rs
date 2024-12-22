@@ -449,4 +449,3 @@ mod tests {
         assert!(full_result.contains("lines"));
     }
 }
-

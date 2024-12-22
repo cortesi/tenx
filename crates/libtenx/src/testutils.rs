@@ -39,9 +39,7 @@ pub fn test_project() -> TestProject {
         .with_root(&tempdir_path)
         .with_cwd(tempdir_path);
 
-    cnf.project
-        .globs
-        .push("**".to_string());
+    cnf.project.globs.push("**".to_string());
 
     let session = Session::default();
 

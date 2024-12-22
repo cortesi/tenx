@@ -16,21 +16,21 @@ impl Runnable {
 
 /// The mode in which the check should run - pre, post or both.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Mode {
+pub enum CheckMode {
     Pre,
     Post,
     Both,
 }
 
-impl Mode {
+impl CheckMode {
     /// Returns true if this mode includes pre checks.
     pub fn is_pre(&self) -> bool {
-        matches!(self, Mode::Pre | Mode::Both)
+        matches!(self, CheckMode::Pre | CheckMode::Both)
     }
 
     /// Returns true if this mode includes post-patch checks.
     pub fn is_post(&self) -> bool {
-        matches!(self, Mode::Post | Mode::Both)
+        matches!(self, CheckMode::Post | CheckMode::Both)
     }
 }
 
@@ -49,7 +49,7 @@ pub struct Check {
     /// Whether to treat any stderr output as a failure, regardless of exit code
     pub fail_on_stderr: bool,
     /// When this check should run
-    pub mode: Mode,
+    pub mode: CheckMode,
 }
 
 impl Check {
@@ -127,7 +127,7 @@ mod tests {
             globs: vec!["src/*.rs".to_string(), "tests/**/*.rs".to_string()],
             default_off: false,
             fail_on_stderr: true,
-            mode: Mode::Both,
+            mode: CheckMode::Both,
         };
 
         let patterns = check.globs.clone();
@@ -144,7 +144,7 @@ mod tests {
             globs: vec!["*.rs".to_string()],
             default_off: false,
             fail_on_stderr: true,
-            mode: Mode::Both,
+            mode: CheckMode::Both,
         };
 
         let config = test_config();
@@ -160,7 +160,7 @@ mod tests {
             globs: vec!["*.rs".to_string()],
             default_off: false,
             fail_on_stderr: true,
-            mode: super::Mode::Both,
+            mode: super::CheckMode::Both,
         };
 
         let config = test_config();

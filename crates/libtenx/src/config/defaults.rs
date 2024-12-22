@@ -355,4 +355,3 @@ pub fn default_config<P: AsRef<Path>>(current_dir: P) -> Config {
         ..Default::default()
     }
 }
-
