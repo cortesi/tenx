@@ -1,10 +1,13 @@
 
 v0.0.4:
 
-- feature: support Groq models
-- feature: support Google Gemini
-- ux: tenx edit args are now mandatory
-- bug: improve relative path handling
-- bug: fix --no-pre-check flag
-- bug: improve handling of duplicate contexts
-- many cleanups and small refactorings
+- Feature: better project file management. The config project object now has a
+  globs attribute, and we have more sophisticated handling of .gitignore and
+  similar files.
+- Feature: support Groq models
+- Feature: support Google Gemini
+- Ux: tenx edit args are now mandatory
+- Bug: improve relative path handling
+- Bug: fix --no-pre-check flag
+- Bug: improve handling of duplicate contexts
+- Many cleanups and small refactorings

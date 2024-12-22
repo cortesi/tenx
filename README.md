@@ -24,6 +24,8 @@ cargo install tenx
 - Preflight checks to ensure the project is consistent before prompting.
 - Post-patch checks with automated model feedback and retry on failure.
 - Undo, retry and re-edit steps in the session.
+- Built-in support for models from OpenAI, Anthropic, DeepInfra, DeepSeek, xAI,
+  Google and Groq, and local models through tools like Ollama.
 - Built on **libtenx**, a Rust library for building AI-assisted coding tools.
 
 

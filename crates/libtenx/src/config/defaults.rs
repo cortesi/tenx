@@ -27,7 +27,6 @@ const XAI_API_BASE: &str = "https://api.x.ai/v1";
 const XAI_DEFAULT_GROK: &str = "grok-beta";
 
 const GOOGLEAI_API_KEY: &str = "GOOGLEAI_API_KEY";
-
 const GOOGLEAI_GEMINI_15_PRO: &str = "gemini-1.5-pro";
 const GOOGLEAI_GEMINI_15_FLASH: &str = "gemini-1.5-flash";
 const GOOGLEAI_GEMINI_15_FLASH_8B: &str = "gemini-1.5-flash-8b";

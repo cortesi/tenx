@@ -370,7 +370,8 @@ pub struct Project {
     pub root: PathBuf,
 
     /// Glob patterns for file inclusion/exclusion. Patterns prefixed with "!" exclude matches.
-    /// For example: ["*.rs", "!test_*.rs"] includes all Rust files except test files.
+    /// For example: ["*.rs", "!test_*.rs"] includes all Rust files except test files. Unless
+    /// over-ridden, Tenx respects .gitignore, .ignore and .git/info/exclude files.
     #[serde(default)]
     pub globs: Vec<String>,
 }

@@ -20,7 +20,6 @@ Bugs:
 
 Features:
     
-    - git should include files in git and un-tracked files
     - reset --all to completely roll back a session
     - readonly: set a local file to be read-only
     - env variable to control default model
