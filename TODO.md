@@ -20,7 +20,6 @@ Bugs:
 
 Features:
     
-    - reset --all to completely roll back a session
     - readonly: set a local file to be read-only
     - context type: command output
     - context type: git diff 

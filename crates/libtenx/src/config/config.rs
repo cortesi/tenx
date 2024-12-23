@@ -121,6 +121,7 @@ pub struct Context {
     pub path: Vec<String>,
     pub project_map: bool,
     pub text: Vec<TextContext>,
+    pub cmd: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

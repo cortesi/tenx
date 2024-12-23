@@ -281,6 +281,8 @@ pub enum Context {
     Url(Url),
     /// Raw text content provided directly
     Text(Text),
+    /// Output from executing a command
+    Cmd(Cmd),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
@@ -321,6 +323,75 @@ impl ContextProvider for Text {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+/// A context provider that captures command output
+pub struct Cmd {
+    command: String,
+    content: String,
+}
+
+impl Cmd {
+    pub(crate) fn new(command: String) -> Self {
+        Self {
+            command,
+            content: String::new(),
+        }
+    }
+}
+
+#[async_trait]
+impl ContextProvider for Cmd {
+    fn context_items(
+        &self,
+        _config: &crate::config::Config,
+        _session: &Session,
+    ) -> Result<Vec<ContextItem>> {
+        Ok(vec![ContextItem {
+            ty: "cmd".to_string(),
+            source: self.command.clone(),
+            body: self.content.clone(),
+        }])
+    }
+
+    fn human(&self) -> String {
+        format!("cmd: {}", self.command)
+    }
+
+    async fn refresh(&mut self) -> Result<()> {
+        let output = tokio::process::Command::new("sh")
+            .arg("-c")
+            .arg(&self.command)
+            .output()
+            .await
+            .map_err(|e| TenxError::Resolve(e.to_string()))?;
+
+        let mut content = String::new();
+        if !output.stdout.is_empty() {
+            let stdo_bytes = strip_ansi_escapes::strip(&output.stdout);
+            let stdout = String::from_utf8_lossy(&stdo_bytes).trim_end().to_string();
+            if !stdout.is_empty() {
+                content.push_str(&stdout);
+            }
+        }
+        if !output.stderr.is_empty() {
+            let stde_bytes = strip_ansi_escapes::strip(&output.stderr);
+            let stderr = String::from_utf8_lossy(&stde_bytes).trim_end().to_string();
+            if !stderr.is_empty() {
+                if !content.is_empty() {
+                    content.push('\n');
+                }
+                content.push_str(&stderr);
+            }
+        }
+        self.content = content;
+        Ok(())
+    }
+
+    async fn needs_refresh(&self) -> bool {
+        self.content.is_empty()
+    }
+}
+
 impl Context {
     /// Creates a new Context for plain text content.
     pub fn new_text(name: &str, content: &str) -> Self {
@@ -346,6 +417,11 @@ impl Context {
     pub fn new_url(url: &str) -> Self {
         Context::Url(Url::new(url.to_string()))
     }
+
+    /// Creates a new Context for a command.
+    pub fn new_cmd(command: &str) -> Self {
+        Context::Cmd(Cmd::new(command.to_string()))
+    }
 }
 
 #[async_trait]
@@ -361,6 +437,7 @@ impl ContextProvider for Context {
             Context::ProjectMap(p) => p.context_items(config, session),
             Context::Url(u) => u.context_items(config, session),
             Context::Text(t) => t.context_items(config, session),
+            Context::Cmd(c) => c.context_items(config, session),
         }
     }
 
@@ -371,6 +448,7 @@ impl ContextProvider for Context {
             Context::ProjectMap(p) => p.human(),
             Context::Url(u) => u.human(),
             Context::Text(t) => t.human(),
+            Context::Cmd(c) => c.human(),
         }
     }
 
@@ -381,6 +459,7 @@ impl ContextProvider for Context {
             Context::ProjectMap(p) => p.refresh().await,
             Context::Url(u) => u.refresh().await,
             Context::Text(t) => t.refresh().await,
+            Context::Cmd(c) => c.refresh().await,
         }
     }
 
@@ -391,6 +470,7 @@ impl ContextProvider for Context {
             Context::ProjectMap(p) => p.needs_refresh().await,
             Context::Url(u) => u.needs_refresh().await,
             Context::Text(t) => t.needs_refresh().await,
+            Context::Cmd(c) => c.needs_refresh().await,
         }
     }
 }
@@ -398,6 +478,7 @@ impl ContextProvider for Context {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tokio::runtime::Runtime;
 
     use crate::{
         model::{DummyModel, Model, ModelProvider},
@@ -523,6 +604,30 @@ mod tests {
         } else {
             panic!("Expected ContextSpec::Path");
         }
+    }
+
+    #[test]
+    fn test_cmd_context() {
+        let rt = Runtime::new().unwrap();
+        let config = test_project().config;
+        let session = Session::default();
+        let cmd = "echo 'hello world' && echo 'error' >&2";
+        let mut context = Context::new_cmd(cmd);
+
+        // Initial state
+        assert!(rt.block_on(async { context.needs_refresh().await }));
+
+        // After refresh
+        rt.block_on(async { context.refresh().await.unwrap() });
+
+        let items = rt.block_on(async { context.context_items(&config, &session).unwrap() });
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].ty, "cmd");
+        assert_eq!(items[0].source, cmd);
+        assert_eq!(items[0].body, "hello world\nerror");
+
+        assert_eq!(context.human(), format!("cmd: {}", cmd));
+        assert!(!rt.block_on(async { context.needs_refresh().await }));
     }
 
     #[test]

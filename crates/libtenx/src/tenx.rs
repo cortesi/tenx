@@ -394,6 +394,7 @@ mod tests {
                 name: "test".to_string(),
                 content: "test content".to_string(),
             }],
+            cmd: vec![],
         };
         let tenx = Tenx::new(config);
 
