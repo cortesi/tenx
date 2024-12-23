@@ -67,53 +67,89 @@ impl Google {
         &mut self,
         params: GenerateContentReq,
         sender: Option<mpsc::Sender<Event>>,
-    ) -> Result<google_genai::datatypes::GenerateContentResponse> {
+    ) -> Result<Vec<google_genai::datatypes::GenerateContentResponse>> {
         use futures_util::StreamExt;
         let mut stream = google_genai::generate_content_stream(&self.api_key, params)
             .await
             .map_err(|e| TenxError::Model(e.to_string()))?;
 
-        let mut final_response = None;
+        let mut responses = Vec::new();
         while let Some(response) = stream.next().await {
             let response = response.map_err(|e| TenxError::Model(e.to_string()))?;
-            if let Some(candidates) = &response.candidates {
-                for candidate in candidates {
-                    if let Some(content) = &candidate.content {
-                        if let Some(parts) = &content.parts {
-                            for part in parts {
-                                if let Some(text) = &part.text {
-                                    send_event(&sender, Event::Snippet(text.clone()))?;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            final_response = Some(response);
+            self.emit_event(&sender, &response)?;
+            responses.push(response);
         }
 
-        final_response.ok_or_else(|| TenxError::Model("No response received from stream".into()))
+        if responses.is_empty() {
+            return Err(TenxError::Model("No response received from stream".into()));
+        }
+        Ok(responses)
     }
 
-    fn extract_changes(
+    fn emit_event(
         &self,
-        dialect: &Dialect,
+        sender: &Option<mpsc::Sender<Event>>,
         response: &google_genai::datatypes::GenerateContentResponse,
-    ) -> Result<ModelResponse> {
+    ) -> Result<()> {
         if let Some(candidates) = &response.candidates {
             if let Some(candidate) = candidates.first() {
                 if let Some(content) = &candidate.content {
                     if let Some(parts) = &content.parts {
                         for part in parts {
                             if let Some(text) = &part.text {
-                                return dialect.parse(text);
+                                send_event(sender, Event::ModelResponse(text.clone()))?;
                             }
                         }
                     }
                 }
             }
         }
-        Err(TenxError::Internal("No patch to parse.".into()))
+        Ok(())
+    }
+
+    fn extract_changes(
+        &self,
+        dialect: &Dialect,
+        responses: &[&google_genai::datatypes::GenerateContentResponse],
+    ) -> Result<ModelResponse> {
+        let mut full_text = String::new();
+        let mut total_prompt_tokens = 0;
+        let mut total_candidate_tokens = 0;
+        let mut total_tokens = 0;
+
+        for response in responses {
+            if let Some(candidates) = &response.candidates {
+                if let Some(candidate) = candidates.first() {
+                    if let Some(content) = &candidate.content {
+                        if let Some(parts) = &content.parts {
+                            for part in parts {
+                                if let Some(text) = &part.text {
+                                    full_text.push_str(text);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if let Some(metadata) = &response.usage_metadata {
+                total_prompt_tokens += metadata.prompt_token_count.unwrap_or(0);
+                total_candidate_tokens += metadata.candidates_token_count.unwrap_or(0);
+                total_tokens += metadata.total_token_count.unwrap_or(0);
+            }
+        }
+
+        if full_text.is_empty() {
+            return Err(TenxError::Internal("No patch to parse.".into()));
+        }
+
+        let mut modresp = dialect.parse(&full_text)?;
+        modresp.usage = Some(super::Usage::Google(GoogleUsage {
+            input_tokens: Some(total_prompt_tokens as u32),
+            output_tokens: Some(total_candidate_tokens as u32),
+            total_tokens: Some(total_tokens as u32),
+        }));
+
+        Ok(modresp)
     }
 
     fn request(
@@ -210,39 +246,19 @@ impl ModelProvider for Google {
         let req = self.request(config, session, &dialect)?;
         trace!("Sending request: {:#?}", req);
 
-        let resp = if self.streaming {
+        let responses = if self.streaming {
             self.stream_response(req.clone(), sender).await?
         } else {
             let resp = google_genai::generate_content(&self.api_key, req.clone())
                 .await
                 .map_err(|e| TenxError::Model(e.to_string()))?;
 
-            if let Some(candidates) = &resp.candidates {
-                if let Some(candidate) = candidates.first() {
-                    if let Some(content) = &candidate.content {
-                        if let Some(parts) = &content.parts {
-                            for part in parts {
-                                if let Some(text) = &part.text {
-                                    send_event(&sender, Event::ModelResponse(text.clone()))?;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            resp
+            self.emit_event(&sender, &resp)?;
+            vec![resp]
         };
 
-        trace!("Got response: {:#?}", resp);
-        let mut modresp = self.extract_changes(&dialect, &resp)?;
-
-        if let Some(metadata) = resp.usage_metadata {
-            modresp.usage = Some(super::Usage::Google(GoogleUsage {
-                input_tokens: Some(metadata.prompt_token_count.unwrap_or(0) as u32),
-                output_tokens: Some(metadata.candidates_token_count.unwrap_or(0) as u32),
-                total_tokens: Some(metadata.total_token_count.unwrap_or(0) as u32),
-            }));
-        }
+        trace!("Got responses: {:#?}", responses);
+        let modresp = self.extract_changes(&dialect, &responses.iter().collect::<Vec<_>>())?;
 
         Ok(modresp)
     }

@@ -21,10 +21,7 @@ Bugs:
 Features:
     
     - readonly: set a local file to be read-only
-    - context type: command output
-    - context type: git diff 
     - custom system prompt additions
-    - git diff context
     - graceful error handling for contexts, e.g. unfetchable urls
     - configurable modes with pre-defined models and contexts
     - deal with rate limits gracefully
