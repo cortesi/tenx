@@ -9,7 +9,7 @@ use fs_err as fs;
 use libruskel::Ruskel as LibRuskel;
 use serde::{Deserialize, Serialize};
 
-use crate::{config::Config, session::Session, Result, TenxError};
+use crate::{config::Config, exec::exec, session::Session, Result, TenxError};
 
 /// An individual context item.
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -358,30 +358,19 @@ impl ContextProvider for Cmd {
     }
 
     async fn refresh(&mut self) -> Result<()> {
-        let output = tokio::process::Command::new("sh")
-            .arg("-c")
-            .arg(&self.command)
-            .output()
-            .await
-            .map_err(|e| TenxError::Resolve(e.to_string()))?;
+        let (_, stdout, stderr) = exec(".", &self.command)?;
 
         let mut content = String::new();
-        if !output.stdout.is_empty() {
-            let stdo_bytes = strip_ansi_escapes::strip(&output.stdout);
-            let stdout = String::from_utf8_lossy(&stdo_bytes).trim_end().to_string();
-            if !stdout.is_empty() {
-                content.push_str(&stdout);
-            }
+        let stdout = stdout.trim_end();
+        if !stdout.is_empty() {
+            content.push_str(stdout);
         }
-        if !output.stderr.is_empty() {
-            let stde_bytes = strip_ansi_escapes::strip(&output.stderr);
-            let stderr = String::from_utf8_lossy(&stde_bytes).trim_end().to_string();
-            if !stderr.is_empty() {
-                if !content.is_empty() {
-                    content.push('\n');
-                }
-                content.push_str(&stderr);
+        let stderr = stderr.trim_end();
+        if !stderr.is_empty() {
+            if !content.is_empty() {
+                content.push('\n');
             }
+            content.push_str(stderr);
         }
         self.content = content;
         Ok(())

@@ -1,5 +1,3 @@
-#![cfg(test)]
-
 use crate::{config, session::Session};
 use fs_err as fs;
 use std::path::Path;

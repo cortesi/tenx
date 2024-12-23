@@ -52,6 +52,10 @@ pub enum TenxError {
     /// An error that occurs when sending an event.
     #[error("Error sending event: {0}")]
     EventSend(String),
+
+    /// Error executing a shell command
+    #[error("Error executing command: {cmd}")]
+    Exec { cmd: String, error: String },
 }
 
 impl TenxError {

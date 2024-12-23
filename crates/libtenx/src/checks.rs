@@ -1,6 +1,6 @@
-use std::{path::PathBuf, process::Command};
+use std::path::PathBuf;
 
-use crate::{config::Config, Result, TenxError};
+use crate::{config::Config, exec::exec, Result, TenxError};
 
 pub enum Runnable {
     Ok,
@@ -53,20 +53,9 @@ pub struct Check {
 
 impl Check {
     pub fn check(&self, config: &Config) -> Result<()> {
-        let output = Command::new("sh")
-            .arg("-c")
-            .arg(&self.command)
-            .current_dir(config.project_root())
-            .output()
-            .map_err(|e| TenxError::Internal(e.to_string()))?;
+        let (status, stdout, stderr) = exec(config.project_root(), &self.command)?;
 
-        let stdo_bytes = strip_ansi_escapes::strip(&output.stdout);
-        let stde_bytes = strip_ansi_escapes::strip(&output.stderr);
-
-        let stdout = String::from_utf8_lossy(&stdo_bytes);
-        let stderr = String::from_utf8_lossy(&stde_bytes);
-
-        if !output.status.success() || (self.fail_on_stderr && !stderr.is_empty()) {
+        if !status.success() || (self.fail_on_stderr && !stderr.is_empty()) {
             let msg = format!("Check command failed: {}", self.command);
             Err(TenxError::Check {
                 name: self.name.clone(),
