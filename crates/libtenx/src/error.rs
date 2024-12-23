@@ -3,6 +3,21 @@ use thiserror::Error;
 
 pub type Result<T> = std::result::Result<T, TenxError>;
 
+#[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
+pub enum Throttle {
+    RetryAfter(u64),
+    Throttle,
+}
+
+impl std::fmt::Display for Throttle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Throttle::RetryAfter(secs) => write!(f, "retry after {} seconds", secs),
+            Throttle::Throttle => write!(f, "rate limited"),
+        }
+    }
+}
+
 #[derive(Error, Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub enum TenxError {
     #[error("config error: {0}")]
@@ -56,6 +71,10 @@ pub enum TenxError {
     /// Error executing a shell command
     #[error("Error executing command: {cmd}")]
     Exec { cmd: String, error: String },
+
+    /// We've been throttled by the model, but we don't have a retry-after header.
+    #[error("Throttled: {0}")]
+    Throttle(Throttle),
 }
 
 impl TenxError {

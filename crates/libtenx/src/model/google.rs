@@ -1,7 +1,7 @@
 //! This module implements the Google model provider for the tenx system.
 use std::collections::HashMap;
 
-use google_genai::datatypes::{Content, GenerateContentReq, Part};
+use google_genai::datatypes::{Content, GenerateContentReq, GenerateContentResponse, Part};
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tracing::trace;
@@ -67,7 +67,7 @@ impl Google {
         &mut self,
         params: GenerateContentReq,
         sender: Option<mpsc::Sender<Event>>,
-    ) -> Result<Vec<google_genai::datatypes::GenerateContentResponse>> {
+    ) -> Result<Vec<GenerateContentResponse>> {
         use futures_util::StreamExt;
         let mut stream = google_genai::generate_content_stream(&self.api_key, params)
             .await
@@ -89,7 +89,7 @@ impl Google {
     fn emit_event(
         &self,
         sender: &Option<mpsc::Sender<Event>>,
-        response: &google_genai::datatypes::GenerateContentResponse,
+        response: &GenerateContentResponse,
     ) -> Result<()> {
         if let Some(candidates) = &response.candidates {
             if let Some(candidate) = candidates.first() {
@@ -110,7 +110,7 @@ impl Google {
     fn extract_changes(
         &self,
         dialect: &Dialect,
-        responses: &[&google_genai::datatypes::GenerateContentResponse],
+        responses: &[&GenerateContentResponse],
     ) -> Result<ModelResponse> {
         let mut full_text = String::new();
         let mut total_prompt_tokens = 0;

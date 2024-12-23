@@ -2314,8 +2314,6 @@ dependencies = [
 [[package]]
 name = "google-genai"
 version = "0.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e1c32ff3d2049168d5dd08e8a52c9243a4a12043bdd367ff2cd370d8b6ade293"
 dependencies = [
  "derive_setters",
  "futures-util",
