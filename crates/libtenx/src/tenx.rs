@@ -188,6 +188,12 @@ impl Tenx {
         self.save_session(session)
     }
 
+    /// Resets all steps in the session.
+    pub fn reset_all(&self, session: &mut Session) -> Result<()> {
+        session.reset_all(&self.config)?;
+        self.save_session(session)
+    }
+
     pub fn check(&self, paths: Vec<PathBuf>, sender: &Option<mpsc::Sender<Event>>) -> Result<()> {
         let _block = EventBlock::start(sender)?;
         self.check_paths(&paths, CheckMode::Both, sender)

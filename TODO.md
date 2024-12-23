@@ -14,6 +14,7 @@ Model response robustness:
 Bugs:
     
     - --no-check flag seems not to work
+    - probably should not do a pre-check on any retry
     - retry doesn't work with fix
     - retry doesn't work if the previous step had an error
 
@@ -21,8 +22,8 @@ Features:
     
     - reset --all to completely roll back a session
     - readonly: set a local file to be read-only
-    - env variable to control default model
-    - command output context type
+    - context type: command output
+    - context type: git diff 
     - custom system prompt additions
     - git diff context
     - graceful error handling for contexts, e.g. unfetchable urls

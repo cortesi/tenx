@@ -281,7 +281,10 @@ enum Commands {
     /// Reset the session to a specific step, undoing changes
     Reset {
         /// The step offset to reset to
-        step_offset: usize,
+        step_offset: Option<usize>,
+        /// Reset all steps in the session
+        #[clap(long)]
+        all: bool,
     },
     /// Retry a prompt
     Retry {
@@ -601,10 +604,20 @@ async fn main() -> anyhow::Result<()> {
                 tx.save_session(&session)?;
                 Ok(())
             }
-            Commands::Reset { step_offset } => {
+            Commands::Reset { step_offset, all } => {
+                if *all && step_offset.is_some() {
+                    return Err(anyhow!("Cannot specify both --all and a step offset"));
+                }
                 let mut session = tx.load_session()?;
-                tx.reset(&mut session, *step_offset)?;
-                println!("Session reset to step {}", step_offset);
+                if *all {
+                    tx.reset_all(&mut session)?;
+                    println!("All steps reset");
+                } else {
+                    let offset = step_offset
+                        .ok_or_else(|| anyhow!("Must specify either --all or a step offset"))?;
+                    tx.reset(&mut session, offset)?;
+                    println!("Session reset to step {}", offset);
+                }
                 Ok(())
             }
             Commands::Retry {

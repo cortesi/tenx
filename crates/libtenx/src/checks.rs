@@ -1,7 +1,5 @@
 use std::{path::PathBuf, process::Command};
 
-use strip_ansi_escapes;
-
 use crate::{config::Config, Result, TenxError};
 
 pub enum Runnable {

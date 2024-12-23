@@ -283,19 +283,37 @@ impl Session {
         }
     }
 
+    fn reset_steps(&mut self, config: &config::Config, keep: Option<usize>) -> Result<()> {
+        let total = self.steps.len();
+        match keep {
+            Some(offset) if offset >= total => {
+                return Err(TenxError::Internal("Invalid rollback offset".into()));
+            }
+            Some(offset) => {
+                let n = total - offset - 1;
+                for step in self.steps.iter_mut().rev().take(n) {
+                    step.rollback(config)?;
+                }
+                self.steps.truncate(offset + 1);
+            }
+            None => {
+                for step in self.steps.iter_mut().rev() {
+                    step.rollback(config)?;
+                }
+                self.steps.clear();
+            }
+        }
+        Ok(())
+    }
+
     /// Resets the session to a specific step, removing and rolling back all subsequent steps.
     pub fn reset(&mut self, config: &config::Config, offset: usize) -> Result<()> {
-        if offset >= self.steps.len() {
-            return Err(TenxError::Internal("Invalid rollback offset".into()));
-        }
+        self.reset_steps(config, Some(offset))
+    }
 
-        let n = self.steps.len() - offset - 1;
-        for step in self.steps.iter_mut().rev().take(n) {
-            step.rollback(config)?;
-        }
-
-        self.steps.truncate(offset + 1);
-        Ok(())
+    /// Rolls back and removes all steps in the session.
+    pub fn reset_all(&mut self, config: &config::Config) -> Result<()> {
+        self.reset_steps(config, None)
     }
 
     /// Apply the last step in the session, applying the patch and operations.
@@ -507,9 +525,13 @@ mod tests {
 
         // Rollback to the first step
         test_project.session.reset(&test_project.config, 0)?;
-
         assert_eq!(test_project.session.steps.len(), 1);
         assert_eq!(test_project.read("test.txt"), "Content 1");
+
+        // Test reset_all
+        test_project.session.reset_all(&test_project.config)?;
+        assert_eq!(test_project.session.steps.len(), 0);
+        assert_eq!(test_project.read("test.txt"), "Initial content");
 
         Ok(())
     }
