@@ -17,6 +17,29 @@ use crate::{
     Result, TenxError,
 };
 
+fn map_error(e: google_genai::error::GenAiError) -> TenxError {
+    match e {
+        google_genai::error::GenAiError::Remote {
+            status,
+            message,
+            headers,
+        } => {
+            if status == 429 {
+                // Look for retry-after header
+                if let Some(retry_after) = headers.get("retry-after") {
+                    if let Ok(secs) = retry_after.parse::<u64>() {
+                        return TenxError::Throttle(crate::error::Throttle::RetryAfter(secs));
+                    }
+                }
+                TenxError::Throttle(crate::error::Throttle::Throttle)
+            } else {
+                TenxError::Model(message)
+            }
+        }
+        google_genai::error::GenAiError::Internal(msg) => TenxError::Model(msg),
+    }
+}
+
 /// A model that interacts with the Google Generative Language API. The general design of the model
 /// is to:
 ///
@@ -71,11 +94,11 @@ impl Google {
         use futures_util::StreamExt;
         let mut stream = google_genai::generate_content_stream(&self.api_key, params)
             .await
-            .map_err(|e| TenxError::Model(e.to_string()))?;
+            .map_err(map_error)?;
 
         let mut responses = Vec::new();
         while let Some(response) = stream.next().await {
-            let response = response.map_err(|e| TenxError::Model(e.to_string()))?;
+            let response = response.map_err(map_error)?;
             self.emit_event(&sender, &response)?;
             responses.push(response);
         }
@@ -251,7 +274,7 @@ impl ModelProvider for Google {
         } else {
             let resp = google_genai::generate_content(&self.api_key, req.clone())
                 .await
-                .map_err(|e| TenxError::Model(e.to_string()))?;
+                .map_err(map_error)?;
 
             self.emit_event(&sender, &resp)?;
             vec![resp]
