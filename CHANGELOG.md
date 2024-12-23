@@ -1,6 +1,7 @@
 
 v0.0.4:
 
+- Checks now strip ANSI color codes from output before returning output to model.
 - Better text representation for prompt editing. Now uses a Markdown format.
 - Feature: better project file management. The config project object now has a
   globs attribute, and we have more sophisticated handling of .gitignore and

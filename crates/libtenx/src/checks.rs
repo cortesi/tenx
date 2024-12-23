@@ -1,5 +1,6 @@
-use std::path::PathBuf;
-use std::process::Command;
+use std::{path::PathBuf, process::Command};
+
+use strip_ansi_escapes;
 
 use crate::{config::Config, Result, TenxError};
 
@@ -61,8 +62,11 @@ impl Check {
             .output()
             .map_err(|e| TenxError::Internal(e.to_string()))?;
 
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let stderr = String::from_utf8_lossy(&output.stderr);
+        let stdo_bytes = strip_ansi_escapes::strip(&output.stdout);
+        let stde_bytes = strip_ansi_escapes::strip(&output.stderr);
+
+        let stdout = String::from_utf8_lossy(&stdo_bytes);
+        let stderr = String::from_utf8_lossy(&stde_bytes);
 
         if !output.status.success() || (self.fail_on_stderr && !stderr.is_empty()) {
             let msg = format!("Check command failed: {}", self.command);

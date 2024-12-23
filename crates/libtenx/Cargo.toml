@@ -47,6 +47,7 @@ googleapis-tonic-google-ai-generativelanguage-v1 = "0.15.0"
 tonic = { version = "0.12.3", features = ["tls", "tls-roots", "channel", "tls-webpki-roots"] }
 http-body = "1.0.1"
 ignore = "0.4.23"
+strip-ansi-escapes = "0.2.0"
 
 [dev-dependencies]
 indoc = "2.0.5"
