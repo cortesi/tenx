@@ -1,9 +1,14 @@
-use anyhow::{Context as AnyhowContext, Result};
 use std::{fs, io::Write, process::Command};
+
+use anyhow::{Context as AnyhowContext, Result};
 use tempfile::NamedTempFile;
 use tokio::sync::mpsc;
 
 use libtenx::{events::Event, session::Session};
+
+const SESSION_INFO_MARKER: &str = "\n** Only edit prompt text ABOVE this marker. **\n";
+
+const SESSION_HEADER: &str = "-----\n\n# Session Summary\n\n";
 
 /// Returns the user's preferred editor.
 fn get_editor() -> (String, Vec<String>) {
@@ -15,35 +20,38 @@ fn get_editor() -> (String, Vec<String>) {
 }
 
 /// Renders a step as a comment.
-fn render_step_commented(session: &Session, step_offset: usize) -> String {
+fn render_step(session: &Session, step_offset: usize) -> String {
     let mut text = String::new();
     let steps = session.steps();
     let step = &steps[step_offset];
 
-    text.push_str(&format!("# Step {}\n", step_offset));
-    text.push_str("# ====\n#\n");
-    text.push_str("# Prompt:\n# -------\n");
+    text.push_str(&format!("## Step {}\n\n", step_offset));
+    text.push_str("### Prompt");
+    text.push_str("\n```\n");
     for line in step.prompt.lines() {
-        text.push_str(&format!("# {}\n", line));
+        text.push_str(&format!("    {}\n", line));
     }
+    text.push_str("```\n");
     if let Some(response) = &step.model_response {
         if let Some(comment) = &response.comment {
-            text.push_str("#\n# Response:\n# ---------\n");
+            text.push_str("\n### Response");
+            text.push_str("\n```\n");
             for line in comment.lines() {
-                text.push_str(&format!("# {}\n", line));
+                text.push_str(&format!("    {}\n", line));
             }
+            text.push_str("```\n");
         }
     }
     text.push('\n');
     text
 }
 
-/// Renders all steps as comments.
-fn comment_all_steps(session: &Session) -> String {
-    let mut text = "\n\n".to_string();
+/// Renders the session summary
+fn render_session_summary(session: &Session) -> String {
+    let mut text = String::new();
     for i in (0..session.steps().len()).rev() {
-        text.push_str(&render_step_commented(session, i));
-        if i == 0 {
+        text.push_str(&render_step(session, i));
+        if i > 0 {
             text.push('\n');
         }
     }
@@ -61,33 +69,22 @@ fn render_initial_text(session: &Session, retry: bool) -> Result<String> {
         }
         let last = steps.last().unwrap();
         text.push_str(&last.prompt);
-        text.push_str("\n\n");
-        // Add all but the last step as comments
-        for i in (0..steps.len() - 1).rev() {
-            text.push_str(&render_step_commented(session, i));
-            if i == 0 {
-                text.push('\n');
-            }
-        }
-    } else {
-        text.push_str(&comment_all_steps(session));
     }
+    text.push('\n');
+    text.push_str(SESSION_INFO_MARKER);
+    text.push_str(SESSION_HEADER);
+    text.push_str(&render_session_summary(session));
 
     Ok(text)
 }
 
 /// Parses the edited text into a Prompt.
 fn parse_edited_text(input: &str) -> String {
-    let mut user_prompt = String::new();
-
-    for line in input.lines() {
-        if !line.trim().starts_with('#') && !line.trim().is_empty() {
-            user_prompt.push_str(line);
-            user_prompt.push('\n');
-        }
+    if let Some(marker_pos) = input.find(SESSION_INFO_MARKER) {
+        input[..marker_pos].trim().to_string()
+    } else {
+        input.trim().to_string()
     }
-
-    user_prompt.trim().to_string()
 }
 
 /// Opens an editor for the user to input their prompt.
@@ -99,7 +96,7 @@ pub fn edit_prompt(
     if let Some(sender) = event_sender {
         let _ = sender.try_send(Event::Interact);
     }
-    let mut temp_file = NamedTempFile::new()?;
+    let mut temp_file = NamedTempFile::with_suffix(".md")?;
     let initial_text = render_initial_text(session, retry)?;
     temp_file.write_all(initial_text.as_bytes())?;
     temp_file.flush()?;
@@ -132,139 +129,69 @@ mod tests {
         session::{ModelResponse, StepType},
     };
 
-    use indoc::indoc;
     use pretty_assertions::assert_eq;
 
     #[test]
     fn test_parse_edited_text() {
-        let input = indoc! {"
-            New prompt here
-            with multiple lines
+        // Basic parse test with session info
+        let input = format!("New prompt{SESSION_INFO_MARKER}Session info...");
+        let prompt = parse_edited_text(&input);
+        assert_eq!(prompt, "New prompt");
 
-            # Step 2
-            # Prompt:
-            # Previous prompt
-            # with multiple lines
-            # Response:
-            # Previous response
-            # also with multiple lines
+        // Multi-line prompt test
+        let input = format!("Line 1\nLine 2{SESSION_INFO_MARKER}Session info...");
+        let prompt = parse_edited_text(&input);
+        assert_eq!(prompt, "Line 1\nLine 2");
 
-            # Step 1
-            # Prompt:
-            # First prompt
-            # Response:
-            # First response
-        "};
+        // No session marker should return full text trimmed
+        let input = "Just a prompt\nNo session info";
         let prompt = parse_edited_text(input);
-        assert_eq!(prompt, "New prompt here\nwith multiple lines");
+        assert_eq!(prompt, "Just a prompt\nNo session info");
     }
 
     #[test]
-    fn test_render_initial_text() {
-        let mut session = Session::default();
-        session
-            .add_prompt(
-                "test_model".into(),
-                "First prompt\nwith multiple lines".to_string(),
-                StepType::Code,
-            )
-            .unwrap();
-        if let Some(step) = session.last_step_mut() {
-            step.model_response = Some(ModelResponse {
-                patch: Some(Patch { changes: vec![] }),
-                operations: vec![],
-                usage: None,
-                comment: Some("First response\nalso with multiple lines".to_string()),
-                response_text: Some("First response\nalso with multiple lines".to_string()),
-            });
-        }
-
-        // Test rendering with retry on first step
-        let rendered_text = render_initial_text(&session, true).unwrap();
-        assert_eq!(rendered_text, "First prompt\nwith multiple lines\n\n");
-
-        // Test rendering with retry on empty session should error
+    fn test_render_initial_text_empty_session() {
         let empty_session = Session::default();
+
+        // Should error on retry with empty session
         assert!(render_initial_text(&empty_session, true).is_err());
 
-        // Add second step
-        session
-            .add_prompt(
-                "test_model".into(),
-                "Second prompt\nstill multiple lines".to_string(),
-                StepType::Code,
-            )
-            .unwrap();
-        if let Some(step) = session.last_step_mut() {
-            step.model_response = Some(ModelResponse {
-                patch: Some(Patch { changes: vec![] }),
-                operations: vec![],
-                usage: None,
-                comment: Some("Second response\nyet more lines".to_string()),
-                response_text: Some("Second response\nyet more lines".to_string()),
-            });
+        // Should succeed with no retry
+        let rendered = render_initial_text(&empty_session, false).unwrap();
+        assert!(rendered.contains(SESSION_INFO_MARKER));
+    }
+
+    #[test]
+    fn test_render_and_parse_roundtrip() {
+        let mut session = Session::default();
+
+        // Add two steps with responses
+        for (prompt, response) in [
+            ("First prompt\nMultiline", "First response"),
+            ("Second prompt", "Second response"),
+        ] {
+            session
+                .add_prompt("test_model".into(), prompt.to_string(), StepType::Code)
+                .unwrap();
+            if let Some(step) = session.last_step_mut() {
+                step.model_response = Some(ModelResponse {
+                    patch: Some(Patch { changes: vec![] }),
+                    operations: vec![],
+                    usage: None,
+                    comment: Some(response.to_string()),
+                    response_text: Some(response.to_string()),
+                });
+            }
         }
 
-        // Test rendering with retry=false should comment all steps
-        let rendered_no_retry = render_initial_text(&session, false).unwrap();
-        assert_eq!(
-            rendered_no_retry,
-            indoc! {"
+        // Test retry=false (empty prompt)
+        let rendered = render_initial_text(&session, false).unwrap();
+        let parsed = parse_edited_text(&rendered);
+        assert_eq!(parsed.trim(), "");
 
-
-            # Step 1
-            # ====
-            #
-            # Prompt:
-            # -------
-            # Second prompt
-            # still multiple lines
-            #
-            # Response:
-            # ---------
-            # Second response
-            # yet more lines
-
-            # Step 0
-            # ====
-            #
-            # Prompt:
-            # -------
-            # First prompt
-            # with multiple lines
-            #
-            # Response:
-            # ---------
-            # First response
-            # also with multiple lines
-
-
-        "}
-        );
-
-        // Test rendering with retry=true should show last step uncommented
-        let rendered_retry = render_initial_text(&session, true).unwrap();
-        assert_eq!(
-            rendered_retry,
-            indoc! {"
-            Second prompt
-            still multiple lines
-
-            # Step 0
-            # ====
-            #
-            # Prompt:
-            # -------
-            # First prompt
-            # with multiple lines
-            #
-            # Response:
-            # ---------
-            # First response
-            # also with multiple lines
-
-
-        "}
-        );
+        // Test retry=true (should show last prompt)
+        let rendered = render_initial_text(&session, true).unwrap();
+        let parsed = parse_edited_text(&rendered);
+        assert_eq!(parsed, "Second prompt");
     }
 }
