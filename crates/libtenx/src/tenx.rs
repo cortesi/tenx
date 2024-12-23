@@ -74,7 +74,7 @@ impl Tenx {
         let _block = EventBlock::context(sender)?;
         for context in session.contexts.iter_mut() {
             let _refresh_block = EventBlock::context_refresh(sender, &context.human())?;
-            context.refresh().await?;
+            context.refresh(&self.config).await?;
         }
         Ok(())
     }
@@ -99,9 +99,9 @@ impl Tenx {
         if !session.contexts.is_empty() {
             let _block = EventBlock::context(sender)?;
             for context in session.contexts.iter_mut() {
-                if context.needs_refresh().await {
+                if context.needs_refresh(&self.config).await {
                     let _refresh_block = EventBlock::context_refresh(sender, &context.human())?;
-                    context.refresh().await?;
+                    context.refresh(&self.config).await?;
                 }
             }
         }

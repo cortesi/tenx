@@ -56,9 +56,9 @@ pub trait ContextProvider {
     fn human(&self) -> String;
 
     /// Refreshes the content of the context provider.
-    async fn refresh(&mut self) -> Result<()>;
+    async fn refresh(&mut self, config: &Config) -> Result<()>;
 
-    async fn needs_refresh(&self) -> bool {
+    async fn needs_refresh(&self, _config: &Config) -> bool {
         false
     }
 }
@@ -97,7 +97,7 @@ impl ContextProvider for Ruskel {
         format!("ruskel: {}", self.name)
     }
 
-    async fn refresh(&mut self) -> Result<()> {
+    async fn refresh(&mut self, _config: &Config) -> Result<()> {
         let ruskel = LibRuskel::new(&self.name);
         self.content = ruskel
             .render(false, false, true)
@@ -105,7 +105,7 @@ impl ContextProvider for Ruskel {
         Ok(())
     }
 
-    async fn needs_refresh(&self) -> bool {
+    async fn needs_refresh(&self, _config: &Config) -> bool {
         self.content.is_empty()
     }
 }
@@ -141,7 +141,7 @@ impl ContextProvider for ProjectMap {
         "project_map".to_string()
     }
 
-    async fn refresh(&mut self) -> Result<()> {
+    async fn refresh(&mut self, _config: &Config) -> Result<()> {
         Ok(())
     }
 }
@@ -201,7 +201,7 @@ impl ContextProvider for Path {
         }
     }
 
-    async fn refresh(&mut self) -> Result<()> {
+    async fn refresh(&mut self, _config: &Config) -> Result<()> {
         Ok(())
     }
 }
@@ -250,7 +250,7 @@ impl ContextProvider for Url {
         format!("url: {}", self.name)
     }
 
-    async fn refresh(&mut self) -> Result<()> {
+    async fn refresh(&mut self, _config: &Config) -> Result<()> {
         let client = reqwest::Client::new();
         self.content = client
             .get(&self.url)
@@ -263,7 +263,7 @@ impl ContextProvider for Url {
         Ok(())
     }
 
-    async fn needs_refresh(&self) -> bool {
+    async fn needs_refresh(&self, _config: &Config) -> bool {
         self.content.is_empty()
     }
 }
@@ -318,7 +318,7 @@ impl ContextProvider for Text {
         format!("text: {} ({} lines, {} chars)", self.name, lines, chars)
     }
 
-    async fn refresh(&mut self) -> Result<()> {
+    async fn refresh(&mut self, _config: &Config) -> Result<()> {
         Ok(())
     }
 }
@@ -357,8 +357,8 @@ impl ContextProvider for Cmd {
         format!("cmd: {}", self.command)
     }
 
-    async fn refresh(&mut self) -> Result<()> {
-        let (_, stdout, stderr) = exec(".", &self.command)?;
+    async fn refresh(&mut self, config: &Config) -> Result<()> {
+        let (_, stdout, stderr) = exec(config.project_root(), &self.command)?;
 
         let mut content = String::new();
         let stdout = stdout.trim_end();
@@ -376,7 +376,7 @@ impl ContextProvider for Cmd {
         Ok(())
     }
 
-    async fn needs_refresh(&self) -> bool {
+    async fn needs_refresh(&self, _config: &Config) -> bool {
         self.content.is_empty()
     }
 }
@@ -441,25 +441,25 @@ impl ContextProvider for Context {
         }
     }
 
-    async fn refresh(&mut self) -> Result<()> {
+    async fn refresh(&mut self, config: &Config) -> Result<()> {
         match self {
-            Context::Ruskel(r) => r.refresh().await,
-            Context::Path(g) => g.refresh().await,
-            Context::ProjectMap(p) => p.refresh().await,
-            Context::Url(u) => u.refresh().await,
-            Context::Text(t) => t.refresh().await,
-            Context::Cmd(c) => c.refresh().await,
+            Context::Ruskel(r) => r.refresh(config).await,
+            Context::Path(g) => g.refresh(config).await,
+            Context::ProjectMap(p) => p.refresh(config).await,
+            Context::Url(u) => u.refresh(config).await,
+            Context::Text(t) => t.refresh(config).await,
+            Context::Cmd(c) => c.refresh(config).await,
         }
     }
 
-    async fn needs_refresh(&self) -> bool {
+    async fn needs_refresh(&self, config: &Config) -> bool {
         match self {
-            Context::Ruskel(r) => r.needs_refresh().await,
-            Context::Path(g) => g.needs_refresh().await,
-            Context::ProjectMap(p) => p.needs_refresh().await,
-            Context::Url(u) => u.needs_refresh().await,
-            Context::Text(t) => t.needs_refresh().await,
-            Context::Cmd(c) => c.needs_refresh().await,
+            Context::Ruskel(r) => r.needs_refresh(config).await,
+            Context::Path(g) => g.needs_refresh(config).await,
+            Context::ProjectMap(p) => p.needs_refresh(config).await,
+            Context::Url(u) => u.needs_refresh(config).await,
+            Context::Text(t) => t.needs_refresh(config).await,
+            Context::Cmd(c) => c.needs_refresh(config).await,
         }
     }
 }
@@ -598,16 +598,18 @@ mod tests {
     #[test]
     fn test_cmd_context() {
         let rt = Runtime::new().unwrap();
-        let config = test_project().config;
+        let test_project = test_project();
+        test_project.create_file_tree(&["test.txt"]);
+        let config = test_project.config;
         let session = Session::default();
         let cmd = "echo 'hello world' && echo 'error' >&2";
         let mut context = Context::new_cmd(cmd);
 
         // Initial state
-        assert!(rt.block_on(async { context.needs_refresh().await }));
+        assert!(rt.block_on(async { context.needs_refresh(&config).await }));
 
         // After refresh
-        rt.block_on(async { context.refresh().await.unwrap() });
+        rt.block_on(async { context.refresh(&config).await.unwrap() });
 
         let items = rt.block_on(async { context.context_items(&config, &session).unwrap() });
         assert_eq!(items.len(), 1);
@@ -616,7 +618,7 @@ mod tests {
         assert_eq!(items[0].body, "hello world\nerror");
 
         assert_eq!(context.human(), format!("cmd: {}", cmd));
-        assert!(!rt.block_on(async { context.needs_refresh().await }));
+        assert!(!rt.block_on(async { context.needs_refresh(&config).await }));
     }
 
     #[test]
