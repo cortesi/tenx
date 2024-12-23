@@ -26,3 +26,32 @@ pub fn exec<P: AsRef<Path>>(root: P, cmd: &str) -> Result<(ExitStatus, String, S
 
     Ok((output.status, stdout, stderr))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::env::current_dir;
+
+    #[test]
+    fn test_exec() {
+        let cwd = current_dir().unwrap();
+
+        // Test successful command with stdout
+        let (status, stdout, stderr) = exec(&cwd, "echo 'hello'").unwrap();
+        assert!(status.success());
+        assert_eq!(stdout, "hello");
+        assert_eq!(stderr, "");
+
+        // Test command with stderr
+        let (status, stdout, stderr) = exec(&cwd, "echo 'error' >&2").unwrap();
+        assert!(status.success());
+        assert_eq!(stdout, "");
+        assert_eq!(stderr, "error");
+
+        // Test command that exits with error status
+        let (status, stdout, stderr) = exec(&cwd, "exit 1").unwrap();
+        assert!(!status.success());
+        assert_eq!(stdout, "");
+        assert_eq!(stderr, "");
+    }
+}
