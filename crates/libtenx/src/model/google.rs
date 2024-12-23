@@ -14,6 +14,7 @@ use crate::{
     model::ModelProvider,
     session::ModelResponse,
     session::Session,
+    throttle::Throttle,
     Result, TenxError,
 };
 
@@ -28,10 +29,10 @@ fn map_error(e: google_genai::error::GenAiError) -> TenxError {
                 // Look for retry-after header
                 if let Some(retry_after) = headers.get("retry-after") {
                     if let Ok(secs) = retry_after.parse::<u64>() {
-                        return TenxError::Throttle(crate::error::Throttle::RetryAfter(secs));
+                        return TenxError::Throttle(Throttle::RetryAfter(secs));
                     }
                 }
-                TenxError::Throttle(crate::error::Throttle::Throttle)
+                TenxError::Throttle(Throttle::Backoff)
             } else {
                 TenxError::Model(message)
             }

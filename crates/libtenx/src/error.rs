@@ -1,22 +1,9 @@
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use crate::throttle::Throttle;
+
 pub type Result<T> = std::result::Result<T, TenxError>;
-
-#[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
-pub enum Throttle {
-    RetryAfter(u64),
-    Throttle,
-}
-
-impl std::fmt::Display for Throttle {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Throttle::RetryAfter(secs) => write!(f, "retry after {} seconds", secs),
-            Throttle::Throttle => write!(f, "rate limited"),
-        }
-    }
-}
 
 #[derive(Error, Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub enum TenxError {
@@ -75,6 +62,10 @@ pub enum TenxError {
     /// We've been throttled by the model, but we don't have a retry-after header.
     #[error("Throttled: {0}")]
     Throttle(Throttle),
+
+    /// We've exceeded the max retries trying to send a request.
+    #[error("Max retries exceeded: {0}")]
+    MaxRetries(u64),
 }
 
 impl TenxError {
