@@ -158,6 +158,11 @@ enum ContextCommands {
         /// File to read text from (reads from stdin if not specified)
         file: Option<String>,
     },
+    /// Add command output to context
+    Cmd {
+        /// Command to execute
+        command: String,
+    },
     /// Show the current session's contexts
     Show,
 }
@@ -589,6 +594,9 @@ async fn main() -> anyhow::Result<()> {
                         };
                         let name = name.as_deref().unwrap_or("<anonymous>");
                         session.add_context(Context::new_text(name, &text));
+                    }
+                    ContextCommands::Cmd { command } => {
+                        session.add_context(Context::new_cmd(command));
                     }
                     ContextCommands::Show => {
                         if session.contexts().is_empty() {
