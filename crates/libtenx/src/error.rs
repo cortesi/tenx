@@ -88,6 +88,14 @@ impl From<std::io::Error> for TenxError {
 
 impl From<misanthropy::Error> for TenxError {
     fn from(error: misanthropy::Error) -> Self {
-        TenxError::Model(error.to_string())
+        match error {
+            misanthropy::Error::RateLimitExceeded(_msg) => {
+                TenxError::Throttle(crate::throttle::Throttle::RetryAfter(60))
+            }
+            misanthropy::Error::ApiOverloaded(_msg) => {
+                TenxError::Throttle(crate::throttle::Throttle::RetryAfter(60))
+            }
+            _ => TenxError::Model(error.to_string()),
+        }
     }
 }
