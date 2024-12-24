@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use google_genai::datatypes::{Content, GenerateContentReq, GenerateContentResponse, Part};
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
-use tracing::trace;
+use tracing::{trace, warn};
 
 use crate::{
     config::Config,
@@ -25,6 +25,7 @@ fn map_error(e: google_genai::error::GenAiError) -> TenxError {
             message,
             headers,
         } => {
+            warn!("Google API error: {} ({})\n{:?}", message, status, headers);
             if status == 429 {
                 // Look for retry-after header
                 if let Some(retry_after) = headers.get("retry-after") {

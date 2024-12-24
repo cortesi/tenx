@@ -148,6 +148,10 @@ pub async fn output_progress(
                 }
 
                 match event {
+                    Event::Throttled(ms) => {
+                        finish_spinner(&mut current_spinner);
+                        println!("{:>width$}{}", "", format!("throttled: waiting {}ms", ms).yellow(), width=spinner_indent);
+                    }
                     Event::Interact => {
                         finish_spinner(&mut current_spinner);
                         println!("{}", "getting user input...".blue());

@@ -60,6 +60,8 @@ pub enum Event {
     PromptStart(String),
     /// A model request has completed
     PromptEnd(String),
+    /// We've been throttled for a given number of milliseconds
+    Throttled(u64),
 
     /// A snippet of output text received from a model
     Snippet(String),
