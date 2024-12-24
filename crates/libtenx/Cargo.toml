@@ -12,8 +12,9 @@ readme.workspace = true
 
 [dependencies]
 
-google-genai = { path = "../../../google-genai" }
-#google-genai = "0.0.1"
+# google-genai = { path = "../../../google-genai" }
+google-genai = "0.0.2"
+
 tempfile = "3.11.0"
 thiserror = "2.0.3"
 tracing = "0.1.40"

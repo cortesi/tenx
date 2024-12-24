@@ -124,6 +124,13 @@ pub struct OpenAiUsage {
 
 impl From<async_openai::error::OpenAIError> for TenxError {
     fn from(e: async_openai::error::OpenAIError) -> Self {
+        if let async_openai::error::OpenAIError::Reqwest(ref e) = e {
+            if let Some(status) = e.status() {
+                if status == 429 || status == 529 {
+                    return TenxError::Throttle(crate::throttle::Throttle::Backoff);
+                }
+            }
+        }
         TenxError::Model(e.to_string())
     }
 }
