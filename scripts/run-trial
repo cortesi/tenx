@@ -21,7 +21,7 @@ cargo run --release --bin ttrial --  \
     --model gemini-15pro \
     --model groq-llama33-70b \
     --model groq-llama31-8b \
+    --model gemini-exp \
     "*" 
 
 
-# --model gemini-exp \

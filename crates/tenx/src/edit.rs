@@ -47,9 +47,15 @@ fn render_step(session: &Session, step_offset: usize) -> String {
 }
 
 /// Renders the session summary
-fn render_session_summary(session: &Session) -> String {
+fn render_session_summary(session: &Session, retry: bool) -> String {
     let mut text = String::new();
-    for i in (0..session.steps().len()).rev() {
+    let steps = session.steps();
+    let start_idx = if retry && !steps.is_empty() {
+        steps.len() - 1
+    } else {
+        steps.len()
+    };
+    for i in (0..start_idx).rev() {
         text.push_str(&render_step(session, i));
         if i > 0 {
             text.push('\n');
@@ -58,8 +64,9 @@ fn render_session_summary(session: &Session) -> String {
     text
 }
 
-/// Renders the initial text for the user to edit.
-fn render_initial_text(session: &Session, retry: bool) -> Result<String> {
+/// Renders the text for the user to edit. This includes space for the user's prompt, and a
+/// summary.
+fn render_edit_text(session: &Session, retry: bool) -> Result<String> {
     let mut text = String::new();
     let steps = session.steps();
 
@@ -73,7 +80,7 @@ fn render_initial_text(session: &Session, retry: bool) -> Result<String> {
     text.push('\n');
     text.push_str(SESSION_INFO_MARKER);
     text.push_str(SESSION_HEADER);
-    text.push_str(&render_session_summary(session));
+    text.push_str(&render_session_summary(session, retry));
 
     Ok(text)
 }
@@ -97,8 +104,8 @@ pub fn edit_prompt(
         let _ = sender.try_send(Event::Interact);
     }
     let mut temp_file = NamedTempFile::with_suffix(".md")?;
-    let initial_text = render_initial_text(session, retry)?;
-    temp_file.write_all(initial_text.as_bytes())?;
+    let edit_text = render_edit_text(session, retry)?;
+    temp_file.write_all(edit_text.as_bytes())?;
     temp_file.flush()?;
     temp_file.as_file().sync_all()?;
 
@@ -154,10 +161,10 @@ mod tests {
         let empty_session = Session::default();
 
         // Should error on retry with empty session
-        assert!(render_initial_text(&empty_session, true).is_err());
+        assert!(render_edit_text(&empty_session, true).is_err());
 
         // Should succeed with no retry
-        let rendered = render_initial_text(&empty_session, false).unwrap();
+        let rendered = render_edit_text(&empty_session, false).unwrap();
         assert!(rendered.contains(SESSION_INFO_MARKER));
     }
 
@@ -185,12 +192,12 @@ mod tests {
         }
 
         // Test retry=false (empty prompt)
-        let rendered = render_initial_text(&session, false).unwrap();
+        let rendered = render_edit_text(&session, false).unwrap();
         let parsed = parse_edited_text(&rendered);
         assert_eq!(parsed.trim(), "");
 
         // Test retry=true (should show last prompt)
-        let rendered = render_initial_text(&session, true).unwrap();
+        let rendered = render_edit_text(&session, true).unwrap();
         let parsed = parse_edited_text(&rendered);
         assert_eq!(parsed, "Second prompt");
     }

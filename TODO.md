@@ -1,6 +1,7 @@
 UX:
 
     - Don't list all operations on a single file individually in sessions
+    - Check header has gone missing in progress output
     
 Model response robustness:
     
@@ -26,3 +27,7 @@ Features:
     - graceful error handling for contexts, e.g. unfetchable urls
     - configurable modes with pre-defined models and contexts
     - token count estimation
+
+Internals:
+
+    - Elicit user input with a UserInput event, shift logic into libtenx::Tenx
