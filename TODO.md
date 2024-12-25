@@ -14,8 +14,6 @@ Model response robustness:
 
 Bugs:
     
-    - retry 0 --edit still shows the prompt from the previous first step as context
-    - --no-check flag seems not to work
     - probably should not do a pre-check on any retry
     - retry doesn't work with fix
     - retry doesn't work if the previous step had an error

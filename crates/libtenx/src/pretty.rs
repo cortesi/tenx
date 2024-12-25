@@ -76,6 +76,27 @@ fn print_editables(config: &Config, session: &Session) -> Result<String> {
     Ok(output)
 }
 
+fn print_operations(config: &Config, operations: &[Operation]) -> String {
+    let mut output = String::new();
+    output.push_str(&format!(
+        "{}{}\n",
+        INDENT.repeat(2),
+        "operations:".blue().bold()
+    ));
+    for op in operations {
+        match op {
+            Operation::Edit(path) => {
+                output.push_str(&format!(
+                    "{}- edit: {}\n",
+                    INDENT.repeat(3),
+                    config.relpath(path).display()
+                ));
+            }
+        }
+    }
+    output
+}
+
 fn print_steps(config: &Config, session: &Session, full: bool, width: usize) -> Result<String> {
     if session.steps().is_empty() {
         return Ok(String::new());
@@ -115,22 +136,7 @@ fn print_steps(config: &Config, session: &Session, full: bool, width: usize) -> 
             }
 
             if !response.operations.is_empty() {
-                output.push_str(&format!(
-                    "{}{}\n",
-                    INDENT.repeat(2),
-                    "operations:".blue().bold()
-                ));
-                for op in &response.operations {
-                    match op {
-                        Operation::Edit(path) => {
-                            output.push_str(&format!(
-                                "{}- edit: {}\n",
-                                INDENT.repeat(3),
-                                config.relpath(path).display()
-                            ));
-                        }
-                    }
-                }
+                output.push_str(&print_operations(config, &response.operations));
             }
             if let Some(patch) = &response.patch {
                 output.push_str(&print_patch(config, patch, full, width));
@@ -193,54 +199,100 @@ fn render_step_prompt(step: &Step, width: usize, full: bool) -> String {
 }
 
 fn print_patch(config: &Config, patch: &patch::Patch, full: bool, width: usize) -> String {
+    use std::collections::HashMap;
+
     let mut output = String::new();
     output.push_str(&format!(
         "{}{}\n",
         INDENT.repeat(2),
         "modified:".blue().bold()
     ));
+
+    // Group changes by file path
+    let mut changes_by_file: HashMap<&std::path::Path, Vec<&patch::Change>> = HashMap::new();
     for change in &patch.changes {
-        match change {
-            patch::Change::Write(w) => {
-                let file_path = config.relpath(&w.path).display().to_string().green().bold();
-                output.push_str(&format!("{}- {} (write)\n", INDENT.repeat(3), file_path));
-                if full {
-                    output.push_str(&wrapped_block(&w.content, width, INDENT.len() * 4));
-                    output.push('\n');
-                }
+        let path = match change {
+            patch::Change::Write(w) => &w.path,
+            patch::Change::Replace(r) => &r.path,
+            patch::Change::Smart(s) => &s.path,
+            patch::Change::UDiff(_) => continue,
+        };
+        changes_by_file.entry(path).or_default().push(change);
+    }
+
+    for (path, changes) in changes_by_file {
+        let file_path = config.relpath(path).display().to_string().green().bold();
+        output.push_str(&format!("{}- {}\n", INDENT.repeat(3), file_path));
+
+        // Count changes by type
+        let mut write_count = 0;
+        let mut replace_count = 0;
+        let mut smart_count = 0;
+        for change in &changes {
+            match change {
+                patch::Change::Write(_) => write_count += 1,
+                patch::Change::Replace(_) => replace_count += 1,
+                patch::Change::Smart(_) => smart_count += 1,
+                patch::Change::UDiff(_) => (),
             }
-            patch::Change::UDiff(w) => {
-                output.push_str(&format!("{} udiff \n", INDENT.repeat(3)));
-                if full {
-                    output.push_str(&wrapped_block(&w.patch, width, INDENT.len() * 4));
-                    output.push('\n');
-                }
-            }
-            patch::Change::Replace(r) => {
-                let file_path = config.relpath(&r.path).display().to_string().green().bold();
-                output.push_str(&format!("{}- {} (replace)\n", INDENT.repeat(3), file_path));
-                if full {
-                    output.push_str(&format!("{}{}\n", INDENT.repeat(4), "old:".yellow().bold()));
-                    output.push_str(&wrapped_block(&r.old, width, INDENT.len() * 5));
-                    output.push_str(&format!(
-                        "\n{}{}\n",
-                        INDENT.repeat(4),
-                        "new:".green().bold()
-                    ));
-                    output.push_str(&wrapped_block(&r.new, width, INDENT.len() * 5));
-                    output.push('\n');
-                }
-            }
-            patch::Change::Smart(s) => {
-                let file_path = config.relpath(&s.path).display().to_string().green().bold();
-                output.push_str(&format!("{}- {} (smart)\n", INDENT.repeat(3), file_path));
-                if full {
-                    output.push_str(&wrapped_block(&s.text, width, INDENT.len() * 4));
-                    output.push('\n');
+        }
+
+        let mut types = Vec::new();
+        if write_count > 0 {
+            types.push(format!("write ({})", write_count));
+        }
+        if replace_count > 0 {
+            types.push(format!("replace ({})", replace_count));
+        }
+        if smart_count > 0 {
+            types.push(format!("smart ({})", smart_count));
+        }
+
+        output.push_str(&format!("{}{}\n", INDENT.repeat(4), types.join(", ")));
+
+        if full {
+            for change in &changes {
+                match *change {
+                    patch::Change::Write(w) => {
+                        output.push_str(&wrapped_block(&w.content, width, INDENT.len() * 5));
+                        output.push('\n');
+                    }
+                    patch::Change::Replace(r) => {
+                        output.push_str(&format!(
+                            "{}{}\n",
+                            INDENT.repeat(5),
+                            "old:".yellow().bold()
+                        ));
+                        output.push_str(&wrapped_block(&r.old, width, INDENT.len() * 6));
+                        output.push_str(&format!(
+                            "\n{}{}\n",
+                            INDENT.repeat(5),
+                            "new:".green().bold()
+                        ));
+                        output.push_str(&wrapped_block(&r.new, width, INDENT.len() * 6));
+                        output.push('\n');
+                    }
+                    patch::Change::Smart(s) => {
+                        output.push_str(&wrapped_block(&s.text, width, INDENT.len() * 5));
+                        output.push('\n');
+                    }
+                    patch::Change::UDiff(_) => (),
                 }
             }
         }
     }
+
+    // Handle UDiff changes separately
+    for change in &patch.changes {
+        if let patch::Change::UDiff(w) = change {
+            output.push_str(&format!("{}- udiff\n", INDENT.repeat(3)));
+            if full {
+                output.push_str(&wrapped_block(&w.patch, width, INDENT.len() * 4));
+                output.push('\n');
+            }
+        }
+    }
+
     output
 }
 
