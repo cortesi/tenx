@@ -114,8 +114,8 @@ impl Event {
         match self {
             Event::ApplyPatch => Some("applying patch".to_string()),
             Event::ContextStart => Some("preparing context".to_string()),
-            Event::PreCheckStart => Some("pre check".to_string()),
-            Event::PostCheckStart => Some("post check".to_string()),
+            Event::PreCheckStart => Some("pre checks".to_string()),
+            Event::PostCheckStart => Some("post checks".to_string()),
             Event::PromptStart(n) => Some(format!("prompting {}", n)),
             _ => None,
         }
@@ -188,7 +188,7 @@ impl EventBlock {
     }
 
     /// Creates a new EventBlock for validator operations
-    pub fn validator(sender: &Option<mpsc::Sender<Event>>, name: &str) -> Result<Self> {
+    pub fn check(sender: &Option<mpsc::Sender<Event>>, name: &str) -> Result<Self> {
         Self::new(
             sender,
             Event::CheckStart(name.to_string()),
@@ -197,7 +197,7 @@ impl EventBlock {
     }
 
     /// Creates a new EventBlock for post-patch validation operations
-    pub fn post_patch(sender: &Option<mpsc::Sender<Event>>) -> Result<Self> {
+    pub fn post_check(sender: &Option<mpsc::Sender<Event>>) -> Result<Self> {
         Self::new(sender, Event::PostCheckStart, Event::PostCheckEnd)
     }
 

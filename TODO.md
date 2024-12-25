@@ -1,7 +1,5 @@
 UX:
 
-    - Don't list all operations on a single file individually in sessions
-    - Check header has gone missing in progress output
     
 Model response robustness:
     

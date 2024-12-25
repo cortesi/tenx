@@ -229,7 +229,7 @@ impl Tenx {
         for c in self.config.enabled_checks() {
             let is_mode_match = c.mode == mode_filter || c.mode == CheckMode::Both;
             if is_mode_match && c.is_relevant(paths)? {
-                let _check_block = EventBlock::validator(sender, &c.name)?;
+                let _check_block = EventBlock::check(sender, &c.name)?;
                 c.check(&self.config)?;
             }
         }
@@ -358,6 +358,7 @@ impl Tenx {
         sender: &Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
         if !self.config.checks.no_pre {
+            let _check_block = EventBlock::pre_check(sender)?;
             self.run_checks(session, CheckMode::Pre, sender)
         } else {
             Ok(())
@@ -369,6 +370,7 @@ impl Tenx {
         session: &mut Session,
         sender: &Option<mpsc::Sender<Event>>,
     ) -> Result<()> {
+        let _check_block = EventBlock::post_check(sender)?;
         if session
             .steps()
             .last()
