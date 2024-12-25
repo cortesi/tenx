@@ -1,5 +1,7 @@
 UX:
 
+    - indicate tenx version clearly in manual
+
     
 Model response robustness:
     
