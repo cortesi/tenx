@@ -443,7 +443,7 @@ mod tests {
 
         config.session_store_dir = temp_dir.path().join("sess");
         config.retry_limit = 1;
-        config.project.globs.push("**".to_string());
+        config.project.include.push("**".to_string());
 
         let tenx = Tenx::new(config.clone());
         let test_file_path = temp_dir.path().join("test.txt");

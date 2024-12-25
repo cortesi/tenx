@@ -389,7 +389,7 @@ pub struct Project {
     /// For example: ["*.rs", "!test_*.rs"] includes all Rust files except test files. Unless
     /// over-ridden, Tenx respects .gitignore, .ignore and .git/info/exclude files.
     #[serde(default)]
-    pub globs: Vec<String>,
+    pub include: Vec<String>,
 }
 
 #[optional_struct]
@@ -909,7 +909,7 @@ mod tests {
         let project = testutils::test_project();
         let mut config = default_config(&project.config.cwd()?);
         config.retry_limit = 42;
-        config.project.globs.push("!*.test".to_string());
+        config.project.include.push("!*.test".to_string());
 
         let ron = config.to_ron()?;
         let current_dir = std::env::current_dir()?;
@@ -931,7 +931,7 @@ mod tests {
         let project = testutils::test_project();
         let default_config = default_config(&project.config.cwd()?);
         assert_eq!(config.models, default_config.models);
-        assert_eq!(config.project.globs, default_config.project.globs);
+        assert_eq!(config.project.include, default_config.project.include);
 
         Ok(())
     }
@@ -1001,7 +1001,7 @@ mod tests {
         let config = Config {
             project: Project {
                 root: root_path.to_path_buf(),
-                globs: vec![
+                include: vec![
                     "**/*.rs".to_string(),
                     "subdir/*.txt".to_string(),
                     "!**/ignore.rs".to_string(),
@@ -1026,7 +1026,7 @@ mod tests {
         let config_multi_exclude = Config {
             project: Project {
                 root: root_path.to_path_buf(),
-                globs: vec![
+                include: vec![
                     "**/*.rs".to_string(),
                     "**/*.txt".to_string(),
                     "!**/ignore.rs".to_string(),

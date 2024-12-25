@@ -380,13 +380,13 @@ pub fn print_project(config: &Config) -> String {
         "project root:".blue().bold(),
         display_path
     ));
-    if !config.project.globs.is_empty() {
+    if !config.project.include.is_empty() {
         output.push_str(&format!(
             "{} {}\n",
             "globs:".blue().bold(),
             config
                 .project
-                .globs
+                .include
                 .iter()
                 .map(|i| i.to_string())
                 .collect::<Vec<_>>()

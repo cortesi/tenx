@@ -341,7 +341,7 @@ pub fn default_config<P: AsRef<Path>>(current_dir: P) -> Config {
         project: {
             let root = find_project_root(current_dir.as_ref());
             Project {
-                globs: vec![],
+                include: vec![],
                 root,
             }
         },

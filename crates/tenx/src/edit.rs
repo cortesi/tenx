@@ -8,7 +8,8 @@ use libtenx::{events::Event, session::Session};
 
 const SESSION_INFO_MARKER: &str = "\n** Only edit prompt text ABOVE this marker. **\n";
 
-const SESSION_HEADER: &str = "-----\n\n# Session Summary\n\n";
+const SESSION_HEADER: &str =
+    "______________________________________________\n\n# Session Summary\n\n";
 
 /// Returns the user's preferred editor.
 fn get_editor() -> (String, Vec<String>) {

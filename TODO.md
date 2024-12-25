@@ -12,7 +12,6 @@ Model response robustness:
 
 Bugs:
     
-    - probably should not do a pre-check on any retry
     - retry doesn't work with fix
     - retry doesn't work if the previous step had an error
 
@@ -23,6 +22,7 @@ Features:
     - graceful error handling for contexts, e.g. unfetchable urls
     - configurable modes with pre-defined models and contexts
     - token count estimation
+    - reassess udiff format
 
 Internals:
 

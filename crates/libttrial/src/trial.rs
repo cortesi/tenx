@@ -177,7 +177,7 @@ impl Trial {
     fn default_config() -> Result<Config> {
         let cwd = std::env::current_dir()?;
         let mut config = default_config(&cwd);
-        config.project.globs = vec![
+        config.project.include = vec![
             "**/*".to_string(),
             "!target/**".to_string(),
             "!.venv/**".to_string(),

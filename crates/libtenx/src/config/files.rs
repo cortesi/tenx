@@ -18,7 +18,7 @@ pub fn walk_project(project: &Project) -> crate::Result<Vec<PathBuf>> {
     let mut builder = OverrideBuilder::new(root);
 
     // Add glob patterns directly - they're already in the correct format
-    for pattern in &project.globs {
+    for pattern in &project.include {
         builder
             .add(pattern)
             .map_err(|e| TenxError::Internal(format!("Invalid glob pattern: {}", e)))?;
@@ -98,7 +98,7 @@ mod tests {
 
         let project = Project {
             root: root.to_path_buf(),
-            globs: vec!["*.rs".to_string(), "!*.tmp".to_string()],
+            include: vec!["*.rs".to_string(), "!*.tmp".to_string()],
         };
 
         let files = walk_project(&project)?;
