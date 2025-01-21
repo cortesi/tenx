@@ -80,15 +80,26 @@ fn default_models() -> Vec<Model> {
         ]);
     }
     if env::var(DEEPSEEK_API_KEY).is_ok() {
-        models.push(Model::OpenAi {
-            name: "deepseek".to_string(),
-            api_model: "deepseek-chat".to_string(),
-            key: "".to_string(),
-            key_env: DEEPSEEK_API_KEY.to_string(),
-            api_base: DEEPSEEK_API_BASE.to_string(),
-            can_stream: true,
-            no_system_prompt: false,
-        })
+        models.extend_from_slice(&[
+            Model::OpenAi {
+                name: "deepseek3".to_string(),
+                api_model: "deepseek-chat".to_string(),
+                key: "".to_string(),
+                key_env: DEEPSEEK_API_KEY.to_string(),
+                api_base: DEEPSEEK_API_BASE.to_string(),
+                can_stream: true,
+                no_system_prompt: false,
+            },
+            Model::OpenAi {
+                name: "deepseek-reasoner".to_string(),
+                api_model: "deepseek-reasoner".to_string(),
+                key: "".to_string(),
+                key_env: DEEPSEEK_API_KEY.to_string(),
+                api_base: DEEPSEEK_API_BASE.to_string(),
+                can_stream: true,
+                no_system_prompt: false,
+            },
+        ]);
     }
 
     if env::var(DEEPINFRA_API_KEY).is_ok() {

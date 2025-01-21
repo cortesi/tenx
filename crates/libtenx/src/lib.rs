@@ -14,7 +14,7 @@ pub mod session_store;
 pub mod tenx;
 #[cfg(test)]
 pub mod testutils;
-pub mod throttle;
+mod throttle;
 
 pub use error::{Result, TenxError};
 pub use tenx::Tenx;
