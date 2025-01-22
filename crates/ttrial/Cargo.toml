@@ -13,7 +13,7 @@ libtenx = { path = "../libtenx" }
 libttrial = { path = "../libttrial" }
 anyhow = "1.0"
 clap = { version = "4.4", features = ["derive"] }
-colored = "2.0"
+colored = "3.0.0"
 tokio = { version = "1.32" }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 textwrap = "0.16"

@@ -19,9 +19,12 @@ cargo run --release --bin ttrial --  \
     --model o1 \
     --model gemini-flash-exp \
     --model gemini-15pro \
-    --model groq-llama33-70b \
-    --model groq-llama31-8b \
     --model gemini-exp \
+    --model deepseek3 \
+    --model deepseek-reasoner \
     "*" 
+
+    # --model groq-llama33-70b \
+    # --model groq-llama31-8b \
 
 

@@ -200,6 +200,7 @@ impl OpenAi {
                     tool_calls: None,
                     refusal: None,
                     function_call: None,
+                    audio: None,
                 },
                 finish_reason: Some(FinishReason::Stop),
                 logprobs: None,

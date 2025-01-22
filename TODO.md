@@ -1,6 +1,8 @@
 UX:
 
     - indicate tenx version clearly in manual
+    - execute pre-checks before asking the user for input
+    - audio cues for model responses and completion
 
     
 Model response robustness:
@@ -8,6 +10,8 @@ Model response robustness:
     - Allow write_file to create files
         - Ensure that newly created files are rolled back in rollback
     - Partial application of patches
+    - A <continue> operation, which lets models break operations into batches
+    - An <abort> operation, which lets a model signal when it can't continue
     - Ignore <edit> requests for files that are already being edited
     - Sometimes the models mix <edit> and <patch> requests. Make sure we do the right thing.
     - <append>, <prepend> and <create> operations.
