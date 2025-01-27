@@ -37,6 +37,7 @@ const GOOGLEAI_GEMINI_THINKING_EXP: &str = "gemini-2.0-flash-thinking-exp-1219";
 const GROQ_BASE_URL: &str = "https://api.groq.com/openai/v1";
 const GROQ_LLAMA33_70B: &str = "llama-3.3-70b-versatile";
 const GROQ_LLAMA31_8B_INSTANT: &str = "llama-3.1-8b-instant";
+const GROQ_DEEPSEEK_R1: &str = "deepseek-r1-distill-llama-70b";
 const GROQ_API_KEY: &str = "GROQ_API_KEY";
 
 /// Returns true if the directory is a git repository
@@ -207,6 +208,15 @@ fn default_models() -> Vec<Model> {
             Model::OpenAi {
                 name: "groq-llama31-8b".to_string(),
                 api_model: GROQ_LLAMA31_8B_INSTANT.to_string(),
+                key: "".to_string(),
+                key_env: GROQ_API_KEY.to_string(),
+                api_base: GROQ_BASE_URL.to_string(),
+                can_stream: true,
+                no_system_prompt: true,
+            },
+            Model::OpenAi {
+                name: "groq-deepseek-r1".to_string(),
+                api_model: GROQ_DEEPSEEK_R1.to_string(),
                 key: "".to_string(),
                 key_env: GROQ_API_KEY.to_string(),
                 api_base: GROQ_BASE_URL.to_string(),
