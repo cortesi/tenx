@@ -32,7 +32,7 @@ const GOOGLEAI_GEMINI_15_FLASH: &str = "gemini-1.5-flash";
 const GOOGLEAI_GEMINI_15_FLASH_8B: &str = "gemini-1.5-flash-8b";
 const GOOGLEAI_GEMINI_FLASH_EXP: &str = "gemini-2.0-flash-exp";
 const GOOGLEAI_GEMINI_EXP: &str = "gemini-exp-1206";
-const GOOGLEAI_GEMINI_THINKING_EXP: &str = "gemini-2.0-flash-thinking-exp-1219";
+const GOOGLEAI_GEMINI_THINKING_EXP: &str = "gemini-2.0-flash-thinking-exp-01-21";
 
 const GROQ_BASE_URL: &str = "https://api.groq.com/openai/v1";
 const GROQ_LLAMA33_70B: &str = "llama-3.3-70b-versatile";
