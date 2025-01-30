@@ -1,3 +1,4 @@
+pub mod action;
 pub mod checks;
 pub mod config;
 pub mod context;

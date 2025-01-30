@@ -4,7 +4,6 @@ use std::{collections::HashMap, convert::From};
 use misanthropy::{Anthropic, Content, ContentBlockDelta, Role, StreamEvent};
 use serde::{Deserialize, Serialize};
 use serde_json;
-use tokio::sync::mpsc;
 use tracing::{trace, warn};
 
 use crate::{
@@ -91,7 +90,7 @@ impl Claude {
         &mut self,
         api_key: String,
         req: &misanthropy::MessagesRequest,
-        sender: Option<mpsc::Sender<Event>>,
+        sender: Option<EventSender>,
     ) -> Result<misanthropy::MessagesResponse> {
         let anthropic = Anthropic::new(&api_key);
         let mut streamed_response = anthropic.messages_stream(req)?;
@@ -222,7 +221,7 @@ impl ModelProvider for Claude {
         &mut self,
         config: &Config,
         session: &Session,
-        sender: Option<mpsc::Sender<Event>>,
+        sender: Option<EventSender>,
     ) -> Result<ModelResponse> {
         if self.anthropic_key.is_empty() {
             return Err(TenxError::Model(

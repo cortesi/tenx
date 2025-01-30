@@ -11,7 +11,6 @@ mod openai;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use tokio::sync::mpsc;
 
 pub use claude::{Claude, ClaudeUsage};
 pub use dummy_model::{DummyModel, DummyUsage};
@@ -20,7 +19,7 @@ pub use openai::{OpenAi, OpenAiUsage};
 
 use crate::{
     config::Config,
-    events::Event,
+    events::EventSender,
     session::{ModelResponse, Session},
     Result,
 };
@@ -72,7 +71,7 @@ pub trait ModelProvider {
         &mut self,
         config: &Config,
         session: &Session,
-        sender: Option<mpsc::Sender<Event>>,
+        sender: Option<EventSender>,
     ) -> Result<ModelResponse>;
 
     /// Render a session as it would be sent to the model. It's a requirement that this step be
@@ -113,7 +112,7 @@ impl ModelProvider for Model {
         &mut self,
         config: &Config,
         session: &Session,
-        sender: Option<mpsc::Sender<Event>>,
+        sender: Option<EventSender>,
     ) -> Result<ModelResponse> {
         match self {
             Model::Claude(c) => c.send(config, session, sender).await,

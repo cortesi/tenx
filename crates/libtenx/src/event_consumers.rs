@@ -8,15 +8,12 @@ use tracing::Subscriber;
 use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::{fmt, EnvFilter};
 
-use crate::events::{Event, LogLevel};
+use crate::events::{Event, EventReceiver, EventSender, LogLevel};
 
 const SPINNER_STRINGS: &[&str] = &["▹▹▹▹▹", "▸▹▹▹▹", "▹▸▹▹▹", "▹▹▸▹▹", "▹▹▹▸▹", "▹▹▹▹▸"];
 
 /// Discards all events without processing them
-pub async fn discard_events(
-    mut receiver: mpsc::Receiver<Event>,
-    mut kill_signal: mpsc::Receiver<()>,
-) {
+pub async fn discard_events(mut receiver: EventReceiver, mut kill_signal: mpsc::Receiver<()>) {
     loop {
         tokio::select! {
             _ = receiver.recv() => {}
@@ -27,7 +24,7 @@ pub async fn discard_events(
 }
 
 /// Creates a subscriber that sends all tracing events to an mpsc channel for processing.
-pub fn create_tracing_subscriber(verbosity: u8, sender: mpsc::Sender<Event>) -> impl Subscriber {
+pub fn create_tracing_subscriber(verbosity: u8, sender: EventSender) -> impl Subscriber {
     let filter = match verbosity {
         0 => EnvFilter::new("warn"),
         1 => EnvFilter::new("info"),
@@ -37,7 +34,7 @@ pub fn create_tracing_subscriber(verbosity: u8, sender: mpsc::Sender<Event>) -> 
     };
 
     struct Writer {
-        sender: mpsc::Sender<Event>,
+        sender: EventSender,
     }
 
     impl std::io::Write for Writer {
@@ -68,7 +65,7 @@ pub fn create_tracing_subscriber(verbosity: u8, sender: mpsc::Sender<Event>) -> 
 }
 
 /// Output events in a text log format
-pub async fn output_logs(mut receiver: mpsc::Receiver<Event>, mut kill_signal: mpsc::Receiver<()>) {
+pub async fn output_logs(mut receiver: EventReceiver, mut kill_signal: mpsc::Receiver<()>) {
     loop {
         tokio::select! {
             Some(event) = receiver.recv() => {
@@ -102,7 +99,7 @@ pub async fn output_logs(mut receiver: mpsc::Receiver<Event>, mut kill_signal: m
 
 /// Fancy event output, with progress bars
 pub async fn output_progress(
-    mut receiver: mpsc::Receiver<Event>,
+    mut receiver: EventReceiver,
     mut kill_signal: mpsc::Receiver<()>,
     verbosity: u8,
 ) {

@@ -1,6 +1,12 @@
 use std::path::PathBuf;
 
-use crate::{config::Config, exec::exec, Result, TenxError};
+use crate::{
+    config::Config,
+    events::{EventBlock, EventSender},
+    exec::exec,
+    session::Session,
+    Result, TenxError,
+};
 
 pub enum Runnable {
     Ok,
@@ -98,6 +104,44 @@ impl Check {
     pub fn default_off(&self) -> bool {
         self.default_off
     }
+}
+
+/// Run checks on a given set of paths with a mode filter.
+pub fn check_paths(
+    conf: &Config,
+    paths: &Vec<PathBuf>,
+    mode_filter: CheckMode,
+    sender: &Option<EventSender>,
+) -> Result<()> {
+    for c in conf.enabled_checks() {
+        let is_mode_match = c.mode == mode_filter || c.mode == CheckMode::Both;
+        if is_mode_match && c.is_relevant(paths)? {
+            let _check_block = EventBlock::check(sender, &c.name)?;
+            c.check(conf)?;
+        }
+    }
+    Ok(())
+}
+
+/// Run checks on a session. If the session has no editables, run checks on all project files.
+pub fn check_session(
+    conf: &Config,
+    session: &Session,
+    mode_filter: CheckMode,
+    sender: &Option<EventSender>,
+) -> Result<()> {
+    let paths = if session.editables().is_empty() {
+        conf.project_files()?
+    } else {
+        session.editables().to_vec()
+    };
+
+    check_paths(
+        conf,
+        &paths.iter().map(PathBuf::from).collect(),
+        mode_filter,
+        sender,
+    )
 }
 
 #[cfg(test)]

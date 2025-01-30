@@ -6,6 +6,9 @@ use tokio::sync::mpsc;
 
 use crate::{Result, TenxError};
 
+pub type EventSender = mpsc::Sender<Event>;
+pub type EventReceiver = mpsc::Receiver<Event>;
+
 /// Log levels used in events to indicate severity.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum LogLevel {
@@ -17,7 +20,7 @@ pub enum LogLevel {
 }
 
 /// Helper function to send an event and handle potential errors.
-pub fn send_event(sender: &Option<mpsc::Sender<Event>>, event: Event) -> Result<()> {
+pub fn send_event(sender: &Option<EventSender>, event: Event) -> Result<()> {
     if let Some(sender) = sender {
         sender
             .try_send(event)
@@ -145,17 +148,13 @@ impl Event {
 
 /// Helper struct to manage event sequencing
 pub struct EventBlock {
-    sender: Option<mpsc::Sender<Event>>,
+    sender: Option<EventSender>,
     end_event: Event,
 }
 
 impl EventBlock {
     /// Creates a new EventBlock, emitting the start event immediately
-    pub fn new(
-        sender: &Option<mpsc::Sender<Event>>,
-        start_event: Event,
-        end_event: Event,
-    ) -> Result<Self> {
+    pub fn new(sender: &Option<EventSender>, start_event: Event, end_event: Event) -> Result<Self> {
         send_event(sender, start_event)?;
         Ok(Self {
             sender: sender.clone(),
@@ -164,17 +163,17 @@ impl EventBlock {
     }
 
     /// Creates a new EventBlock for start/finish operations
-    pub fn start(sender: &Option<mpsc::Sender<Event>>) -> Result<Self> {
+    pub fn start(sender: &Option<EventSender>) -> Result<Self> {
         Self::new(sender, Event::Start, Event::Finish)
     }
 
     /// Creates a new EventBlock for context operations
-    pub fn context(sender: &Option<mpsc::Sender<Event>>) -> Result<Self> {
+    pub fn context(sender: &Option<EventSender>) -> Result<Self> {
         Self::new(sender, Event::ContextStart, Event::ContextEnd)
     }
 
     /// Creates a new EventBlock for context refresh operations
-    pub fn context_refresh(sender: &Option<mpsc::Sender<Event>>, name: &str) -> Result<Self> {
+    pub fn context_refresh(sender: &Option<EventSender>, name: &str) -> Result<Self> {
         Self::new(
             sender,
             Event::ContextRefreshStart(name.to_string()),
@@ -183,12 +182,12 @@ impl EventBlock {
     }
 
     /// Creates a new EventBlock for pre check operations
-    pub fn pre_check(sender: &Option<mpsc::Sender<Event>>) -> Result<Self> {
+    pub fn pre_check(sender: &Option<EventSender>) -> Result<Self> {
         Self::new(sender, Event::PreCheckStart, Event::PreCheckEnd)
     }
 
     /// Creates a new EventBlock for validator operations
-    pub fn check(sender: &Option<mpsc::Sender<Event>>, name: &str) -> Result<Self> {
+    pub fn check(sender: &Option<EventSender>, name: &str) -> Result<Self> {
         Self::new(
             sender,
             Event::CheckStart(name.to_string()),
@@ -197,12 +196,12 @@ impl EventBlock {
     }
 
     /// Creates a new EventBlock for post-patch validation operations
-    pub fn post_check(sender: &Option<mpsc::Sender<Event>>) -> Result<Self> {
+    pub fn post_check(sender: &Option<EventSender>) -> Result<Self> {
         Self::new(sender, Event::PostCheckStart, Event::PostCheckEnd)
     }
 
     /// Creates a new EventBlock for model request operations
-    pub fn prompt(sender: &Option<mpsc::Sender<Event>>, model: &str) -> Result<Self> {
+    pub fn prompt(sender: &Option<EventSender>, model: &str) -> Result<Self> {
         Self::new(
             sender,
             Event::PromptStart(model.to_string()),

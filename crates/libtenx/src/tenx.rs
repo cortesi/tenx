@@ -1,12 +1,11 @@
 use std::path::PathBuf;
-use tokio::sync::mpsc;
 use tracing::{debug, warn};
 
 use crate::{
-    checks::CheckMode,
+    checks::{check_paths, check_session, CheckMode},
     config::Config,
     context::{Context, ContextProvider},
-    events::{send_event, Event, EventBlock},
+    events::{send_event, Event, EventBlock, EventSender},
     model::ModelProvider,
     session::{Session, StepType},
     session_store::{path_to_filename, SessionStore},
@@ -28,7 +27,7 @@ impl Tenx {
     /// adding the default context from the config.
     pub async fn new_session_from_cwd(
         &self,
-        sender: &Option<mpsc::Sender<Event>>,
+        sender: &Option<EventSender>,
         no_context: bool,
     ) -> Result<Session> {
         let _block = EventBlock::start(sender)?;
@@ -65,7 +64,7 @@ impl Tenx {
     async fn refresh_contexts_inner(
         &self,
         session: &mut Session,
-        sender: &Option<mpsc::Sender<Event>>,
+        sender: &Option<EventSender>,
     ) -> Result<()> {
         if session.contexts.is_empty() {
             return Ok(());
@@ -83,7 +82,7 @@ impl Tenx {
     pub async fn refresh_contexts(
         &self,
         session: &mut Session,
-        sender: &Option<mpsc::Sender<Event>>,
+        sender: &Option<EventSender>,
     ) -> Result<()> {
         let _block = EventBlock::start(sender)?;
         self.refresh_contexts_inner(session, sender).await
@@ -93,7 +92,7 @@ impl Tenx {
     pub async fn refresh_needed_contexts(
         &self,
         session: &mut Session,
-        sender: &Option<mpsc::Sender<Event>>,
+        sender: &Option<EventSender>,
     ) -> Result<()> {
         let _block = EventBlock::start(sender)?;
         if !session.contexts.is_empty() {
@@ -112,7 +111,7 @@ impl Tenx {
     pub async fn fix(
         &self,
         session: &mut Session,
-        sender: Option<mpsc::Sender<Event>>,
+        sender: Option<EventSender>,
         prompt: Option<String>,
     ) -> Result<()> {
         let _block = EventBlock::start(&sender)?;
@@ -156,7 +155,7 @@ impl Tenx {
         &self,
         session: &mut Session,
         prompt: Option<String>,
-        sender: Option<mpsc::Sender<Event>>,
+        sender: Option<EventSender>,
     ) -> Result<()> {
         let _block = EventBlock::start(&sender)?;
         if let Some(step) = session.last_step_mut() {
@@ -174,7 +173,7 @@ impl Tenx {
         &self,
         session: &mut Session,
         prompt: String,
-        sender: Option<mpsc::Sender<Event>>,
+        sender: Option<EventSender>,
     ) -> Result<()> {
         let _block = EventBlock::start(&sender)?;
         let model = self.config.models.default.clone();
@@ -194,46 +193,10 @@ impl Tenx {
         self.save_session(session)
     }
 
-    pub fn check(&self, paths: Vec<PathBuf>, sender: &Option<mpsc::Sender<Event>>) -> Result<()> {
+    /// Run checks on specified paths.
+    pub fn check(&self, paths: Vec<PathBuf>, sender: &Option<EventSender>) -> Result<()> {
         let _block = EventBlock::start(sender)?;
-        self.check_paths(&paths, CheckMode::Both, sender)
-    }
-
-    /// Run checks based on an optional session and an optional mode filter.
-    fn run_checks(
-        &self,
-        session: &Session,
-        mode_filter: CheckMode,
-        sender: &Option<mpsc::Sender<Event>>,
-    ) -> Result<()> {
-        let paths = if session.editables().is_empty() {
-            self.config.project_files()?
-        } else {
-            session.editables().to_vec()
-        };
-
-        self.check_paths(
-            &paths.iter().map(PathBuf::from).collect(),
-            mode_filter,
-            sender,
-        )
-    }
-
-    /// Run checks on a given set of paths with a mode filter.
-    fn check_paths(
-        &self,
-        paths: &Vec<PathBuf>,
-        mode_filter: CheckMode,
-        sender: &Option<mpsc::Sender<Event>>,
-    ) -> Result<()> {
-        for c in self.config.enabled_checks() {
-            let is_mode_match = c.mode == mode_filter || c.mode == CheckMode::Both;
-            if is_mode_match && c.is_relevant(paths)? {
-                let _check_block = EventBlock::check(sender, &c.name)?;
-                c.check(&self.config)?;
-            }
-        }
-        Ok(())
+        check_paths(&self.config, &paths, CheckMode::Both, sender)
     }
 
     /// Common logic for processing a prompt and updating the state. The prompt that will be
@@ -241,7 +204,7 @@ impl Tenx {
     async fn process_prompt(
         &self,
         session: &mut Session,
-        sender: Option<mpsc::Sender<Event>>,
+        sender: Option<EventSender>,
     ) -> Result<()> {
         self.save_session(session)?;
         if session.last_step_error().is_none() {
@@ -308,7 +271,7 @@ impl Tenx {
     async fn execute_prompt_cycle(
         &self,
         session: &mut Session,
-        sender: Option<mpsc::Sender<Event>>,
+        sender: Option<EventSender>,
     ) -> Result<()> {
         self.prompt(session, sender.clone()).await?;
         send_event(&sender, Event::ApplyPatch)?;
@@ -321,11 +284,7 @@ impl Tenx {
     }
 
     /// Prompts the current model with the session's state and sets the resulting patch and usage.
-    async fn prompt(
-        &self,
-        session: &mut Session,
-        sender: Option<mpsc::Sender<Event>>,
-    ) -> Result<()> {
+    async fn prompt(&self, session: &mut Session, sender: Option<EventSender>) -> Result<()> {
         let mut model = self.config.active_model()?;
         let _block = EventBlock::prompt(&sender, &model.name())?;
         // FIXME: Make this param configurable
@@ -352,24 +311,16 @@ impl Tenx {
         }
     }
 
-    fn run_pre_checks(
-        &self,
-        session: &mut Session,
-        sender: &Option<mpsc::Sender<Event>>,
-    ) -> Result<()> {
+    fn run_pre_checks(&self, session: &mut Session, sender: &Option<EventSender>) -> Result<()> {
         if !self.config.checks.no_pre {
             let _check_block = EventBlock::pre_check(sender)?;
-            self.run_checks(session, CheckMode::Pre, sender)
+            check_session(&self.config, session, CheckMode::Pre, sender)
         } else {
             Ok(())
         }
     }
 
-    fn run_post_checks(
-        &self,
-        session: &mut Session,
-        sender: &Option<mpsc::Sender<Event>>,
-    ) -> Result<()> {
+    fn run_post_checks(&self, session: &mut Session, sender: &Option<EventSender>) -> Result<()> {
         let _check_block = EventBlock::post_check(sender)?;
         if session
             .steps()
@@ -377,7 +328,7 @@ impl Tenx {
             .and_then(|s| s.model_response.as_ref())
             .is_some()
         {
-            self.run_checks(session, CheckMode::Post, sender)?
+            check_session(&self.config, session, CheckMode::Post, sender)?
         }
         Ok(())
     }

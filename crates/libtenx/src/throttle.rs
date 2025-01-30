@@ -1,10 +1,9 @@
 use crate::{
-    events::{send_event, Event},
+    events::{send_event, Event, EventSender},
     Result, TenxError,
 };
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
-use tokio::sync::mpsc;
 use tokio::time::sleep;
 
 const BACKOFF_MULTIPLIER: f64 = 2.0;
@@ -67,11 +66,7 @@ impl Throttler {
     }
 
     /// Throttle by sleeping until we can make the next request.
-    pub async fn throttle(
-        &mut self,
-        t: &Throttle,
-        sender: &Option<mpsc::Sender<Event>>,
-    ) -> Result<()> {
+    pub async fn throttle(&mut self, t: &Throttle, sender: &Option<EventSender>) -> Result<()> {
         let duration = self.throttle_time(t)?;
         send_event(sender, Event::Throttled(duration.as_millis() as u64))?;
         sleep(duration).await;

@@ -11,13 +11,12 @@ use async_openai::{
 use async_trait::async_trait;
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
-use tokio::sync::mpsc;
 use tracing::trace;
 
 use crate::{
     config::Config,
     dialect::{Dialect, DialectProvider},
-    events::{send_event, Event},
+    events::{send_event, Event, EventSender},
     model::{
         conversation::{build_conversation, Conversation, ACK, EDITABLE_LEADIN},
         ModelProvider,
@@ -163,7 +162,7 @@ impl OpenAi {
         &self,
         client: &Client<OpenAIConfig>,
         request: CreateChatCompletionRequest,
-        sender: Option<mpsc::Sender<Event>>,
+        sender: Option<EventSender>,
     ) -> Result<CreateChatCompletionResponse> {
         let mut stream = client.chat().create_stream(request).await?;
         let mut full_response = String::new();
@@ -238,7 +237,7 @@ impl ModelProvider for OpenAi {
         &mut self,
         config: &Config,
         session: &Session,
-        sender: Option<mpsc::Sender<Event>>,
+        sender: Option<EventSender>,
     ) -> Result<ModelResponse> {
         if self.openai_key.is_empty() {
             return Err(TenxError::Model("No OpenAI key configured.".into()));

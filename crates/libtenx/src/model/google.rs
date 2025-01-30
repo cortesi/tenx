@@ -3,7 +3,6 @@ use std::collections::HashMap;
 
 use google_genai::datatypes::{Content, GenerateContentReq, GenerateContentResponse, Part};
 use serde::{Deserialize, Serialize};
-use tokio::sync::mpsc;
 use tracing::{trace, warn};
 
 use crate::{
@@ -91,7 +90,7 @@ impl Google {
     async fn stream_response(
         &mut self,
         params: GenerateContentReq,
-        sender: Option<mpsc::Sender<Event>>,
+        sender: Option<EventSender>,
     ) -> Result<Vec<GenerateContentResponse>> {
         use futures_util::StreamExt;
         let mut stream = google_genai::generate_content_stream(&self.api_key, params)
@@ -113,7 +112,7 @@ impl Google {
 
     fn emit_event(
         &self,
-        sender: &Option<mpsc::Sender<Event>>,
+        sender: &Option<EventSender>,
         response: &GenerateContentResponse,
     ) -> Result<()> {
         if let Some(candidates) = &response.candidates {
@@ -255,7 +254,7 @@ impl ModelProvider for Google {
         &mut self,
         config: &Config,
         session: &Session,
-        sender: Option<mpsc::Sender<Event>>,
+        sender: Option<EventSender>,
     ) -> Result<ModelResponse> {
         if self.api_key.is_empty() {
             return Err(TenxError::Model(

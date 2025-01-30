@@ -1,10 +1,9 @@
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use tokio::sync::mpsc;
 
 use super::ModelProvider;
 use crate::{
-    config::Config, dialect::DialectProvider, events::Event, session::ModelResponse,
+    config::Config, dialect::DialectProvider, events::EventSender, session::ModelResponse,
     session::Session, Result,
 };
 
@@ -65,7 +64,7 @@ impl ModelProvider for DummyModel {
         &mut self,
         _config: &Config,
         _state: &Session,
-        _sender: Option<mpsc::Sender<Event>>,
+        _sender: Option<EventSender>,
     ) -> Result<ModelResponse> {
         let mut resp = self.model_response.clone()?;
         resp.usage = Some(super::Usage::Dummy(DummyUsage { dummy_counter: 1 }));
