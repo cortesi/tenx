@@ -119,7 +119,8 @@ impl TrialReport {
         n: usize,
         config: &libtenx::config::Config,
     ) -> Result<Self> {
-        let model = session.steps().first().ok_or_else(|| {
+        let steps = session.steps();
+        let model = steps.first().ok_or_else(|| {
             TenxError::Internal("Cannot create trial report from empty session".to_string())
         })?;
 

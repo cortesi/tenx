@@ -179,7 +179,7 @@ mod tests {
             ("Second prompt", "Second response"),
         ] {
             session
-                .add_prompt("test_model".into(), prompt.to_string(), StepType::Code)
+                .add_step("test_model".into(), prompt.to_string(), StepType::Auto)
                 .unwrap();
             if let Some(step) = session.last_step_mut() {
                 step.model_response = Some(ModelResponse {

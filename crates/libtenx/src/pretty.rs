@@ -170,30 +170,28 @@ fn render_step_prompt(step: &Step, width: usize, full: bool) -> String {
     let prompt_header = format!("{}{}\n", INDENT.repeat(2), "prompt:".blue().bold());
     let text = &step.prompt;
     match step.step_type {
-        StepType::Code | StepType::Fix | StepType::Auto => format!(
-            "{}{}",
-            prompt_header,
-            wrapped_block(text, width, INDENT.len() * 3)
-        ),
-        StepType::Error if full => format!(
-            "{}{}",
-            prompt_header,
-            wrapped_block(text, width, INDENT.len() * 3)
-        ),
-        StepType::Error => {
-            let lines: Vec<&str> = text.lines().collect();
-            let first_line = lines.first().unwrap_or(&"");
-            let remaining_lines = lines.len().saturating_sub(1);
-            format!(
-                "{}{}\n{}",
-                prompt_header,
-                wrapped_block(first_line, width, INDENT.len() * 3),
-                wrapped_block(
-                    &format!("... {} more lines", remaining_lines),
-                    width,
-                    INDENT.len() * 3
+        StepType::Auto | StepType::Error => {
+            if step.step_type == StepType::Error && !full {
+                let lines: Vec<&str> = text.lines().collect();
+                let first_line = lines.first().unwrap_or(&"");
+                let remaining_lines = lines.len().saturating_sub(1);
+                format!(
+                    "{}{}\n{}",
+                    prompt_header,
+                    wrapped_block(first_line, width, INDENT.len() * 3),
+                    wrapped_block(
+                        &format!("... {} more lines", remaining_lines),
+                        width,
+                        INDENT.len() * 3
+                    )
                 )
-            )
+            } else {
+                format!(
+                    "{}{}",
+                    prompt_header,
+                    wrapped_block(text, width, INDENT.len() * 3)
+                )
+            }
         }
     }
 }
@@ -425,10 +423,10 @@ mod tests {
         let config = Config::default();
         let mut session = Session::default();
         session
-            .add_prompt(
+            .add_step(
                 "test_model".into(),
                 "Test prompt".to_string(),
-                StepType::Code,
+                StepType::Auto,
             )
             .unwrap();
         let test_file_path = root_path.join("test_file.rs");
@@ -493,7 +491,7 @@ mod tests {
         let step = Step::new(
             "test_model".into(),
             "Test prompt\nwith multiple\nlines".to_string(),
-            StepType::Code,
+            StepType::Auto,
         );
         let full_result = render_step_prompt(&step, 80, true);
         assert!(full_result.contains("Test prompt"));

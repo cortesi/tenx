@@ -105,8 +105,8 @@ impl DialectProvider for Tags {
         session: &Session,
         offset: usize,
     ) -> Result<String> {
-        let prompt = session
-            .steps()
+        let steps = session.steps();
+        let prompt = steps
             .get(offset)
             .ok_or_else(|| TenxError::Internal("Invalid prompt offset".into()))?;
         let mut rendered = String::new();
@@ -246,8 +246,8 @@ impl DialectProvider for Tags {
         session: &Session,
         offset: usize,
     ) -> Result<String> {
-        let step = session
-            .steps()
+        let steps = session.steps();
+        let step = steps
             .get(offset)
             .ok_or_else(|| TenxError::Internal("Invalid step offset".into()))?;
         if let Some(resp) = &step.model_response {
@@ -300,7 +300,7 @@ impl DialectProvider for Tags {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::session::{Step, StepType};
+    use crate::session::StepType;
 
     use indoc::indoc;
     use pretty_assertions::assert_eq;
@@ -382,7 +382,7 @@ mod tests {
     }
 
     #[test]
-    fn test_render_edit() {
+    fn test_render_edit() -> Result<()> {
         let d = Tags::default();
         let mut session = Session::default();
 
@@ -397,12 +397,8 @@ mod tests {
             response_text: Some("Test response".into()),
         };
 
-        session.steps_mut().push(Step::new(
-            "test_model".into(),
-            "test".into(),
-            StepType::Code,
-        ));
-        if let Some(step) = session.steps_mut().last_mut() {
+        session.add_step("test_model".into(), "test".into(), StepType::Auto)?;
+        if let Some(step) = session.last_step_mut() {
             step.model_response = Some(response);
         }
 
@@ -426,6 +422,7 @@ mod tests {
 
             "#}
         );
+        Ok(())
     }
 
     #[test]

@@ -142,10 +142,10 @@ mod tests {
         let dialect = Dialect::Dummy(DummyDialect::default());
         let config = Config::default();
         let mut session = Session::default();
-        session.add_prompt(
+        session.add_step(
             "test_model".into(),
             "test prompt".to_string(),
-            StepType::Code,
+            StepType::Auto,
         )?;
 
         build_conversation(&conversation, &mut req, &config, &session, &dialect)?;

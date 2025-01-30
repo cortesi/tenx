@@ -18,6 +18,7 @@ pub struct ModelResponse {
     pub patch: Option<Patch>,
     /// Operations requested by the model, other than patching.
     pub operations: Vec<Operation>,
+
     /// Model-specific usage statistics
     pub usage: Option<Usage>,
     /// The verbatim text response from the model
@@ -32,13 +33,16 @@ pub enum Operation {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
-pub enum StepType {
+pub enum ActionType {
     /// A user code request
     Code,
 
     /// A fix request
     Fix,
+}
 
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
+pub enum StepType {
     /// An automatically generated step. This might be needed if, for instance, the model asks to
     /// edit a file, in order to mantain request/response sequencing.
     Auto,
@@ -52,12 +56,8 @@ pub enum StepType {
 pub struct Step {
     /// The name of the model used for this step
     pub model: String,
-    /// The type of step
-    pub step_type: StepType,
     /// The prompt provided to the model
     pub prompt: String,
-    /// The response from the model
-    pub model_response: Option<ModelResponse>,
     /// Time taken in seconds to receive the complete model response
     pub response_time: Option<f64>,
     /// An associated error, for instance an error processing a model response. This may be
@@ -65,6 +65,12 @@ pub struct Step {
     pub err: Option<TenxError>,
     /// A cache of the file contents before the step was applied
     pub rollback_cache: HashMap<PathBuf, String>,
+
+    /// The response from the model
+    pub model_response: Option<ModelResponse>,
+
+    /// The type of step
+    pub step_type: StepType,
 }
 
 impl Step {
@@ -103,6 +109,16 @@ impl Step {
     }
 }
 
+/// A user-requested action, which may contain many steps.
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct Action {
+    /// The type of step
+    pub action_type: ActionType,
+
+    /// The steps in the action
+    pub steps: Vec<Step>,
+}
+
 /// Determines if a given string is a glob pattern or a path.
 fn is_glob(s: &str) -> bool {
     s.contains('*') || s.contains('?')
@@ -112,7 +128,7 @@ fn is_glob(s: &str) -> bool {
 #[derive(Debug, Deserialize, Serialize, Default, Clone)]
 pub struct Session {
     editable: Vec<PathBuf>,
-    pub steps: Vec<Step>,
+    actions: Vec<Action>,
     pub contexts: Vec<context::Context>,
 }
 
@@ -122,38 +138,37 @@ impl Session {
         self.contexts.clear();
     }
 
-    /// Updates the prompt at a specific step.
-    pub fn update_prompt_at(&mut self, offset: usize, prompt: String) -> Result<()> {
-        if offset >= self.steps.len() {
-            return Err(TenxError::Internal("Invalid step offset".into()));
-        }
-        self.steps[offset].prompt = prompt;
-        Ok(())
-    }
-
-    /// Clears all steps in the session, but keeps the current editable and context intact.
+    /// Clears all actions in the session, but keeps the current editable and context intact.
     pub fn clear(&mut self) {
-        self.steps.clear();
+        self.actions.clear();
     }
 }
 
 impl Session {
-    pub fn steps(&self) -> &Vec<Step> {
-        &self.steps
-    }
-
-    pub fn steps_mut(&mut self) -> &mut Vec<Step> {
-        &mut self.steps
+    /// Returns all steps across all actions in the session.
+    pub fn steps(&self) -> Vec<&Step> {
+        self.actions
+            .iter()
+            .flat_map(|action| &action.steps)
+            .collect()
     }
 
     /// Returns a reference to the last step in the session.
     pub fn last_step(&self) -> Option<&Step> {
-        self.steps.last()
+        self.actions
+            .iter()
+            .rev()
+            .flat_map(|action| action.steps.iter().rev())
+            .next()
     }
 
     /// Returns a mutable reference to the last step in the session.
     pub fn last_step_mut(&mut self) -> Option<&mut Step> {
-        self.steps.last_mut()
+        self.actions
+            .iter_mut()
+            .rev()
+            .flat_map(|action| action.steps.iter_mut().rev())
+            .next()
     }
 
     pub fn contexts(&self) -> &Vec<context::Context> {
@@ -181,7 +196,7 @@ impl Session {
 
     /// Does this session have a pending prompt?
     pub fn should_continue(&self) -> bool {
-        if let Some(step) = self.steps.last() {
+        if let Some(step) = self.steps().last() {
             step.model_response.is_none() && step.err.is_none()
         } else {
             false
@@ -193,41 +208,30 @@ impl Session {
         self.last_step().and_then(|step| step.err.as_ref())
     }
 
-    /// Adds a new step to the session, and sets the step prompt.
+    /// Adds a new step to the last action in the session.
     ///
     /// Returns an error if the last step doesn't have either a patch or an error.
-    pub fn add_prompt(&mut self, model: String, prompt: String, step_type: StepType) -> Result<()> {
-        if let Some(last_step) = self.steps.last() {
-            if last_step.model_response.is_none() && last_step.err.is_none() {
-                return Err(TenxError::Internal(
-                    "Cannot add a new prompt while the previous step has no response".into(),
-                ));
+    pub fn add_step(&mut self, model: String, prompt: String, step_type: StepType) -> Result<()> {
+        if let Some(last_action) = self.actions.last() {
+            if let Some(last_step) = last_action.steps.last() {
+                if last_step.model_response.is_none() && last_step.err.is_none() {
+                    return Err(TenxError::Internal(
+                        "Cannot add a new prompt while the previous step has no response".into(),
+                    ));
+                }
             }
         }
-        self.steps.push(Step::new(model, prompt, step_type));
-        Ok(())
-    }
 
-    /// Sets the prompt for the last step in the session.
-    /// If there are no steps, it creates a new one.
-    pub fn set_last_prompt(
-        &mut self,
-        model: String,
-        prompt: String,
-        step_type: StepType,
-    ) -> Result<()> {
-        if self.steps.is_empty() {
-            self.steps.push(Step::new(model, prompt, step_type));
-            Ok(())
-        } else if let Some(last_step) = self.steps.last_mut() {
-            last_step.prompt = prompt;
-            last_step.model = model;
-            last_step.step_type = step_type;
-            last_step.model_response = None;
-            Ok(())
+        // Add to existing action or create new Code action
+        if let Some(action) = self.actions.last_mut() {
+            action.steps.push(Step::new(model, prompt, step_type));
         } else {
-            Err(TenxError::Internal("Failed to set prompt".into()))
+            self.actions.push(Action {
+                action_type: ActionType::Code,
+                steps: vec![Step::new(model, prompt, step_type)],
+            });
         }
+        Ok(())
     }
 
     /// Adds a new context to the session.
@@ -284,23 +288,47 @@ impl Session {
     }
 
     fn reset_steps(&mut self, config: &config::Config, keep: Option<usize>) -> Result<()> {
-        let total = self.steps.len();
+        let total_steps: usize = self.actions.iter().map(|a| a.steps.len()).sum();
         match keep {
-            Some(offset) if offset >= total => {
+            Some(offset) if offset >= total_steps => {
                 return Err(TenxError::Internal("Invalid rollback offset".into()));
             }
             Some(offset) => {
-                let n = total - offset - 1;
-                for step in self.steps.iter_mut().rev().take(n) {
-                    step.rollback(config)?;
+                let mut steps_remaining = offset + 1;
+                let mut new_actions = Vec::new();
+
+                // Preserve actions until we reach the required step count
+                for action in &mut self.actions {
+                    if steps_remaining == 0 {
+                        break;
+                    }
+
+                    let keep_steps = std::cmp::min(action.steps.len(), steps_remaining);
+                    // Keep first 'keep_steps' steps in this action
+                    if keep_steps > 0 {
+                        if keep_steps < action.steps.len() {
+                            // Rollback steps being removed
+                            for step in action.steps[keep_steps..].iter_mut().rev() {
+                                step.rollback(config)?;
+                            }
+                            action.steps.truncate(keep_steps);
+                        }
+                        new_actions.push(action.clone());
+                    }
+
+                    steps_remaining = steps_remaining.saturating_sub(action.steps.len());
                 }
-                self.steps.truncate(offset + 1);
+
+                self.actions = new_actions;
             }
             None => {
-                for step in self.steps.iter_mut().rev() {
-                    step.rollback(config)?;
+                // Rollback all steps in reverse order
+                for action in self.actions.iter_mut().rev() {
+                    for step in action.steps.iter_mut().rev() {
+                        step.rollback(config)?;
+                    }
                 }
-                self.steps.clear();
+                self.actions.clear();
             }
         }
         Ok(())
@@ -339,52 +367,46 @@ impl Session {
         if had_edit {
             // Use the same model as the current step for auto-prompts
             let current_model = self
-                .steps
+                .steps()
                 .last()
                 .map(|s| s.model.clone())
                 .unwrap_or_default();
-            self.add_prompt(current_model, "OK".into(), StepType::Auto)?;
+            self.add_step(current_model, "OK".into(), StepType::Auto)?;
         }
         Ok(())
     }
 
     /// Return the list of files that should be included in the editable block before a given step.
-    /// - Files are included for step N, if they are modified in step N-1, AND that modification
-    ///   is the last modification in to the file in the step list.
-    /// - Edit operations and appearing in a Patch are both counted as a modifications.
-    /// - Offset can be num_steps + 1, meaning we're considering all steps and calculating the edit
-    ///   set for a new step to be added.
-    /// - Passing an offset beyond num_steps + 1 is an error
     pub fn editables_for_step(&self, step_offset: usize) -> Result<Vec<PathBuf>> {
-        if step_offset > self.steps.len() {
+        let total_steps: usize = self.actions.iter().map(|a| a.steps.len()).sum();
+        if step_offset > total_steps {
             return Err(TenxError::Internal("Invalid step offset".into()));
         }
 
-        // Initialize with all files having -1 as their last modification step
         let mut most_recent_modified: HashMap<PathBuf, i32> = self
             .editable
             .iter()
             .map(|path| (path.clone(), -1))
             .collect();
 
-        // Record all file modifications with their step index
-        for (idx, step) in self.steps.iter().enumerate() {
-            if let Some(resp) = &step.model_response {
-                // Add files modified by patches
-                if let Some(patch) = &resp.patch {
-                    for path in patch.changed_files() {
-                        most_recent_modified.insert(path.clone(), idx as i32);
+        let mut global_idx = 0;
+        for action in &self.actions {
+            for step in &action.steps {
+                if let Some(resp) = &step.model_response {
+                    if let Some(patch) = &resp.patch {
+                        for path in patch.changed_files() {
+                            most_recent_modified.insert(path.clone(), global_idx);
+                        }
+                    }
+                    for op in &resp.operations {
+                        let Operation::Edit(path) = op;
+                        most_recent_modified.insert(path.clone(), global_idx);
                     }
                 }
-                // Add files that were requested for editing
-                for op in &resp.operations {
-                    let Operation::Edit(path) = op;
-                    most_recent_modified.insert(path.clone(), idx as i32);
-                }
+                global_idx += 1;
             }
         }
 
-        // Return files modified in the previous step
         let target_step = (step_offset as i32) - 1;
         Ok(self
             .editable
@@ -497,10 +519,10 @@ mod tests {
                     content: content.clone(),
                 })],
             };
-            test_project.session.add_prompt(
+            test_project.session.add_step(
                 "test_model".into(),
                 format!("Prompt {}", i),
-                StepType::Code,
+                StepType::Auto,
             )?;
 
             let rollback_cache = [(PathBuf::from("test.txt"), test_project.read("test.txt"))]
@@ -520,17 +542,20 @@ mod tests {
             }
         }
 
-        assert_eq!(test_project.session.steps.len(), 3);
+        let steps = test_project.session.steps();
+        assert_eq!(steps.len(), 3);
         assert_eq!(test_project.read("test.txt"), "Content 3");
 
         // Rollback to the first step
         test_project.session.reset(&test_project.config, 0)?;
-        assert_eq!(test_project.session.steps.len(), 1);
+        let steps = test_project.session.steps();
+        assert_eq!(steps.len(), 1);
         assert_eq!(test_project.read("test.txt"), "Content 1");
 
         // Test reset_all
         test_project.session.reset_all(&test_project.config)?;
-        assert_eq!(test_project.session.steps.len(), 0);
+        let steps = test_project.session.steps();
+        assert_eq!(steps.len(), 0);
         assert_eq!(test_project.read("test.txt"), "Initial content");
 
         Ok(())
@@ -562,8 +587,8 @@ mod tests {
         // Step 0: Modify file1.txt through patch
         test_project
             .session
-            .add_prompt("test_model".into(), "step0".into(), StepType::Code)?;
-        let step = test_project.session.steps.last_mut().unwrap();
+            .add_step("test_model".into(), "step0".into(), StepType::Auto)?;
+        let step = test_project.session.last_step_mut().unwrap();
         step.model_response = Some(ModelResponse {
             patch: Some(Patch {
                 changes: vec![Change::Write(WriteFile {
@@ -580,8 +605,8 @@ mod tests {
         // Step 1: Request to edit file2.txt and modify file3.txt through patch
         test_project
             .session
-            .add_prompt("test_model".into(), "step1".into(), StepType::Code)?;
-        let step = test_project.session.steps.last_mut().unwrap();
+            .add_step("test_model".into(), "step1".into(), StepType::Auto)?;
+        let step = test_project.session.last_step_mut().unwrap();
         step.model_response = Some(ModelResponse {
             patch: Some(Patch {
                 changes: vec![Change::Write(WriteFile {
@@ -598,8 +623,8 @@ mod tests {
         // Step 2: Empty step (no modifications)
         test_project
             .session
-            .add_prompt("test_model".into(), "step2".into(), StepType::Code)?;
-        let step = test_project.session.steps.last_mut().unwrap();
+            .add_step("test_model".into(), "step2".into(), StepType::Auto)?;
+        let step = test_project.session.last_step_mut().unwrap();
         step.model_response = Some(ModelResponse {
             patch: None,
             operations: vec![],
@@ -647,12 +672,10 @@ mod tests {
         test_project.write("new.txt", "new content");
 
         // Add a step with both a patch and an edit operation
-        test_project.session.add_prompt(
-            "test_model".into(),
-            "test prompt".into(),
-            StepType::Code,
-        )?;
-        let step = test_project.session.steps.last_mut().unwrap();
+        test_project
+            .session
+            .add_step("test_model".into(), "test prompt".into(), StepType::Auto)?;
+        let step = test_project.session.last_step_mut().unwrap();
         let patch = Patch {
             changes: vec![Change::Write(WriteFile {
                 path: PathBuf::from("test.txt"),
