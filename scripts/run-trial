@@ -22,6 +22,7 @@ cargo run --release --bin ttrial --  \
     --model gemini-exp \
     --model deepseek3 \
     --model deepseek-reasoner \
+    --model o3-mini 
     "*" 
 
     # --model groq-llama33-70b \

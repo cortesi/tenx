@@ -13,6 +13,7 @@ const OPENAI_API_BASE: &str = "https://api.openai.com/v1";
 const OPENAI_API_KEY: &str = "OPENAI_API_KEY";
 const OPENAI_GPT_O1_PREVIEW: &str = "o1-preview";
 const OPENAI_GPT_O1_MINI: &str = "o1-mini";
+const OPENAI_GPT_O3_MINI: &str = "o3-mini";
 const OPENAI_GPT4O: &str = "gpt-4o";
 const OPENAI_GPT4O_MINI: &str = "gpt-4o-mini";
 
@@ -167,6 +168,15 @@ fn default_models() -> Vec<Model> {
             Model::OpenAi {
                 name: "o1-mini".to_string(),
                 api_model: OPENAI_GPT_O1_MINI.to_string(),
+                key: "".to_string(),
+                key_env: OPENAI_API_KEY.to_string(),
+                api_base: OPENAI_API_BASE.to_string(),
+                can_stream: false,
+                no_system_prompt: true,
+            },
+            Model::OpenAi {
+                name: "o3-mini".to_string(),
+                api_model: OPENAI_GPT_O3_MINI.to_string(),
                 key: "".to_string(),
                 key_env: OPENAI_API_KEY.to_string(),
                 api_base: OPENAI_API_BASE.to_string(),
