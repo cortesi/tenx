@@ -5,7 +5,6 @@ cargo run --release --bin ttrial --  \
     run -n 3 \
     --resume \
     --save ./tmp/trial1 \
-    --model deepseek \
     --model gpt4o \
     --model gpt4o-mini \
     --model sonnet \
@@ -17,6 +16,8 @@ cargo run --release --bin ttrial --  \
     --model o1-mini \
     --model llama33-70b \
     --model o1 \
+    --model o1-preview \
+    --model o3-mini \
     --model gemini-flash-exp \
     --model gemini-15pro \
     --model gemini-exp \
