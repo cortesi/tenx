@@ -2,9 +2,10 @@ use async_openai::{
     config::OpenAIConfig,
     types::{
         ChatChoice, ChatCompletionRequestAssistantMessageArgs,
-        ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessageArgs,
-        ChatCompletionResponseMessage, CreateChatCompletionRequest,
-        CreateChatCompletionRequestArgs, CreateChatCompletionResponse, FinishReason,
+        ChatCompletionRequestDeveloperMessageArgs, ChatCompletionRequestSystemMessageArgs,
+        ChatCompletionRequestUserMessageArgs, ChatCompletionResponseMessage,
+        CreateChatCompletionRequest, CreateChatCompletionRequestArgs, CreateChatCompletionResponse,
+        FinishReason,
     },
     Client,
 };
@@ -47,14 +48,8 @@ impl Conversation<CreateChatCompletionRequest> for OpenAi {
     ) -> Result<()> {
         if self.no_system_prompt {
             req.messages.push(
-                ChatCompletionRequestUserMessageArgs::default()
+                ChatCompletionRequestDeveloperMessageArgs::default()
                     .content(prompt)
-                    .build()?
-                    .into(),
-            );
-            req.messages.push(
-                ChatCompletionRequestAssistantMessageArgs::default()
-                    .content(ACK)
                     .build()?
                     .into(),
             );
