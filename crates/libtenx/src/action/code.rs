@@ -38,6 +38,11 @@ impl ActionStrategy for Code {
                             StepType::Error,
                         )));
                     }
+                } else if let Some(model_response) = &step.model_response {
+                    if !model_response.operations.is_empty() {
+                        let model = config.models.default.clone();
+                        return Ok(Some(Step::new(model, "OK".to_string(), StepType::Auto)));
+                    }
                 }
             } else {
                 let model = config.models.default.clone();
@@ -77,6 +82,11 @@ impl ActionStrategy for Fix {
                             model_message.to_string(),
                             StepType::Error,
                         )));
+                    }
+                } else if let Some(model_response) = &step.model_response {
+                    if !model_response.operations.is_empty() {
+                        let model = config.models.default.clone();
+                        return Ok(Some(Step::new(model, "OK".to_string(), StepType::Auto)));
                     }
                 }
             } else {

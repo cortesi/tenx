@@ -3,6 +3,7 @@ use tracing::{debug, warn};
 
 use crate::{
     action,
+    action::ActionStrategy,
     checks::{check_paths, check_session, CheckMode},
     config::Config,
     context::{Context, ContextProvider},
@@ -117,25 +118,16 @@ impl Tenx {
     ) -> Result<()> {
         let _block = EventBlock::start(&sender)?;
         let pre_result = self.run_pre_checks(session, &sender);
-        let result = if let Err(e) = pre_result {
-            let model = self.config.models.default.clone();
+        if let Err(e) = pre_result {
             session.add_action(action::Strategy::Fix(action::Fix::new(
                 e.clone(),
                 prompt.clone(),
             )))?;
-
-            let prompt = prompt.unwrap_or_else(|| "Please fix the following errors.".to_string());
-            session.add_step(model, prompt, StepType::Error)?;
-
-            if let Some(step) = session.last_step_mut() {
-                step.err = Some(e.clone());
-            }
             self.save_session(session)?;
             self.process_prompt(session, sender.clone()).await
         } else {
             Err(TenxError::Internal("No errors found".to_string()))
-        };
-        result
+        }
     }
 
     /// Saves a session to the store.
@@ -183,10 +175,7 @@ impl Tenx {
         sender: Option<EventSender>,
     ) -> Result<()> {
         let _block = EventBlock::start(&sender)?;
-        let model = self.config.models.default.clone();
-
-        session.add_action(action::Strategy::Code(action::Code::new(prompt.clone())))?;
-        session.add_step(model, prompt, StepType::Auto)?;
+        session.add_action(action::Strategy::Code(action::Code::new(prompt)))?;
         self.process_prompt(session, sender.clone()).await
     }
 
@@ -216,54 +205,30 @@ impl Tenx {
         sender: Option<EventSender>,
     ) -> Result<()> {
         self.save_session(session)?;
-        if session.last_step_error().is_none() {
-            if let Err(e) = self.run_pre_checks(session, &sender) {
-                if let Some(step) = session.last_step_mut() {
-                    step.err = Some(e.clone());
-                }
-                self.save_session(session)?;
-                return Err(e);
-            }
-        }
-
         let mut retry_count = 0;
+
         loop {
-            if let Some(e) = session.last_step_error() {
-                if let Some(model_message) = e.should_retry() {
-                    if retry_count >= self.config.retry_limit {
-                        warn!("Retry limit reached. Last error: {}", e);
-                        send_event(
-                            &sender,
-                            Event::Fatal(format!("Retry limit reached. Last error: {}", e)),
-                        )?;
-                        return Err(e.clone());
-                    }
-                    send_event(
-                        &sender,
-                        Event::Retry {
-                            user: format!("{}", e),
-                            model: model_message.to_string(),
-                        },
-                    )?;
-                    retry_count += 1;
-                    debug!(
-                        "Retryable error (attempt {}/{}): {}",
-                        retry_count, self.config.retry_limit, e
-                    );
-                    let model = self.config.models.default.clone();
-                    session.add_step(model, model_message.to_string(), StepType::Error)?;
+            let next_step = if let Some(action) = session.last_action() {
+                action
+                    .strategy
+                    .next_step(&self.config, session, sender.clone())?
+            } else {
+                return Ok(());
+            };
+
+            match next_step {
+                Some(step) => {
+                    session.add_step(step.model, step.prompt, step.step_type)?;
                     self.save_session(session)?;
-                } else {
-                    debug!("Non-retryable error: {}", e);
-                    send_event(&sender, Event::Fatal(format!("{}", e)))?;
-                    return Err(e.clone());
                 }
+                None => return Ok(()),
             }
 
-            let result = self.execute_prompt_cycle(session, sender.clone()).await;
-            match result {
+            // Execute the step
+            match self.execute_prompt_cycle(session, sender.clone()).await {
                 Ok(()) => {
                     self.save_session(session)?;
+                    retry_count = 0;
                     if !session.should_continue() {
                         return Ok(());
                     }
@@ -271,6 +236,34 @@ impl Tenx {
                 Err(e) => {
                     if let Some(step) = session.last_step_mut() {
                         step.err = Some(e.clone());
+                    }
+                    retry_count += 1;
+
+                    if retry_count >= self.config.retry_limit {
+                        warn!("Retry limit reached. Last error: {}", e);
+                        send_event(
+                            &sender,
+                            Event::Fatal(format!("Retry limit reached. Last error: {}", e)),
+                        )?;
+                        return Err(e);
+                    }
+
+                    if let Some(model_message) = e.should_retry() {
+                        send_event(
+                            &sender,
+                            Event::Retry {
+                                user: format!("{}", e),
+                                model: model_message.to_string(),
+                            },
+                        )?;
+                        debug!(
+                            "Retryable error (attempt {}/{}): {}",
+                            retry_count, self.config.retry_limit, e
+                        );
+                    } else {
+                        debug!("Non-retryable error: {}", e);
+                        send_event(&sender, Event::Fatal(format!("{}", e)))?;
+                        return Err(e);
                     }
                 }
             }
@@ -413,13 +406,6 @@ mod tests {
 
         session
             .add_action(action::Strategy::Code(action::Code::new("test".into())))
-            .unwrap();
-        session
-            .add_step(
-                config.models.default.clone(),
-                "Test prompt".to_string(),
-                StepType::Auto,
-            )
             .unwrap();
         session
             .add_editable_path(&config, test_file_path.clone())

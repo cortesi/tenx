@@ -381,23 +381,12 @@ impl Session {
             .ok_or_else(|| TenxError::Internal("No response in the last step".into()))?;
 
         step.apply(config)?;
-        let mut had_edit = false;
         for operation in &resp.operations {
             match operation {
                 Operation::Edit(path) => {
                     self.add_editable_path(config, path)?;
-                    had_edit = true;
                 }
             }
-        }
-        if had_edit {
-            // Use the same model as the current step for auto-prompts
-            let current_model = self
-                .steps()
-                .last()
-                .map(|s| s.model.clone())
-                .unwrap_or_default();
-            self.add_step(current_model, "OK".into(), StepType::Auto)?;
         }
         Ok(())
     }
