@@ -88,9 +88,9 @@ pub enum Event {
 
     /// A retryable error has occurred
     NextStep {
-        /// An error to display to the user
+        /// A message to display to the user
         user: String,
-        /// An error to the model, often the full tool output
+        /// The full message sent to the model
         model: String,
     },
     /// A fatal error has occurred

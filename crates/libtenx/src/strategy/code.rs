@@ -1,9 +1,10 @@
 use serde::{Deserialize, Serialize};
+use tracing::debug;
 
 use crate::{
     config::Config,
     error::{Result, TenxError},
-    events::EventSender,
+    events::{send_event, Event, EventSender},
     session::{Session, Step, StepType},
 };
 
@@ -21,19 +22,45 @@ impl Code {
 }
 
 /// Common logic for handling steps in both Code and Fix strategies
-fn handle_existing_step(config: &Config, step: &Step) -> Option<Step> {
+fn handle_existing_step(
+    config: &Config,
+    step: &Step,
+    events: Option<EventSender>,
+) -> Result<Option<Step>> {
+    let model = config.models.default.clone();
     if let Some(err) = &step.err {
         if let Some(model_message) = err.should_retry() {
-            let model = config.models.default.clone();
-            return Some(Step::new(model, model_message.to_string(), StepType::Error));
+            send_event(
+                &events,
+                Event::NextStep {
+                    user: format!("{}", err),
+                    model: model_message.to_string(),
+                },
+            )?;
+            debug!("Next step, based on error: {}", err);
+
+            return Ok(Some(Step::new(
+                model,
+                model_message.to_string(),
+                StepType::Error,
+            )));
         }
     } else if let Some(model_response) = &step.model_response {
         if !model_response.operations.is_empty() {
-            let model = config.models.default.clone();
-            return Some(Step::new(model, "OK".to_string(), StepType::Auto));
+            let model_message = "OK".to_string();
+            send_event(
+                &events,
+                Event::NextStep {
+                    user: "operations applied".into(),
+                    model: model_message.clone(),
+                },
+            )?;
+            debug!("Next step, based on operations");
+
+            return Ok(Some(Step::new(model, model_message, StepType::Auto)));
         }
     }
-    None
+    Ok(None)
 }
 
 impl ActionStrategy for Code {
@@ -41,13 +68,11 @@ impl ActionStrategy for Code {
         &self,
         config: &Config,
         session: &Session,
-        _events: Option<EventSender>,
+        events: Option<EventSender>,
     ) -> Result<Option<Step>> {
         if let Some(action) = session.last_action() {
             if let Some(step) = action.last_step() {
-                if let Some(step) = handle_existing_step(config, step) {
-                    return Ok(Some(step));
-                }
+                return handle_existing_step(config, step, events);
             } else {
                 let model = config.models.default.clone();
                 return Ok(Some(Step::new(model, self.prompt.clone(), StepType::Auto)));
@@ -74,13 +99,11 @@ impl ActionStrategy for Fix {
         &self,
         config: &Config,
         session: &Session,
-        _events: Option<EventSender>,
+        events: Option<EventSender>,
     ) -> Result<Option<Step>> {
         if let Some(action) = session.last_action() {
             if let Some(step) = action.last_step() {
-                if let Some(step) = handle_existing_step(config, step) {
-                    return Ok(Some(step));
-                }
+                return handle_existing_step(config, step, events);
             } else {
                 let model = config.models.default.clone();
                 let prompt = self

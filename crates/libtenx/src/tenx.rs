@@ -248,16 +248,7 @@ impl Tenx {
                         return Err(e);
                     }
 
-                    if let Some(model_message) = e.should_retry() {
-                        send_event(
-                            &sender,
-                            Event::NextStep {
-                                user: format!("{}", e),
-                                model: model_message.to_string(),
-                            },
-                        )?;
-                        debug!("Next step: {}", e);
-                    } else {
+                    if e.should_retry().is_none() {
                         debug!("Non-retryable error: {}", e);
                         send_event(&sender, Event::Fatal(format!("{}", e)))?;
                         return Err(e);
