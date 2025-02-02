@@ -91,3 +91,105 @@ impl ActionStrategy for Fix {
         Ok(None)
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::testutils::test_project;
+
+    #[test]
+    fn test_code_next_step() -> Result<()> {
+        let test_project = test_project();
+        let code = Code::new("Test".into());
+        let mut session = Session::default();
+
+        assert!(code
+            .next_step(&test_project.config, &session, None)?
+            .is_none());
+
+        session.add_action(super::super::Strategy::Code(code.clone()))?;
+        let step = code
+            .next_step(&test_project.config, &session, None)?
+            .unwrap();
+        assert_eq!(step.prompt, "Test");
+        assert_eq!(step.step_type, StepType::Auto);
+
+        session.add_step(
+            test_project.config.models.default.clone(),
+            "Test".into(),
+            StepType::Auto,
+        )?;
+        let patch_err = TenxError::Patch {
+            user: "Error".into(),
+            model: "Retry".into(),
+        };
+        session.last_step_mut().unwrap().err = Some(patch_err);
+        let step = code
+            .next_step(&test_project.config, &session, None)?
+            .unwrap();
+        assert_eq!(step.prompt, "Retry");
+        assert_eq!(step.step_type, StepType::Error);
+
+        session.last_step_mut().unwrap().err = Some(TenxError::Config("Error".into()));
+        assert!(code
+            .next_step(&test_project.config, &session, None)?
+            .is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_fix_next_step() -> Result<()> {
+        let test_project = test_project();
+        let mut session = Session::default();
+
+        // Empty session
+        let fix = Fix::new(TenxError::Config("Error".into()), Some("Fix prompt".into()));
+        assert!(fix
+            .next_step(&test_project.config, &session, None)?
+            .is_none());
+
+        // Custom prompt
+        session.add_action(super::super::Strategy::Fix(fix))?;
+        let step = session
+            .last_action()
+            .unwrap()
+            .strategy
+            .next_step(&test_project.config, &session, None)?
+            .unwrap();
+        assert_eq!(step.prompt, "Fix prompt");
+        assert_eq!(step.step_type, StepType::Error);
+
+        // Retryable error
+        session.add_step(
+            test_project.config.models.default.clone(),
+            "Test".into(),
+            StepType::Auto,
+        )?;
+        session.last_step_mut().unwrap().err = Some(TenxError::Patch {
+            user: "Error".into(),
+            model: "Retry".into(),
+        });
+        let step = session
+            .last_action()
+            .unwrap()
+            .strategy
+            .next_step(&test_project.config, &session, None)?
+            .unwrap();
+        assert_eq!(step.prompt, "Retry");
+        assert_eq!(step.step_type, StepType::Error);
+
+        // Default prompt
+        let fix = Fix::new(TenxError::Config("Error".into()), None);
+        session.add_action(super::super::Strategy::Fix(fix))?;
+        let step = session
+            .last_action()
+            .unwrap()
+            .strategy
+            .next_step(&test_project.config, &session, None)?
+            .unwrap();
+        assert_eq!(step.prompt, "Please fix the following errors.");
+
+        Ok(())
+    }
+}
