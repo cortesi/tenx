@@ -63,10 +63,31 @@ impl Fix {
 impl ActionStrategy for Fix {
     fn next_step(
         &self,
-        _config: &Config,
-        _session: &Session,
+        config: &Config,
+        session: &Session,
         _events: Option<EventSender>,
     ) -> Result<Option<Step>> {
+        if let Some(action) = session.last_action() {
+            if let Some(step) = action.last_step() {
+                if let Some(err) = &step.err {
+                    if let Some(model_message) = err.should_retry() {
+                        let model = config.models.default.clone();
+                        return Ok(Some(Step::new(
+                            model,
+                            model_message.to_string(),
+                            StepType::Error,
+                        )));
+                    }
+                }
+            } else {
+                let model = config.models.default.clone();
+                let prompt = self
+                    .prompt
+                    .clone()
+                    .unwrap_or_else(|| "Please fix the following errors.".to_string());
+                return Ok(Some(Step::new(model, prompt, StepType::Error)));
+            }
+        }
         Ok(None)
     }
 }
