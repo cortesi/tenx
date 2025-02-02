@@ -20,6 +20,22 @@ impl Code {
     }
 }
 
+/// Common logic for handling steps in both Code and Fix strategies
+fn handle_existing_step(config: &Config, step: &Step) -> Option<Step> {
+    if let Some(err) = &step.err {
+        if let Some(model_message) = err.should_retry() {
+            let model = config.models.default.clone();
+            return Some(Step::new(model, model_message.to_string(), StepType::Error));
+        }
+    } else if let Some(model_response) = &step.model_response {
+        if !model_response.operations.is_empty() {
+            let model = config.models.default.clone();
+            return Some(Step::new(model, "OK".to_string(), StepType::Auto));
+        }
+    }
+    None
+}
+
 impl ActionStrategy for Code {
     fn next_step(
         &self,
@@ -29,20 +45,8 @@ impl ActionStrategy for Code {
     ) -> Result<Option<Step>> {
         if let Some(action) = session.last_action() {
             if let Some(step) = action.last_step() {
-                if let Some(err) = &step.err {
-                    if let Some(model_message) = err.should_retry() {
-                        let model = config.models.default.clone();
-                        return Ok(Some(Step::new(
-                            model,
-                            model_message.to_string(),
-                            StepType::Error,
-                        )));
-                    }
-                } else if let Some(model_response) = &step.model_response {
-                    if !model_response.operations.is_empty() {
-                        let model = config.models.default.clone();
-                        return Ok(Some(Step::new(model, "OK".to_string(), StepType::Auto)));
-                    }
+                if let Some(step) = handle_existing_step(config, step) {
+                    return Ok(Some(step));
                 }
             } else {
                 let model = config.models.default.clone();
@@ -74,20 +78,8 @@ impl ActionStrategy for Fix {
     ) -> Result<Option<Step>> {
         if let Some(action) = session.last_action() {
             if let Some(step) = action.last_step() {
-                if let Some(err) = &step.err {
-                    if let Some(model_message) = err.should_retry() {
-                        let model = config.models.default.clone();
-                        return Ok(Some(Step::new(
-                            model,
-                            model_message.to_string(),
-                            StepType::Error,
-                        )));
-                    }
-                } else if let Some(model_response) = &step.model_response {
-                    if !model_response.operations.is_empty() {
-                        let model = config.models.default.clone();
-                        return Ok(Some(Step::new(model, "OK".to_string(), StepType::Auto)));
-                    }
+                if let Some(step) = handle_existing_step(config, step) {
+                    return Ok(Some(step));
                 }
             } else {
                 let model = config.models.default.clone();
