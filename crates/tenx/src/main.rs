@@ -81,9 +81,9 @@ struct Cli {
     #[clap(long)]
     session_store_dir: Option<PathBuf>,
 
-    /// Number of times to retry a prompt before failing
+    /// Limit number of steps after a prompt
     #[clap(long)]
-    retry_limit: Option<usize>,
+    step_limit: Option<usize>,
 
     /// Skip pre checks
     #[clap(long)]
@@ -338,7 +338,7 @@ fn load_config(cli: &Cli) -> Result<config::Config> {
     // Apply CLI arguments
     config = config.load_env();
     set_config!(config, session_store_dir, cli.session_store_dir.clone());
-    set_config!(config, retry_limit, cli.retry_limit);
+    set_config!(config, step_limit, cli.step_limit);
     // set_config!(config, tags.smart, cli.tags_smart);
     // set_config!(config, tags.replace, cli.tags_replace);
     // set_config!(config, tags.udiff, cli.tags_udiff);

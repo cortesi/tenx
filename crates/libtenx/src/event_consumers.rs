@@ -153,9 +153,9 @@ pub async fn output_progress(
                         finish_spinner(&mut current_spinner);
                         println!("{}", "getting user input...".blue());
                     }
-                    Event::Retry{ref user, ref model} => {
+                    Event::NextStep{ref user, ref model} => {
                         finish_spinner(&mut current_spinner);
-                        println!("{:>width$}{}", "", format!("retrying: {}", user).yellow(), width=spinner_indent);
+                        println!("{:>width$}{}", "", format!("next step: {}", user).yellow(), width=spinner_indent);
                         if verbosity > 0 {
                             let wrapped = textwrap::indent(
                                 &textwrap::fill(model, 80 - spinner_indent),

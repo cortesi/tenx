@@ -33,15 +33,6 @@ pub enum Operation {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
-pub enum ActionType {
-    /// A user code request
-    Code,
-
-    /// A fix request
-    Fix,
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
 pub enum StepType {
     /// An automatically generated step. This might be needed if, for instance, the model asks to
     /// edit a file, in order to mantain request/response sequencing.
@@ -114,9 +105,6 @@ impl Step {
 pub struct Action {
     pub strategy: strategy::Strategy,
 
-    /// The type of step
-    pub action_type: ActionType,
-
     /// The steps in the action
     pub steps: Vec<Step>,
 }
@@ -126,7 +114,6 @@ impl Action {
     pub fn new(strategy: strategy::Strategy) -> Self {
         Action {
             strategy,
-            action_type: ActionType::Code,
             steps: Vec::new(),
         }
     }

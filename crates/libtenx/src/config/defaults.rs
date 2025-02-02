@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use super::config::*;
 
-const DEFAULT_RETRY_LIMIT: usize = 16;
+const DEFAULT_STEP_LIMIT: usize = 16;
 
 const ANTHROPIC_API_KEY: &str = "ANTHROPIC_API_KEY";
 const ANTHROPIC_CLAUDE_SONNET: &str = "claude-3-5-sonnet-latest";
@@ -381,7 +381,7 @@ pub fn default_config<P: AsRef<Path>>(current_dir: P) -> Config {
             ..Default::default()
         },
         session_store_dir: home_config_dir().join("state"),
-        retry_limit: DEFAULT_RETRY_LIMIT,
+        step_limit: DEFAULT_STEP_LIMIT,
         checks: default_checks(),
         ..Default::default()
     }

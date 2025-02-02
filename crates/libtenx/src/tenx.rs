@@ -205,9 +205,11 @@ impl Tenx {
         sender: Option<EventSender>,
     ) -> Result<()> {
         self.save_session(session)?;
-        let mut retry_count = 0;
+        let mut step_count = 0;
 
         loop {
+            step_count += 1;
+
             let next_step = if let Some(action) = session.last_action() {
                 action
                     .strategy
@@ -228,7 +230,6 @@ impl Tenx {
             match self.execute_prompt_cycle(session, sender.clone()).await {
                 Ok(()) => {
                     self.save_session(session)?;
-                    retry_count = 0;
                     if !session.should_continue() {
                         return Ok(());
                     }
@@ -237,13 +238,12 @@ impl Tenx {
                     if let Some(step) = session.last_step_mut() {
                         step.err = Some(e.clone());
                     }
-                    retry_count += 1;
 
-                    if retry_count >= self.config.retry_limit {
-                        warn!("Retry limit reached. Last error: {}", e);
+                    if step_count >= self.config.step_limit {
+                        warn!("Step count limit reached. Last error: {}", e);
                         send_event(
                             &sender,
-                            Event::Fatal(format!("Retry limit reached. Last error: {}", e)),
+                            Event::Fatal(format!("Step count limit reached. Last error: {}", e)),
                         )?;
                         return Err(e);
                     }
@@ -251,15 +251,12 @@ impl Tenx {
                     if let Some(model_message) = e.should_retry() {
                         send_event(
                             &sender,
-                            Event::Retry {
+                            Event::NextStep {
                                 user: format!("{}", e),
                                 model: model_message.to_string(),
                             },
                         )?;
-                        debug!(
-                            "Retryable error (attempt {}/{}): {}",
-                            retry_count, self.config.retry_limit, e
-                        );
+                        debug!("Next step: {}", e);
                     } else {
                         debug!("Non-retryable error: {}", e);
                         send_event(&sender, Event::Fatal(format!("{}", e)))?;
@@ -395,7 +392,7 @@ mod tests {
             .with_root(temp_dir.path());
 
         config.session_store_dir = temp_dir.path().join("sess");
-        config.retry_limit = 1;
+        config.step_limit = 1;
         config.project.include.push("**".to_string());
 
         let tenx = Tenx::new(config.clone());

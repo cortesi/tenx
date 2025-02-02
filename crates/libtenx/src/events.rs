@@ -87,7 +87,7 @@ pub enum Event {
     Log(LogLevel, String),
 
     /// A retryable error has occurred
-    Retry {
+    NextStep {
         /// An error to display to the user
         user: String,
         /// An error to the model, often the full tool output

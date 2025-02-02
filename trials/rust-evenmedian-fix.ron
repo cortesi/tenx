@@ -5,6 +5,6 @@
         primpt: "Fix the test failure, but don't touch the unit tests.",
     ),
     config: (
-        retry_limit: 5
+        step_limit: 5
     )
 )

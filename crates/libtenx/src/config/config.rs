@@ -502,8 +502,10 @@ pub struct Config {
     /// The directory to store session state. Defaults to ~/.config/tenx/state
     pub session_store_dir: PathBuf,
 
-    /// The number of times to retry a request.
-    pub retry_limit: usize,
+    /// The number of steps we can take in a single interaction. This is reset
+    /// every time the user issues another prompt, so doesn't limit the total
+    /// number of steps in a session.
+    pub step_limit: usize,
 
     /// The tags dialect configuration.
     #[optional_rename(OptionalTags)]
@@ -908,7 +910,7 @@ mod tests {
     fn test_config_roundtrip() -> crate::Result<()> {
         let project = testutils::test_project();
         let mut config = default_config(&project.config.cwd()?);
-        config.retry_limit = 42;
+        config.step_limit = 42;
         config.project.include.push("!*.test".to_string());
 
         let ron = config.to_ron()?;
@@ -921,11 +923,11 @@ mod tests {
 
     #[test]
     fn test_parse_config_value() -> crate::Result<()> {
-        // Test loading a config with a custom retry_limit
+        // Test loading a config with a custom step_limit
         let project = testutils::test_project();
-        let test_config = r#"(retry_limit: 10)"#;
+        let test_config = r#"(step_limit: 10)"#;
         let config = parse_config("", test_config, &project.config.cwd()?)?;
-        assert_eq!(config.retry_limit, 10);
+        assert_eq!(config.step_limit, 10);
 
         // Test that other values remain at default
         let project = testutils::test_project();

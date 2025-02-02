@@ -184,7 +184,7 @@ impl Trial {
             ".pytest/**".to_string(),
             "__pycache__/**".to_string(),
         ];
-        config.retry_limit = 1;
+        config.step_limit = 1;
         // We disable streaming for trials by default, because streaming messes up token counts
         config.models.no_stream = true;
         Ok(config)

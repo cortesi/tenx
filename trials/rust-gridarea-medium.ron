@@ -6,7 +6,7 @@
         editable: ["**/code.rs"]
     ),
     config: (
-        retry_limit: 5,
+        step_limit: 5,
         checks: (
             no_pre: true
         )
