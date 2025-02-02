@@ -119,10 +119,14 @@ impl Tenx {
         let pre_result = self.run_pre_checks(session, &sender);
         let result = if let Err(e) = pre_result {
             let model = self.config.models.default.clone();
-            session.add_action(action::Strategy::Fix(action::Fix::new(prompt.clone())))?;
+            session.add_action(action::Strategy::Fix(action::Fix::new(
+                e.clone(),
+                prompt.clone(),
+            )))?;
 
             let prompt = prompt.unwrap_or_else(|| "Please fix the following errors.".to_string());
             session.add_step(model, prompt, StepType::Error)?;
+
             if let Some(step) = session.last_step_mut() {
                 step.err = Some(e.clone());
             }

@@ -130,6 +130,11 @@ impl Action {
             steps: Vec::new(),
         }
     }
+
+    /// Returns a reference to the last step in the action
+    pub fn last_step(&self) -> Option<&Step> {
+        self.steps.last()
+    }
 }
 
 /// Determines if a given string is a glob pattern or a path.
@@ -173,6 +178,11 @@ impl Session {
             .rev()
             .flat_map(|action| action.steps.iter().rev())
             .next()
+    }
+
+    /// Returns a reference to the last action in the session.
+    pub fn last_action(&self) -> Option<&Action> {
+        self.actions.last()
     }
 
     /// Returns a mutable reference to the last step in the session.
