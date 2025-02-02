@@ -133,9 +133,9 @@ mod tests {
     use super::*;
 
     use libtenx::{
-        action,
         patch::Patch,
         session::{ModelResponse, StepType},
+        strategy,
     };
 
     use pretty_assertions::assert_eq;
@@ -174,7 +174,7 @@ mod tests {
     fn test_render_and_parse_roundtrip() {
         let mut session = Session::default();
         session
-            .add_action(action::Strategy::Code(action::Code::new("test".into())))
+            .add_action(strategy::Strategy::Code(strategy::Code::new("test".into())))
             .unwrap();
 
         // Add two steps with responses

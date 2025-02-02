@@ -1,4 +1,3 @@
-pub mod action;
 pub mod checks;
 pub mod config;
 pub mod context;
@@ -12,6 +11,7 @@ pub mod patch;
 pub mod pretty;
 pub mod session;
 pub mod session_store;
+pub mod strategy;
 pub mod tenx;
 #[cfg(test)]
 pub mod testutils;

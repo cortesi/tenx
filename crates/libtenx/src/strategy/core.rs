@@ -1,6 +1,3 @@
-use serde::{Deserialize, Serialize};
-
-use super::code::{Code, Fix};
 use crate::{
     config::Config,
     error::Result,
@@ -22,24 +19,4 @@ pub trait ActionStrategy {
         session: &Session,
         sender: Option<EventSender>,
     ) -> Result<Option<Step>>;
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum Strategy {
-    Code(Code),
-    Fix(Fix),
-}
-
-impl ActionStrategy for Strategy {
-    fn next_step(
-        &self,
-        config: &Config,
-        session: &Session,
-        sender: Option<EventSender>,
-    ) -> Result<Option<Step>> {
-        match self {
-            Strategy::Code(code) => code.next_step(config, session, sender),
-            Strategy::Fix(fix) => fix.next_step(config, session, sender),
-        }
-    }
 }

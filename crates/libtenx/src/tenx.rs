@@ -2,8 +2,6 @@ use std::path::PathBuf;
 use tracing::{debug, warn};
 
 use crate::{
-    action,
-    action::ActionStrategy,
     checks::{check_paths, check_session, CheckMode},
     config::Config,
     context::{Context, ContextProvider},
@@ -11,6 +9,8 @@ use crate::{
     model::ModelProvider,
     session::{Session, StepType},
     session_store::{path_to_filename, SessionStore},
+    strategy,
+    strategy::ActionStrategy,
     Result, TenxError,
 };
 
@@ -119,7 +119,7 @@ impl Tenx {
         let _block = EventBlock::start(&sender)?;
         let pre_result = self.run_pre_checks(session, &sender);
         if let Err(e) = pre_result {
-            session.add_action(action::Strategy::Fix(action::Fix::new(
+            session.add_action(strategy::Strategy::Fix(strategy::Fix::new(
                 e.clone(),
                 prompt.clone(),
             )))?;
@@ -175,7 +175,7 @@ impl Tenx {
         sender: Option<EventSender>,
     ) -> Result<()> {
         let _block = EventBlock::start(&sender)?;
-        session.add_action(action::Strategy::Code(action::Code::new(prompt)))?;
+        session.add_action(strategy::Strategy::Code(strategy::Code::new(prompt)))?;
         self.process_prompt(session, sender.clone()).await
     }
 
@@ -405,7 +405,7 @@ mod tests {
         let mut session = Session::default();
 
         session
-            .add_action(action::Strategy::Code(action::Code::new("test".into())))
+            .add_action(strategy::Strategy::Code(strategy::Code::new("test".into())))
             .unwrap();
         session
             .add_editable_path(&config, test_file_path.clone())

@@ -7,7 +7,7 @@ use std::{
 use fs_err as fs;
 use serde::{Deserialize, Serialize};
 
-use crate::{action, config, context, model::Usage, patch::Patch, Result, TenxError};
+use crate::{config, context, model::Usage, patch::Patch, strategy, Result, TenxError};
 
 /// A parsed model response
 #[derive(Debug, Deserialize, Serialize, Clone, Default, PartialEq, Eq)]
@@ -112,7 +112,7 @@ impl Step {
 /// A user-requested action, which may contain many steps.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Action {
-    pub strategy: action::Strategy,
+    pub strategy: strategy::Strategy,
 
     /// The type of step
     pub action_type: ActionType,
@@ -123,7 +123,7 @@ pub struct Action {
 
 impl Action {
     /// Creates a new Action with the given strategy.
-    pub fn new(strategy: action::Strategy) -> Self {
+    pub fn new(strategy: strategy::Strategy) -> Self {
         Action {
             strategy,
             action_type: ActionType::Code,
@@ -255,7 +255,7 @@ impl Session {
     }
 
     /// Adds a new action to the session.
-    pub fn add_action(&mut self, strategy: action::Strategy) -> Result<()> {
+    pub fn add_action(&mut self, strategy: strategy::Strategy) -> Result<()> {
         self.actions.push(Action::new(strategy));
         Ok(())
     }
@@ -527,7 +527,7 @@ mod tests {
 
         test_project
             .session
-            .add_action(action::Strategy::Code(action::Code::new("test".into())))?;
+            .add_action(strategy::Strategy::Code(strategy::Code::new("test".into())))?;
 
         // Add three steps
         for i in 1..=3 {
@@ -601,7 +601,7 @@ mod tests {
 
         test_project
             .session
-            .add_action(action::Strategy::Code(action::Code::new("test".into())))?;
+            .add_action(strategy::Strategy::Code(strategy::Code::new("test".into())))?;
         // Test 1: Before any steps are added, all files should be marked as modified
         let editables = test_project.session.editables_for_step(0)?;
         assert_eq!(editables.len(), 3,);
@@ -695,7 +695,7 @@ mod tests {
 
         test_project
             .session
-            .add_action(action::Strategy::Code(action::Code::new("test".into())))
+            .add_action(strategy::Strategy::Code(strategy::Code::new("test".into())))
             .unwrap();
 
         // Add a step with both a patch and an edit operation

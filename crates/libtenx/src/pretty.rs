@@ -410,11 +410,10 @@ pub fn print_contexts(config: &Config, session: &Session) -> Result<String> {
 mod tests {
     use super::*;
     use crate::{
-        action,
         context::Context,
         patch::Patch,
         session::{ModelResponse, Step},
-        TenxError,
+        strategy, TenxError,
     };
     use tempfile::TempDir;
 
@@ -424,7 +423,7 @@ mod tests {
         let config = Config::default();
         let mut session = Session::default();
         session
-            .add_action(action::Strategy::Code(action::Code::new("test".into())))
+            .add_action(strategy::Strategy::Code(strategy::Code::new("test".into())))
             .unwrap();
         session
             .add_step(
