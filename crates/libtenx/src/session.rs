@@ -7,7 +7,7 @@ use std::{
 use fs_err as fs;
 use serde::{Deserialize, Serialize};
 
-use crate::{config, context, model::Usage, patch::Patch, Result, TenxError};
+use crate::{action, config, context, model::Usage, patch::Patch, Result, TenxError};
 
 /// A parsed model response
 #[derive(Debug, Deserialize, Serialize, Clone, Default, PartialEq, Eq)]
@@ -112,11 +112,24 @@ impl Step {
 /// A user-requested action, which may contain many steps.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Action {
+    pub strategy: action::Strategy,
+
     /// The type of step
     pub action_type: ActionType,
 
     /// The steps in the action
     pub steps: Vec<Step>,
+}
+
+impl Action {
+    /// Creates a new Action with the given strategy.
+    pub fn new(strategy: action::Strategy) -> Self {
+        Action {
+            strategy,
+            action_type: ActionType::Code,
+            steps: Vec::new(),
+        }
+    }
 }
 
 /// Determines if a given string is a glob pattern or a path.
@@ -226,11 +239,14 @@ impl Session {
         if let Some(action) = self.actions.last_mut() {
             action.steps.push(Step::new(model, prompt, step_type));
         } else {
-            self.actions.push(Action {
-                action_type: ActionType::Code,
-                steps: vec![Step::new(model, prompt, step_type)],
-            });
+            Err(TenxError::Internal("No actions in session".into()))?
         }
+        Ok(())
+    }
+
+    /// Adds a new action to the session.
+    pub fn add_action(&mut self, strategy: action::Strategy) -> Result<()> {
+        self.actions.push(Action::new(strategy));
         Ok(())
     }
 
@@ -510,6 +526,10 @@ mod tests {
         test_project.create_file_tree(&["test.txt"]);
         test_project.write("test.txt", "Initial content");
 
+        test_project
+            .session
+            .add_action(action::Strategy::Code(action::Code::new("test".into())))?;
+
         // Add three steps
         for i in 1..=3 {
             let content = format!("Content {}", i);
@@ -580,6 +600,9 @@ mod tests {
             .session
             .add_editable_path(&test_project.config, "file3.txt")?;
 
+        test_project
+            .session
+            .add_action(action::Strategy::Code(action::Code::new("test".into())))?;
         // Test 1: Before any steps are added, all files should be marked as modified
         let editables = test_project.session.editables_for_step(0)?;
         assert_eq!(editables.len(), 3,);
@@ -670,6 +693,11 @@ mod tests {
         test_project.create_file_tree(&["test.txt", "new.txt"]);
         test_project.write("test.txt", "content");
         test_project.write("new.txt", "new content");
+
+        test_project
+            .session
+            .add_action(action::Strategy::Code(action::Code::new("test".into())))
+            .unwrap();
 
         // Add a step with both a patch and an edit operation
         test_project

@@ -4,28 +4,31 @@ cargo run --release --bin ttrial --  \
     --output progress \
     run -n 3 \
     --resume \
-    --save ./tmp/trial1 \
-    --model gpt4o \
-    --model gpt4o-mini \
-    --model sonnet \
-    --model haiku \
-    --model qwen \
-    --model llama-70b \
-    --model grok \
-    --model llama-8b-turbo \
-    --model o1-mini \
-    --model llama33-70b \
-    --model o1 \
-    --model o1-preview \
+    --save ./tmp/trial \
     --model o3-mini \
-    --model gemini-flash-exp \
-    --model gemini-15pro \
-    --model gemini-exp \
-    --model deepseek3 \
-    --model deepseek-reasoner \
-    --model o3-mini 
     "*" 
 
+
+    # --model gemini-flash-exp \
+    # --model gemini-15pro \
+    # --model gemini-exp \
+    # --model deepseek3 \
+    # --model deepseek-reasoner \
+    # --model o3-mini 
+    # --model gpt4o \
+    # --model gpt4o-mini \
+    # --model sonnet \
+    # --model haiku \
+    # --model qwen \
+    # --model llama-70b \
+    # --model grok \
+    # --model llama-8b-turbo \
+    # --model o1-mini \
+    # --model llama33-70b \
+    # --model o1 \
+    # --model o1-preview \
+    
+    #
     # --model groq-llama33-70b \
     # --model groq-llama31-8b \
 

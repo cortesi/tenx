@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use tracing::{debug, warn};
 
 use crate::{
+    action,
     checks::{check_paths, check_session, CheckMode},
     config::Config,
     context::{Context, ContextProvider},
@@ -117,8 +118,10 @@ impl Tenx {
         let _block = EventBlock::start(&sender)?;
         let pre_result = self.run_pre_checks(session, &sender);
         let result = if let Err(e) = pre_result {
-            let prompt = prompt.unwrap_or_else(|| "Please fix the following errors.".to_string());
             let model = self.config.models.default.clone();
+            session.add_action(action::Strategy::Fix(action::Fix::new(prompt.clone())))?;
+
+            let prompt = prompt.unwrap_or_else(|| "Please fix the following errors.".to_string());
             session.add_step(model, prompt, StepType::Error)?;
             if let Some(step) = session.last_step_mut() {
                 step.err = Some(e.clone());
@@ -177,6 +180,8 @@ impl Tenx {
     ) -> Result<()> {
         let _block = EventBlock::start(&sender)?;
         let model = self.config.models.default.clone();
+
+        session.add_action(action::Strategy::Code(action::Code::new(prompt.clone())))?;
         session.add_step(model, prompt, StepType::Auto)?;
         self.process_prompt(session, sender.clone()).await
     }
@@ -401,6 +406,10 @@ mod tests {
         fs::write(&test_file_path, "Initial content").unwrap();
 
         let mut session = Session::default();
+
+        session
+            .add_action(action::Strategy::Code(action::Code::new("test".into())))
+            .unwrap();
         session
             .add_step(
                 config.models.default.clone(),

@@ -133,6 +133,7 @@ mod tests {
     use super::*;
 
     use libtenx::{
+        action,
         patch::Patch,
         session::{ModelResponse, StepType},
     };
@@ -172,6 +173,9 @@ mod tests {
     #[test]
     fn test_render_and_parse_roundtrip() {
         let mut session = Session::default();
+        session
+            .add_action(action::Strategy::Code(action::Code::new("test".into())))
+            .unwrap();
 
         // Add two steps with responses
         for (prompt, response) in [

@@ -1,3 +1,5 @@
 pub mod code;
-pub mod core;
-pub mod fix;
+mod core;
+
+pub use code::*;
+pub use core::*;

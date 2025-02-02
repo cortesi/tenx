@@ -410,6 +410,7 @@ pub fn print_contexts(config: &Config, session: &Session) -> Result<String> {
 mod tests {
     use super::*;
     use crate::{
+        action,
         context::Context,
         patch::Patch,
         session::{ModelResponse, Step},
@@ -422,6 +423,9 @@ mod tests {
         let root_path = temp_dir.path().to_path_buf();
         let config = Config::default();
         let mut session = Session::default();
+        session
+            .add_action(action::Strategy::Code(action::Code::new("test".into())))
+            .unwrap();
         session
             .add_step(
                 "test_model".into(),
@@ -450,6 +454,7 @@ mod tests {
     fn test_print_steps_with_patch() {
         let config = Config::default();
         let (_temp_dir, mut session) = create_test_session();
+
         if let Some(step) = session.last_step_mut() {
             step.model_response = Some(ModelResponse {
                 patch: Some(Patch {
