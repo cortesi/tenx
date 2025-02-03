@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use tracing::{debug, warn};
+use tracing::warn;
 
 use crate::{
     checks::{check_paths, check_session, CheckMode},
@@ -230,13 +230,11 @@ impl Tenx {
             match self.execute_prompt_cycle(session, sender.clone()).await {
                 Ok(()) => {
                     self.save_session(session)?;
-                    if !session.should_continue() {
-                        return Ok(());
-                    }
                 }
                 Err(e) => {
                     if let Some(step) = session.last_step_mut() {
                         step.err = Some(e.clone());
+                        self.save_session(session)?;
                     }
 
                     if step_count >= self.config.step_limit {
@@ -245,12 +243,6 @@ impl Tenx {
                             &sender,
                             Event::Fatal(format!("Step count limit reached. Last error: {}", e)),
                         )?;
-                        return Err(e);
-                    }
-
-                    if e.should_retry().is_none() {
-                        debug!("Non-retryable error: {}", e);
-                        send_event(&sender, Event::Fatal(format!("{}", e)))?;
                         return Err(e);
                     }
                 }
@@ -275,6 +267,7 @@ impl Tenx {
 
     /// Prompts the current model with the session's state and sets the resulting patch and usage.
     async fn prompt(&self, session: &mut Session, sender: Option<EventSender>) -> Result<()> {
+        // FIXME: Get the model from the last step
         let mut model = self.config.active_model()?;
         let _block = EventBlock::prompt(&sender, &model.name())?;
         // FIXME: Make this param configurable
