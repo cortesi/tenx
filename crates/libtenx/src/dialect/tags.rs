@@ -7,14 +7,13 @@ use super::{xmlish, DialectProvider};
 use crate::{
     config::Config,
     context::ContextProvider,
-    patch::{Change, Patch, Replace, Smart, UDiff, WriteFile},
+    patch::{Change, Patch, Replace, UDiff, WriteFile},
     session::{ModelResponse, Operation, Session},
     Result, TenxError,
 };
 use fs_err as fs;
 
 const SYSTEM: &str = include_str!("./tags-system.txt");
-const SMART: &str = include_str!("./tags-smart.txt");
 const REPLACE: &str = include_str!("./tags-replace.txt");
 const UDIFF: &str = include_str!("./tags-udiff.txt");
 const EDIT: &str = include_str!("./tags-edit.txt");
@@ -22,16 +21,14 @@ const EDIT: &str = include_str!("./tags-edit.txt");
 /// Tenx's primary code generation dialect, which uses XML-ish tags as the basic communication format with models.
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct Tags {
-    pub smart: bool,
     pub replace: bool,
     pub udiff: bool,
     pub edit: bool,
 }
 
 impl Tags {
-    pub fn new(smart: bool, replace: bool, udiff: bool, edit: bool) -> Self {
+    pub fn new(replace: bool, udiff: bool, edit: bool) -> Self {
         Self {
-            smart,
             replace,
             udiff,
             edit,
@@ -46,9 +43,6 @@ impl DialectProvider for Tags {
 
     fn system(&self) -> String {
         let mut out = SYSTEM.to_string();
-        if self.smart {
-            out.push_str(SMART);
-        }
         if self.replace {
             out.push_str(REPLACE);
         }
@@ -146,24 +140,6 @@ impl DialectProvider for Tags {
         while let Some(line) = lines.peek() {
             if let Some(tag) = xmlish::parse_open(line) {
                 match tag.name.as_str() {
-                    "smart" => {
-                        let path = tag
-                            .attributes
-                            .get("path")
-                            .ok_or_else(|| TenxError::ResponseParse {
-                                user: "Failed to parse model response".into(),
-                                model: format!(
-                                    "Missing path attribute in smart tag. Line: '{}'",
-                                    line
-                                ),
-                            })?
-                            .clone();
-                        let (_, content) = xmlish::parse_block("smart", &mut lines)?;
-                        patch.changes.push(Change::Smart(Smart {
-                            path: path.into(),
-                            text: content.join("\n"),
-                        }));
-                    }
                     "write_file" => {
                         let path = tag
                             .attributes
@@ -277,13 +253,6 @@ impl DialectProvider for Tags {
                             replace.new
                         ));
                         }
-                        Change::Smart(smart) => {
-                            rendered.push_str(&format!(
-                                "<smart path=\"{}\">\n{}\n</smart>\n\n",
-                                smart.path.display(),
-                                smart.text
-                            ));
-                        }
                         Change::UDiff(udiff) => {
                             rendered.push_str(&format!("<udiff>\n{}\n</udiff>\n\n", udiff.patch));
                         }
@@ -308,7 +277,6 @@ mod tests {
     #[test]
     fn test_parse_response_basic() {
         let d = Tags {
-            smart: true,
             replace: true,
             udiff: false,
             edit: false,
@@ -450,13 +418,11 @@ mod tests {
     #[test]
     fn test_render_system() {
         let tags_with_smart = Tags {
-            smart: true,
             replace: true,
             udiff: false,
             edit: false,
         };
         let tags_without_smart = Tags {
-            smart: false,
             replace: true,
             udiff: false,
             edit: false,

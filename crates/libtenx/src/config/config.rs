@@ -369,8 +369,6 @@ pub struct Dialect {
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 /// Configuration for the tags dialect feature set.
 pub struct Tags {
-    /// EXPERIMENTAL: enable smart change type
-    pub smart: bool,
     /// Enable replace change type
     pub replace: bool,
     /// EXPERIMENTAL: enable udiff change type
@@ -806,7 +804,6 @@ impl Config {
             return Ok(dialect::Dialect::Dummy(dummy_dialect.clone()));
         }
         Ok(dialect::Dialect::Tags(dialect::Tags::new(
-            self.tags.smart,
             self.tags.replace,
             self.tags.udiff,
             self.dialect.edit,

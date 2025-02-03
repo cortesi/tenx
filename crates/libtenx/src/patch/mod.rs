@@ -1,11 +1,9 @@
 //! Patch operations that modify files in the project.
 mod replace;
-mod smart;
 mod udiff;
 mod write;
 
 pub use replace::*;
-pub use smart::*;
 pub use udiff::*;
 pub use write::*;
 
@@ -22,7 +20,6 @@ use crate::{config::Config, error::Result};
 pub enum Change {
     Write(write::WriteFile),
     Replace(replace::Replace),
-    Smart(smart::Smart),
     UDiff(udiff::UDiff),
 }
 
@@ -41,7 +38,6 @@ impl Patch {
             match change {
                 Change::Write(write_file) => paths.push(write_file.path.clone()),
                 Change::Replace(replace) => paths.push(replace.path.clone()),
-                Change::Smart(block) => paths.push(block.path.clone()),
                 Change::UDiff(udiff) => paths.extend(udiff.modified_files.iter().map(|f| f.into())),
             }
         }
@@ -69,7 +65,6 @@ impl Patch {
             match change {
                 Change::Replace(replace) => replace.apply_to_cache(&mut modified_cache)?,
                 Change::Write(write_file) => write_file.apply_to_cache(&mut modified_cache)?,
-                Change::Smart(smart) => smart.apply_to_cache(&mut modified_cache)?,
                 Change::UDiff(udiff) => udiff.apply_to_cache(&mut modified_cache)?,
             }
         }

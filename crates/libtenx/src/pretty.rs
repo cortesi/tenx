@@ -212,7 +212,6 @@ fn print_patch(config: &Config, patch: &patch::Patch, full: bool, width: usize) 
         let path = match change {
             patch::Change::Write(w) => &w.path,
             patch::Change::Replace(r) => &r.path,
-            patch::Change::Smart(s) => &s.path,
             patch::Change::UDiff(_) => continue,
         };
         changes_by_file.entry(path).or_default().push(change);
@@ -225,12 +224,10 @@ fn print_patch(config: &Config, patch: &patch::Patch, full: bool, width: usize) 
         // Count changes by type
         let mut write_count = 0;
         let mut replace_count = 0;
-        let mut smart_count = 0;
         for change in &changes {
             match change {
                 patch::Change::Write(_) => write_count += 1,
                 patch::Change::Replace(_) => replace_count += 1,
-                patch::Change::Smart(_) => smart_count += 1,
                 patch::Change::UDiff(_) => (),
             }
         }
@@ -241,9 +238,6 @@ fn print_patch(config: &Config, patch: &patch::Patch, full: bool, width: usize) 
         }
         if replace_count > 0 {
             types.push(format!("replace ({})", replace_count));
-        }
-        if smart_count > 0 {
-            types.push(format!("smart ({})", smart_count));
         }
 
         output.push_str(&format!("{}{}\n", INDENT.repeat(4), types.join(", ")));
@@ -268,10 +262,6 @@ fn print_patch(config: &Config, patch: &patch::Patch, full: bool, width: usize) 
                             "new:".green().bold()
                         ));
                         output.push_str(&wrapped_block(&r.new, width, INDENT.len() * 6));
-                        output.push('\n');
-                    }
-                    patch::Change::Smart(s) => {
-                        output.push_str(&wrapped_block(&s.text, width, INDENT.len() * 5));
                         output.push('\n');
                     }
                     patch::Change::UDiff(_) => (),
