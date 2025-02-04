@@ -251,7 +251,7 @@ impl DialectProvider for Tags {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{session::StepType, strategy};
+    use crate::strategy;
 
     use indoc::indoc;
     use pretty_assertions::assert_eq;
@@ -347,7 +347,7 @@ mod tests {
         };
 
         session.add_action(strategy::Strategy::Code(strategy::Code::new("test".into())))?;
-        session.add_step("test_model".into(), "test".into(), StepType::Auto)?;
+        session.add_step("test_model".into(), "test".into())?;
         if let Some(step) = session.last_step_mut() {
             step.model_response = Some(response);
         }

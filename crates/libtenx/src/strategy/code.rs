@@ -5,7 +5,7 @@ use crate::{
     config::Config,
     error::{Result, TenxError},
     events::{send_event, Event, EventSender},
-    session::{Session, Step, StepType},
+    session::{Session, Step},
 };
 
 use super::core::*;
@@ -39,11 +39,7 @@ fn handle_existing_step(
             )?;
             debug!("Next step, based on error: {}", err);
 
-            return Ok(Some(Step::new(
-                model,
-                model_message.to_string(),
-                StepType::Error,
-            )));
+            return Ok(Some(Step::new(model, model_message.to_string())));
         }
     } else if let Some(model_response) = &step.model_response {
         if !model_response.operations.is_empty() {
@@ -57,7 +53,7 @@ fn handle_existing_step(
             )?;
             debug!("Next step, based on operations");
 
-            return Ok(Some(Step::new(model, model_message, StepType::Auto)));
+            return Ok(Some(Step::new(model, model_message)));
         }
     }
     Ok(None)
@@ -75,7 +71,7 @@ impl ActionStrategy for Code {
                 return handle_existing_step(config, step, events);
             } else {
                 let model = config.models.default.clone();
-                return Ok(Some(Step::new(model, self.prompt.clone(), StepType::Auto)));
+                return Ok(Some(Step::new(model, self.prompt.clone())));
             }
         }
         Ok(None)
@@ -110,7 +106,7 @@ impl ActionStrategy for Fix {
                     .prompt
                     .clone()
                     .unwrap_or_else(|| "Please fix the following errors.".to_string());
-                return Ok(Some(Step::new(model, prompt, StepType::Error)));
+                return Ok(Some(Step::new(model, prompt)));
             }
         }
         Ok(None)
@@ -137,13 +133,8 @@ mod test {
             .next_step(&test_project.config, &session, None)?
             .unwrap();
         assert_eq!(step.prompt, "Test");
-        assert_eq!(step.step_type, StepType::Auto);
 
-        session.add_step(
-            test_project.config.models.default.clone(),
-            "Test".into(),
-            StepType::Auto,
-        )?;
+        session.add_step(test_project.config.models.default.clone(), "Test".into())?;
         let patch_err = TenxError::Patch {
             user: "Error".into(),
             model: "Retry".into(),
@@ -153,7 +144,6 @@ mod test {
             .next_step(&test_project.config, &session, None)?
             .unwrap();
         assert_eq!(step.prompt, "Retry");
-        assert_eq!(step.step_type, StepType::Error);
 
         session.last_step_mut().unwrap().err = Some(TenxError::Config("Error".into()));
         assert!(code
@@ -183,14 +173,9 @@ mod test {
             .next_step(&test_project.config, &session, None)?
             .unwrap();
         assert_eq!(step.prompt, "Fix prompt");
-        assert_eq!(step.step_type, StepType::Error);
 
         // Retryable error
-        session.add_step(
-            test_project.config.models.default.clone(),
-            "Test".into(),
-            StepType::Auto,
-        )?;
+        session.add_step(test_project.config.models.default.clone(), "Test".into())?;
         session.last_step_mut().unwrap().err = Some(TenxError::Patch {
             user: "Error".into(),
             model: "Retry".into(),
@@ -202,7 +187,6 @@ mod test {
             .next_step(&test_project.config, &session, None)?
             .unwrap();
         assert_eq!(step.prompt, "Retry");
-        assert_eq!(step.step_type, StepType::Error);
 
         // Default prompt
         let fix = Fix::new(TenxError::Config("Error".into()), None);

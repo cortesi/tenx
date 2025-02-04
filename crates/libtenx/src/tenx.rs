@@ -7,7 +7,7 @@ use crate::{
     context::{Context, ContextProvider},
     events::{send_event, Event, EventBlock, EventSender},
     model::ModelProvider,
-    session::{Session, StepType},
+    session::Session,
     session_store::{path_to_filename, SessionStore},
     strategy,
     strategy::ActionStrategy,
@@ -161,7 +161,6 @@ impl Tenx {
             step.rollback(&self.config)?;
             if let Some(p) = prompt {
                 step.prompt = p;
-                step.step_type = StepType::Auto;
             }
         }
         self.process_prompt(session, sender.clone()).await
@@ -220,7 +219,7 @@ impl Tenx {
 
             match next_step {
                 Some(step) => {
-                    session.add_step(step.model, step.prompt, step.step_type)?;
+                    session.add_step(step.model, step.prompt)?;
                     self.save_session(session)?;
                 }
                 None => return Ok(()),

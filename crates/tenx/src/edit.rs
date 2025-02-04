@@ -132,11 +132,7 @@ pub fn edit_prompt(
 mod tests {
     use super::*;
 
-    use libtenx::{
-        patch::Patch,
-        session::{ModelResponse, StepType},
-        strategy,
-    };
+    use libtenx::{patch::Patch, session::ModelResponse, strategy};
 
     use pretty_assertions::assert_eq;
 
@@ -183,7 +179,7 @@ mod tests {
             ("Second prompt", "Second response"),
         ] {
             session
-                .add_step("test_model".into(), prompt.to_string(), StepType::Auto)
+                .add_step("test_model".into(), prompt.to_string())
                 .unwrap();
             if let Some(step) = session.last_step_mut() {
                 step.model_response = Some(ModelResponse {

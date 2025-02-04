@@ -32,16 +32,6 @@ pub enum Operation {
     Edit(PathBuf),
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
-pub enum StepType {
-    /// An automatically generated step. This might be needed if, for instance, the model asks to
-    /// edit a file, in order to mantain request/response sequencing.
-    Auto,
-
-    /// A prompt generated to handle a retryable error
-    Error,
-}
-
 /// A single step in the session - basically a prompt and a patch.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Step {
@@ -59,17 +49,13 @@ pub struct Step {
 
     /// The response from the model
     pub model_response: Option<ModelResponse>,
-
-    /// The type of step
-    pub step_type: StepType,
 }
 
 impl Step {
     /// Creates a new Step with the given prompt.
-    pub fn new(model: String, prompt: String, step_type: StepType) -> Self {
+    pub fn new(model: String, prompt: String) -> Self {
         Step {
             model,
-            step_type,
             prompt,
             model_response: None,
             response_time: None,
@@ -221,7 +207,7 @@ impl Session {
     /// Adds a new step to the last action in the session.
     ///
     /// Returns an error if the last step doesn't have either a patch or an error.
-    pub fn add_step(&mut self, model: String, prompt: String, step_type: StepType) -> Result<()> {
+    pub fn add_step(&mut self, model: String, prompt: String) -> Result<()> {
         if let Some(last_action) = self.actions.last() {
             if let Some(last_step) = last_action.steps.last() {
                 if last_step.model_response.is_none() && last_step.err.is_none() {
@@ -234,7 +220,7 @@ impl Session {
 
         // Add to existing action or create new Code action
         if let Some(action) = self.actions.last_mut() {
-            action.steps.push(Step::new(model, prompt, step_type));
+            action.steps.push(Step::new(model, prompt));
         } else {
             Err(TenxError::Internal("No actions in session".into()))?
         }
@@ -525,11 +511,9 @@ mod tests {
                     content: content.clone(),
                 })],
             };
-            test_project.session.add_step(
-                "test_model".into(),
-                format!("Prompt {}", i),
-                StepType::Auto,
-            )?;
+            test_project
+                .session
+                .add_step("test_model".into(), format!("Prompt {}", i))?;
 
             let rollback_cache = [(PathBuf::from("test.txt"), test_project.read("test.txt"))]
                 .into_iter()
@@ -596,7 +580,7 @@ mod tests {
         // Step 0: Modify file1.txt through patch
         test_project
             .session
-            .add_step("test_model".into(), "step0".into(), StepType::Auto)?;
+            .add_step("test_model".into(), "step0".into())?;
         let step = test_project.session.last_step_mut().unwrap();
         step.model_response = Some(ModelResponse {
             patch: Some(Patch {
@@ -614,7 +598,7 @@ mod tests {
         // Step 1: Request to edit file2.txt and modify file3.txt through patch
         test_project
             .session
-            .add_step("test_model".into(), "step1".into(), StepType::Auto)?;
+            .add_step("test_model".into(), "step1".into())?;
         let step = test_project.session.last_step_mut().unwrap();
         step.model_response = Some(ModelResponse {
             patch: Some(Patch {
@@ -632,7 +616,7 @@ mod tests {
         // Step 2: Empty step (no modifications)
         test_project
             .session
-            .add_step("test_model".into(), "step2".into(), StepType::Auto)?;
+            .add_step("test_model".into(), "step2".into())?;
         let step = test_project.session.last_step_mut().unwrap();
         step.model_response = Some(ModelResponse {
             patch: None,
@@ -688,7 +672,7 @@ mod tests {
         // Add a step with both a patch and an edit operation
         test_project
             .session
-            .add_step("test_model".into(), "test prompt".into(), StepType::Auto)?;
+            .add_step("test_model".into(), "test prompt".into())?;
         let step = test_project.session.last_step_mut().unwrap();
         let patch = Patch {
             changes: vec![Change::Write(WriteFile {

@@ -4,7 +4,7 @@ use crate::{
     context,
     context::ContextProvider,
     model, patch,
-    session::{Operation, Session, Step, StepType},
+    session::{Operation, Session, Step},
     Result, TenxError,
 };
 use colored::*;
@@ -166,34 +166,14 @@ fn print_steps(config: &Config, session: &Session, full: bool, width: usize) -> 
     Ok(output)
 }
 
-fn render_step_prompt(step: &Step, width: usize, full: bool) -> String {
+fn render_step_prompt(step: &Step, width: usize, _full: bool) -> String {
     let prompt_header = format!("{}{}\n", INDENT.repeat(2), "prompt:".blue().bold());
     let text = &step.prompt;
-    match step.step_type {
-        StepType::Auto | StepType::Error => {
-            if step.step_type == StepType::Error && !full {
-                let lines: Vec<&str> = text.lines().collect();
-                let first_line = lines.first().unwrap_or(&"");
-                let remaining_lines = lines.len().saturating_sub(1);
-                format!(
-                    "{}{}\n{}",
-                    prompt_header,
-                    wrapped_block(first_line, width, INDENT.len() * 3),
-                    wrapped_block(
-                        &format!("... {} more lines", remaining_lines),
-                        width,
-                        INDENT.len() * 3
-                    )
-                )
-            } else {
-                format!(
-                    "{}{}",
-                    prompt_header,
-                    wrapped_block(text, width, INDENT.len() * 3)
-                )
-            }
-        }
-    }
+    format!(
+        "{}{}",
+        prompt_header,
+        wrapped_block(text, width, INDENT.len() * 3)
+    )
 }
 
 fn print_patch(config: &Config, patch: &patch::Patch, full: bool, width: usize) -> String {
@@ -402,11 +382,7 @@ mod tests {
             .add_action(strategy::Strategy::Code(strategy::Code::new("test".into())))
             .unwrap();
         session
-            .add_step(
-                "test_model".into(),
-                "Test prompt".to_string(),
-                StepType::Auto,
-            )
+            .add_step("test_model".into(), "Test prompt".to_string())
             .unwrap();
         let test_file_path = root_path.join("test_file.rs");
         std::fs::write(&test_file_path, "Test content").unwrap();
@@ -471,7 +447,6 @@ mod tests {
         let step = Step::new(
             "test_model".into(),
             "Test prompt\nwith multiple\nlines".to_string(),
-            StepType::Auto,
         );
         let full_result = render_step_prompt(&step, 80, true);
         assert!(full_result.contains("Test prompt"));

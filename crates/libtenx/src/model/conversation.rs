@@ -68,7 +68,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{dialect::DummyDialect, session::StepType, strategy};
+    use crate::{dialect::DummyDialect, strategy};
 
     #[derive(Debug, PartialEq, Clone)]
     enum Message {
@@ -142,11 +142,7 @@ mod tests {
         let config = Config::default();
         let mut session = Session::default();
         session.add_action(strategy::Strategy::Code(strategy::Code::new("test".into())))?;
-        session.add_step(
-            "test_model".into(),
-            "test prompt".to_string(),
-            StepType::Auto,
-        )?;
+        session.add_step("test_model".into(), "test prompt".to_string())?;
 
         build_conversation(&conversation, &mut req, &config, &session, &dialect)?;
 
