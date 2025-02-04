@@ -29,6 +29,13 @@ use crate::{
 
 use std::collections::HashMap;
 
+#[derive(Debug, Clone)]
+pub enum ReasoningEffort {
+    Low,
+    Medium,
+    High,
+}
+
 /// OpenAI model implementation
 #[derive(Default, Debug, Clone)]
 pub struct OpenAi {
@@ -38,6 +45,8 @@ pub struct OpenAi {
     pub api_base: String,
     pub streaming: bool,
     pub no_system_prompt: bool,
+    /// For OpenAI o1 and o3 models only.
+    pub reasoning_effort: Option<ReasoningEffort>,
 }
 
 impl Conversation<CreateChatCompletionRequest> for OpenAi {
@@ -209,10 +218,16 @@ impl OpenAi {
         session: &Session,
         dialect: &Dialect,
     ) -> Result<CreateChatCompletionRequest> {
-        let mut req = CreateChatCompletionRequestArgs::default()
-            .model(&self.api_model)
-            .messages(Vec::new())
-            .build()?;
+        let mut ra = CreateChatCompletionRequestArgs::default();
+        ra.model(&self.api_model).messages(Vec::new());
+        if let Some(ref re) = self.reasoning_effort {
+            ra.reasoning_effort(match re {
+                ReasoningEffort::Low => async_openai::types::ReasoningEffort::Low,
+                ReasoningEffort::Medium => async_openai::types::ReasoningEffort::Medium,
+                ReasoningEffort::High => async_openai::types::ReasoningEffort::High,
+            });
+        }
+        let mut req = ra.build()?;
         build_conversation(self, &mut req, config, session, dialect)?;
         Ok(req)
     }

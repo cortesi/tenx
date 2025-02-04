@@ -91,6 +91,7 @@ fn default_models() -> Vec<Model> {
                 api_base: DEEPSEEK_API_BASE.to_string(),
                 can_stream: true,
                 no_system_prompt: false,
+                reasoning_effort: None,
             },
             Model::OpenAi {
                 name: "deepseek-reasoner".to_string(),
@@ -100,6 +101,7 @@ fn default_models() -> Vec<Model> {
                 api_base: DEEPSEEK_API_BASE.to_string(),
                 can_stream: true,
                 no_system_prompt: false,
+                reasoning_effort: None,
             },
         ]);
     }
@@ -114,6 +116,7 @@ fn default_models() -> Vec<Model> {
                 api_base: DEEPINFRA_API_BASE.to_string(),
                 can_stream: true,
                 no_system_prompt: false,
+                reasoning_effort: None,
             },
             Model::OpenAi {
                 name: "llama-8b-turbo".to_string(),
@@ -123,6 +126,7 @@ fn default_models() -> Vec<Model> {
                 api_base: DEEPINFRA_API_BASE.to_string(),
                 can_stream: true,
                 no_system_prompt: false,
+                reasoning_effort: None,
             },
             Model::OpenAi {
                 name: "llama-70b".to_string(),
@@ -132,6 +136,7 @@ fn default_models() -> Vec<Model> {
                 api_base: DEEPINFRA_API_BASE.to_string(),
                 can_stream: true,
                 no_system_prompt: false,
+                reasoning_effort: None,
             },
             Model::OpenAi {
                 name: "llama33-70b".to_string(),
@@ -141,6 +146,7 @@ fn default_models() -> Vec<Model> {
                 api_base: DEEPINFRA_API_BASE.to_string(),
                 can_stream: true,
                 no_system_prompt: false,
+                reasoning_effort: None,
             },
             Model::OpenAi {
                 name: "qwq".to_string(),
@@ -150,6 +156,7 @@ fn default_models() -> Vec<Model> {
                 api_base: DEEPINFRA_API_BASE.to_string(),
                 can_stream: true,
                 no_system_prompt: false,
+                reasoning_effort: None,
             },
         ]);
     }
@@ -164,6 +171,7 @@ fn default_models() -> Vec<Model> {
                 api_base: OPENAI_API_BASE.to_string(),
                 can_stream: false,
                 no_system_prompt: true,
+                reasoning_effort: None,
             },
             Model::OpenAi {
                 name: "o1-mini".to_string(),
@@ -173,15 +181,37 @@ fn default_models() -> Vec<Model> {
                 api_base: OPENAI_API_BASE.to_string(),
                 can_stream: false,
                 no_system_prompt: true,
+                reasoning_effort: None,
             },
             Model::OpenAi {
-                name: "o3-mini".to_string(),
+                name: "o3-mini-low".to_string(),
                 api_model: OPENAI_GPT_O3_MINI.to_string(),
                 key: "".to_string(),
                 key_env: OPENAI_API_KEY.to_string(),
                 api_base: OPENAI_API_BASE.to_string(),
                 can_stream: false,
                 no_system_prompt: true,
+                reasoning_effort: Some(ReasoningEffort::Low),
+            },
+            Model::OpenAi {
+                name: "o3-mini-medium".to_string(),
+                api_model: OPENAI_GPT_O3_MINI.to_string(),
+                key: "".to_string(),
+                key_env: OPENAI_API_KEY.to_string(),
+                api_base: OPENAI_API_BASE.to_string(),
+                can_stream: false,
+                no_system_prompt: true,
+                reasoning_effort: Some(ReasoningEffort::Medium),
+            },
+            Model::OpenAi {
+                name: "o3-mini-high".to_string(),
+                api_model: OPENAI_GPT_O3_MINI.to_string(),
+                key: "".to_string(),
+                key_env: OPENAI_API_KEY.to_string(),
+                api_base: OPENAI_API_BASE.to_string(),
+                can_stream: false,
+                no_system_prompt: true,
+                reasoning_effort: Some(ReasoningEffort::High),
             },
             Model::OpenAi {
                 name: "gpt4o".to_string(),
@@ -191,6 +221,7 @@ fn default_models() -> Vec<Model> {
                 api_base: OPENAI_API_BASE.to_string(),
                 can_stream: true,
                 no_system_prompt: false,
+                reasoning_effort: None,
             },
             Model::OpenAi {
                 name: "gpt4o-mini".to_string(),
@@ -200,6 +231,7 @@ fn default_models() -> Vec<Model> {
                 api_base: OPENAI_API_BASE.to_string(),
                 can_stream: true,
                 no_system_prompt: false,
+                reasoning_effort: None,
             },
         ]);
     }
@@ -214,6 +246,7 @@ fn default_models() -> Vec<Model> {
                 api_base: GROQ_BASE_URL.to_string(),
                 can_stream: true,
                 no_system_prompt: true,
+                reasoning_effort: None,
             },
             Model::OpenAi {
                 name: "groq-llama31-8b".to_string(),
@@ -223,6 +256,7 @@ fn default_models() -> Vec<Model> {
                 api_base: GROQ_BASE_URL.to_string(),
                 can_stream: true,
                 no_system_prompt: true,
+                reasoning_effort: None,
             },
             Model::OpenAi {
                 name: "groq-deepseek-r1".to_string(),
@@ -232,6 +266,7 @@ fn default_models() -> Vec<Model> {
                 api_base: GROQ_BASE_URL.to_string(),
                 can_stream: true,
                 no_system_prompt: true,
+                reasoning_effort: None,
             },
         ]);
     }
@@ -245,6 +280,7 @@ fn default_models() -> Vec<Model> {
             api_base: XAI_API_BASE.to_string(),
             can_stream: true,
             no_system_prompt: false,
+            reasoning_effort: None,
         });
     }
 

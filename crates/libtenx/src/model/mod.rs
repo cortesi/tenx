@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 pub use claude::{Claude, ClaudeUsage};
 pub use dummy_model::{DummyModel, DummyUsage};
 pub use google::{Google, GoogleUsage};
-pub use openai::{OpenAi, OpenAiUsage};
+pub use openai::{OpenAi, OpenAiUsage, ReasoningEffort};
 
 use crate::{
     config::Config,

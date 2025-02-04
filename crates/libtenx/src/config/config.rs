@@ -153,6 +153,8 @@ pub enum Model {
         can_stream: bool,
         /// Whether the model supports a separate system prompt.
         no_system_prompt: bool,
+        /// Reasoning effort for OpenAI o1 and o3 models.
+        reasoning_effort: Option<ReasoningEffort>,
     },
     Google {
         /// The name of the model.
@@ -323,6 +325,7 @@ impl Model {
                 api_base,
                 can_stream,
                 no_system_prompt,
+                reasoning_effort,
                 ..
             } => Ok(model::Model::OpenAi(model::OpenAi {
                 name: self.name().to_string(),
@@ -331,6 +334,12 @@ impl Model {
                 api_base: api_base.clone(),
                 streaming: *can_stream && !no_stream,
                 no_system_prompt: *no_system_prompt,
+                reasoning_effort: match reasoning_effort {
+                    Some(ReasoningEffort::Low) => Some(model::ReasoningEffort::Low),
+                    Some(ReasoningEffort::Medium) => Some(model::ReasoningEffort::Medium),
+                    Some(ReasoningEffort::High) => Some(model::ReasoningEffort::High),
+                    None => None,
+                },
             })),
             Model::Google {
                 api_model,
@@ -428,6 +437,15 @@ pub struct Models {
     /// Disable streaming for all models
     #[serde(default)]
     pub no_stream: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+/// When a check should run - before changes, after changes, or both.
+pub enum ReasoningEffort {
+    Low,
+    Medium,
+    High,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
@@ -782,6 +800,7 @@ impl Config {
                 api_base: api_base.clone(),
                 streaming: can_stream && !self.models.no_stream,
                 no_system_prompt,
+                reasoning_effort: None,
             })),
             Model::Google {
                 name,
