@@ -20,7 +20,6 @@ use crate::{config::Config, error::Result};
 pub enum Change {
     Write(write::WriteFile),
     Replace(replace::Replace),
-    UDiff(udiff::UDiff),
 }
 
 /// A unified patch operation requested by the model. This contains all changes, as well as a cache
@@ -38,7 +37,6 @@ impl Patch {
             match change {
                 Change::Write(write_file) => paths.push(write_file.path.clone()),
                 Change::Replace(replace) => paths.push(replace.path.clone()),
-                Change::UDiff(udiff) => paths.push(udiff.path.clone().into()),
             }
         }
         paths
@@ -65,7 +63,6 @@ impl Patch {
             match change {
                 Change::Replace(replace) => replace.apply_to_cache(&mut modified_cache)?,
                 Change::Write(write_file) => write_file.apply_to_cache(&mut modified_cache)?,
-                Change::UDiff(udiff) => udiff.apply_to_cache(&mut modified_cache)?,
             }
         }
 

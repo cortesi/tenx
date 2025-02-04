@@ -412,10 +412,7 @@ pub fn default_config<P: AsRef<Path>>(current_dir: P) -> Config {
                 root,
             }
         },
-        tags: Tags {
-            replace: false,
-            udiff: true,
-        },
+        tags: Tags { replace: true },
         session_store_dir: home_config_dir().join("state"),
         step_limit: DEFAULT_STEP_LIMIT,
         checks: default_checks(),

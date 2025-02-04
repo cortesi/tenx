@@ -7,7 +7,7 @@ use super::{xmlish, DialectProvider};
 use crate::{
     config::Config,
     context::ContextProvider,
-    patch::{Change, Patch, Replace, UDiff, WriteFile},
+    patch::{Change, Patch, Replace, WriteFile},
     session::{ModelResponse, Operation, Session},
     Result, TenxError,
 };
@@ -15,24 +15,18 @@ use fs_err as fs;
 
 const SYSTEM: &str = include_str!("./tags-system.txt");
 const REPLACE: &str = include_str!("./tags-replace.txt");
-const UDIFF: &str = include_str!("./tags-udiff.txt");
 const EDIT: &str = include_str!("./tags-edit.txt");
 
 /// Tenx's primary code generation dialect, which uses XML-ish tags as the basic communication format with models.
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct Tags {
     pub replace: bool,
-    pub udiff: bool,
     pub edit: bool,
 }
 
 impl Tags {
-    pub fn new(replace: bool, udiff: bool, edit: bool) -> Self {
-        Self {
-            replace,
-            udiff,
-            edit,
-        }
+    pub fn new(replace: bool, edit: bool) -> Self {
+        Self { replace, edit }
     }
 }
 
@@ -45,9 +39,6 @@ impl DialectProvider for Tags {
         let mut out = SYSTEM.to_string();
         if self.replace {
             out.push_str(REPLACE);
-        }
-        if self.udiff {
-            out.push_str(UDIFF);
         }
         if self.edit {
             out.push_str(EDIT);
@@ -180,23 +171,6 @@ impl DialectProvider for Tags {
                             new: new.join("\n"),
                         }));
                     }
-                    "udiff" => {
-                        let path = tag
-                            .attributes
-                            .get("path")
-                            .ok_or_else(|| TenxError::ResponseParse {
-                                user: "Failed to parse model response".into(),
-                                model: format!(
-                                    "Missing path attribute in replace tag. Line: '{}'",
-                                    line
-                                ),
-                            })?
-                            .clone();
-                        let (_, content) = xmlish::parse_block("udiff", &mut lines)?;
-                        patch
-                            .changes
-                            .push(Change::UDiff(UDiff::new(path, content.join("\n"))?));
-                    }
                     "comment" => {
                         let (_, content) = xmlish::parse_block("comment", &mut lines)?;
                         comment = Some(content.join("\n"));
@@ -264,13 +238,6 @@ impl DialectProvider for Tags {
                             replace.new
                         ));
                         }
-                        Change::UDiff(udiff) => {
-                            rendered.push_str(&format!(
-                                "<udiff path=\"{}\">\n{}\n</udiff>\n\n",
-                                udiff.path,
-                                udiff.fudiff.render()
-                            ));
-                        }
                     }
                 }
             }
@@ -293,7 +260,6 @@ mod tests {
     fn test_parse_response_basic() {
         let d = Tags {
             replace: true,
-            udiff: false,
             edit: false,
         };
 
@@ -434,12 +400,10 @@ mod tests {
     fn test_render_system() {
         let tags_with_smart = Tags {
             replace: true,
-            udiff: false,
             edit: false,
         };
         let tags_without_smart = Tags {
             replace: true,
-            udiff: false,
             edit: false,
         };
 

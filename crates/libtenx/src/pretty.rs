@@ -212,7 +212,6 @@ fn print_patch(config: &Config, patch: &patch::Patch, full: bool, width: usize) 
         let path = match change {
             patch::Change::Write(w) => &w.path,
             patch::Change::Replace(r) => &r.path,
-            patch::Change::UDiff(_) => continue,
         };
         changes_by_file.entry(path).or_default().push(change);
     }
@@ -228,7 +227,6 @@ fn print_patch(config: &Config, patch: &patch::Patch, full: bool, width: usize) 
             match change {
                 patch::Change::Write(_) => write_count += 1,
                 patch::Change::Replace(_) => replace_count += 1,
-                patch::Change::UDiff(_) => (),
             }
         }
 
@@ -264,19 +262,7 @@ fn print_patch(config: &Config, patch: &patch::Patch, full: bool, width: usize) 
                         output.push_str(&wrapped_block(&r.new, width, INDENT.len() * 6));
                         output.push('\n');
                     }
-                    patch::Change::UDiff(_) => (),
                 }
-            }
-        }
-    }
-
-    // Handle UDiff changes separately
-    for change in &patch.changes {
-        if let patch::Change::UDiff(w) = change {
-            output.push_str(&format!("{}- udiff\n", INDENT.repeat(3)));
-            if full {
-                output.push_str(&wrapped_block(&w.fudiff.render(), width, INDENT.len() * 4));
-                output.push('\n');
             }
         }
     }

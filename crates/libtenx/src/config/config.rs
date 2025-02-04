@@ -380,8 +380,6 @@ pub struct Dialect {
 pub struct Tags {
     /// Enable replace change type
     pub replace: bool,
-    /// EXPERIMENTAL: enable udiff change type
-    pub udiff: bool,
 }
 
 /// Project configuration.
@@ -824,7 +822,6 @@ impl Config {
         }
         Ok(dialect::Dialect::Tags(dialect::Tags::new(
             self.tags.replace,
-            self.tags.udiff,
             self.dialect.edit,
         )))
     }
