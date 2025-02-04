@@ -18,20 +18,9 @@ impl UDiff {
     /// Creates a new UDiff instance by parsing the provided diff text using FuDiff.
     /// The filename must be provided separately.
     pub fn new(file: String, patch: String) -> Result<Self> {
-        if patch
-            .lines()
-            .filter(|l| l.trim_start().starts_with("--- "))
-            .count()
-            > 1
-        {
-            return Err(TenxError::Patch {
-                user: "Multi-file diffs are not supported".to_string(),
-                model: "The provided diff contains multiple file sections".to_string(),
-            });
-        }
         let fudiff = parse(&patch).map_err(|e| TenxError::Patch {
             user: "Failed to parse unified diff".to_string(),
-            model: format!("Error parsing diff: {:?}", e),
+            model: format!("Error parsing diff: {:?}", e.details()),
         })?;
         Ok(UDiff { path: file, fudiff })
     }
@@ -49,7 +38,7 @@ impl UDiff {
             .patch(current_content)
             .map_err(|e| TenxError::Patch {
                 user: format!("Failed to apply patch to file: {}", self.path),
-                model: format!("Error applying patch to {}: {:?}", self.path, e),
+                model: format!("Error applying patch to {}: {:?}", self.path, e.details()),
             })?;
 
         cache.insert(path, new_content);

@@ -1,21 +1,28 @@
 ## <udiff>
 
 Specify a unified diff to apply to the editable files. A unified diff may
-include multiple hunks. Each hunk is demarcated by lines starting and ending
-with `@@`. The hunk header does not include line numbers.
+include multiple hunks. Each hunk is demarcated by lines starting with `@@`,
+with all content on the rest of the line ignored. The hunk header does not
+include line numbers, and should contain no other content. The path is
+specified in the `path` attribute of the `udiff` tag, not in the diff itself.
+Each `udiff` tag should contain changes, in order, to a SINGLE file.
+
+Hunks MUST occur in order - that is, each hunk can only apply to text below the
+previous hunk.
+
 
 Format:
 
 <udiff path="file1.txt">
-@@ @@
+@@
  unchanged line
 -removed line
 -removed line2
 +added line
 +added line2
  last line
-@@ @@
- first line
+@@
+ next line
 +inserted line
  last line
 </udiff>
@@ -52,7 +59,7 @@ Format:
     </comment>
 
     <udiff path="src/main.rs">
-    @@ @@
+    @@
     fn main() {
     -    println!("Hello there!");
     +    println!("Hi!");

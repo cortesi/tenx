@@ -413,8 +413,8 @@ pub fn default_config<P: AsRef<Path>>(current_dir: P) -> Config {
             }
         },
         tags: Tags {
-            replace: true,
-            ..Default::default()
+            replace: false,
+            udiff: true,
         },
         session_store_dir: home_config_dir().join("state"),
         step_limit: DEFAULT_STEP_LIMIT,
