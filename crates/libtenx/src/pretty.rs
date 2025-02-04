@@ -275,7 +275,7 @@ fn print_patch(config: &Config, patch: &patch::Patch, full: bool, width: usize) 
         if let patch::Change::UDiff(w) = change {
             output.push_str(&format!("{}- udiff\n", INDENT.repeat(3)));
             if full {
-                output.push_str(&wrapped_block(&w.patch, width, INDENT.len() * 4));
+                output.push_str(&wrapped_block(&w.fudiff.render(), width, INDENT.len() * 4));
                 output.push('\n');
             }
         }

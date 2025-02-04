@@ -181,10 +181,21 @@ impl DialectProvider for Tags {
                         }));
                     }
                     "udiff" => {
+                        let path = tag
+                            .attributes
+                            .get("path")
+                            .ok_or_else(|| TenxError::ResponseParse {
+                                user: "Failed to parse model response".into(),
+                                model: format!(
+                                    "Missing path attribute in replace tag. Line: '{}'",
+                                    line
+                                ),
+                            })?
+                            .clone();
                         let (_, content) = xmlish::parse_block("udiff", &mut lines)?;
                         patch
                             .changes
-                            .push(Change::UDiff(UDiff::new(content.join("\n"))?));
+                            .push(Change::UDiff(UDiff::new(path, content.join("\n"))?));
                     }
                     "comment" => {
                         let (_, content) = xmlish::parse_block("comment", &mut lines)?;
@@ -254,7 +265,11 @@ impl DialectProvider for Tags {
                         ));
                         }
                         Change::UDiff(udiff) => {
-                            rendered.push_str(&format!("<udiff>\n{}\n</udiff>\n\n", udiff.patch));
+                            rendered.push_str(&format!(
+                                "<udiff path=\"{}\">\n{}\n</udiff>\n\n",
+                                udiff.path,
+                                udiff.fudiff.render()
+                            ));
                         }
                     }
                 }

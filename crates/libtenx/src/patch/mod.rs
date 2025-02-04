@@ -25,7 +25,7 @@ pub enum Change {
 
 /// A unified patch operation requested by the model. This contains all changes, as well as a cache
 /// of file state before the patch is applied, so we can roll back.
-#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct Patch {
     pub changes: Vec<Change>,
 }
@@ -38,7 +38,7 @@ impl Patch {
             match change {
                 Change::Write(write_file) => paths.push(write_file.path.clone()),
                 Change::Replace(replace) => paths.push(replace.path.clone()),
-                Change::UDiff(udiff) => paths.extend(udiff.modified_files.iter().map(|f| f.into())),
+                Change::UDiff(udiff) => paths.push(udiff.path.clone().into()),
             }
         }
         paths
