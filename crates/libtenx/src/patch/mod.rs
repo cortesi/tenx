@@ -1,10 +1,8 @@
 //! Patch operations that modify files in the project.
 mod replace;
-mod udiff;
 mod write;
 
 pub use replace::*;
-pub use udiff::*;
 pub use write::*;
 
 use std::collections::HashMap;
