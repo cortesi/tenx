@@ -1,9 +1,13 @@
-use std::fmt;
-use std::ops::Deref;
-use std::path::{Path, PathBuf};
+use std::{
+    fmt,
+    ops::Deref,
+    path::{Path, PathBuf},
+};
+
+use serde::{Deserialize, Serialize};
 
 /// A wrapper around PathBuf that guarantees the enclosed path is absolute.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct AbsPath(PathBuf);
 
 impl AbsPath {

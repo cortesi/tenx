@@ -7,7 +7,7 @@ use std::{
 use fs_err as fs;
 use serde::{Deserialize, Serialize};
 
-use crate::{config, context, model::Usage, patch::Patch, strategy, Result, TenxError};
+use crate::{config, context, model::Usage, patch::Patch, state, strategy, Result, TenxError};
 
 /// A parsed model response
 #[derive(Debug, Deserialize, Serialize, Clone, Default, PartialEq, Eq)]
@@ -121,6 +121,7 @@ pub struct Session {
     editable: Vec<PathBuf>,
     actions: Vec<Action>,
     pub contexts: Vec<context::Context>,
+    state: state::State,
 }
 
 impl Session {

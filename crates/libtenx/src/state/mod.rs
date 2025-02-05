@@ -7,6 +7,8 @@ use std::{
     path::{absolute, Path, PathBuf},
 };
 
+use serde::{Deserialize, Serialize};
+
 use crate::{
     error::{Result, TenxError},
     patch::{Change, Patch},
@@ -15,7 +17,7 @@ use crate::{
 
 pub const MEM_PREFIX: &str = "::";
 
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 struct Snapshot {
     content: HashMap<PathBuf, String>,
     created: Vec<PathBuf>,
@@ -33,7 +35,7 @@ impl Snapshot {
 }
 
 /// A file system directory
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Directory {
     root: AbsPath,
     globs: Vec<String>,
@@ -110,7 +112,7 @@ impl Directory {
 /// The state underlying a session. This is the set of resources that our models are editing. State
 /// presents a unified interface over an optional filesystem directory and a memory store.
 /// In-memory file names are prefixed with "::"
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct State {
     directory: Option<Directory>,
     memory: HashMap<String, String>,
