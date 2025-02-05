@@ -32,7 +32,7 @@ impl Snapshot {
     }
 }
 
-/// A file system.
+/// A file system directory
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Directory {
     root: AbsPath,
@@ -120,8 +120,15 @@ pub struct State {
 
 impl State {
     /// Set the directory path and glob patterns for file operations.
-    pub fn set_directory(&mut self, root: AbsPath, globs: Vec<String>) -> Result<()> {
-        self.directory = Some(Directory::new(root, globs)?);
+    pub fn set_directory<P>(&mut self, root: P, globs: Vec<String>) -> Result<()>
+    where
+        P: TryInto<AbsPath>,
+        P::Error: std::fmt::Display,
+    {
+        let abs = root
+            .try_into()
+            .map_err(|e| TenxError::Internal(format!("failed to convert directory: {}", e)))?;
+        self.directory = Some(Directory::new(abs, globs)?);
         Ok(())
     }
 
@@ -136,13 +143,19 @@ impl State {
 
     /// Create a new memory entry with the given key and value.
     /// Fails if the key does not start with MEM_PREFIX.
-    pub fn create_memory(&mut self, key: String, value: String) -> Result<u64> {
-        if !key.starts_with(MEM_PREFIX) {
+    pub fn create_memory<K, V>(&mut self, key: K, value: V) -> Result<u64>
+    where
+        K: AsRef<str>,
+        V: AsRef<str>,
+    {
+        let key_str = key.as_ref();
+        if !key_str.starts_with(MEM_PREFIX) {
             return Err(TenxError::Internal(
                 "Memory key must start with MEM_PREFIX".to_string(),
             ));
         }
-        self.memory.insert(key, value);
+        self.memory
+            .insert(key_str.to_string(), value.as_ref().to_string());
         Ok(self.next_snapshot_id)
     }
 
@@ -413,8 +426,7 @@ mod tests {
 
             // Setup memory if content provided
             if let Some(content) = case.memory_content {
-                let _ = state
-                    .create_memory(format!("{}{}", MEM_PREFIX, case.path), content.to_string());
+                let _ = state.create_memory(format!("{}{}", MEM_PREFIX, case.path), content);
             }
 
             // Test the get operation
@@ -475,8 +487,8 @@ mod tests {
         // Insert initial memory entries.
         let key_a = "::a.txt";
         let key_x = "::x.txt";
-        let _ = state.create_memory(key_a.to_string(), "A0".to_string());
-        let _ = state.create_memory(key_x.to_string(), "X0".to_string());
+        let _ = state.create_memory(key_a, "A0");
+        let _ = state.create_memory(key_x, "X0");
 
         // Create first snapshot (id 0) capturing the initial state.
         let paths = vec![PathBuf::from(key_a), PathBuf::from(key_x)];
