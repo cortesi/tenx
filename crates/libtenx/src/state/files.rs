@@ -1,6 +1,8 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
+use globset::Glob;
 use ignore::{overrides::OverrideBuilder, WalkBuilder};
+use pathdiff::diff_paths;
 
 use crate::TenxError;
 
@@ -10,7 +12,11 @@ use crate::TenxError;
 /// Applies project glob patterns and uses the ignore crate's functionality for respecting
 /// .gitignore and other ignore files. Glob patterns can be positive (include) or negative
 /// (exclude, prefixed with !).
-pub fn walk_files(root: PathBuf, globs: Vec<String>) -> crate::Result<Vec<PathBuf>> {
+///
+/// Files are sorted by path.
+use crate::state::abspath::AbsPath;
+
+pub fn walk_files(root: AbsPath, globs: Vec<String>) -> crate::Result<Vec<PathBuf>> {
     // Build override rules from project config
     let mut builder = OverrideBuilder::new(&root);
 
@@ -52,6 +58,78 @@ pub fn walk_files(root: PathBuf, globs: Vec<String>) -> crate::Result<Vec<PathBu
     Ok(files)
 }
 
+/// Traverse the root using the include patterns provided, finding files that match `pattern`.
+/// The pattern can be either a glob match pattern or a simple path.
+///
+/// # Arguments
+///
+/// * `root` - The absolute root path to search from
+/// * `include` - List of glob patterns to include in the search
+/// * `current_dir` - The absolute path of the current directory, which must be equal to or under `root`
+/// * `pattern` - The glob pattern to match against files
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The pattern is invalid
+/// - The current_dir is not equal to or under root
+/// - Any matched file does not exist
+pub fn find_files(
+    root: AbsPath,
+    include: Vec<String>,
+    current_dir: AbsPath,
+    pattern: &str,
+) -> crate::Result<Vec<PathBuf>> {
+    // Verify that current_dir is under root
+    if !current_dir.starts_with(&*root) {
+        return Err(TenxError::Internal(format!(
+            "Current directory {} must be under root {}",
+            current_dir, root
+        )));
+    }
+
+    let glob = Glob::new(pattern)
+        .map_err(|e| TenxError::Internal(format!("Invalid glob pattern: {}", e)))?;
+    let included_files = walk_files(root.clone(), include)?;
+
+    let mut matched_files = Vec::new();
+
+    for file in included_files {
+        let relative_path = if file.is_absolute() {
+            file.strip_prefix(root.clone()).unwrap_or(&file)
+        } else {
+            &file
+        };
+
+        let match_path = if current_dir.as_ref() != root.as_ref() {
+            // If we're in a subdirectory, we need to adjust the path for matching
+            diff_paths(
+                relative_path,
+                Path::new(&*current_dir)
+                    .strip_prefix(&*root)
+                    .unwrap_or(Path::new("")),
+            )
+            .unwrap_or_else(|| relative_path.to_path_buf())
+        } else {
+            relative_path.to_path_buf()
+        };
+
+        if glob.compile_matcher().is_match(&match_path) {
+            let absolute_path = root.join(relative_path);
+            if absolute_path.exists() {
+                matched_files.push(relative_path.to_path_buf());
+            } else {
+                return Err(TenxError::Internal(format!(
+                    "File does not exist: {:?}",
+                    absolute_path
+                )));
+            }
+        }
+    }
+
+    Ok(matched_files)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -78,25 +156,22 @@ mod tests {
     #[test]
     fn test_walk_project() -> crate::Result<()> {
         let temp_dir = TempDir::new()?;
-        let root = temp_dir.path();
+        let root = AbsPath::new(temp_dir.path().to_path_buf())?;
 
         // Initialize git repo
-        init_git_repo(root)?;
+        init_git_repo(&root)?;
 
         // Create test file structure
-        create_file(root, "src/main.rs")?;
-        create_file(root, "src/lib.rs")?;
-        create_file(root, "tests/test1.rs")?;
-        create_file(root, "target/debug/build.rs")?;
-        create_file(root, ".gitignore")?;
+        create_file(&root, "src/main.rs")?;
+        create_file(&root, "src/lib.rs")?;
+        create_file(&root, "tests/test1.rs")?;
+        create_file(&root, "target/debug/build.rs")?;
+        create_file(&root, ".gitignore")?;
 
         // Write gitignore content
         fs::write(root.join(".gitignore"), "/target\n*.tmp\n.git/\n")?;
 
-        let files = walk_files(
-            root.to_path_buf(),
-            vec!["*.rs".to_string(), "!*.tmp".to_string()],
-        )?;
+        let files = walk_files(root.clone(), vec!["*.rs".to_string(), "!*.tmp".to_string()])?;
 
         let expected: Vec<PathBuf> = vec!["src/lib.rs", "src/main.rs", "tests/test1.rs"]
             .into_iter()

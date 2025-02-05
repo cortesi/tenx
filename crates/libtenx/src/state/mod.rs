@@ -1,3 +1,4 @@
+pub mod abspath;
 pub mod files;
 
 use std::{
@@ -5,28 +6,40 @@ use std::{
     path::{absolute, Path, PathBuf},
 };
 
-use crate::error::TenxError;
+use crate::error::{Result, TenxError};
 
 pub const MEM_PREFIX: &str = "::";
 
+use crate::state::abspath::AbsPath;
+
 /// A file system.
-pub struct FileSystem {
-    root: PathBuf,
+pub struct Directory {
+    root: AbsPath,
     globs: Vec<String>,
 }
 
-impl FileSystem {
-    pub fn new(root: PathBuf, globs: Vec<String>) -> Self {
-        Self { root, globs }
+impl Directory {
+    pub fn new(root: PathBuf, globs: Vec<String>) -> Result<Self> {
+        Ok(Self {
+            root: AbsPath::new(root)?,
+            globs,
+        })
     }
 
-    pub fn walk(&self) -> Vec<PathBuf> {
-        files::walk_files(self.root.clone(), self.globs.clone()).unwrap()
+    /// List files in the directory using ignore rules, returning all included files relative to
+    /// project root.
+    ///
+    /// Applies the `FileSystem` glob patterns and respects .gitignore and other ignore files. Glob
+    /// patterns can be positive (include) or negative (exclude, prefixed with !).
+    ///
+    /// Files are sorted by path.
+    pub fn list_files(&self) -> Result<Vec<PathBuf>> {
+        files::walk_files(self.root.clone(), self.globs.clone())
     }
 
     /// Converts a path relative to the root directory to an absolute path
     pub fn abspath(&self, path: &Path) -> crate::Result<PathBuf> {
-        let p = self.root.join(path);
+        let p = PathBuf::from(&*self.root).join(path);
         absolute(p.clone())
             .map_err(|e| TenxError::Internal(format!("could not absolute {}: {}", p.display(), e)))
     }
@@ -65,14 +78,24 @@ impl FileSystem {
 /// directory and a memory store. In-memory file names are prefixed with "::"
 #[derive(Default)]
 pub struct State {
-    file_system: Option<FileSystem>,
+    directory: Option<Directory>,
     memory: HashMap<String, String>,
 }
 
 impl State {
-    /// Set the file system to the given value.
-    pub fn set_file_system(&mut self, file_system: FileSystem) {
-        self.file_system = Some(file_system);
+    /// Set the directory path and glob patterns for file operations.
+    pub fn set_directory(&mut self, root: PathBuf, globs: Vec<String>) -> Result<()> {
+        self.directory = Some(Directory::new(root, globs)?);
+        Ok(())
+    }
+
+    /// List files in the directory, applying the inclusion globs.
+    pub fn list_directory(&self) -> Result<Vec<PathBuf>> {
+        Ok(if let Some(fs) = self.directory.as_ref() {
+            fs.list_files()?
+        } else {
+            vec![]
+        })
     }
 
     /// Create a new memory entry with the given key and value.
@@ -88,7 +111,7 @@ impl State {
             return Ok(value.clone());
         }
 
-        match &self.file_system {
+        match &self.directory {
             Some(fs) => fs.read(path).map_err(|_| TenxError::NotFound {
                 msg: "File not found".to_string(),
                 path: path.display().to_string(),
@@ -109,7 +132,7 @@ impl State {
             return Ok(());
         }
 
-        match &self.file_system {
+        match &self.directory {
             Some(fs) => fs.write(path, content),
             None => Err(TenxError::NotFound {
                 msg: "No file system available".to_string(),
@@ -136,18 +159,12 @@ mod tests {
         fs::write(&test_file, "fn main() {}")?;
 
         // Create a Filesystem with a glob pattern for .rs files.
-        let fsystem = FileSystem::new(root.clone(), vec!["*.rs".to_string()]);
-
-        // Create a State and set its Filesystem.
         let mut state = State::default();
-        state.set_file_system(fsystem);
+        state.set_directory(root.clone(), vec!["*.rs".to_string()])?;
 
         // Get the filesystem from the state and list the files.
-        let file_system = state
-            .file_system
-            .as_ref()
-            .expect("Filesystem should be set");
-        let files = file_system.walk();
+        let file_system = state.directory.as_ref().expect("Filesystem should be set");
+        let files = file_system.list_files().unwrap();
 
         // Check that the test file is found (relative path).
         assert!(files.contains(&PathBuf::from("test.rs")));
@@ -162,7 +179,7 @@ mod tests {
 
         // Setup filesystem
         let root = temp_dir.path().to_path_buf();
-        state.set_file_system(FileSystem::new(root.clone(), vec!["*.txt".to_string()]));
+        state.set_directory(root.clone(), vec!["*.txt".to_string()])?;
 
         // Test writing to filesystem
         state.write(Path::new("test.txt"), "file content")?;
@@ -182,7 +199,7 @@ mod tests {
             fs_content: Option<&'static str>,
             memory_content: Option<&'static str>,
             path: &'static str,
-            expected: Result<&'static str, &'static str>,
+            expected: Result<&'static str>,
         }
 
         let cases = vec![
@@ -212,18 +229,24 @@ mod tests {
                 fs_content: None,
                 memory_content: None,
                 path: "test.txt",
-                expected: Err("No file system available: test.txt"),
+                expected: Err(TenxError::NotFound {
+                    msg: "No file system available".to_string(),
+                    path: "test.txt".to_string(),
+                }),
             },
             TestCase {
                 name: "missing file in filesystem",
                 fs_content: Some("file content"),
                 memory_content: None,
                 path: "nonexistent.txt",
-                expected: Err("File not found: nonexistent.txt"),
+                expected: Err(TenxError::NotFound {
+                    msg: "File not found".to_string(),
+                    path: "nonexistent.txt".to_string(),
+                }),
             },
         ];
 
-        for case in cases {
+        for case in cases.into_iter() {
             // Setup temporary directory if we need filesystem
             let temp_dir = TempDir::new().expect("failed to create temporary directory");
             let mut state = State::default();
@@ -233,7 +256,7 @@ mod tests {
                 let root = temp_dir.path().to_path_buf();
                 let test_file = root.join("test.txt");
                 fs::write(&test_file, content)?;
-                state.set_file_system(FileSystem::new(root, vec!["*.txt".to_string()]));
+                state.set_directory(root, vec!["*.txt".to_string()])?;
             }
 
             // Setup memory if content provided
@@ -254,7 +277,7 @@ mod tests {
                     );
                     assert_eq!(result.unwrap(), expected, "{}: content mismatch", case.name);
                 }
-                Err(expected_err) => {
+                Err(_) => {
                     assert!(
                         result.is_err(),
                         "{}: expected Err but got Ok({:?})",
@@ -263,9 +286,12 @@ mod tests {
                     );
                     let err = result.unwrap_err();
                     if let TenxError::NotFound { msg, path } = err {
-                        let error_string = format!("{}: {}", msg, path);
                         assert_eq!(
-                            error_string, expected_err,
+                            &TenxError::NotFound { msg, path },
+                            match &case.expected {
+                                Err(expected) => expected,
+                                _ => panic!("Expected error variant"),
+                            },
                             "{}: error message mismatch",
                             case.name
                         );

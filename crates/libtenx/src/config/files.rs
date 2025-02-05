@@ -8,6 +8,9 @@ use crate::{config::Project, state::files::walk_files};
 /// Applies project glob patterns and uses the ignore crate's functionality for respecting
 /// .gitignore and other ignore files. Glob patterns can be positive (include) or negative
 /// (exclude, prefixed with !).
+use crate::state::abspath::AbsPath;
+
 pub fn walk_project(project: &Project) -> crate::Result<Vec<PathBuf>> {
-    walk_files(project.root.clone(), project.include.clone())
+    let root = AbsPath::new(project.root.clone())?;
+    walk_files(root, project.include.clone())
 }
