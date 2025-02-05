@@ -9,6 +9,7 @@ use std::{
 
 use crate::{
     error::{Result, TenxError},
+    patch::{Change, Patch},
     state::abspath::AbsPath,
 };
 
@@ -55,14 +56,14 @@ impl Directory {
     }
 
     /// Converts a path relative to the root directory to an absolute path
-    pub fn abspath(&self, path: &Path) -> crate::Result<PathBuf> {
+    pub fn abspath(&self, path: &Path) -> Result<PathBuf> {
         let p = PathBuf::from(&*self.root).join(path);
         absolute(p.clone())
             .map_err(|e| TenxError::Internal(format!("could not absolute {}: {}", p.display(), e)))
     }
 
     /// Gets the content of a file by converting the input path to an absolute path and reading it.
-    pub fn read(&self, path: &Path) -> crate::Result<String> {
+    pub fn read(&self, path: &Path) -> Result<String> {
         let abs_path = self.abspath(path)?;
         fs::read_to_string(&abs_path).map_err(|e| {
             TenxError::Internal(format!("Could not read file {}: {}", abs_path.display(), e))
@@ -70,7 +71,7 @@ impl Directory {
     }
 
     /// Writes content to a file, creating it if it doesn't exist or overwriting if it does.
-    pub fn write(&self, path: &Path, content: &str) -> crate::Result<()> {
+    pub fn write(&self, path: &Path, content: &str) -> Result<()> {
         let abs_path = self.abspath(path)?;
         if let Some(parent) = abs_path.parent() {
             fs::create_dir_all(parent).map_err(|e| {
@@ -91,7 +92,7 @@ impl Directory {
     }
 
     /// Removes a file by joining the given path with the root directory.
-    pub fn remove(&self, path: &Path) -> crate::Result<()> {
+    pub fn remove(&self, path: &Path) -> Result<()> {
         let abs_path = self.root.join(path);
         if abs_path.exists() {
             fs::remove_file(&abs_path).map_err(|e| {
@@ -106,8 +107,9 @@ impl Directory {
     }
 }
 
-/// The state underlying a session. Presents a unified interface over an optional filesystem
-/// directory and a memory store. In-memory file names are prefixed with "::"
+/// The state underlying a session. This is the set of resources that our models are editing. State
+/// presents a unified interface over an optional filesystem directory and a memory store.
+/// In-memory file names are prefixed with "::"
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct State {
     directory: Option<Directory>,
@@ -133,18 +135,28 @@ impl State {
     }
 
     /// Create a new memory entry with the given key and value.
-    pub fn create_memory(&mut self, key: String, value: String) {
+    /// Fails if the key does not start with MEM_PREFIX.
+    pub fn create_memory(&mut self, key: String, value: String) -> Result<u64> {
+        if !key.starts_with(MEM_PREFIX) {
+            return Err(TenxError::Internal(
+                "Memory key must start with MEM_PREFIX".to_string(),
+            ));
+        }
         self.memory.insert(key, value);
+        Ok(self.next_snapshot_id)
     }
 
     /// Retrieves the content associated with the given path.
-    /// If the path exists in memory, return that value. Otherwise, read from the file system.
-    pub fn read(&self, path: &Path) -> crate::Result<String> {
+    /// If the path exists in memory, returns that value. Otherwise, reads from the file system.
+    pub fn read(&self, path: &Path) -> Result<String> {
         let key = path.to_string_lossy().to_string();
         if let Some(value) = self.memory.get(&key) {
             return Ok(value.clone());
         }
-
+        let mem_key = format!("{}{}", MEM_PREFIX, key);
+        if let Some(value) = self.memory.get(&mem_key) {
+            return Ok(value.clone());
+        }
         match &self.directory {
             Some(fs) => fs.read(path).map_err(|_| TenxError::NotFound {
                 msg: "File not found".to_string(),
@@ -159,7 +171,7 @@ impl State {
 
     /// Writes content to a path. If the path starts with MEM_PREFIX, writes to memory,
     /// otherwise writes to the filesystem.
-    pub fn write(&mut self, path: &Path, content: &str) -> crate::Result<()> {
+    fn write(&mut self, path: &Path, content: &str) -> Result<()> {
         let key = path.to_string_lossy().to_string();
         if key.starts_with(MEM_PREFIX) {
             self.memory.insert(key, content.to_string());
@@ -176,7 +188,7 @@ impl State {
     }
 
     /// Removes a file or memory entry for the given path.
-    pub fn remove(&mut self, path: &Path) -> crate::Result<()> {
+    fn remove(&mut self, path: &Path) -> Result<()> {
         let key = path.to_string_lossy().to_string();
         if key.starts_with(MEM_PREFIX) {
             self.memory.remove(&key);
@@ -194,7 +206,7 @@ impl State {
 
     /// Creates a snapshot of the given list of paths. For each path, if the file exists, its content is captured;
     /// otherwise, the path is marked as created.
-    fn create_snapshot(&self, paths: &[PathBuf]) -> crate::Result<Snapshot> {
+    fn create_snapshot(&self, paths: &[PathBuf]) -> Result<Snapshot> {
         let mut snap = Snapshot::default();
         for p in paths {
             match self.read(p) {
@@ -208,7 +220,7 @@ impl State {
 
     /// Reverts the state to the given snapshot.
     /// Restores content for existing files and memory entries, and removes files or memory entries that were created.
-    fn revert_snapshot(&mut self, snapshot: Snapshot) -> crate::Result<()> {
+    fn revert_snapshot(&mut self, snapshot: Snapshot) -> Result<()> {
         // Remove files or entries that were created.
         for path in snapshot.created.iter() {
             self.remove(path)?;
@@ -223,7 +235,7 @@ impl State {
     }
 
     /// Creates a snapshot from the provided paths, appends it to the snapshots list, and returns its identifier.
-    pub fn snapshot(&mut self, paths: &[PathBuf]) -> crate::Result<u64> {
+    fn snapshot(&mut self, paths: &[PathBuf]) -> Result<u64> {
         let snap = self.create_snapshot(paths)?;
         let id = self.next_snapshot_id;
         self.next_snapshot_id += 1;
@@ -231,8 +243,36 @@ impl State {
         Ok(id)
     }
 
+    /// Applies a patch by taking a snapshot of all files to be modified, then attempts to apply each change in the patch.
+    /// If any change fails, the error is collected in a vector of (change, error) tuples.
+    /// Returns a tuple containing the snapshot ID and a vector of failed changes.
+    pub fn patch(&mut self, patch: &Patch) -> Result<(u64, Vec<(Change, TenxError)>)> {
+        let snap_id = self.snapshot(&patch.changed_files())?;
+        let mut failures = Vec::new();
+        for change in &patch.changes {
+            match change {
+                Change::Write(write_file) => {
+                    if let Err(e) = self.write(write_file.path.as_path(), &write_file.content) {
+                        failures.push((change.clone(), e));
+                    }
+                }
+                Change::Replace(replace) => {
+                    let res = (|| {
+                        let original = self.read(replace.path.as_path())?;
+                        let new_content = replace.apply(&original)?;
+                        self.write(replace.path.as_path(), &new_content)
+                    })();
+                    if let Err(e) = res {
+                        failures.push((change.clone(), e));
+                    }
+                }
+            }
+        }
+        Ok((snap_id, failures))
+    }
+
     /// Reverts all snapshots up to and including the given ID in reverse order, then removes them from the snapshots list.
-    pub fn revert(&mut self, id: u64) -> crate::Result<()> {
+    pub fn revert(&mut self, id: u64) -> Result<()> {
         let mut to_revert = Vec::new();
         let mut remaining = Vec::new();
         // Partition snapshots into those to revert and those to keep.
@@ -262,7 +302,7 @@ mod tests {
     use tempfile::TempDir;
 
     #[test]
-    fn test_state_with_filesystem() -> crate::Result<()> {
+    fn test_state_with_filesystem() -> Result<()> {
         let temp_dir = TempDir::new().expect("failed to create temporary directory");
         let root = temp_dir.path().to_path_buf();
 
@@ -285,7 +325,7 @@ mod tests {
     }
 
     #[test]
-    fn test_state_write() -> crate::Result<()> {
+    fn test_state_write() -> Result<()> {
         let temp_dir = TempDir::new().expect("failed to create temporary directory");
         let mut state = State::default();
 
@@ -305,7 +345,7 @@ mod tests {
     }
 
     #[test]
-    fn test_state_read() -> crate::Result<()> {
+    fn test_state_read() -> Result<()> {
         struct TestCase {
             name: &'static str,
             fs_content: Option<&'static str>,
@@ -373,7 +413,8 @@ mod tests {
 
             // Setup memory if content provided
             if let Some(content) = case.memory_content {
-                state.create_memory(case.path.to_string(), content.to_string());
+                let _ = state
+                    .create_memory(format!("{}{}", MEM_PREFIX, case.path), content.to_string());
             }
 
             // Test the get operation
@@ -419,7 +460,7 @@ mod tests {
 
     // Table-driven test for snapshot creation and revert.
     #[test]
-    fn test_create_and_revert_snapshot() -> crate::Result<()> {
+    fn test_create_and_revert_snapshot() -> Result<()> {
         // Existing test for single snapshot revert.
         // (unchanged)
         Ok(())
@@ -427,15 +468,15 @@ mod tests {
 
     /// Unit test for multiple snapshot layers.
     #[test]
-    fn test_multiple_snapshot_layers() -> crate::Result<()> {
+    fn test_multiple_snapshot_layers() -> Result<()> {
         // We'll test using memory entries.
         let mut state = State::default();
 
         // Insert initial memory entries.
         let key_a = "::a.txt";
         let key_x = "::x.txt";
-        state.create_memory(key_a.to_string(), "A0".to_string());
-        state.create_memory(key_x.to_string(), "X0".to_string());
+        let _ = state.create_memory(key_a.to_string(), "A0".to_string());
+        let _ = state.create_memory(key_x.to_string(), "X0".to_string());
 
         // Create first snapshot (id 0) capturing the initial state.
         let paths = vec![PathBuf::from(key_a), PathBuf::from(key_x)];
