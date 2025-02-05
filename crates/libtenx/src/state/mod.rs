@@ -3,6 +3,7 @@ pub mod files;
 
 use std::{
     collections::HashMap,
+    fs,
     path::{absolute, Path, PathBuf},
 };
 
@@ -21,8 +22,7 @@ pub struct Snapshot {
 
 impl Snapshot {
     pub fn insert(&mut self, path: PathBuf, content: String) {
-        self.content.insert(path.clone(), content);
-        self.created.push(path);
+        self.content.insert(path, content);
     }
 
     pub fn create(&mut self, path: PathBuf) {
@@ -64,7 +64,7 @@ impl Directory {
     /// Gets the content of a file by converting the input path to an absolute path and reading it.
     pub fn read(&self, path: &Path) -> crate::Result<String> {
         let abs_path = self.abspath(path)?;
-        std::fs::read_to_string(&abs_path).map_err(|e| {
+        fs::read_to_string(&abs_path).map_err(|e| {
             TenxError::Internal(format!("Could not read file {}: {}", abs_path.display(), e))
         })
     }
@@ -73,7 +73,7 @@ impl Directory {
     pub fn write(&self, path: &Path, content: &str) -> crate::Result<()> {
         let abs_path = self.abspath(path)?;
         if let Some(parent) = abs_path.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| {
+            fs::create_dir_all(parent).map_err(|e| {
                 TenxError::Internal(format!(
                     "Could not create directory {}: {}",
                     parent.display(),
@@ -81,7 +81,7 @@ impl Directory {
                 ))
             })?;
         }
-        std::fs::write(&abs_path, content).map_err(|e| {
+        fs::write(&abs_path, content).map_err(|e| {
             TenxError::Internal(format!(
                 "Could not write file {}: {}",
                 abs_path.display(),
@@ -160,7 +160,7 @@ impl State {
 
     /// Creates a snapshot of the given list of paths. For each path, if the file exists, its content is captured;
     /// otherwise, the path is marked as created.
-    pub fn snapshot(&self, paths: &[PathBuf]) -> crate::Result<Snapshot> {
+    pub fn create_snapshot(&self, paths: &[PathBuf]) -> crate::Result<Snapshot> {
         let mut snap = Snapshot::default();
         for p in paths {
             match self.read(p) {
@@ -171,13 +171,55 @@ impl State {
         }
         Ok(snap)
     }
+
+    /// Removes a file or memory entry for the given path.
+    pub fn remove(&mut self, path: &Path) -> crate::Result<()> {
+        let key = path.to_string_lossy().to_string();
+        if key.starts_with(MEM_PREFIX) {
+            self.memory.remove(&key);
+            return Ok(());
+        }
+        if let Some(fs) = &self.directory {
+            let abs_path = fs.abspath(path)?;
+            if abs_path.exists() {
+                std::fs::remove_file(&abs_path).map_err(|e| {
+                    TenxError::Internal(format!(
+                        "Could not remove file {}: {}",
+                        abs_path.display(),
+                        e
+                    ))
+                })?;
+            }
+            Ok(())
+        } else {
+            Err(TenxError::NotFound {
+                msg: "No file system available".to_string(),
+                path: key,
+            })
+        }
+    }
+
+    /// Reverts the state to the given snapshot.
+    /// Restores content for existing files and memory entries, and removes files or memory entries that were created.
+    pub fn revert(&mut self, snapshot: Snapshot) -> crate::Result<()> {
+        // Remove files or entries that were created.
+        for path in snapshot.created.iter() {
+            self.remove(path)?;
+        }
+        // Restore content for files or memory entries that existed.
+        for (path, content) in snapshot.content.iter() {
+            if !snapshot.created.contains(path) {
+                self.write(path, content)?;
+            }
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
-    use std::path::PathBuf;
+    use std::{fs, path::PathBuf};
     use tempfile::TempDir;
 
     #[test]
@@ -333,6 +375,138 @@ mod tests {
             }
         }
 
+        Ok(())
+    }
+
+    // Table-driven test for snapshot creation and revert.
+    #[test]
+    fn test_create_and_revert_snapshot() -> crate::Result<()> {
+        // Define an action for modifying state.
+        enum Action {
+            WriteFile {
+                path: &'static str,
+                content: &'static str,
+            },
+            WriteMemory {
+                key: &'static str,
+                content: &'static str,
+            },
+        }
+
+        struct TestCase {
+            name: &'static str,
+            initial_files: Vec<(&'static str, &'static str)>,
+            initial_memory: Vec<(&'static str, &'static str)>,
+            snapshot_paths: Vec<&'static str>,
+            modifications: Vec<Action>,
+            expected: Vec<(&'static str, Option<&'static str>)>, // None means key should not exist
+        }
+
+        let test_cases = vec![
+            TestCase {
+                name: "Revert modifications and removals",
+                initial_files: vec![("file1.txt", "original file content")],
+                initial_memory: vec![("::mem1.txt", "original memory")],
+                snapshot_paths: vec!["file1.txt", "::mem1.txt", "file2.txt"],
+                modifications: vec![
+                    Action::WriteFile {
+                        path: "file1.txt",
+                        content: "modified file content",
+                    },
+                    Action::WriteFile {
+                        path: "file2.txt",
+                        content: "new file content",
+                    },
+                    Action::WriteMemory {
+                        key: "::mem1.txt",
+                        content: "modified memory",
+                    },
+                    Action::WriteMemory {
+                        key: "::mem2.txt",
+                        content: "extra memory",
+                    },
+                ],
+                expected: vec![
+                    ("file1.txt", Some("original file content")),
+                    ("file2.txt", None),
+                    ("::mem1.txt", Some("original memory")),
+                    ("::mem2.txt", Some("extra memory")),
+                ],
+            },
+            TestCase {
+                name: "No changes revert",
+                initial_files: vec![("fileA.txt", "contentA")],
+                initial_memory: vec![("::memA.txt", "contentA")],
+                snapshot_paths: vec!["fileA.txt", "::memA.txt"],
+                modifications: vec![],
+                expected: vec![
+                    ("fileA.txt", Some("contentA")),
+                    ("::memA.txt", Some("contentA")),
+                ],
+            },
+        ];
+
+        for tc in test_cases {
+            // Create a temp directory and initialize state.
+            let temp_dir = TempDir::new().expect("failed to create temporary directory");
+            let root = temp_dir.path().to_path_buf();
+            let mut state = State::default();
+            state.set_directory(AbsPath::new(root.clone())?, vec!["*.txt".to_string()])?;
+
+            // Setup initial file system state.
+            for (file, content) in tc.initial_files.iter() {
+                state.write(Path::new(file), content)?;
+            }
+            // Setup initial memory state.
+            for (key, content) in tc.initial_memory.iter() {
+                state.create_memory(key.to_string(), content.to_string());
+            }
+
+            // Create snapshot over specified paths.
+            let paths: Vec<PathBuf> = tc.snapshot_paths.iter().map(PathBuf::from).collect();
+            let snapshot = state.create_snapshot(&paths)?;
+
+            // Apply modifications.
+            for action in tc.modifications.iter() {
+                match action {
+                    Action::WriteFile { path, content } => {
+                        state.write(Path::new(path), content)?;
+                    }
+                    Action::WriteMemory { key, content } => {
+                        state.write(Path::new(key), content)?;
+                    }
+                }
+            }
+
+            // Revert to snapshot.
+            state.revert(snapshot)?;
+
+            // Verify expected outcomes.
+            for (path_str, expected_opt) in tc.expected.iter() {
+                let path = Path::new(path_str);
+                let result = state.read(path);
+                match expected_opt {
+                    Some(expected_content) => {
+                        let actual = result.unwrap_or_else(|_| {
+                            panic!("{}: expected content for {}", tc.name, path_str)
+                        });
+                        assert_eq!(
+                            actual, *expected_content,
+                            "{}: content mismatch for {}",
+                            tc.name, path_str
+                        );
+                    }
+                    None => {
+                        assert!(
+                            result.is_err(),
+                            "{}: expected error for {}",
+                            tc.name,
+                            path_str
+                        );
+                    }
+                }
+            }
+        }
         Ok(())
     }
 }
