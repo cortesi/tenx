@@ -122,7 +122,7 @@ mod test {
     fn test_code_next_step() -> Result<()> {
         let test_project = test_project();
         let code = Code::new("Test".into());
-        let mut session = Session::default();
+        let mut session = Session::new(&test_project.config)?;
 
         assert!(code
             .next_step(&test_project.config, &session, None)?
@@ -156,7 +156,7 @@ mod test {
     #[test]
     fn test_fix_next_step() -> Result<()> {
         let test_project = test_project();
-        let mut session = Session::default();
+        let mut session = Session::new(&test_project.config)?;
 
         // Empty session
         let fix = Fix::new(TenxError::Config("Error".into()), Some("Fix prompt".into()));

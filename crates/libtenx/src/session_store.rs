@@ -113,7 +113,7 @@ mod tests {
 
         let state_store = SessionStore::open(temp_dir.path().into()).unwrap();
 
-        let state = Session::default();
+        let state = Session::new(&config)?;
         state_store.save_current(&config, &state).unwrap();
         state_store.save("test_session", &state).unwrap();
 

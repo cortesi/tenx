@@ -132,7 +132,7 @@ pub fn edit_prompt(
 mod tests {
     use super::*;
 
-    use libtenx::{patch::Patch, session::ModelResponse, strategy};
+    use libtenx::{patch::Patch, session::ModelResponse, strategy, testutils};
 
     use pretty_assertions::assert_eq;
 
@@ -156,20 +156,20 @@ mod tests {
 
     #[test]
     fn test_render_initial_text_empty_session() {
-        let empty_session = Session::default();
+        let p = testutils::test_project();
 
         // Should error on retry with empty session
-        assert!(render_edit_text(&empty_session, true).is_err());
+        assert!(render_edit_text(&p.session, true).is_err());
 
         // Should succeed with no retry
-        let rendered = render_edit_text(&empty_session, false).unwrap();
+        let rendered = render_edit_text(&p.session, false).unwrap();
         assert!(rendered.contains(SESSION_INFO_MARKER));
     }
 
     #[test]
     fn test_render_and_parse_roundtrip() {
-        let mut session = Session::default();
-        session
+        let mut p = testutils::test_project();
+        p.session
             .add_action(strategy::Strategy::Code(strategy::Code::new("test".into())))
             .unwrap();
 
@@ -178,10 +178,10 @@ mod tests {
             ("First prompt\nMultiline", "First response"),
             ("Second prompt", "Second response"),
         ] {
-            session
+            p.session
                 .add_step("test_model".into(), prompt.to_string())
                 .unwrap();
-            if let Some(step) = session.last_step_mut() {
+            if let Some(step) = p.session.last_step_mut() {
                 step.model_response = Some(ModelResponse {
                     patch: Some(Patch { changes: vec![] }),
                     operations: vec![],
@@ -193,12 +193,12 @@ mod tests {
         }
 
         // Test retry=false (empty prompt)
-        let rendered = render_edit_text(&session, false).unwrap();
+        let rendered = render_edit_text(&p.session, false).unwrap();
         let parsed = parse_edited_text(&rendered);
         assert_eq!(parsed.trim(), "");
 
         // Test retry=true (should show last prompt)
-        let rendered = render_edit_text(&session, true).unwrap();
+        let rendered = render_edit_text(&p.session, true).unwrap();
         let parsed = parse_edited_text(&rendered);
         assert_eq!(parsed, "Second prompt");
     }

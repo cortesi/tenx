@@ -68,7 +68,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{dialect::DummyDialect, strategy};
+    use crate::{dialect::DummyDialect, strategy, testutils};
 
     #[derive(Debug, PartialEq, Clone)]
     enum Message {
@@ -136,15 +136,18 @@ mod tests {
 
     #[test]
     fn test_basic_conversation_flow() -> Result<()> {
+        let mut p = testutils::test_project();
+
         let conversation = DummyConversation {};
         let mut req = DummyRequest::default();
         let dialect = Dialect::Dummy(DummyDialect::default());
-        let config = Config::default();
-        let mut session = Session::default();
-        session.add_action(strategy::Strategy::Code(strategy::Code::new("test".into())))?;
-        session.add_step("test_model".into(), "test prompt".to_string())?;
 
-        build_conversation(&conversation, &mut req, &config, &session, &dialect)?;
+        p.session
+            .add_action(strategy::Strategy::Code(strategy::Code::new("test".into())))?;
+        p.session
+            .add_step("test_model".into(), "test prompt".to_string())?;
+
+        build_conversation(&conversation, &mut req, &p.config, &p.session, &dialect)?;
 
         assert!(req.system_prompt.is_some());
         assert_flow(&req.messages);
@@ -154,13 +157,13 @@ mod tests {
 
     #[test]
     fn test_empty_session() -> Result<()> {
+        let p = testutils::test_project();
+
         let conversation = DummyConversation {};
         let mut req = DummyRequest::default();
         let dialect = Dialect::Dummy(DummyDialect::default());
-        let config = Config::default();
-        let session = Session::default();
 
-        build_conversation(&conversation, &mut req, &config, &session, &dialect)?;
+        build_conversation(&conversation, &mut req, &p.config, &p.session, &dialect)?;
 
         assert!(req.system_prompt.is_some());
         assert_eq!(req.editable_calls, vec![0]);

@@ -601,7 +601,7 @@ mod tests {
         let test_project = test_project();
         test_project.create_file_tree(&["test.txt"]);
         let config = test_project.config;
-        let session = Session::default();
+        let session = Session::new(&config).unwrap();
         let cmd = "echo 'hello world' && echo 'error' >&2";
         let mut context = Context::new_cmd(cmd);
 
@@ -633,7 +633,7 @@ mod tests {
         config = config.with_cwd(test_project.tempdir.path().to_path_buf());
 
         // Create context and verify rendering when referencing file outside project root
-        let mut session = Session::default();
+        let mut session = Session::new(&config).unwrap();
         session.contexts.push(Context::Path(
             Path::new(&config, outside_file_path.to_str().unwrap().to_string()).unwrap(),
         ));

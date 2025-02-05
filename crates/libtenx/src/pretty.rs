@@ -354,7 +354,7 @@ pub fn print_project(config: &Config) -> String {
 pub fn print_contexts(config: &Config, session: &Session) -> Result<String> {
     let mut output = String::new();
     for context in session.contexts() {
-        let items = context.context_items(config, &Session::default())?;
+        let items = context.context_items(config, &Session::new(config)?)?;
         if let Some(item) = items.into_iter().next() {
             output.push_str(&print_context_item(&item));
         }
@@ -369,32 +369,28 @@ mod tests {
         context::Context,
         patch::Patch,
         session::{ModelResponse, Step},
-        strategy, TenxError,
+        strategy, testutils, TenxError,
     };
-    use tempfile::TempDir;
 
-    fn create_test_session() -> (TempDir, Session) {
-        let temp_dir = TempDir::new().unwrap();
-        let root_path = temp_dir.path().to_path_buf();
-        let config = Config::default();
-        let mut session = Session::default();
-        session
+    fn create_test_project() -> testutils::TestProject {
+        let mut p = testutils::test_project();
+        p.session
             .add_action(strategy::Strategy::Code(strategy::Code::new("test".into())))
             .unwrap();
-        session
+        p.session
             .add_step("test_model".into(), "Test prompt".to_string())
             .unwrap();
-        let test_file_path = root_path.join("test_file.rs");
-        std::fs::write(&test_file_path, "Test content").unwrap();
-        session.add_context(Context::new_path(&config, "test_file.rs").unwrap());
-        (temp_dir, session)
+        p.write("test_file.rs", "Test content");
+        p.session
+            .add_context(Context::new_path(&p.config, "test_file.rs").unwrap());
+        p
     }
 
     #[test]
     fn test_print_steps_empty_session() {
         let config = Config::default();
-        let (_temp_dir, session) = create_test_session();
-        let result = print_steps(&config, &session, false, 80);
+        let p = create_test_project();
+        let result = print_steps(&config, &p.session, false, 80);
         assert!(result.is_ok());
         let output = result.unwrap();
         assert!(output.contains("Step 0"));
@@ -404,9 +400,9 @@ mod tests {
     #[test]
     fn test_print_steps_with_patch() {
         let config = Config::default();
-        let (_temp_dir, mut session) = create_test_session();
+        let mut p = create_test_project();
 
-        if let Some(step) = session.last_step_mut() {
+        if let Some(step) = p.session.last_step_mut() {
             step.model_response = Some(ModelResponse {
                 patch: Some(Patch {
                     ..Default::default()
@@ -417,7 +413,7 @@ mod tests {
                 response_text: Some("Test comment".to_string()),
             });
         }
-        let result = print_steps(&config, &session, false, 80);
+        let result = print_steps(&config, &p.session, false, 80);
         assert!(result.is_ok());
         let output = result.unwrap();
         assert!(output.contains("Step 0"));
@@ -429,11 +425,11 @@ mod tests {
     #[test]
     fn test_print_steps_with_error() {
         let config = Config::default();
-        let (_temp_dir, mut session) = create_test_session();
-        if let Some(step) = session.last_step_mut() {
+        let mut p = create_test_project();
+        if let Some(step) = p.session.last_step_mut() {
             step.err = Some(TenxError::Internal("Test error".to_string()));
         }
-        let result = print_steps(&config, &session, false, 80);
+        let result = print_steps(&config, &p.session, false, 80);
         assert!(result.is_ok());
         let output = result.unwrap();
         assert!(output.contains("Step 0"));

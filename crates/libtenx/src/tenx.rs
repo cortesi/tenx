@@ -33,7 +33,7 @@ impl Tenx {
         no_context: bool,
     ) -> Result<Session> {
         let _block = EventBlock::start(sender)?;
-        let mut session = Session::default();
+        let mut session = Session::new(&self.config)?;
 
         if !no_context {
             // Add path contexts
@@ -382,7 +382,7 @@ mod tests {
         let test_file_path = temp_dir.path().join("test.txt");
         fs::write(&test_file_path, "Initial content").unwrap();
 
-        let mut session = Session::default();
+        let mut session = Session::new(&config).unwrap();
 
         session
             .add_action(strategy::Strategy::Code(strategy::Code::new("test".into())))

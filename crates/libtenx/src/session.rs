@@ -116,7 +116,7 @@ fn is_glob(s: &str) -> bool {
 }
 
 /// A serializable session, which persists between invocations.
-#[derive(Debug, Deserialize, Serialize, Default, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Session {
     editable: Vec<PathBuf>,
     actions: Vec<Action>,
@@ -125,6 +125,21 @@ pub struct Session {
 }
 
 impl Session {
+    /// Creates a new Session, configuring its state directory.
+    ///
+    /// If `dir` is provided, it is used as the project root; otherwise the configuration's
+    /// project root is used.
+    pub fn new(config: &config::Config) -> Result<Self> {
+        let mut state = state::State::default();
+        state.set_directory(config.project.root.clone(), config.project.include.clone())?;
+        Ok(Session {
+            editable: vec![],
+            actions: vec![],
+            contexts: Vec::new(),
+            state,
+        })
+    }
+
     /// Clears all contexts from the session.
     pub fn clear_ctx(&mut self) {
         self.contexts.clear();
@@ -134,9 +149,7 @@ impl Session {
     pub fn clear(&mut self) {
         self.actions.clear();
     }
-}
 
-impl Session {
     /// Returns all steps across all actions in the session.
     pub fn steps(&self) -> Vec<&Step> {
         self.actions

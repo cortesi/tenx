@@ -39,7 +39,7 @@ pub fn test_project() -> TestProject {
 
     cnf.project.include.push("**".to_string());
 
-    let session = Session::default();
+    let session = Session::new(&cnf).unwrap();
 
     TestProject {
         config: cnf,

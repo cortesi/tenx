@@ -251,7 +251,8 @@ impl DialectProvider for Tags {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::strategy;
+
+    use crate::{strategy, testutils};
 
     use indoc::indoc;
     use pretty_assertions::assert_eq;
@@ -332,8 +333,9 @@ mod tests {
 
     #[test]
     fn test_render_edit() -> Result<()> {
+        let mut p = testutils::test_project();
+
         let d = Tags::default();
-        let mut session = Session::default();
 
         let response = ModelResponse {
             comment: Some("A comment".into()),
@@ -346,14 +348,15 @@ mod tests {
             response_text: Some("Test response".into()),
         };
 
-        session.add_action(strategy::Strategy::Code(strategy::Code::new("test".into())))?;
-        session.add_step("test_model".into(), "test".into())?;
-        if let Some(step) = session.last_step_mut() {
+        p.session
+            .add_action(strategy::Strategy::Code(strategy::Code::new("test".into())))?;
+        p.session.add_step("test_model".into(), "test".into())?;
+        if let Some(step) = p.session.last_step_mut() {
             step.model_response = Some(response);
         }
 
         let result = d
-            .render_step_response(&Config::default(), &session, 0)
+            .render_step_response(&Config::default(), &p.session, 0)
             .unwrap();
         assert_eq!(
             result,
