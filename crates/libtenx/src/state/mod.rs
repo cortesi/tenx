@@ -6,24 +6,41 @@ use std::{
     path::{absolute, Path, PathBuf},
 };
 
-use crate::error::{Result, TenxError};
+use crate::{
+    error::{Result, TenxError},
+    state::abspath::AbsPath,
+};
 
 pub const MEM_PREFIX: &str = "::";
 
-use crate::state::abspath::AbsPath;
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct Snapshot {
+    content: HashMap<PathBuf, String>,
+    created: Vec<PathBuf>,
+}
+
+impl Snapshot {
+    pub fn insert(&mut self, path: PathBuf, content: String) {
+        self.content.insert(path.clone(), content);
+        self.created.push(path);
+    }
+
+    pub fn create(&mut self, path: PathBuf) {
+        self.content.insert(path.clone(), String::new());
+        self.created.push(path);
+    }
+}
 
 /// A file system.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Directory {
     root: AbsPath,
     globs: Vec<String>,
 }
 
 impl Directory {
-    pub fn new(root: PathBuf, globs: Vec<String>) -> Result<Self> {
-        Ok(Self {
-            root: AbsPath::new(root)?,
-            globs,
-        })
+    pub fn new(root: AbsPath, globs: Vec<String>) -> Result<Self> {
+        Ok(Self { root, globs })
     }
 
     /// List files in the directory using ignore rules, returning all included files relative to
@@ -34,7 +51,7 @@ impl Directory {
     ///
     /// Files are sorted by path.
     pub fn list_files(&self) -> Result<Vec<PathBuf>> {
-        files::walk_files(self.root.clone(), self.globs.clone())
+        files::list_files(self.root.clone(), self.globs.clone())
     }
 
     /// Converts a path relative to the root directory to an absolute path
@@ -76,7 +93,7 @@ impl Directory {
 
 /// The state underlying a session. Presents a unified interface over an optional filesystem
 /// directory and a memory store. In-memory file names are prefixed with "::"
-#[derive(Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct State {
     directory: Option<Directory>,
     memory: HashMap<String, String>,
@@ -84,7 +101,7 @@ pub struct State {
 
 impl State {
     /// Set the directory path and glob patterns for file operations.
-    pub fn set_directory(&mut self, root: PathBuf, globs: Vec<String>) -> Result<()> {
+    pub fn set_directory(&mut self, root: AbsPath, globs: Vec<String>) -> Result<()> {
         self.directory = Some(Directory::new(root, globs)?);
         Ok(())
     }
@@ -140,6 +157,20 @@ impl State {
             }),
         }
     }
+
+    /// Creates a snapshot of the given list of paths. For each path, if the file exists, its content is captured;
+    /// otherwise, the path is marked as created.
+    pub fn snapshot(&self, paths: &[PathBuf]) -> crate::Result<Snapshot> {
+        let mut snap = Snapshot::default();
+        for p in paths {
+            match self.read(p) {
+                Ok(content) => snap.insert(p.clone(), content),
+                Err(TenxError::NotFound { .. }) => snap.create(p.clone()),
+                Err(e) => return Err(e),
+            }
+        }
+        Ok(snap)
+    }
 }
 
 #[cfg(test)]
@@ -160,7 +191,7 @@ mod tests {
 
         // Create a Filesystem with a glob pattern for .rs files.
         let mut state = State::default();
-        state.set_directory(root.clone(), vec!["*.rs".to_string()])?;
+        state.set_directory(AbsPath::new(root.clone())?, vec!["*.rs".to_string()])?;
 
         // Get the filesystem from the state and list the files.
         let file_system = state.directory.as_ref().expect("Filesystem should be set");
@@ -179,7 +210,7 @@ mod tests {
 
         // Setup filesystem
         let root = temp_dir.path().to_path_buf();
-        state.set_directory(root.clone(), vec!["*.txt".to_string()])?;
+        state.set_directory(AbsPath::new(root.clone())?, vec!["*.txt".to_string()])?;
 
         // Test writing to filesystem
         state.write(Path::new("test.txt"), "file content")?;
@@ -256,7 +287,7 @@ mod tests {
                 let root = temp_dir.path().to_path_buf();
                 let test_file = root.join("test.txt");
                 fs::write(&test_file, content)?;
-                state.set_directory(root, vec!["*.txt".to_string()])?;
+                state.set_directory(AbsPath::new(root)?, vec!["*.txt".to_string()])?;
             }
 
             // Setup memory if content provided

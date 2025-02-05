@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use crate::{config::Project, state::files::walk_files};
+use crate::{config::Project, state::files::list_files};
 
 /// Walk project directory using ignore rules, returning all included files relative to project
 /// root.
@@ -12,5 +12,5 @@ use crate::state::abspath::AbsPath;
 
 pub fn walk_project(project: &Project) -> crate::Result<Vec<PathBuf>> {
     let root = AbsPath::new(project.root.clone())?;
-    walk_files(root, project.include.clone())
+    list_files(root, project.include.clone())
 }

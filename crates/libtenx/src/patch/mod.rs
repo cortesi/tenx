@@ -20,6 +20,22 @@ pub enum Change {
     Replace(replace::Replace),
 }
 
+impl Change {
+    pub fn path(&self) -> &PathBuf {
+        match self {
+            Change::Write(write_file) => &write_file.path,
+            Change::Replace(replace) => &replace.path,
+        }
+    }
+
+    pub fn apply(&self, input: &str) -> Result<String> {
+        match self {
+            Change::Write(write_file) => Ok(write_file.content.clone()),
+            Change::Replace(replace) => replace.apply(input),
+        }
+    }
+}
+
 /// A unified patch operation requested by the model. This contains all changes, as well as a cache
 /// of file state before the patch is applied, so we can roll back.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
@@ -28,16 +44,13 @@ pub struct Patch {
 }
 
 impl Patch {
-    /// Returns a vector of PathBufs for all files changed in the patch.
+    /// Returns a vector of unique PathBufs for all files changed in the patch.
     pub fn changed_files(&self) -> Vec<PathBuf> {
-        let mut paths = vec![];
+        let mut paths = HashMap::new();
         for change in &self.changes {
-            match change {
-                Change::Write(write_file) => paths.push(write_file.path.clone()),
-                Change::Replace(replace) => paths.push(replace.path.clone()),
-            }
+            paths.insert(change.path().clone(), ());
         }
-        paths
+        paths.into_keys().collect()
     }
 
     /// Takes a snapshot of the current state of all files that would be modified by this patch.

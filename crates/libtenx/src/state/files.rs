@@ -16,7 +16,7 @@ use crate::TenxError;
 /// Files are sorted by path.
 use crate::state::abspath::AbsPath;
 
-pub fn walk_files(root: AbsPath, globs: Vec<String>) -> crate::Result<Vec<PathBuf>> {
+pub fn list_files(root: AbsPath, globs: Vec<String>) -> crate::Result<Vec<PathBuf>> {
     // Build override rules from project config
     let mut builder = OverrideBuilder::new(&root);
 
@@ -90,7 +90,7 @@ pub fn find_files(
 
     let glob = Glob::new(pattern)
         .map_err(|e| TenxError::Internal(format!("Invalid glob pattern: {}", e)))?;
-    let included_files = walk_files(root.clone(), include)?;
+    let included_files = list_files(root.clone(), include)?;
 
     let mut matched_files = Vec::new();
 
@@ -154,7 +154,7 @@ mod tests {
     }
 
     #[test]
-    fn test_walk_project() -> crate::Result<()> {
+    fn test_list_files() -> crate::Result<()> {
         let temp_dir = TempDir::new()?;
         let root = AbsPath::new(temp_dir.path().to_path_buf())?;
 
@@ -171,7 +171,7 @@ mod tests {
         // Write gitignore content
         fs::write(root.join(".gitignore"), "/target\n*.tmp\n.git/\n")?;
 
-        let files = walk_files(root.clone(), vec!["*.rs".to_string(), "!*.tmp".to_string()])?;
+        let files = list_files(root.clone(), vec!["*.rs".to_string(), "!*.tmp".to_string()])?;
 
         let expected: Vec<PathBuf> = vec!["src/lib.rs", "src/main.rs", "tests/test1.rs"]
             .into_iter()
