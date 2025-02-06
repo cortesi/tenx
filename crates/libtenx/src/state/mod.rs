@@ -2,7 +2,7 @@ pub mod abspath;
 pub mod files;
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     fs,
     path::{absolute, Path, PathBuf},
 };
@@ -323,25 +323,46 @@ impl State {
         Ok(())
     }
 
-    /// Takes all items included in a given snapshot ID, removes any that are included in a
-    /// subsequent snapshot, and returns the resulting list.
-    pub fn changed_at(&self, id: u64) -> Result<Vec<PathBuf>> {
-        let target_snapshot = &self
-            .snapshots
-            .iter()
-            .find(|(snap_id, _)| *snap_id == id)
-            .ok_or_else(|| TenxError::Internal(format!("Snapshot id {} not found", id)))?
-            .1;
-
-        let mut target_files: HashSet<PathBuf> = target_snapshot.touched().into_iter().collect();
-        for (snap_id, snap) in self.snapshots.iter() {
-            if *snap_id > id {
-                for path in snap.touched() {
-                    target_files.remove(&path);
-                }
+    /// Returns the list of files for which the most recent touch occurred within the snapshot
+    /// range [start, end] (inclusive). If `start` is None, the range starts from the earliest
+    /// snapshot, and if `end` is None, the range extends to the latest snapshot. Files that were
+    /// touched after the `end` snapshot are excluded.
+    pub fn last_changed_between(
+        &self,
+        start: Option<u64>,
+        end: Option<u64>,
+    ) -> Result<Vec<PathBuf>> {
+        if self.snapshots.is_empty() {
+            return Err(TenxError::Internal("No snapshots available".to_string()));
+        }
+        let min_id = start.unwrap_or(self.snapshots.first().unwrap().0);
+        let max_id = match end {
+            Some(e) => e,
+            None => self.snapshots.last().unwrap().0,
+        };
+        let mut latest: std::collections::HashMap<PathBuf, u64> = std::collections::HashMap::new();
+        for (snap_id, snap) in &self.snapshots {
+            for path in snap.touched() {
+                latest
+                    .entry(path)
+                    .and_modify(|e| {
+                        if *snap_id > *e {
+                            *e = *snap_id;
+                        }
+                    })
+                    .or_insert(*snap_id);
             }
         }
-        let mut result: Vec<PathBuf> = target_files.into_iter().collect();
+        let mut result: Vec<PathBuf> = latest
+            .into_iter()
+            .filter_map(|(path, id)| {
+                if id >= min_id && id <= max_id {
+                    Some(path)
+                } else {
+                    None
+                }
+            })
+            .collect();
         result.sort();
         Ok(result)
     }
@@ -543,7 +564,7 @@ mod tests {
 
         // When calling changed_at on snapshot 0, key_b should be removed because it was touched in snapshot 1.
         // Only key_a should remain.
-        let changed = state.changed_at(0)?;
+        let changed = state.last_changed_between(Some(0), Some(0))?;
         assert_eq!(changed, vec![PathBuf::from(key_a)]);
         Ok(())
     }

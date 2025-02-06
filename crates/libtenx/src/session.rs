@@ -92,7 +92,6 @@ pub struct Action {
     pub strategy: strategy::Strategy,
     /// The steps in the action
     pub steps: Vec<Step>,
-
     state: state::State,
 }
 
