@@ -67,7 +67,7 @@ pub fn list_files(root: AbsPath, globs: Vec<String>) -> crate::Result<Vec<PathBu
     }
     builder
         .add("!/.git")
-        .map_err(|e| TenxError::Internal(format!("Invalid glob pattern: {}", e)))?; // Don't include the .git directory
+        .map_err(|e| TenxError::Path(format!("Invalid glob pattern: {}", e)))?; // Don't include the .git directory
 
     let overrides = builder
         .build()

@@ -1,10 +1,11 @@
 pub mod abspath;
+pub mod directory;
 pub mod files;
+pub mod memory;
 
 use std::{
     collections::HashMap,
-    fs,
-    path::{absolute, Path, PathBuf},
+    path::{Path, PathBuf},
 };
 
 use serde::{Deserialize, Serialize};
@@ -16,6 +17,13 @@ use crate::{
 };
 
 pub const MEM_PREFIX: &str = "::";
+
+pub trait SubStore {
+    fn list(&self) -> Result<Vec<PathBuf>>;
+    fn read(&self, path: &Path) -> Result<String>;
+    fn write(&self, path: &Path, content: &str) -> Result<()>;
+    fn remove(&self, path: &Path) -> Result<()>;
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 struct Snapshot {
@@ -47,87 +55,12 @@ impl Snapshot {
     }
 }
 
-/// A file system directory
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Directory {
-    root: AbsPath,
-    globs: Vec<String>,
-}
-
-impl Directory {
-    pub fn new(root: AbsPath, globs: Vec<String>) -> Result<Self> {
-        Ok(Self { root, globs })
-    }
-
-    /// List files in the directory using ignore rules, returning all included files relative to
-    /// project root.
-    ///
-    /// Applies the `FileSystem` glob patterns and respects .gitignore and other ignore files. Glob
-    /// patterns can be positive (include) or negative (exclude, prefixed with !).
-    ///
-    /// Files are sorted by path.
-    pub fn list_files(&self) -> Result<Vec<PathBuf>> {
-        files::list_files(self.root.clone(), self.globs.clone())
-    }
-
-    /// Converts a path relative to the root directory to an absolute path
-    pub fn abspath(&self, path: &Path) -> Result<PathBuf> {
-        let p = PathBuf::from(&*self.root).join(path);
-        absolute(p.clone())
-            .map_err(|e| TenxError::Internal(format!("could not absolute {}: {}", p.display(), e)))
-    }
-
-    /// Gets the content of a file by converting the input path to an absolute path and reading it.
-    pub fn read(&self, path: &Path) -> Result<String> {
-        let abs_path = self.abspath(path)?;
-        fs::read_to_string(&abs_path).map_err(|e| {
-            TenxError::Internal(format!("Could not read file {}: {}", abs_path.display(), e))
-        })
-    }
-
-    /// Writes content to a file, creating it if it doesn't exist or overwriting if it does.
-    pub fn write(&self, path: &Path, content: &str) -> Result<()> {
-        let abs_path = self.abspath(path)?;
-        if let Some(parent) = abs_path.parent() {
-            fs::create_dir_all(parent).map_err(|e| {
-                TenxError::Internal(format!(
-                    "Could not create directory {}: {}",
-                    parent.display(),
-                    e
-                ))
-            })?;
-        }
-        fs::write(&abs_path, content).map_err(|e| {
-            TenxError::Internal(format!(
-                "Could not write file {}: {}",
-                abs_path.display(),
-                e
-            ))
-        })
-    }
-
-    /// Removes a file by joining the given path with the root directory.
-    pub fn remove(&self, path: &Path) -> Result<()> {
-        let abs_path = self.root.join(path);
-        if abs_path.exists() {
-            fs::remove_file(&abs_path).map_err(|e| {
-                TenxError::Internal(format!(
-                    "Could not remove file {}: {}",
-                    abs_path.display(),
-                    e
-                ))
-            })?;
-        }
-        Ok(())
-    }
-}
-
 /// The state underlying a session. This is the set of resources that our models are editing. State
 /// presents a unified interface over an optional filesystem directory and a memory store.
 /// In-memory file names are prefixed with "::"
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct State {
-    directory: Option<Directory>,
+    directory: Option<directory::Directory>,
     memory: HashMap<String, String>,
     snapshots: Vec<(u64, Snapshot)>,
     next_snapshot_id: u64,
@@ -143,17 +76,8 @@ impl State {
         let abs = root
             .try_into()
             .map_err(|e| TenxError::Internal(format!("failed to convert directory: {}", e)))?;
-        self.directory = Some(Directory::new(abs, globs)?);
+        self.directory = Some(directory::Directory::new(abs, globs)?);
         Ok(())
-    }
-
-    /// List files in the directory, applying the inclusion globs.
-    pub fn list_directory(&self) -> Result<Vec<PathBuf>> {
-        Ok(if let Some(fs) = self.directory.as_ref() {
-            fs.list_files()?
-        } else {
-            vec![]
-        })
     }
 
     /// Create a new memory entry with the given key and value.
@@ -340,7 +264,7 @@ impl State {
             Some(e) => e,
             None => self.snapshots.last().unwrap().0,
         };
-        let mut latest: std::collections::HashMap<PathBuf, u64> = std::collections::HashMap::new();
+        let mut latest: HashMap<PathBuf, u64> = HashMap::new();
         for (snap_id, snap) in &self.snapshots {
             for path in snap.touched() {
                 latest
@@ -389,7 +313,7 @@ mod tests {
 
         // Get the filesystem from the state and list the files.
         let file_system = state.directory.as_ref().expect("Filesystem should be set");
-        let files = file_system.list_files().unwrap();
+        let files = file_system.list().unwrap();
 
         // Check that the test file is found (relative path).
         assert!(files.contains(&PathBuf::from("test.rs")));
