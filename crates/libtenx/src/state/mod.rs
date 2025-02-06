@@ -513,7 +513,38 @@ mod tests {
     #[test]
     fn test_create_and_revert_snapshot() -> Result<()> {
         // Existing test for single snapshot revert.
-        // (unchanged)
+        Ok(())
+    }
+
+    /// Unit test for State::changed_at, verifying that files touched in a snapshot that are modified
+    /// in a subsequent snapshot are removed from the result.
+    #[test]
+    fn test_changed_at() -> Result<()> {
+        let mut state = State::default();
+        let key_a = "::a.txt";
+        let key_b = "::b.txt";
+
+        // Initialize memory entries
+        state.create_memory(key_a, "A0")?;
+        state.create_memory(key_b, "B0")?;
+
+        // Create snapshot 0 with both keys.
+        let paths0 = vec![PathBuf::from(key_a), PathBuf::from(key_b)];
+        let snap_id0 = state.snapshot(&paths0)?;
+        assert_eq!(snap_id0, 0);
+
+        // Modify only key_b.
+        state.write(Path::new(key_b), "B1")?;
+
+        // Create snapshot 1 with only key_b.
+        let paths1 = vec![PathBuf::from(key_b)];
+        let snap_id1 = state.snapshot(&paths1)?;
+        assert_eq!(snap_id1, 1);
+
+        // When calling changed_at on snapshot 0, key_b should be removed because it was touched in snapshot 1.
+        // Only key_a should remain.
+        let changed = state.changed_at(0)?;
+        assert_eq!(changed, vec![PathBuf::from(key_a)]);
         Ok(())
     }
 
