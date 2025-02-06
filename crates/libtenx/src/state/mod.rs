@@ -68,7 +68,7 @@ pub struct State {
 
 impl State {
     /// Set the directory path and glob patterns for file operations.
-    pub fn set_directory<P>(&mut self, root: P, globs: Vec<String>) -> Result<()>
+    pub fn with_directory<P>(mut self, root: P, globs: Vec<String>) -> Result<Self>
     where
         P: TryInto<AbsPath>,
         P::Error: std::fmt::Display,
@@ -77,7 +77,7 @@ impl State {
             .try_into()
             .map_err(|e| TenxError::Internal(format!("failed to convert directory: {}", e)))?;
         self.directory = Some(directory::Directory::new(abs, globs)?);
-        Ok(())
+        Ok(self)
     }
 
     /// Create a new memory entry with the given key and value.
@@ -308,8 +308,8 @@ mod tests {
         fs::write(&test_file, "fn main() {}")?;
 
         // Create a Filesystem with a glob pattern for .rs files.
-        let mut state = State::default();
-        state.set_directory(AbsPath::new(root.clone())?, vec!["*.rs".to_string()])?;
+        let state = State::default()
+            .with_directory(AbsPath::new(root.clone())?, vec!["*.rs".to_string()])?;
 
         // Get the filesystem from the state and list the files.
         let file_system = state.directory.as_ref().expect("Filesystem should be set");
@@ -324,11 +324,10 @@ mod tests {
     #[test]
     fn test_state_write() -> Result<()> {
         let temp_dir = TempDir::new().expect("failed to create temporary directory");
-        let mut state = State::default();
-
         // Setup filesystem
         let root = temp_dir.path().to_path_buf();
-        state.set_directory(AbsPath::new(root.clone())?, vec!["*.txt".to_string()])?;
+        let mut state = State::default()
+            .with_directory(AbsPath::new(root.clone())?, vec!["*.txt".to_string()])?;
 
         // Test writing to filesystem
         state.write(Path::new("test.txt"), "file content")?;
@@ -405,7 +404,7 @@ mod tests {
                 let root = temp_dir.path().to_path_buf();
                 let test_file = root.join("test.txt");
                 fs::write(&test_file, content)?;
-                state.set_directory(AbsPath::new(root)?, vec!["*.txt".to_string()])?;
+                state = state.with_directory(AbsPath::new(root)?, vec!["*.txt".to_string()])?;
             }
 
             // Setup memory if content provided

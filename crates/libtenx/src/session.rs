@@ -99,7 +99,8 @@ impl Action {
     /// Creates a new Action with the given strategy.
     pub fn new(config: &config::Config, strategy: strategy::Strategy) -> Result<Self> {
         let mut state = state::State::default();
-        state.set_directory(config.project.root.clone(), config.project.include.clone())?;
+        state =
+            state.with_directory(config.project.root.clone(), config.project.include.clone())?;
         Ok(Action {
             strategy,
             steps: Vec::new(),
