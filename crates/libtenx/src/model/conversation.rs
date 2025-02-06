@@ -142,8 +142,10 @@ mod tests {
         let mut req = DummyRequest::default();
         let dialect = Dialect::Dummy(DummyDialect::default());
 
-        p.session
-            .add_action(strategy::Strategy::Code(strategy::Code::new("test".into())))?;
+        p.session.add_action(
+            &p.config,
+            strategy::Strategy::Code(strategy::Code::new("test".into())),
+        )?;
         p.session
             .add_step("test_model".into(), "test prompt".to_string())?;
 

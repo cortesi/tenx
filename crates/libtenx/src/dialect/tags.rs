@@ -349,8 +349,10 @@ mod tests {
             response_text: Some("Test response".into()),
         };
 
-        p.session
-            .add_action(strategy::Strategy::Code(strategy::Code::new("test".into())))?;
+        p.session.add_action(
+            &p.config,
+            strategy::Strategy::Code(strategy::Code::new("test".into())),
+        )?;
         p.session.add_step("test_model".into(), "test".into())?;
         if let Some(step) = p.session.last_step_mut() {
             step.model_response = Some(response);

@@ -374,7 +374,10 @@ mod tests {
     fn create_test_project() -> testutils::TestProject {
         let mut p = testutils::test_project();
         p.session
-            .add_action(strategy::Strategy::Code(strategy::Code::new("test".into())))
+            .add_action(
+                &p.config,
+                strategy::Strategy::Code(strategy::Code::new("test".into())),
+            )
             .unwrap();
         p.session
             .add_step("test_model".into(), "Test prompt".to_string())

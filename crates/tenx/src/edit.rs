@@ -170,7 +170,10 @@ mod tests {
     fn test_render_and_parse_roundtrip() {
         let mut p = testutils::test_project();
         p.session
-            .add_action(strategy::Strategy::Code(strategy::Code::new("test".into())))
+            .add_action(
+                &p.config,
+                strategy::Strategy::Code(strategy::Code::new("test".into())),
+            )
             .unwrap();
 
         // Add two steps with responses

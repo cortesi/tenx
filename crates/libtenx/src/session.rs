@@ -90,18 +90,22 @@ impl Step {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Action {
     pub strategy: strategy::Strategy,
-
     /// The steps in the action
     pub steps: Vec<Step>,
+
+    state: state::State,
 }
 
 impl Action {
     /// Creates a new Action with the given strategy.
-    pub fn new(strategy: strategy::Strategy) -> Self {
-        Action {
+    pub fn new(config: &config::Config, strategy: strategy::Strategy) -> Result<Self> {
+        let mut state = state::State::default();
+        state.set_directory(config.project.root.clone(), config.project.include.clone())?;
+        Ok(Action {
             strategy,
             steps: Vec::new(),
-        }
+            state,
+        })
     }
 
     /// Returns a reference to the last step in the action
@@ -121,7 +125,6 @@ pub struct Session {
     editable: Vec<PathBuf>,
     actions: Vec<Action>,
     pub contexts: Vec<context::Context>,
-    state: state::State,
 }
 
 impl Session {
@@ -129,14 +132,11 @@ impl Session {
     ///
     /// If `dir` is provided, it is used as the project root; otherwise the configuration's
     /// project root is used.
-    pub fn new(config: &config::Config) -> Result<Self> {
-        let mut state = state::State::default();
-        state.set_directory(config.project.root.clone(), config.project.include.clone())?;
+    pub fn new(_config: &config::Config) -> Result<Self> {
         Ok(Session {
             editable: vec![],
             actions: vec![],
             contexts: Vec::new(),
-            state,
         })
     }
 
@@ -230,8 +230,12 @@ impl Session {
     }
 
     /// Adds a new action to the session.
-    pub fn add_action(&mut self, strategy: strategy::Strategy) -> Result<()> {
-        self.actions.push(Action::new(strategy));
+    pub fn add_action(
+        &mut self,
+        config: &config::Config,
+        strategy: strategy::Strategy,
+    ) -> Result<()> {
+        self.actions.push(Action::new(config, strategy)?);
         Ok(())
     }
 
@@ -500,9 +504,10 @@ mod tests {
         test_project.create_file_tree(&["test.txt"]);
         test_project.write("test.txt", "Initial content");
 
-        test_project
-            .session
-            .add_action(strategy::Strategy::Code(strategy::Code::new("test".into())))?;
+        test_project.session.add_action(
+            &test_project.config,
+            strategy::Strategy::Code(strategy::Code::new("test".into())),
+        )?;
 
         // Add three steps
         for i in 1..=3 {
@@ -572,9 +577,10 @@ mod tests {
             .session
             .add_editable_path(&test_project.config, "file3.txt")?;
 
-        test_project
-            .session
-            .add_action(strategy::Strategy::Code(strategy::Code::new("test".into())))?;
+        test_project.session.add_action(
+            &test_project.config,
+            strategy::Strategy::Code(strategy::Code::new("test".into())),
+        )?;
         // Test 1: Before any steps are added, all files should be marked as modified
         let editables = test_project.session.editables_for_step(0)?;
         assert_eq!(editables.len(), 3,);
@@ -668,7 +674,10 @@ mod tests {
 
         test_project
             .session
-            .add_action(strategy::Strategy::Code(strategy::Code::new("test".into())))
+            .add_action(
+                &test_project.config,
+                strategy::Strategy::Code(strategy::Code::new("test".into())),
+            )
             .unwrap();
 
         // Add a step with both a patch and an edit operation

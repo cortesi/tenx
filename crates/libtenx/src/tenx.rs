@@ -119,10 +119,10 @@ impl Tenx {
         let _block = EventBlock::start(&sender)?;
         let pre_result = self.run_pre_checks(session, &sender);
         if let Err(e) = pre_result {
-            session.add_action(strategy::Strategy::Fix(strategy::Fix::new(
-                e.clone(),
-                prompt.clone(),
-            )))?;
+            session.add_action(
+                &self.config,
+                strategy::Strategy::Fix(strategy::Fix::new(e.clone(), prompt.clone())),
+            )?;
             self.save_session(session)?;
             self.process_prompt(session, sender.clone()).await
         } else {
@@ -174,7 +174,10 @@ impl Tenx {
         sender: Option<EventSender>,
     ) -> Result<()> {
         let _block = EventBlock::start(&sender)?;
-        session.add_action(strategy::Strategy::Code(strategy::Code::new(prompt)))?;
+        session.add_action(
+            &self.config,
+            strategy::Strategy::Code(strategy::Code::new(prompt)),
+        )?;
         self.process_prompt(session, sender.clone()).await
     }
 
@@ -385,7 +388,10 @@ mod tests {
         let mut session = Session::new(&config).unwrap();
 
         session
-            .add_action(strategy::Strategy::Code(strategy::Code::new("test".into())))
+            .add_action(
+                &config,
+                strategy::Strategy::Code(strategy::Code::new("test".into())),
+            )
             .unwrap();
         session
             .add_editable_path(&config, test_file_path.clone())
