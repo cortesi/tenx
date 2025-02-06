@@ -192,18 +192,6 @@ impl Session {
         paths
     }
 
-    /// Returns the absolute paths of the editables for this session in sorted order.
-    pub fn abs_editables(&self, config: &config::Config) -> Result<Vec<PathBuf>> {
-        let mut paths: Vec<PathBuf> = self
-            .editable
-            .clone()
-            .iter()
-            .map(|p| config.abspath(p))
-            .collect::<Result<Vec<PathBuf>>>()?;
-        paths.sort();
-        Ok(paths)
-    }
-
     /// Does this session have a pending prompt?
     pub fn should_continue(&self) -> bool {
         if let Some(step) = self.steps().last() {

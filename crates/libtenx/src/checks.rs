@@ -130,10 +130,11 @@ pub fn check_session(
     mode_filter: CheckMode,
     sender: &Option<EventSender>,
 ) -> Result<()> {
-    let paths = if session.editables().is_empty() {
+    let editables = session.editables().to_vec();
+    let paths = if editables.is_empty() {
         conf.project_files()?
     } else {
-        session.editables().to_vec()
+        editables
     };
 
     check_paths(

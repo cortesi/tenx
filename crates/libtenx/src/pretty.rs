@@ -60,17 +60,13 @@ fn print_context_specs(session: &Session) -> String {
     output
 }
 
-fn print_editables(config: &Config, session: &Session) -> Result<String> {
+fn print_editables(_config: &Config, session: &Session) -> Result<String> {
     let mut output = String::new();
-    let editables = session.abs_editables(config)?;
+    let editables = session.editables();
     if !editables.is_empty() {
         output.push_str(&format!("{}\n", "edit:".blue().bold()));
         for path in editables {
-            output.push_str(&format!(
-                "{}- {}\n",
-                INDENT,
-                config.relpath(&path).display()
-            ));
+            output.push_str(&format!("{}- {}\n", INDENT, path.display()));
         }
     }
     Ok(output)
@@ -192,6 +188,7 @@ fn print_patch(config: &Config, patch: &patch::Patch, full: bool, width: usize) 
         let path = match change {
             patch::Change::Write(w) => &w.path,
             patch::Change::Replace(r) => &r.path,
+            patch::Change::View(p) => p,
         };
         changes_by_file.entry(path).or_default().push(change);
     }
@@ -207,6 +204,7 @@ fn print_patch(config: &Config, patch: &patch::Patch, full: bool, width: usize) 
             match change {
                 patch::Change::Write(_) => write_count += 1,
                 patch::Change::Replace(_) => replace_count += 1,
+                patch::Change::View(_) => (),
             }
         }
 
@@ -242,6 +240,7 @@ fn print_patch(config: &Config, patch: &patch::Patch, full: bool, width: usize) 
                         output.push_str(&wrapped_block(&r.new, width, INDENT.len() * 6));
                         output.push('\n');
                     }
+                    patch::Change::View(_) => (),
                 }
             }
         }

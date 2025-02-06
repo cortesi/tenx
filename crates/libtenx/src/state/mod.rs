@@ -2,7 +2,7 @@ pub mod abspath;
 pub mod files;
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fs,
     path::{absolute, Path, PathBuf},
 };
@@ -31,6 +31,19 @@ impl Snapshot {
     pub fn create(&mut self, path: PathBuf) {
         self.content.insert(path.clone(), String::new());
         self.created.push(path);
+    }
+
+    /// Returns a unique list of all files touched in the snapshot.
+    pub fn touched(&self) -> Vec<PathBuf> {
+        use std::collections::BTreeSet;
+        let mut touched = BTreeSet::new();
+        for path in self.content.keys() {
+            touched.insert(path.clone());
+        }
+        for path in &self.created {
+            touched.insert(path.clone());
+        }
+        touched.into_iter().collect()
     }
 }
 
@@ -281,6 +294,7 @@ impl State {
                         failures.push((change.clone(), e));
                     }
                 }
+                Change::View(_) => (),
             }
         }
         Ok((snap_id, failures))
@@ -307,6 +321,29 @@ impl State {
         }
         self.snapshots = remaining;
         Ok(())
+    }
+
+    /// Takes all items included in a given snapshot ID, removes any that are included in a
+    /// subsequent snapshot, and returns the resulting list.
+    pub fn changed_at(&self, id: u64) -> Result<Vec<PathBuf>> {
+        let target_snapshot = &self
+            .snapshots
+            .iter()
+            .find(|(snap_id, _)| *snap_id == id)
+            .ok_or_else(|| TenxError::Internal(format!("Snapshot id {} not found", id)))?
+            .1;
+
+        let mut target_files: HashSet<PathBuf> = target_snapshot.touched().into_iter().collect();
+        for (snap_id, snap) in self.snapshots.iter() {
+            if *snap_id > id {
+                for path in snap.touched() {
+                    target_files.remove(&path);
+                }
+            }
+        }
+        let mut result: Vec<PathBuf> = target_files.into_iter().collect();
+        result.sort();
+        Ok(result)
     }
 }
 

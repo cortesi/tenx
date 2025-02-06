@@ -18,6 +18,7 @@ use crate::{config::Config, error::Result};
 pub enum Change {
     Write(write::WriteFile),
     Replace(replace::Replace),
+    View(PathBuf),
 }
 
 impl Change {
@@ -25,6 +26,7 @@ impl Change {
         match self {
             Change::Write(write_file) => &write_file.path,
             Change::Replace(replace) => &replace.path,
+            Change::View(path) => path,
         }
     }
 
@@ -32,6 +34,7 @@ impl Change {
         match self {
             Change::Write(write_file) => Ok(write_file.content.clone()),
             Change::Replace(replace) => replace.apply(input),
+            Change::View(_) => Ok(input.to_string()),
         }
     }
 }
@@ -74,6 +77,7 @@ impl Patch {
             match change {
                 Change::Replace(replace) => replace.apply_to_cache(&mut modified_cache)?,
                 Change::Write(write_file) => write_file.apply_to_cache(&mut modified_cache)?,
+                Change::View(_) => (),
             }
         }
 

@@ -238,6 +238,7 @@ impl DialectProvider for Tags {
                             replace.new
                         ));
                         }
+                        Change::View(_) => (),
                     }
                 }
             }
