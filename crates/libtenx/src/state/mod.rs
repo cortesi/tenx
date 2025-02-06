@@ -537,35 +537,224 @@ mod tests {
         Ok(())
     }
 
-    /// Unit test for State::changed_at, verifying that files touched in a snapshot that are modified
-    /// in a subsequent snapshot are removed from the result.
     #[test]
-    fn test_changed_at() -> Result<()> {
-        let mut state = State::default();
-        let key_a = "::a.txt";
-        let key_b = "::b.txt";
+    fn test_last_changed_between() -> Result<()> {
+        use crate::patch::{Change, Patch, WriteFile};
 
-        // Initialize memory entries
-        state.create_memory(key_a, "A0")?;
-        state.create_memory(key_b, "B0")?;
+        struct TestCase {
+            name: &'static str,
+            patches: Vec<Patch>,
+            start: Option<u64>,
+            end: Option<u64>,
+            expected: Result<Vec<&'static str>>,
+        }
 
-        // Create snapshot 0 with both keys.
-        let paths0 = vec![PathBuf::from(key_a), PathBuf::from(key_b)];
-        let snap_id0 = state.snapshot(&paths0)?;
-        assert_eq!(snap_id0, 0);
+        let cases = vec![
+            TestCase {
+                name: "empty snapshots list",
+                patches: vec![],
+                start: None,
+                end: None,
+                expected: Err(TenxError::Internal("No snapshots available".to_string())),
+            },
+            TestCase {
+                name: "single snapshot",
+                patches: vec![Patch {
+                    changes: vec![
+                        Change::Write(WriteFile {
+                            path: PathBuf::from("::a.txt"),
+                            content: "A0".to_string(),
+                        }),
+                        Change::Write(WriteFile {
+                            path: PathBuf::from("::b.txt"),
+                            content: "B0".to_string(),
+                        }),
+                    ],
+                }],
+                start: Some(0),
+                end: Some(0),
+                expected: Ok(vec!["::a.txt", "::b.txt"]),
+            },
+            TestCase {
+                name: "overlapping changes in range",
+                patches: vec![
+                    Patch {
+                        changes: vec![
+                            Change::Write(WriteFile {
+                                path: PathBuf::from("::a.txt"),
+                                content: "A0".to_string(),
+                            }),
+                            Change::Write(WriteFile {
+                                path: PathBuf::from("::b.txt"),
+                                content: "B0".to_string(),
+                            }),
+                        ],
+                    },
+                    Patch {
+                        changes: vec![Change::Write(WriteFile {
+                            path: PathBuf::from("::b.txt"),
+                            content: "B1".to_string(),
+                        })],
+                    },
+                ],
+                start: Some(0),
+                end: Some(0),
+                expected: Ok(vec!["::a.txt"]), // b.txt was modified in snapshot 1
+            },
+            TestCase {
+                name: "full range with implicit boundaries",
+                patches: vec![
+                    Patch {
+                        changes: vec![Change::Write(WriteFile {
+                            path: PathBuf::from("::a.txt"),
+                            content: "A0".to_string(),
+                        })],
+                    },
+                    Patch {
+                        changes: vec![Change::Write(WriteFile {
+                            path: PathBuf::from("::b.txt"),
+                            content: "B0".to_string(),
+                        })],
+                    },
+                    Patch {
+                        changes: vec![Change::Write(WriteFile {
+                            path: PathBuf::from("::c.txt"),
+                            content: "C0".to_string(),
+                        })],
+                    },
+                ],
+                start: None,
+                end: None,
+                expected: Ok(vec!["::a.txt", "::b.txt", "::c.txt"]),
+            },
+            TestCase {
+                name: "middle range",
+                patches: vec![
+                    Patch {
+                        changes: vec![Change::Write(WriteFile {
+                            path: PathBuf::from("::a.txt"),
+                            content: "A0".to_string(),
+                        })],
+                    },
+                    Patch {
+                        changes: vec![Change::Write(WriteFile {
+                            path: PathBuf::from("::b.txt"),
+                            content: "B0".to_string(),
+                        })],
+                    },
+                    Patch {
+                        changes: vec![Change::Write(WriteFile {
+                            path: PathBuf::from("::c.txt"),
+                            content: "C0".to_string(),
+                        })],
+                    },
+                ],
+                start: Some(1),
+                end: Some(1),
+                expected: Ok(vec!["::b.txt"]),
+            },
+            TestCase {
+                name: "changes outside range excluded",
+                patches: vec![
+                    Patch {
+                        changes: vec![Change::Write(WriteFile {
+                            path: PathBuf::from("::a.txt"),
+                            content: "A0".to_string(),
+                        })],
+                    },
+                    Patch {
+                        changes: vec![Change::Write(WriteFile {
+                            path: PathBuf::from("::b.txt"),
+                            content: "B0".to_string(),
+                        })],
+                    },
+                    Patch {
+                        changes: vec![Change::Write(WriteFile {
+                            path: PathBuf::from("::a.txt"),
+                            content: "A1".to_string(),
+                        })],
+                    },
+                ],
+                start: Some(1),
+                end: Some(1),
+                expected: Ok(vec!["::b.txt"]), // a.txt changed in snapshot 2
+            },
+            TestCase {
+                name: "multiple files in multiple snapshots",
+                patches: vec![
+                    Patch {
+                        changes: vec![
+                            Change::Write(WriteFile {
+                                path: PathBuf::from("::a.txt"),
+                                content: "A0".to_string(),
+                            }),
+                            Change::Write(WriteFile {
+                                path: PathBuf::from("::b.txt"),
+                                content: "B0".to_string(),
+                            }),
+                        ],
+                    },
+                    Patch {
+                        changes: vec![
+                            Change::Write(WriteFile {
+                                path: PathBuf::from("::c.txt"),
+                                content: "C0".to_string(),
+                            }),
+                            Change::Write(WriteFile {
+                                path: PathBuf::from("::d.txt"),
+                                content: "D0".to_string(),
+                            }),
+                        ],
+                    },
+                    Patch {
+                        changes: vec![
+                            Change::Write(WriteFile {
+                                path: PathBuf::from("::b.txt"),
+                                content: "B1".to_string(),
+                            }),
+                            Change::Write(WriteFile {
+                                path: PathBuf::from("::d.txt"),
+                                content: "D1".to_string(),
+                            }),
+                        ],
+                    },
+                ],
+                start: Some(0),
+                end: Some(1),
+                expected: Ok(vec!["::a.txt", "::c.txt"]), // b.txt and d.txt modified in snapshot 2
+            },
+        ];
 
-        // Modify only key_b.
-        state.write(Path::new(key_b), "B1")?;
+        for case in cases {
+            let mut state = State::default();
 
-        // Create snapshot 1 with only key_b.
-        let paths1 = vec![PathBuf::from(key_b)];
-        let snap_id1 = state.snapshot(&paths1)?;
-        assert_eq!(snap_id1, 1);
+            // Apply each patch to build up the snapshot history
+            for patch in case.patches {
+                let (_, failures) = state.patch(&patch)?;
+                assert!(
+                    failures.is_empty(),
+                    "{}: patch application failed",
+                    case.name
+                );
+            }
 
-        // When calling changed_at on snapshot 0, key_b should be removed because it was touched in snapshot 1.
-        // Only key_a should remain.
-        let changed = state.last_changed_between(Some(0), Some(0))?;
-        assert_eq!(changed, vec![PathBuf::from(key_a)]);
+            // Test last_changed_between
+            let result = state.last_changed_between(case.start, case.end);
+
+            match (result, case.expected) {
+                (Ok(got), Ok(expected)) => {
+                    let got: Vec<&str> = got.iter().map(|p| p.to_str().unwrap()).collect();
+                    assert_eq!(got, expected, "{}: got wrong paths", case.name);
+                }
+                (Err(TenxError::Internal(got)), Err(TenxError::Internal(expected))) => {
+                    assert_eq!(got, expected, "{}: got wrong error message", case.name);
+                }
+                (got, expected) => {
+                    panic!("{}: got {:?}, expected {:?}", case.name, got, expected);
+                }
+            }
+        }
+
         Ok(())
     }
 
