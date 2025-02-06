@@ -80,24 +80,6 @@ impl State {
         Ok(self)
     }
 
-    /// Create a new memory entry with the given key and value.
-    /// Fails if the key does not start with MEM_PREFIX.
-    pub fn create_memory<K, V>(&mut self, key: K, value: V) -> Result<u64>
-    where
-        K: AsRef<str>,
-        V: AsRef<str>,
-    {
-        let key_str = key.as_ref();
-        if !key_str.starts_with(MEM_PREFIX) {
-            return Err(TenxError::Internal(
-                "Memory key must start with MEM_PREFIX".to_string(),
-            ));
-        }
-        self.memory
-            .insert(key_str.to_string(), value.as_ref().to_string());
-        Ok(self.next_snapshot_id)
-    }
-
     /// Retrieves the content associated with the given path.
     /// If the path exists in memory, returns that value. Otherwise, reads from the file system.
     pub fn read(&self, path: &Path) -> Result<String> {
@@ -409,7 +391,7 @@ mod tests {
 
             // Setup memory if content provided
             if let Some(content) = case.memory_content {
-                let _ = state.create_memory(format!("{}{}", MEM_PREFIX, case.path), content);
+                let _ = state.write(Path::new(&format!("{}{}", MEM_PREFIX, case.path)), content);
             }
 
             // Test the get operation
@@ -690,8 +672,8 @@ mod tests {
         // Insert initial memory entries.
         let key_a = "::a.txt";
         let key_x = "::x.txt";
-        let _ = state.create_memory(key_a, "A0");
-        let _ = state.create_memory(key_x, "X0");
+        state.write(Path::new(key_a), "A0")?;
+        state.write(Path::new(key_x), "X0")?;
 
         // Create first snapshot (id 0) capturing the initial state.
         let paths = vec![PathBuf::from(key_a), PathBuf::from(key_x)];
