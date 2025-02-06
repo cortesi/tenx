@@ -1,10 +1,49 @@
+//! File and path manipulation for filesystem state.
 use std::path::{Path, PathBuf};
 
 use globset::Glob;
 use ignore::{overrides::OverrideBuilder, WalkBuilder};
+use path_clean;
 use pathdiff::diff_paths;
 
 use crate::TenxError;
+
+use crate::state::abspath::AbsPath;
+
+const GLOB_START: &str = "*";
+
+/// Normalize a given path to be a relative path under the root. Returns an error if the
+/// resulting path is not under the root.
+///
+/// - If the path starts with relative path components, the path is joined to the CWD.
+/// - If the path starts with a glob component (i.e. `*`), it is preserved as-is.
+/// - All paths are cleaned to remove redundant ".." and "." components.
+pub fn normalize_path(root: AbsPath, cwd: AbsPath, path: &str) -> crate::Result<PathBuf> {
+    if path.starts_with(GLOB_START) {
+        return Ok(PathBuf::from(path));
+    }
+    let path = path_clean::clean(path);
+
+    let abs_path = if path.is_relative() {
+        cwd.join(&path)
+    } else {
+        path.clone()
+    };
+
+    let rel_path = diff_paths(&abs_path, &root).ok_or_else(|| {
+        TenxError::Internal(format!(
+            "Path not under current directory: {}",
+            path.display()
+        ))
+    })?;
+    if rel_path.starts_with("..") {
+        return Err(TenxError::Internal(format!(
+            "Path not under current directory: {}",
+            path.display()
+        )));
+    }
+    Ok(rel_path)
+}
 
 /// Walk project directory using ignore rules, returning all included files relative to project
 /// root.
@@ -14,8 +53,6 @@ use crate::TenxError;
 /// (exclude, prefixed with !).
 ///
 /// Files are sorted by path.
-use crate::state::abspath::AbsPath;
-
 pub fn list_files(root: AbsPath, globs: Vec<String>) -> crate::Result<Vec<PathBuf>> {
     // Build override rules from project config
     let mut builder = OverrideBuilder::new(&root);
@@ -135,6 +172,114 @@ mod tests {
     use super::*;
     use std::{fs, path::Path, process::Command};
     use tempfile::TempDir;
+
+    #[test]
+    fn test_normalize_path() -> crate::Result<()> {
+        struct TestCase {
+            name: &'static str,
+            root: &'static str,
+            cwd: &'static str,
+            input: &'static str,
+            expected: Option<&'static str>,
+        }
+
+        let cases = vec![
+            // Glob patterns must remain unchanged.
+            TestCase {
+                name: "simple glob pattern",
+                root: "/project",
+                cwd: "/project/src",
+                input: "*.rs",
+                expected: Some("*.rs"),
+            },
+            TestCase {
+                name: "recursive glob pattern",
+                root: "/project",
+                cwd: "/project/src",
+                input: "**/test.rs",
+                expected: Some("**/test.rs"),
+            },
+            // Relative path: joining with cwd yields a path relative to project root.
+            TestCase {
+                name: "relative path",
+                root: "/project",
+                cwd: "/project/src",
+                input: "test.rs",
+                expected: Some("src/test.rs"),
+            },
+            // Absolute path under root should normalize correctly.
+            TestCase {
+                name: "absolute path under root",
+                root: "/project",
+                cwd: "/project/src",
+                input: "/project/src/test.rs",
+                expected: Some("src/test.rs"),
+            },
+            // Paths outside the root should yield an error.
+            TestCase {
+                name: "path outside root",
+                root: "/project",
+                cwd: "/project/src",
+                input: "/outside.rs",
+                expected: None,
+            },
+            // Test with cwd outside root - should fail
+            TestCase {
+                name: "cwd outside root",
+                root: "/project",
+                cwd: "/other/dir",
+                input: "test.rs",
+                expected: None,
+            },
+            // Test with cwd at different absolute path but same relative path
+            TestCase {
+                name: "cwd in different absolute path",
+                root: "/other/project",
+                cwd: "/other/project/src",
+                input: "test.rs",
+                expected: Some("src/test.rs"),
+            },
+            // Test with root deep in filesystem
+            TestCase {
+                name: "deep root path",
+                root: "/very/deep/project/path",
+                cwd: "/very/deep/project/path/src",
+                input: "test.rs",
+                expected: Some("src/test.rs"),
+            },
+        ];
+
+        for case in cases {
+            let root = AbsPath::new(PathBuf::from(case.root))?;
+            let cwd = AbsPath::new(PathBuf::from(case.cwd))?;
+            let result = normalize_path(root, cwd, case.input);
+            match (result, case.expected) {
+                (Ok(path), Some(exp)) => {
+                    assert_eq!(
+                        path,
+                        PathBuf::from(exp),
+                        "Failed case: {}. Input: {}",
+                        case.name,
+                        case.input
+                    );
+                }
+                (Err(_), None) => { /* expected error */ }
+                (Ok(path), None) => {
+                    panic!(
+                        "Expected error for case '{}', but got path: {:?}",
+                        case.name, path
+                    );
+                }
+                (Err(e), Some(exp)) => {
+                    panic!(
+                        "Expected path '{}' for case '{}', but got error: {:?}",
+                        exp, case.name, e
+                    );
+                }
+            }
+        }
+        Ok(())
+    }
 
     fn create_file(root: &Path, path: &str) -> std::io::Result<()> {
         let full_path = root.join(path);
