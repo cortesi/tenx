@@ -10,6 +10,9 @@ pub enum TenxError {
     #[error("config error: {0}")]
     Config(String),
 
+    #[error("Path error: {0}")]
+    Path(String),
+
     #[error("Io error: {0}")]
     Io(String),
 

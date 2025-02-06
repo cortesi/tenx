@@ -18,6 +18,8 @@ const GLOB_START: &str = "*";
 /// - If the path starts with relative path components, the path is joined to the CWD.
 /// - If the path starts with a glob component (i.e. `*`), it is preserved as-is.
 /// - All paths are cleaned to remove redundant ".." and "." components.
+///
+/// This function only normalizes the path - it does not check if the file exists.
 pub fn normalize_path(root: AbsPath, cwd: AbsPath, path: &str) -> crate::Result<PathBuf> {
     if path.starts_with(GLOB_START) {
         return Ok(PathBuf::from(path));
@@ -31,13 +33,13 @@ pub fn normalize_path(root: AbsPath, cwd: AbsPath, path: &str) -> crate::Result<
     };
 
     let rel_path = diff_paths(&abs_path, &root).ok_or_else(|| {
-        TenxError::Internal(format!(
+        TenxError::Path(format!(
             "Path not under current directory: {}",
             path.display()
         ))
     })?;
     if rel_path.starts_with("..") {
-        return Err(TenxError::Internal(format!(
+        return Err(TenxError::Path(format!(
             "Path not under current directory: {}",
             path.display()
         )));
@@ -61,7 +63,7 @@ pub fn list_files(root: AbsPath, globs: Vec<String>) -> crate::Result<Vec<PathBu
     for pattern in &globs {
         builder
             .add(pattern)
-            .map_err(|e| TenxError::Internal(format!("Invalid glob pattern: {}", e)))?;
+            .map_err(|e| TenxError::Path(format!("Invalid glob pattern: {}", e)))?;
     }
     builder
         .add("!/.git")
@@ -69,7 +71,7 @@ pub fn list_files(root: AbsPath, globs: Vec<String>) -> crate::Result<Vec<PathBu
 
     let overrides = builder
         .build()
-        .map_err(|e| TenxError::Internal(format!("Failed to build override rules: {}", e)))?;
+        .map_err(|e| TenxError::Path(format!("Failed to build override rules: {}", e)))?;
 
     // Build and configure the walker
     let mut walker = WalkBuilder::new(&root);
@@ -84,7 +86,7 @@ pub fn list_files(root: AbsPath, globs: Vec<String>) -> crate::Result<Vec<PathBu
     // Collect all files, converting to relative paths
     let mut files = Vec::new();
     for result in walker.build() {
-        let entry = result.map_err(|e| TenxError::Internal(format!("Walk error: {}", e)))?;
+        let entry = result.map_err(|e| TenxError::Path(format!("Walk error: {}", e)))?;
         if entry.file_type().is_some_and(|ft| ft.is_file()) {
             if let Ok(path) = entry.path().strip_prefix(&root) {
                 files.push(path.to_path_buf());
@@ -119,14 +121,14 @@ pub fn find_files(
 ) -> crate::Result<Vec<PathBuf>> {
     // Verify that current_dir is under root
     if !current_dir.starts_with(&*root) {
-        return Err(TenxError::Internal(format!(
+        return Err(TenxError::Path(format!(
             "Current directory {} must be under root {}",
             current_dir, root
         )));
     }
 
-    let glob = Glob::new(pattern)
-        .map_err(|e| TenxError::Internal(format!("Invalid glob pattern: {}", e)))?;
+    let glob =
+        Glob::new(pattern).map_err(|e| TenxError::Path(format!("Invalid glob pattern: {}", e)))?;
     let included_files = list_files(root.clone(), include)?;
 
     let mut matched_files = Vec::new();
@@ -156,7 +158,7 @@ pub fn find_files(
             if absolute_path.exists() {
                 matched_files.push(relative_path.to_path_buf());
             } else {
-                return Err(TenxError::Internal(format!(
+                return Err(TenxError::Path(format!(
                     "File does not exist: {:?}",
                     absolute_path
                 )));
