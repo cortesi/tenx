@@ -14,7 +14,7 @@ use super::files;
 use super::SubStore;
 
 /// A file system directory
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Directory {
     root: AbsPath,
     globs: Vec<String>,
@@ -52,7 +52,7 @@ impl Directory {
     }
 
     /// Writes content to a file, creating it if it doesn't exist or overwriting if it does.
-    pub fn write(&self, path: &Path, content: &str) -> Result<()> {
+    pub fn write(&mut self, path: &Path, content: &str) -> Result<()> {
         let abs_path = self.abspath(path)?;
         if let Some(parent) = abs_path.parent() {
             fs::create_dir_all(parent).map_err(|e| {
@@ -73,7 +73,7 @@ impl Directory {
     }
 
     /// Removes a file by joining the given path with the root directory.
-    pub fn remove(&self, path: &Path) -> Result<()> {
+    pub fn remove(&mut self, path: &Path) -> Result<()> {
         let abs_path = self.root.join(path);
         if abs_path.exists() {
             fs::remove_file(&abs_path).map_err(|e| {
@@ -97,11 +97,11 @@ impl SubStore for Directory {
         self.read(path)
     }
 
-    fn write(&self, path: &Path, content: &str) -> Result<()> {
+    fn write(&mut self, path: &Path, content: &str) -> Result<()> {
         self.write(path, content)
     }
 
-    fn remove(&self, path: &Path) -> Result<()> {
+    fn remove(&mut self, path: &Path) -> Result<()> {
         self.remove(path)
     }
 }

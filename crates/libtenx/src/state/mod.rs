@@ -5,6 +5,7 @@ pub mod memory;
 
 use std::{
     collections::HashMap,
+    fmt::Debug,
     path::{Path, PathBuf},
 };
 
@@ -18,14 +19,14 @@ use crate::{
 
 pub const MEM_PREFIX: &str = "::";
 
-pub trait SubStore {
+pub trait SubStore: Debug + Clone + Serialize + Deserialize<'static> {
     fn list(&self) -> Result<Vec<PathBuf>>;
     fn read(&self, path: &Path) -> Result<String>;
-    fn write(&self, path: &Path, content: &str) -> Result<()>;
-    fn remove(&self, path: &Path) -> Result<()>;
+    fn write(&mut self, path: &Path, content: &str) -> Result<()>;
+    fn remove(&mut self, path: &Path) -> Result<()>;
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 struct Snapshot {
     content: HashMap<PathBuf, String>,
     created: Vec<PathBuf>,
@@ -58,7 +59,7 @@ impl Snapshot {
 /// The state underlying a session. This is the set of resources that our models are editing. State
 /// presents a unified interface over an optional filesystem directory and a memory store.
 /// In-memory file names are prefixed with "::"
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct State {
     directory: Option<directory::Directory>,
     memory: HashMap<String, String>,
@@ -112,7 +113,7 @@ impl State {
             return Ok(());
         }
 
-        match &self.directory {
+        match &mut self.directory {
             Some(fs) => fs.write(path, content),
             None => Err(TenxError::NotFound {
                 msg: "No file system available".to_string(),
@@ -128,7 +129,7 @@ impl State {
             self.memory.remove(&key);
             return Ok(());
         }
-        if let Some(fs) = &self.directory {
+        if let Some(fs) = &mut self.directory {
             fs.remove(path)
         } else {
             Err(TenxError::NotFound {

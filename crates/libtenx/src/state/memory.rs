@@ -1,8 +1,11 @@
-use super::SubStore;
-use crate::Result;
 use std::{collections::HashMap, path::PathBuf};
 
-#[derive(Default)]
+use serde::{Deserialize, Serialize};
+
+use super::SubStore;
+use crate::Result;
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Memory {
     memory: HashMap<PathBuf, String>,
 }
@@ -24,15 +27,13 @@ impl SubStore for Memory {
             })
     }
 
-    fn write(&self, path: &std::path::Path, content: &str) -> Result<()> {
-        let mut this = self.memory.clone();
-        this.insert(path.to_path_buf(), content.to_string());
+    fn write(&mut self, path: &std::path::Path, content: &str) -> Result<()> {
+        self.memory.insert(path.to_path_buf(), content.to_string());
         Ok(())
     }
 
-    fn remove(&self, path: &std::path::Path) -> Result<()> {
-        let mut this = self.memory.clone();
-        this.remove(path);
+    fn remove(&mut self, path: &std::path::Path) -> Result<()> {
+        self.memory.remove(path);
         Ok(())
     }
 }

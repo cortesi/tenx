@@ -2,7 +2,7 @@
     project: (
         globs: [ "!**/*.gif"]
     ),
-    retry_limit: 25,
+    retry_limit: 50,
     context: (
         ruskel: ["libtenx", "libttrial"]
     ),
