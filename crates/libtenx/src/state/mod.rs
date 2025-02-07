@@ -276,7 +276,14 @@ impl State {
     /// Matches files in both the memory and directory stores based on the provided patterns.
     /// The patterns are normalized using the substore's root (empty for memory) and the given current
     /// working directory, and matched using globset.
-    pub fn find(&self, cwd: AbsPath, patterns: Vec<String>) -> Result<Vec<PathBuf>> {
+    pub fn find<T>(&self, cwd: T, patterns: Vec<String>) -> Result<Vec<PathBuf>>
+    where
+        T: TryInto<AbsPath>,
+        T::Error: std::fmt::Display,
+    {
+        let cwd = cwd
+            .try_into()
+            .map_err(|e| TenxError::Internal(format!("failed to convert cwd: {}", e)))?;
         let mut results = HashSet::new();
 
         // First, handle memory store with path cleaning

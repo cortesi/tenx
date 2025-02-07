@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use ron;
 
 use super::files;
-use crate::{checks, config::default_config, dialect, model, TenxError};
+use crate::{checks, config::default_config, dialect, model, state, TenxError};
 
 pub const HOME_CONFIG_FILE: &str = "tenx.ron";
 pub const PROJECT_CONFIG_FILE: &str = ".tenx.ron";
@@ -706,6 +706,13 @@ impl Config {
         }
 
         Ok(matched_files)
+    }
+
+    /// Construct the default state for the project, including the project root directory, and
+    /// a memory overlay for files prefixed with "::".
+    pub fn state(&self) -> crate::Result<state::State> {
+        state::State::default()
+            .with_directory(self.project.root.clone(), self.project.include.clone())
     }
 
     pub fn project_files(&self) -> crate::Result<Vec<PathBuf>> {

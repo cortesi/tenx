@@ -428,10 +428,11 @@ async fn main() -> anyhow::Result<()> {
                 Ok(())
             }
             Commands::Files { pattern } => {
+                let state = config.state()?;
                 let files = if let Some(p) = pattern {
-                    config.match_files_with_glob(p)?
+                    state.find(std::env::current_dir()?, vec![p.to_string()])?
                 } else {
-                    config.project_files()?
+                    state.list()?
                 };
                 for file in files {
                     println!("{}", file.display());

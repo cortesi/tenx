@@ -98,12 +98,10 @@ pub struct Action {
 impl Action {
     /// Creates a new Action with the given strategy.
     pub fn new(config: &config::Config, strategy: strategy::Strategy) -> Result<Self> {
-        let state = state::State::default()
-            .with_directory(config.project.root.clone(), config.project.include.clone())?;
         Ok(Action {
             strategy,
             steps: Vec::new(),
-            state,
+            state: config.state()?,
         })
     }
 
