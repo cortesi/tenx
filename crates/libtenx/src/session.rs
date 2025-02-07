@@ -92,7 +92,7 @@ pub struct Action {
     pub strategy: strategy::Strategy,
     /// The steps in the action
     pub steps: Vec<Step>,
-    state: state::State,
+    pub state: state::State,
 }
 
 impl Action {
@@ -167,6 +167,11 @@ impl Session {
     /// Returns a reference to the last action in the session.
     pub fn last_action(&self) -> Option<&Action> {
         self.actions.last()
+    }
+
+    /// Returns a reference to the last action in the session.
+    pub fn last_action_mut(&mut self) -> Option<&mut Action> {
+        self.actions.iter_mut().last()
     }
 
     /// Returns a mutable reference to the last step in the session.

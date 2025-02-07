@@ -199,6 +199,17 @@ impl Tenx {
         check_paths(&self.config, &paths, CheckMode::Both, sender)
     }
 
+    /// Creates a view patch for files matching the given patterns using the last action's state.
+    pub fn view(&self, session: &mut Session, patterns: Vec<String>) -> Result<u64> {
+        match session.last_action_mut() {
+            Some(action) => {
+                let cwd = self.config.project_root();
+                action.state.view(cwd, patterns)
+            }
+            None => Err(TenxError::Internal("No actions in session".to_string())),
+        }
+    }
+
     /// Common logic for processing a prompt and updating the state. The prompt that will be
     /// processed is the final prompt in the step list.
     async fn process_prompt(
