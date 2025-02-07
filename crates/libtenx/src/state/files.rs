@@ -50,9 +50,8 @@ pub fn normalize_path(root: AbsPath, cwd: AbsPath, path: &str) -> crate::Result<
 /// Walk project directory using ignore rules, returning all included files relative to project
 /// root.
 ///
-/// Applies project glob patterns and uses the ignore crate's functionality for respecting
-/// .gitignore and other ignore files. Glob patterns can be positive (include) or negative
-/// (exclude, prefixed with !).
+/// Glob patterns can be positive (equivalent to --include) or negative (prefixed with `!`,
+/// equivalent to --exclude). If no glob patterns are provided, all files are included.
 ///
 /// Files are sorted by path.
 pub fn list_files(root: AbsPath, globs: Vec<String>) -> crate::Result<Vec<PathBuf>> {

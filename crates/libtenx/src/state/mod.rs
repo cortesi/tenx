@@ -4,11 +4,12 @@ pub mod files;
 pub mod memory;
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fmt::Debug,
     path::{Path, PathBuf},
 };
 
+use globset::Glob;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -145,13 +146,11 @@ impl State {
     }
 
     /// Reverts the state to the given snapshot.
-    /// Restores content for existing files and memory entries, and removes files or memory entries that were created.
+    /// Restores content for files or memory entries that existed and removes those that were created.
     fn revert_snapshot(&mut self, snapshot: Snapshot) -> Result<()> {
-        // Remove files or entries that were created.
         for path in snapshot.created.iter() {
             self.remove(path)?;
         }
-        // Restore content for files or memory entries that existed.
         for (path, content) in snapshot.content.iter() {
             if !snapshot.created.contains(path) {
                 self.write(path, content)?;
@@ -202,7 +201,6 @@ impl State {
     pub fn revert(&mut self, id: u64) -> Result<()> {
         let mut to_revert = Vec::new();
         let mut remaining = Vec::new();
-        // Partition snapshots into those to revert and those to keep.
         for pair in self.snapshots.drain(..) {
             if pair.0 <= id {
                 to_revert.push(pair);
@@ -213,7 +211,6 @@ impl State {
         if to_revert.is_empty() {
             return Err(TenxError::Internal(format!("Snapshot id {} not found", id)));
         }
-        // Revert in reverse order.
         for (_id, snap) in to_revert.into_iter().rev() {
             self.revert_snapshot(snap)?;
         }
@@ -221,10 +218,16 @@ impl State {
         Ok(())
     }
 
-    /// Returns the list of files for which the most recent touch occurred within the snapshot
-    /// range [start, end] (inclusive). If `start` is None, the range starts from the earliest
-    /// snapshot, and if `end` is None, the range extends to the latest snapshot. Files that were
-    /// touched after the `end` snapshot are excluded.
+    /// Lists all files from both the memory and directory stores.
+    pub fn list(&self) -> Result<Vec<PathBuf>> {
+        let mut files = self.memory.list()?;
+        if let Some(ref fs) = self.directory {
+            files.extend(fs.list()?);
+        }
+        Ok(files)
+    }
+
+    /// Returns the files that were last changed between the given snapshot ids, inclusive.
     pub fn last_changed_between(
         &self,
         start: Option<u64>,
@@ -233,19 +236,16 @@ impl State {
         if self.snapshots.is_empty() {
             return Err(TenxError::Internal("No snapshots available".to_string()));
         }
-        let min_id = start.unwrap_or(self.snapshots.first().unwrap().0);
-        let max_id = match end {
-            Some(e) => e,
-            None => self.snapshots.last().unwrap().0,
-        };
-        let mut latest: std::collections::HashMap<PathBuf, u64> = std::collections::HashMap::new();
+        let min_id = start.unwrap_or_else(|| self.snapshots.first().unwrap().0);
+        let max_id = end.unwrap_or_else(|| self.snapshots.last().unwrap().0);
+        let mut latest: HashMap<PathBuf, u64> = HashMap::new();
         for (snap_id, snap) in &self.snapshots {
             for path in snap.touched() {
                 latest
                     .entry(path)
                     .and_modify(|e| {
                         if *snap_id > *e {
-                            *e = *snap_id;
+                            *e = *snap_id
                         }
                     })
                     .or_insert(*snap_id);
@@ -263,6 +263,54 @@ impl State {
             .collect();
         result.sort();
         Ok(result)
+    }
+
+    /// Matches files in both the memory and directory stores based on the provided patterns.
+    /// The patterns are normalized using the substore's root (empty for memory) and the given current
+    /// working directory, and matched using globset.
+    pub fn find(&self, cwd: AbsPath, patterns: Vec<String>) -> Result<Vec<PathBuf>> {
+        let mut results = HashSet::new();
+
+        // First, handle memory store with path cleaning
+        let mem_files = self.memory.list()?;
+        for pattern in &patterns {
+            let cleaned = path_clean::clean(pattern);
+            let pattern_str = cleaned.to_str().ok_or_else(|| {
+                TenxError::Internal("Failed to convert cleaned path to string".to_string())
+            })?;
+            let glob = Glob::new(pattern_str).map_err(|e| TenxError::Path(e.to_string()))?;
+            let matcher = glob.compile_matcher();
+            for file in &mem_files {
+                if matcher.is_match(file) {
+                    results.insert(file.clone());
+                }
+            }
+        }
+
+        // Then handle directory store with path normalization for non-memory patterns
+        if let Some(ref dir) = self.directory {
+            let dir_files = dir.list()?;
+            for pattern in &patterns {
+                if pattern.starts_with(MEM_PREFIX) {
+                    continue;
+                }
+                let normalized = files::normalize_path(dir.root.clone(), cwd.clone(), pattern)?;
+                let pattern_str = normalized.to_str().ok_or_else(|| {
+                    TenxError::Internal("Failed to convert normalized path to string".to_string())
+                })?;
+                let glob = Glob::new(pattern_str).map_err(|e| TenxError::Path(e.to_string()))?;
+                let matcher = glob.compile_matcher();
+                for file in &dir_files {
+                    if matcher.is_match(file) {
+                        results.insert(file.clone());
+                    }
+                }
+            }
+        }
+
+        let mut result_vec: Vec<_> = results.into_iter().collect();
+        result_vec.sort();
+        Ok(result_vec)
     }
 }
 
@@ -660,10 +708,8 @@ mod tests {
     /// Unit test for multiple snapshot layers.
     #[test]
     fn test_multiple_snapshot_layers() -> Result<()> {
-        // We'll test using memory entries.
         let mut state = State::default();
 
-        // Insert initial memory entries.
         let key_a = "::a.txt";
         let key_x = "::x.txt";
         state.dispatch_mut(Path::new(key_a), |store| {
@@ -673,35 +719,146 @@ mod tests {
             store.write(Path::new(key_x), "X0")
         })?;
 
-        // Create first snapshot (id 0) capturing the initial state.
         let paths = vec![PathBuf::from(key_a), PathBuf::from(key_x)];
         let snap_id0 = state.snapshot(&paths)?;
         assert_eq!(snap_id0, 0);
 
-        // Modify the state.
         state.write(Path::new(key_a), "A1")?;
         state.write(Path::new(key_x), "X1")?;
 
-        // Create a second snapshot (id 1) capturing state after modifications.
         let snap_id1 = state.snapshot(&paths)?;
         assert_eq!(snap_id1, 1);
 
-        // Further modify the state.
         state.write(Path::new(key_a), "A2")?;
         state.write(Path::new(key_x), "X2")?;
 
-        // Verify that current state is modified.
         assert_eq!(state.read(Path::new(key_a))?, "A2");
         assert_eq!(state.read(Path::new(key_x))?, "X2");
 
-        // Revert all snapshots up to id 1. This should revert both snapshots in reverse order.
         state.revert(1)?;
 
-        // After reverting:
-        // The second snapshot (id 1) reverts state from "A2"/"X2" back to state at snapshot id 1 ("A1"/"X1"),
-        // then the first snapshot (id 0) reverts state to the initial state ("A0"/"X0").
         assert_eq!(state.read(Path::new(key_a))?, "A0");
         assert_eq!(state.read(Path::new(key_x))?, "X0");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_find() -> Result<()> {
+        type TestSetup = Box<dyn Fn(&mut State) -> Result<Option<TempDir>>>;
+        struct TestCase {
+            name: &'static str,
+            setup: TestSetup,
+            patterns: Vec<&'static str>,
+            expected: Vec<&'static str>,
+        }
+
+        let cases = vec![
+            TestCase {
+                name: "memory only - exact match",
+                setup: Box::new(|state| {
+                    state.write(Path::new("::foo.txt"), "foo")?;
+                    state.write(Path::new("::bar.txt"), "bar")?;
+                    Ok(None)
+                }),
+                patterns: vec!["::foo.txt"],
+                expected: vec!["::foo.txt"],
+            },
+            TestCase {
+                name: "memory only - dupes",
+                setup: Box::new(|state| {
+                    state.write(Path::new("::foo.txt"), "foo")?;
+                    state.write(Path::new("::bar.txt"), "bar")?;
+                    Ok(None)
+                }),
+                patterns: vec!["::foo.txt", "::foo.txt"],
+                expected: vec!["::foo.txt"],
+            },
+            TestCase {
+                name: "memory only - glob match",
+                setup: Box::new(|state| {
+                    state.write(Path::new("::foo.txt"), "foo")?;
+                    state.write(Path::new("::bar.txt"), "bar")?;
+                    Ok(None)
+                }),
+                patterns: vec!["::*.txt"],
+                expected: vec!["::bar.txt", "::foo.txt"],
+            },
+            TestCase {
+                name: "filesystem only",
+                setup: Box::new(|state| {
+                    let temp_dir = TempDir::new().expect("failed to create temporary directory");
+                    let root = temp_dir.path().to_path_buf();
+                    fs::write(root.join("foo.txt"), "foo")?;
+                    fs::write(root.join("bar.txt"), "bar")?;
+                    *state = state
+                        .clone()
+                        .with_directory(AbsPath::new(root)?, vec!["*.txt".to_string()])?;
+                    Ok(Some(temp_dir))
+                }),
+                patterns: vec!["*.txt"],
+                expected: vec!["bar.txt", "foo.txt"],
+            },
+            TestCase {
+                name: "both stores - mixed patterns",
+                setup: Box::new(|state| {
+                    let temp_dir = TempDir::new().expect("failed to create temporary directory");
+                    let root = temp_dir.path().to_path_buf();
+                    fs::write(root.join("fs.txt"), "fs")?;
+                    state.write(Path::new("::mem.txt"), "mem")?;
+                    *state = state
+                        .clone()
+                        .with_directory(AbsPath::new(root)?, vec!["*.txt".to_string()])?;
+                    Ok(Some(temp_dir))
+                }),
+                patterns: vec!["*.txt", "::*.txt"],
+                expected: vec!["::mem.txt", "fs.txt"],
+            },
+            TestCase {
+                name: "no matches",
+                setup: Box::new(|state| {
+                    state.write(Path::new("::foo.txt"), "foo")?;
+                    Ok(None)
+                }),
+                patterns: vec!["::nonexistent.txt"],
+                expected: vec![],
+            },
+            TestCase {
+                name: "multiple patterns",
+                setup: Box::new(|state| {
+                    state.write(Path::new("::foo.txt"), "foo")?;
+                    state.write(Path::new("::bar.rs"), "bar")?;
+                    Ok(None)
+                }),
+                patterns: vec!["::*.txt", "::*.rs"],
+                expected: vec!["::bar.rs", "::foo.txt"],
+            },
+        ];
+
+        let cwd = AbsPath::new(std::path::PathBuf::from("/"))?;
+
+        for case in cases {
+            let mut guards: Vec<TempDir> = Vec::new();
+            let mut state = State::default();
+            if let Some(guard) = (case.setup)(&mut state)? {
+                guards.push(guard);
+            }
+
+            let patterns: Vec<String> = case.patterns.iter().map(|s| s.to_string()).collect();
+            let results = state.find(cwd.clone(), patterns)?;
+
+            let result_strs: Vec<String> = results
+                .iter()
+                .filter_map(|p| p.to_str().map(String::from))
+                .collect();
+            let expected: Vec<String> = case.expected.into_iter().map(String::from).collect();
+
+            assert_eq!(
+                result_strs, expected,
+                "{}: expected {:?}, got {:?}",
+                case.name, expected, result_strs
+            );
+        }
 
         Ok(())
     }

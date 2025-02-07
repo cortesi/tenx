@@ -16,7 +16,7 @@ use super::SubStore;
 /// A file system directory
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Directory {
-    root: AbsPath,
+    pub root: AbsPath,
     globs: Vec<String>,
 }
 
