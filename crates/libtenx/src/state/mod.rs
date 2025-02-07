@@ -173,7 +173,7 @@ impl State {
     /// If any change fails, the error is collected in a vector of (change, error) tuples.
     /// Returns a tuple containing the snapshot ID and a vector of failed changes.
     pub fn patch(&mut self, patch: &Patch) -> Result<(u64, Vec<(Change, TenxError)>)> {
-        let snap_id = self.snapshot(&patch.changed_files())?;
+        let snap_id = self.snapshot(&patch.affected_files())?;
         let mut failures = Vec::new();
         for change in &patch.changes {
             match change {

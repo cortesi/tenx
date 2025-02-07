@@ -98,9 +98,8 @@ pub struct Action {
 impl Action {
     /// Creates a new Action with the given strategy.
     pub fn new(config: &config::Config, strategy: strategy::Strategy) -> Result<Self> {
-        let mut state = state::State::default();
-        state =
-            state.with_directory(config.project.root.clone(), config.project.include.clone())?;
+        let state = state::State::default()
+            .with_directory(config.project.root.clone(), config.project.include.clone())?;
         Ok(Action {
             strategy,
             steps: Vec::new(),
@@ -388,7 +387,7 @@ impl Session {
             for step in &action.steps {
                 if let Some(resp) = &step.model_response {
                     if let Some(patch) = &resp.patch {
-                        for path in patch.changed_files() {
+                        for path in patch.affected_files() {
                             most_recent_modified.insert(path.clone(), global_idx);
                         }
                     }

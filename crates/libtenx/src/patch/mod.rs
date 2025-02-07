@@ -48,7 +48,7 @@ pub struct Patch {
 
 impl Patch {
     /// Returns a vector of unique PathBufs for all files changed in the patch.
-    pub fn changed_files(&self) -> Vec<PathBuf> {
+    pub fn affected_files(&self) -> Vec<PathBuf> {
         let mut paths = HashMap::new();
         for change in &self.changes {
             paths.insert(change.path().clone(), ());
@@ -59,7 +59,7 @@ impl Patch {
     /// Takes a snapshot of the current state of all files that would be modified by this patch.
     pub fn snapshot(&self, config: &Config) -> Result<HashMap<PathBuf, String>> {
         let mut snapshot = HashMap::new();
-        for path in self.changed_files() {
+        for path in self.affected_files() {
             let abs_path = config.abspath(&path)?;
             let content = fs_err::read_to_string(&abs_path)?;
             snapshot.insert(path, content);
@@ -109,7 +109,7 @@ mod tests {
             new: "new".to_string(),
         }));
 
-        let changed_files = patch.changed_files();
+        let changed_files = patch.affected_files();
         assert_eq!(changed_files.len(), 2);
         assert!(changed_files.contains(&PathBuf::from("file1.txt")));
         assert!(changed_files.contains(&PathBuf::from("file2.txt")));
