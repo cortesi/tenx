@@ -1,3 +1,4 @@
+//! A PathBuf wrapper that guarantees the enclosed path is absolute.
 use std::{
     fmt,
     ops::Deref,
@@ -6,7 +7,7 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
-/// A wrapper around PathBuf that guarantees the enclosed path is absolute.
+/// A PathBuf wrapper that guarantees the enclosed path is absolute.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct AbsPath(PathBuf);
 

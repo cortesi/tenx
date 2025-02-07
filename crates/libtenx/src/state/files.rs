@@ -1,7 +1,6 @@
 //! File and path manipulation for filesystem state.
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
-use globset::Glob;
 use ignore::{overrides::OverrideBuilder, WalkBuilder};
 use path_clean;
 use pathdiff::diff_paths;
@@ -94,78 +93,6 @@ pub fn list_files(root: AbsPath, globs: Vec<String>) -> crate::Result<Vec<PathBu
     }
 
     Ok(files)
-}
-
-/// Traverse the root using the include patterns provided, finding files that match `pattern`.
-/// The pattern can be either a glob match pattern or a simple path.
-///
-/// # Arguments
-///
-/// * `root` - The absolute root path to search from
-/// * `include` - List of glob patterns to include in the search
-/// * `current_dir` - The absolute path of the current directory, which must be equal to or under `root`
-/// * `pattern` - The glob pattern to match against files
-///
-/// # Errors
-///
-/// Returns an error if:
-/// - The pattern is invalid
-/// - The current_dir is not equal to or under root
-/// - Any matched file does not exist
-pub fn find_files(
-    root: AbsPath,
-    include: Vec<String>,
-    current_dir: AbsPath,
-    pattern: &str,
-) -> crate::Result<Vec<PathBuf>> {
-    // Verify that current_dir is under root
-    if !current_dir.starts_with(&*root) {
-        return Err(TenxError::Path(format!(
-            "Current directory {} must be under root {}",
-            current_dir, root
-        )));
-    }
-
-    let glob =
-        Glob::new(pattern).map_err(|e| TenxError::Path(format!("Invalid glob pattern: {}", e)))?;
-    let included_files = list_files(root.clone(), include)?;
-
-    let mut matched_files = Vec::new();
-
-    for file in included_files {
-        let relative_path = if file.is_absolute() {
-            file.strip_prefix(root.clone()).unwrap_or(&file)
-        } else {
-            &file
-        };
-
-        let match_path = if current_dir.as_ref() != root.as_ref() {
-            // If we're in a subdirectory, we need to adjust the path for matching
-            diff_paths(
-                relative_path,
-                Path::new(&*current_dir)
-                    .strip_prefix(&*root)
-                    .unwrap_or(Path::new("")),
-            )
-            .unwrap_or_else(|| relative_path.to_path_buf())
-        } else {
-            relative_path.to_path_buf()
-        };
-
-        if glob.compile_matcher().is_match(&match_path) {
-            let absolute_path = root.join(relative_path);
-            if absolute_path.exists() {
-                matched_files.push(relative_path.to_path_buf());
-            } else {
-                return Err(TenxError::Path(format!(
-                    "File does not exist: {:?}",
-                    absolute_path
-                )));
-            }
-        }
-    }
-
-    Ok(matched_files)
 }
 
 #[cfg(test)]

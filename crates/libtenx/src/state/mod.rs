@@ -1,7 +1,11 @@
+//! A unified interface over all persistent state.
+//!
+//! All modifications are made through `Patch` operations, and return an ID that can be used
+//! to revert the state to a previous snapshot.
 pub mod abspath;
-pub mod directory;
+mod directory;
 pub mod files;
-pub mod memory;
+mod memory;
 
 use std::{
     collections::{HashMap, HashSet},
@@ -18,9 +22,10 @@ use crate::{
     state::abspath::AbsPath,
 };
 
+/// Prefix for in-memory files
 pub const MEM_PREFIX: &str = "::";
 
-pub trait SubStore: Debug {
+trait SubStore: Debug {
     fn list(&self) -> Result<Vec<PathBuf>>;
     fn read(&self, path: &Path) -> Result<String>;
     fn write(&mut self, path: &Path, content: &str) -> Result<()>;
@@ -70,6 +75,9 @@ pub struct State {
 
 impl State {
     /// Set the directory path and glob patterns for file operations.
+    ///
+    /// Glob patterns can be positive (equivalent to --include) or negative (prefixed with `!`,
+    /// equivalent to --exclude). If no glob patterns are provided, all files are included.
     pub fn with_directory<P>(mut self, root: P, globs: Vec<String>) -> Result<Self>
     where
         P: TryInto<AbsPath>,
@@ -311,6 +319,19 @@ impl State {
         let mut result_vec: Vec<_> = results.into_iter().collect();
         result_vec.sort();
         Ok(result_vec)
+    }
+
+    /// Creates and dispatches a view patch for files matching the provided patterns.
+    /// Expands the patterns using the current working directory, creates a Change::View for each matched path,
+    /// and applies the patch. Returns the snapshot ID from applying the patch.
+    pub fn view(&mut self, cwd: AbsPath, patterns: Vec<String>) -> Result<u64> {
+        let paths = self.find(cwd, patterns)?;
+        let changes: Vec<Change> = paths.into_iter().map(Change::View).collect();
+        let patch = Patch { changes };
+        let (snap_id, failures) = self.patch(&patch)?;
+        // Failures for view changes should always be empty.
+        debug_assert!(failures.is_empty());
+        Ok(snap_id)
     }
 }
 
