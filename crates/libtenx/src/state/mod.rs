@@ -19,7 +19,7 @@ use crate::{
 
 pub const MEM_PREFIX: &str = "::";
 
-pub trait SubStore: Debug + Clone + Serialize + Deserialize<'static> {
+pub trait SubStore: Debug {
     fn list(&self) -> Result<Vec<PathBuf>>;
     fn read(&self, path: &Path) -> Result<String>;
     fn write(&mut self, path: &Path, content: &str) -> Result<()>;
@@ -81,55 +81,53 @@ impl State {
         Ok(self)
     }
 
-    /// Retrieves the content associated with the given path.
-    /// If the path exists in memory, returns that value. Otherwise, reads from the file system.
-    pub fn read(&self, path: &Path) -> Result<String> {
+    /// Dispatches an operation to the appropriate immutable store based on the path prefix.
+    fn dispatch_ro<T, F>(&self, path: &Path, f: F) -> Result<T>
+    where
+        F: FnOnce(&dyn SubStore) -> Result<T>,
+    {
         if path.to_string_lossy().starts_with(MEM_PREFIX) {
-            if let Ok(content) = self.memory.read(path) {
-                return Ok(content);
-            }
-        }
-        match &self.directory {
-            Some(fs) => fs.read(path).map_err(|_| TenxError::NotFound {
-                msg: "File not found".to_string(),
+            f(&self.memory)
+        } else if let Some(ref fs) = self.directory {
+            f(fs)
+        } else {
+            Err(TenxError::NotFound {
+                msg: "No matching store".to_string(),
                 path: path.display().to_string(),
-            }),
-            None => Err(TenxError::NotFound {
-                msg: "No file system available".to_string(),
-                path: path.display().to_string(),
-            }),
+            })
         }
     }
 
-    /// Writes content to a path. If the path starts with MEM_PREFIX, writes to memory,
-    /// otherwise writes to the filesystem.
-    fn write(&mut self, path: &Path, content: &str) -> Result<()> {
+    /// Dispatches an operation to the appropriate mutable store based on the path prefix.
+    fn dispatch_mut<T, F>(&mut self, path: &Path, f: F) -> Result<T>
+    where
+        F: FnOnce(&mut dyn SubStore) -> Result<T>,
+    {
         if path.to_string_lossy().starts_with(MEM_PREFIX) {
-            return self.memory.write(path, content);
-        }
-
-        match &mut self.directory {
-            Some(fs) => fs.write(path, content),
-            None => Err(TenxError::NotFound {
-                msg: "No file system available".to_string(),
+            f(&mut self.memory)
+        } else if let Some(ref mut fs) = self.directory {
+            f(fs)
+        } else {
+            Err(TenxError::NotFound {
+                msg: "No matching store".to_string(),
                 path: path.display().to_string(),
-            }),
+            })
         }
+    }
+
+    /// Retrieves the content associated with the given path.
+    pub fn read(&self, path: &Path) -> Result<String> {
+        self.dispatch_ro(path, |store| store.read(path))
+    }
+
+    /// Writes content to a path.
+    fn write(&mut self, path: &Path, content: &str) -> Result<()> {
+        self.dispatch_mut(path, |store| store.write(path, content))
     }
 
     /// Removes a file or memory entry for the given path.
     fn remove(&mut self, path: &Path) -> Result<()> {
-        if path.to_string_lossy().starts_with(MEM_PREFIX) {
-            return self.memory.remove(path);
-        }
-        if let Some(fs) = &mut self.directory {
-            fs.remove(path)
-        } else {
-            Err(TenxError::NotFound {
-                msg: "No file system available".to_string(),
-                path: path.display().to_string(),
-            })
-        }
+        self.dispatch_mut(path, |store| store.remove(path))
     }
 
     /// Creates a snapshot of the given list of paths. For each path, if the file exists, its content is captured;
@@ -240,7 +238,7 @@ impl State {
             Some(e) => e,
             None => self.snapshots.last().unwrap().0,
         };
-        let mut latest: HashMap<PathBuf, u64> = HashMap::new();
+        let mut latest: std::collections::HashMap<PathBuf, u64> = std::collections::HashMap::new();
         for (snap_id, snap) in &self.snapshots {
             for path in snap.touched() {
                 latest
@@ -349,12 +347,12 @@ mod tests {
                 expected: Ok("memory content"),
             },
             TestCase {
-                name: "no filesystem configured",
+                name: "no store configured",
                 fs_content: None,
                 memory_content: None,
                 path: "test.txt",
                 expected: Err(TenxError::NotFound {
-                    msg: "No file system available".to_string(),
+                    msg: "No matching store".to_string(),
                     path: "test.txt".to_string(),
                 }),
             },
@@ -385,7 +383,9 @@ mod tests {
 
             // Setup memory if content provided
             if let Some(content) = case.memory_content {
-                let _ = state.write(Path::new(case.path), content);
+                let _ = state.dispatch_mut(Path::new(case.path), |store| {
+                    store.write(Path::new(case.path), content)
+                });
             }
 
             // Test the get operation
@@ -411,9 +411,9 @@ mod tests {
                     let err = result.unwrap_err();
                     if let TenxError::NotFound { msg, path } = err {
                         assert_eq!(
-                            &TenxError::NotFound { msg, path },
+                            TenxError::NotFound { msg, path },
                             match &case.expected {
-                                Err(expected) => expected,
+                                Err(expected) => expected.clone(),
                                 _ => panic!("Expected error variant"),
                             },
                             "{}: error message mismatch",
@@ -498,7 +498,7 @@ mod tests {
                 ],
                 start: Some(0),
                 end: Some(0),
-                expected: Ok(vec!["::a.txt"]), // b.txt was modified in snapshot 1
+                expected: Ok(vec!["::a.txt"]),
             },
             TestCase {
                 name: "full range with implicit boundaries",
@@ -576,7 +576,7 @@ mod tests {
                 ],
                 start: Some(1),
                 end: Some(1),
-                expected: Ok(vec!["::b.txt"]), // a.txt changed in snapshot 2
+                expected: Ok(vec!["::b.txt"]),
             },
             TestCase {
                 name: "multiple files in multiple snapshots",
@@ -620,7 +620,7 @@ mod tests {
                 ],
                 start: Some(0),
                 end: Some(1),
-                expected: Ok(vec!["::a.txt", "::c.txt"]), // b.txt and d.txt modified in snapshot 2
+                expected: Ok(vec!["::a.txt", "::c.txt"]),
             },
         ];
 
@@ -666,8 +666,12 @@ mod tests {
         // Insert initial memory entries.
         let key_a = "::a.txt";
         let key_x = "::x.txt";
-        state.write(Path::new(key_a), "A0")?;
-        state.write(Path::new(key_x), "X0")?;
+        state.dispatch_mut(Path::new(key_a), |store| {
+            store.write(Path::new(key_a), "A0")
+        })?;
+        state.dispatch_mut(Path::new(key_x), |store| {
+            store.write(Path::new(key_x), "X0")
+        })?;
 
         // Create first snapshot (id 0) capturing the initial state.
         let paths = vec![PathBuf::from(key_a), PathBuf::from(key_x)];

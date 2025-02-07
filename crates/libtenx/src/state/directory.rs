@@ -46,6 +46,12 @@ impl Directory {
     /// Gets the content of a file by converting the input path to an absolute path and reading it.
     pub fn read(&self, path: &Path) -> Result<String> {
         let abs_path = self.abspath(path)?;
+        if !abs_path.exists() {
+            return Err(TenxError::NotFound {
+                msg: "File not found".to_string(),
+                path: path.display().to_string(),
+            });
+        }
         fs::read_to_string(&abs_path).map_err(|e| {
             TenxError::Internal(format!("Could not read file {}: {}", abs_path.display(), e))
         })
@@ -64,27 +70,26 @@ impl Directory {
             })?;
         }
         fs::write(&abs_path, content).map_err(|e| {
-            TenxError::Internal(format!(
-                "Could not write file {}: {}",
-                abs_path.display(),
-                e
-            ))
+            TenxError::Internal(format!("Could not write file {}: {}", path.display(), e))
         })
     }
 
     /// Removes a file by joining the given path with the root directory.
     pub fn remove(&mut self, path: &Path) -> Result<()> {
         let abs_path = self.root.join(path);
-        if abs_path.exists() {
-            fs::remove_file(&abs_path).map_err(|e| {
-                TenxError::Internal(format!(
-                    "Could not remove file {}: {}",
-                    abs_path.display(),
-                    e
-                ))
-            })?;
+        if !abs_path.exists() {
+            return Err(TenxError::NotFound {
+                msg: "File not found".to_string(),
+                path: path.display().to_string(),
+            });
         }
-        Ok(())
+        fs::remove_file(&abs_path).map_err(|e| {
+            TenxError::Internal(format!(
+                "Could not remove file {}: {}",
+                abs_path.display(),
+                e
+            ))
+        })
     }
 }
 
