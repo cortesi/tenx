@@ -704,15 +704,13 @@ impl Config {
                 }
             }
         }
-
         Ok(matched_files)
     }
 
     /// Construct the default state for the project, including the project root directory, and
     /// a memory overlay for files prefixed with "::".
     pub fn state(&self) -> crate::Result<state::State> {
-        state::State::default()
-            .with_directory(self.project.root.clone(), self.project.include.clone())
+        state::State::default().with_directory(&self.project.root, self.project.include.clone())
     }
 
     pub fn project_files(&self) -> crate::Result<Vec<PathBuf>> {

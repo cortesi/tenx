@@ -7,6 +7,29 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
+/// A helper trait to convert a type into an AbsPath.
+pub trait IntoAbsPath {
+    fn into_abs_path(self) -> crate::Result<AbsPath>;
+}
+
+impl IntoAbsPath for AbsPath {
+    fn into_abs_path(self) -> crate::Result<AbsPath> {
+        Ok(self)
+    }
+}
+
+impl IntoAbsPath for PathBuf {
+    fn into_abs_path(self) -> crate::Result<AbsPath> {
+        AbsPath::new(self)
+    }
+}
+
+impl IntoAbsPath for &PathBuf {
+    fn into_abs_path(self) -> crate::Result<AbsPath> {
+        AbsPath::new(self.to_path_buf())
+    }
+}
+
 /// A PathBuf wrapper that guarantees the enclosed path is absolute.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct AbsPath(PathBuf);
@@ -21,6 +44,14 @@ impl AbsPath {
             )));
         }
         Ok(AbsPath(path))
+    }
+}
+
+impl TryFrom<&PathBuf> for AbsPath {
+    type Error = crate::TenxError;
+
+    fn try_from(path: &PathBuf) -> Result<Self, Self::Error> {
+        Self::new(path.to_path_buf())
     }
 }
 

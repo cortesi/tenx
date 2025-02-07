@@ -80,12 +80,9 @@ impl State {
     /// equivalent to --exclude). If no glob patterns are provided, all files are included.
     pub fn with_directory<P>(mut self, root: P, globs: Vec<String>) -> Result<Self>
     where
-        P: TryInto<AbsPath>,
-        P::Error: std::fmt::Display,
+        P: abspath::IntoAbsPath,
     {
-        let abs = root
-            .try_into()
-            .map_err(|e| TenxError::Internal(format!("failed to convert directory: {}", e)))?;
+        let abs = root.into_abs_path()?;
         self.directory = Some(directory::Directory::new(abs, globs)?);
         Ok(self)
     }
@@ -278,12 +275,9 @@ impl State {
     /// working directory, and matched using globset.
     pub fn find<T>(&self, cwd: T, patterns: Vec<String>) -> Result<Vec<PathBuf>>
     where
-        T: TryInto<AbsPath>,
-        T::Error: std::fmt::Display,
+        T: abspath::IntoAbsPath,
     {
-        let cwd = cwd
-            .try_into()
-            .map_err(|e| TenxError::Internal(format!("failed to convert cwd: {}", e)))?;
+        let cwd = cwd.into_abs_path()?;
         let mut results = HashSet::new();
 
         // First, handle memory store with path cleaning
@@ -331,7 +325,10 @@ impl State {
     /// Creates and dispatches a view patch for files matching the provided patterns.
     /// Expands the patterns using the current working directory, creates a Change::View for each matched path,
     /// and applies the patch. Returns the snapshot ID from applying the patch.
-    pub fn view(&mut self, cwd: AbsPath, patterns: Vec<String>) -> Result<u64> {
+    pub fn view<P>(&mut self, cwd: P, patterns: Vec<String>) -> Result<u64>
+    where
+        P: abspath::IntoAbsPath,
+    {
         let paths = self.find(cwd, patterns)?;
         let changes: Vec<Change> = paths.into_iter().map(Change::View).collect();
         let patch = Patch { changes };
