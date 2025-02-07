@@ -62,7 +62,7 @@ impl Snapshot {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct State {
     directory: Option<directory::Directory>,
-    memory: HashMap<String, String>,
+    memory: memory::Memory,
     snapshots: Vec<(u64, Snapshot)>,
     next_snapshot_id: u64,
 }
@@ -84,13 +84,10 @@ impl State {
     /// Retrieves the content associated with the given path.
     /// If the path exists in memory, returns that value. Otherwise, reads from the file system.
     pub fn read(&self, path: &Path) -> Result<String> {
-        let key = path.to_string_lossy().to_string();
-        if let Some(value) = self.memory.get(&key) {
-            return Ok(value.clone());
-        }
-        let mem_key = format!("{}{}", MEM_PREFIX, key);
-        if let Some(value) = self.memory.get(&mem_key) {
-            return Ok(value.clone());
+        if path.to_string_lossy().starts_with(MEM_PREFIX) {
+            if let Ok(content) = self.memory.read(path) {
+                return Ok(content);
+            }
         }
         match &self.directory {
             Some(fs) => fs.read(path).map_err(|_| TenxError::NotFound {
@@ -107,10 +104,8 @@ impl State {
     /// Writes content to a path. If the path starts with MEM_PREFIX, writes to memory,
     /// otherwise writes to the filesystem.
     fn write(&mut self, path: &Path, content: &str) -> Result<()> {
-        let key = path.to_string_lossy().to_string();
-        if key.starts_with(MEM_PREFIX) {
-            self.memory.insert(key, content.to_string());
-            return Ok(());
+        if path.to_string_lossy().starts_with(MEM_PREFIX) {
+            return self.memory.write(path, content);
         }
 
         match &mut self.directory {
@@ -124,17 +119,15 @@ impl State {
 
     /// Removes a file or memory entry for the given path.
     fn remove(&mut self, path: &Path) -> Result<()> {
-        let key = path.to_string_lossy().to_string();
-        if key.starts_with(MEM_PREFIX) {
-            self.memory.remove(&key);
-            return Ok(());
+        if path.to_string_lossy().starts_with(MEM_PREFIX) {
+            return self.memory.remove(path);
         }
         if let Some(fs) = &mut self.directory {
             fs.remove(path)
         } else {
             Err(TenxError::NotFound {
                 msg: "No file system available".to_string(),
-                path: key,
+                path: path.display().to_string(),
             })
         }
     }
@@ -338,7 +331,7 @@ mod tests {
                 name: "get from memory only",
                 fs_content: None,
                 memory_content: Some("memory content"),
-                path: "test.txt",
+                path: "::test.txt",
                 expected: Ok("memory content"),
             },
             TestCase {
@@ -392,7 +385,7 @@ mod tests {
 
             // Setup memory if content provided
             if let Some(content) = case.memory_content {
-                let _ = state.write(Path::new(&format!("{}{}", MEM_PREFIX, case.path)), content);
+                let _ = state.write(Path::new(case.path), content);
             }
 
             // Test the get operation
