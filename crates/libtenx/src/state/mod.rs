@@ -19,7 +19,6 @@ use serde::{Deserialize, Serialize};
 use crate::{
     error::{Result, TenxError},
     patch::{Change, Patch},
-    state::abspath::AbsPath,
 };
 
 /// Prefix for in-memory files
@@ -341,6 +340,7 @@ impl State {
 
 #[cfg(test)]
 mod tests {
+    use super::abspath::AbsPath;
     use super::*;
     use std::{fs, path::PathBuf};
     use tempfile::TempDir;

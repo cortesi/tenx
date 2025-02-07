@@ -5,9 +5,8 @@ use ignore::{overrides::OverrideBuilder, WalkBuilder};
 use path_clean;
 use pathdiff::diff_paths;
 
+use super::abspath::IntoAbsPath;
 use crate::TenxError;
-
-use crate::state::abspath::AbsPath;
 
 const GLOB_START: &str = "*";
 
@@ -19,7 +18,13 @@ const GLOB_START: &str = "*";
 /// - All paths are cleaned to remove redundant ".." and "." components.
 ///
 /// This function only normalizes the path - it does not check if the file exists.
-pub fn normalize_path(root: AbsPath, cwd: AbsPath, path: &str) -> crate::Result<PathBuf> {
+pub fn normalize_path<R, C>(root: R, cwd: C, path: &str) -> crate::Result<PathBuf>
+where
+    R: IntoAbsPath,
+    C: IntoAbsPath,
+{
+    let root = root.into_abs_path()?;
+    let cwd = cwd.into_abs_path()?;
     if path.starts_with(GLOB_START) {
         return Ok(PathBuf::from(path));
     }
@@ -53,7 +58,11 @@ pub fn normalize_path(root: AbsPath, cwd: AbsPath, path: &str) -> crate::Result<
 /// equivalent to --exclude). If no glob patterns are provided, all files are included.
 ///
 /// Files are sorted by path.
-pub fn list_files(root: AbsPath, globs: Vec<String>) -> crate::Result<Vec<PathBuf>> {
+pub fn list_files<R>(root: R, globs: Vec<String>) -> crate::Result<Vec<PathBuf>>
+where
+    R: IntoAbsPath,
+{
+    let root = root.into_abs_path()?;
     // Build override rules from project config
     let mut builder = OverrideBuilder::new(&root);
 
@@ -98,6 +107,7 @@ pub fn list_files(root: AbsPath, globs: Vec<String>) -> crate::Result<Vec<PathBu
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::state::abspath::AbsPath;
     use std::{fs, path::Path, process::Command};
     use tempfile::TempDir;
 
