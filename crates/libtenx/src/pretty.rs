@@ -367,43 +367,39 @@ mod tests {
     use crate::{
         context::Context,
         patch::Patch,
-        session::{ModelResponse, Step},
+        session::{Action, ModelResponse, Step},
         strategy, testutils, TenxError,
     };
 
-    fn create_test_project() -> testutils::TestProject {
+    fn create_test_project() -> Result<testutils::TestProject> {
         let mut p = testutils::test_project();
-        p.session
-            .add_action(
-                &p.config,
-                strategy::Strategy::Code(strategy::Code::new("test".into())),
-            )
-            .unwrap();
+        p.session.add_action(Action::new(
+            &p.config,
+            strategy::Strategy::Code(strategy::Code::new("test".into())),
+        )?)?;
         p.session
             .add_step("test_model".into(), "Test prompt".to_string())
             .unwrap();
         p.write("test_file.rs", "Test content");
         p.session
             .add_context(Context::new_path(&p.config, "test_file.rs").unwrap());
-        p
+        Ok(p)
     }
 
     #[test]
-    fn test_print_steps_empty_session() {
+    fn test_print_steps_empty_session() -> Result<()> {
         let config = Config::default();
-        let p = create_test_project();
-        let result = print_steps(&config, &p.session, false, 80);
-        assert!(result.is_ok());
-        let output = result.unwrap();
+        let p = create_test_project()?;
+        let output = print_steps(&config, &p.session, false, 80)?;
         assert!(output.contains("Step 0"));
         assert!(output.contains("Test prompt"));
+        Ok(())
     }
 
     #[test]
-    fn test_print_steps_with_patch() {
+    fn test_print_steps_with_patch() -> Result<()> {
         let config = Config::default();
-        let mut p = create_test_project();
-
+        let mut p = create_test_project()?;
         if let Some(step) = p.session.last_step_mut() {
             step.model_response = Some(ModelResponse {
                 patch: Some(Patch {
@@ -415,29 +411,27 @@ mod tests {
                 response_text: Some("Test comment".to_string()),
             });
         }
-        let result = print_steps(&config, &p.session, false, 80);
-        assert!(result.is_ok());
-        let output = result.unwrap();
+        let output = print_steps(&config, &p.session, false, 80)?;
         assert!(output.contains("Step 0"));
         assert!(output.contains("Test prompt"));
         assert!(output.contains("comment:"));
         assert!(output.contains("Test comment"));
+        Ok(())
     }
 
     #[test]
-    fn test_print_steps_with_error() {
+    fn test_print_steps_with_error() -> Result<()> {
         let config = Config::default();
-        let mut p = create_test_project();
+        let mut p = create_test_project()?;
         if let Some(step) = p.session.last_step_mut() {
             step.err = Some(TenxError::Internal("Test error".to_string()));
         }
-        let result = print_steps(&config, &p.session, false, 80);
-        assert!(result.is_ok());
-        let output = result.unwrap();
+        let output = print_steps(&config, &p.session, false, 80)?;
         assert!(output.contains("Step 0"));
         assert!(output.contains("Test prompt"));
         assert!(output.contains("error:"));
         assert!(output.contains("Test error"));
+        Ok(())
     }
 
     #[test]

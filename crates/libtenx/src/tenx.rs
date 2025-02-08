@@ -7,7 +7,7 @@ use crate::{
     context::{Context, ContextProvider},
     events::{send_event, Event, EventBlock, EventSender},
     model::ModelProvider,
-    session::Session,
+    session::{Action, Session},
     session_store::{path_to_filename, SessionStore},
     strategy,
     strategy::ActionStrategy,
@@ -149,10 +149,10 @@ impl Tenx {
         let _block = EventBlock::start(&sender)?;
         let pre_result = self.run_pre_checks(session, &sender);
         if let Err(e) = pre_result {
-            session.add_action(
+            session.add_action(Action::new(
                 &self.config,
                 strategy::Strategy::Fix(strategy::Fix::new(e.clone(), prompt.clone())),
-            )?;
+            )?)?;
             self.save_session(session)?;
             self.process_prompt(session, sender.clone()).await
         } else {
@@ -206,10 +206,10 @@ impl Tenx {
     ) -> Result<()> {
         self.add_files(session, files)?;
         let _block = EventBlock::start(&sender)?;
-        session.add_action(
+        session.add_action(Action::new(
             &self.config,
             strategy::Strategy::Code(strategy::Code::new(prompt)),
-        )?;
+        )?)?;
         self.process_prompt(session, sender.clone()).await
     }
 
@@ -375,7 +375,7 @@ mod tests {
     use tempfile::tempdir;
 
     #[tokio::test]
-    async fn test_new_session_with_no_context() {
+    async fn test_new_session_with_no_context() -> Result<()> {
         use crate::config::{Context, TextContext};
         let temp_dir = tempdir().unwrap();
         let mut config = Config::default().with_root(temp_dir.path());
@@ -396,12 +396,13 @@ mod tests {
         let session = tenx.new_session_from_cwd(&None, true).await.unwrap();
         assert!(session.contexts().is_empty());
 
-        let session = tenx.new_session_from_cwd(&None, false).await.unwrap();
+        let session = tenx.new_session_from_cwd(&None, false).await?;
         assert!(!session.contexts().is_empty());
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_tenx_process_prompt() {
+    async fn test_tenx_process_prompt() -> Result<()> {
         let temp_dir = tempdir().unwrap();
         let mut config = Config::default()
             .with_dummy_model(crate::model::DummyModel::from_model_response(
@@ -431,10 +432,10 @@ mod tests {
         let mut session = Session::new(&config).unwrap();
 
         session
-            .add_action(
+            .add_action(Action::new(
                 &config,
                 strategy::Strategy::Code(strategy::Code::new("test".into())),
-            )
+            )?)
             .unwrap();
         session
             .add_editable_path(&config, test_file_path.clone())
@@ -451,5 +452,6 @@ mod tests {
 
         let file_content = fs::read_to_string(&test_file_path).unwrap();
         assert_eq!(file_content, "Updated content");
+        Ok(())
     }
 }

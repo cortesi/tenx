@@ -116,6 +116,7 @@ impl ActionStrategy for Fix {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::session::Action;
     use crate::strategy::Strategy;
     use crate::testutils::test_project;
 
@@ -129,7 +130,10 @@ mod test {
             .next_step(&test_project.config, &session, None)?
             .is_none());
 
-        session.add_action(&test_project.config, Strategy::Code(code.clone()))?;
+        session.add_action(Action::new(
+            &test_project.config,
+            Strategy::Code(code.clone()),
+        )?)?;
         let step = code
             .next_step(&test_project.config, &session, None)?
             .unwrap();
@@ -166,7 +170,7 @@ mod test {
             .is_none());
 
         // Custom prompt
-        session.add_action(&test_project.config, Strategy::Fix(fix))?;
+        session.add_action(Action::new(&test_project.config, Strategy::Fix(fix))?)?;
         let step = session
             .last_action()
             .unwrap()
@@ -191,7 +195,7 @@ mod test {
 
         // Default prompt
         let fix = Fix::new(TenxError::Config("Error".into()), None);
-        session.add_action(&test_project.config, Strategy::Fix(fix))?;
+        session.add_action(Action::new(&test_project.config, Strategy::Fix(fix))?)?;
         let step = session
             .last_action()
             .unwrap()

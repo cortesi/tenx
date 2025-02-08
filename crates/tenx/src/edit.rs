@@ -4,7 +4,10 @@ use anyhow::{Context as AnyhowContext, Result};
 use tempfile::NamedTempFile;
 use tokio::sync::mpsc;
 
-use libtenx::{events::Event, session::Session};
+use libtenx::{
+    events::Event,
+    session::{Action, Session},
+};
 
 const SESSION_INFO_MARKER: &str = "\n** Only edit prompt text ABOVE this marker. **\n";
 
@@ -167,13 +170,13 @@ mod tests {
     }
 
     #[test]
-    fn test_render_and_parse_roundtrip() {
+    fn test_render_and_parse_roundtrip() -> anyhow::Result<()> {
         let mut p = testutils::test_project();
         p.session
-            .add_action(
+            .add_action(Action::new(
                 &p.config,
                 strategy::Strategy::Code(strategy::Code::new("test".into())),
-            )
+            )?)
             .unwrap();
 
         // Add two steps with responses
@@ -204,5 +207,6 @@ mod tests {
         let rendered = render_edit_text(&p.session, true).unwrap();
         let parsed = parse_edited_text(&rendered);
         assert_eq!(parsed, "Second prompt");
+        Ok(())
     }
 }

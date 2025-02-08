@@ -1,5 +1,10 @@
 STATE REFACTORING:
 
+    - Refactor State::add_action to take an Action
+    - Perform state manipulation before adding Action 
+
+
+    - Shift patch module into state
 
 UX:
 

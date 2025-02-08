@@ -231,12 +231,8 @@ impl Session {
     }
 
     /// Adds a new action to the session.
-    pub fn add_action(
-        &mut self,
-        config: &config::Config,
-        strategy: strategy::Strategy,
-    ) -> Result<()> {
-        self.actions.push(Action::new(config, strategy)?);
+    pub fn add_action(&mut self, action: Action) -> Result<()> {
+        self.actions.push(action);
         Ok(())
     }
 
@@ -505,10 +501,10 @@ mod tests {
         test_project.create_file_tree(&["test.txt"]);
         test_project.write("test.txt", "Initial content");
 
-        test_project.session.add_action(
+        test_project.session.add_action(Action::new(
             &test_project.config,
             strategy::Strategy::Code(strategy::Code::new("test".into())),
-        )?;
+        )?)?;
 
         // Add three steps
         for i in 1..=3 {
@@ -578,10 +574,10 @@ mod tests {
             .session
             .add_editable_path(&test_project.config, "file3.txt")?;
 
-        test_project.session.add_action(
+        test_project.session.add_action(Action::new(
             &test_project.config,
             strategy::Strategy::Code(strategy::Code::new("test".into())),
-        )?;
+        )?)?;
         // Test 1: Before any steps are added, all files should be marked as modified
         let editables = test_project.session.editables_for_step(0)?;
         assert_eq!(editables.len(), 3,);
@@ -675,10 +671,10 @@ mod tests {
 
         test_project
             .session
-            .add_action(
+            .add_action(Action::new(
                 &test_project.config,
                 strategy::Strategy::Code(strategy::Code::new("test".into())),
-            )
+            )?)
             .unwrap();
 
         // Add a step with both a patch and an edit operation
