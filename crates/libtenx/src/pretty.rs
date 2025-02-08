@@ -439,6 +439,7 @@ mod tests {
         let step = Step::new(
             "test_model".into(),
             "Test prompt\nwith multiple\nlines".to_string(),
+            0,
         );
         let full_result = render_step_prompt(&step, 80, true);
         assert!(full_result.contains("Test prompt"));

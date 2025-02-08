@@ -53,13 +53,12 @@ pub struct Step {
 }
 
 impl Step {
-    /// Creates a new Step with the given prompt.
-    pub fn new(model: String, prompt: String) -> Self {
+    /// Creates a new Step with the given prompt and rollback ID.
+    pub fn new(model: String, prompt: String, rollback_id: u64) -> Self {
         Step {
             model,
             prompt,
-            rollback_id: 0,
-
+            rollback_id,
             model_response: None,
             response_time: None,
             err: None,
@@ -224,7 +223,8 @@ impl Session {
     /// Returns an error if the last step doesn't have either a patch or an error.
     pub fn add_step(&mut self, model: String, prompt: String) -> Result<()> {
         if let Some(action) = self.actions.last_mut() {
-            action.add_step(Step::new(model, prompt))?;
+            let rollback_id = self.state.mark()?;
+            action.add_step(Step::new(model, prompt, rollback_id))?;
         } else {
             Err(TenxError::Internal("No actions in session".into()))?
         }
@@ -520,10 +520,6 @@ mod tests {
                 .session
                 .add_step("test_model".into(), format!("Prompt {}", i))?;
 
-            let rollback_cache = [(PathBuf::from("test.txt"), test_project.read("test.txt"))]
-                .into_iter()
-                .collect();
-
             if let Some(step) = test_project.session.last_step_mut() {
                 step.model_response = Some(ModelResponse {
                     patch: Some(patch.clone()),
@@ -532,7 +528,6 @@ mod tests {
                     comment: Some(format!("Step {}", i)),
                     response_text: Some(format!("Step {}", i)),
                 });
-                step.rollback_cache = rollback_cache;
                 step.apply(&test_project.config)?;
             }
         }

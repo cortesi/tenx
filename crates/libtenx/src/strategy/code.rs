@@ -39,7 +39,7 @@ fn handle_existing_step(
             )?;
             debug!("Next step, based on error: {}", err);
 
-            return Ok(Some(Step::new(model, model_message.to_string())));
+            return Ok(Some(Step::new(model, model_message.to_string(), 0)));
         }
     } else if let Some(model_response) = &step.model_response {
         if !model_response.operations.is_empty() {
@@ -53,7 +53,7 @@ fn handle_existing_step(
             )?;
             debug!("Next step, based on operations");
 
-            return Ok(Some(Step::new(model, model_message)));
+            return Ok(Some(Step::new(model, model_message, 0)));
         }
     }
     Ok(None)
@@ -71,7 +71,7 @@ impl ActionStrategy for Code {
                 return handle_existing_step(config, step, events);
             } else {
                 let model = config.models.default.clone();
-                return Ok(Some(Step::new(model, self.prompt.clone())));
+                return Ok(Some(Step::new(model, self.prompt.clone(), 0)));
             }
         }
         Ok(None)
@@ -106,7 +106,7 @@ impl ActionStrategy for Fix {
                     .prompt
                     .clone()
                     .unwrap_or_else(|| "Please fix the following errors.".to_string());
-                return Ok(Some(Step::new(model, prompt)));
+                return Ok(Some(Step::new(model, prompt, 0)));
             }
         }
         Ok(None)
