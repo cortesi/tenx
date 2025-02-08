@@ -58,11 +58,12 @@ impl Step {
         Step {
             model,
             prompt,
+            rollback_id: 0,
+
             model_response: None,
             response_time: None,
             err: None,
             rollback_cache: HashMap::new(),
-            rollback_id: 0,
         }
     }
 
@@ -94,16 +95,14 @@ pub struct Action {
     pub strategy: strategy::Strategy,
     /// The steps in the action
     steps: Vec<Step>,
-    pub state: state::State,
 }
 
 impl Action {
     /// Creates a new Action with the given strategy.
-    pub fn new(config: &config::Config, strategy: strategy::Strategy) -> Result<Self> {
+    pub fn new(_config: &config::Config, strategy: strategy::Strategy) -> Result<Self> {
         Ok(Action {
             strategy,
             steps: Vec::new(),
-            state: config.state()?,
         })
     }
 
@@ -112,7 +111,7 @@ impl Action {
         self.steps.last()
     }
 
-    pub fn add_step(&mut self, mut step: Step) -> Result<()> {
+    pub fn add_step(&mut self, step: Step) -> Result<()> {
         if let Some(last_step) = self.steps.last() {
             if last_step.model_response.is_none() && last_step.err.is_none() {
                 return Err(TenxError::Internal(
@@ -120,7 +119,7 @@ impl Action {
                 ));
             }
         }
-        step.rollback_id = self.state.mark()?;
+        // step.rollback_id = self.state.mark()?;
         self.steps.push(step);
         Ok(())
     }
@@ -136,6 +135,7 @@ fn is_glob(s: &str) -> bool {
 pub struct Session {
     editable: Vec<PathBuf>,
     actions: Vec<Action>,
+    pub state: state::State,
     pub contexts: Vec<context::Context>,
 }
 
@@ -144,11 +144,12 @@ impl Session {
     ///
     /// If `dir` is provided, it is used as the project root; otherwise the configuration's
     /// project root is used.
-    pub fn new(_config: &config::Config) -> Result<Self> {
+    pub fn new(config: &config::Config) -> Result<Self> {
         Ok(Session {
             editable: vec![],
             actions: vec![],
             contexts: Vec::new(),
+            state: config.state()?,
         })
     }
 
