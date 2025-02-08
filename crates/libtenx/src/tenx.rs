@@ -126,6 +126,23 @@ impl Tenx {
         Ok(())
     }
 
+    /// Add files to edit in the session and save it
+    pub fn edit(&self, session: &mut Session, files: &[String]) -> Result<usize> {
+        let mut total = 0;
+        for file in files {
+            let added = session.add_editable(&self.config, file)?;
+            if added == 0 {
+                return Err(TenxError::Path(format!(
+                    "glob did not match any files: {}",
+                    file
+                )));
+            }
+            total += added;
+        }
+        self.save_session(session)?;
+        Ok(total)
+    }
+
     pub async fn fix(
         &self,
         session: &mut Session,

@@ -21,22 +21,6 @@ use libtenx::{
 
 mod edit;
 
-fn add_files_to_session(
-    session: &mut Session,
-    config: &config::Config,
-    files: &[String],
-) -> Result<usize> {
-    let mut total = 0;
-    for file in files {
-        let added = session.add_editable(config, file)?;
-        if added == 0 {
-            return Err(anyhow!("glob did not match any files: {}", file));
-        }
-        total += added;
-    }
-    Ok(total)
-}
-
 fn get_prompt(
     prompt: &Option<String>,
     prompt_file: &Option<PathBuf>,
@@ -549,9 +533,8 @@ async fn main() -> anyhow::Result<()> {
             }
             Commands::Edit { files } => {
                 let mut session = tx.load_session()?;
-                let total = add_files_to_session(&mut session, &config, files)?;
+                let total = tx.edit(&mut session, files)?;
                 println!("{} files added for editing", total);
-                tx.save_session(&session)?;
                 Ok(())
             }
             Commands::Context { command } => {
