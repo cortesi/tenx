@@ -336,6 +336,15 @@ impl State {
         debug_assert!(failures.is_empty());
         Ok(snap_id)
     }
+
+    /// Add an empty patch to the snapshot sequence and return a snapshot ID. Useful as a markder.
+    pub fn mark(&mut self) -> Result<u64> {
+        let patch = Patch { changes: vec![] };
+        let (snap_id, failures) = self.patch(&patch)?;
+        // Failures for view changes should always be empty.
+        debug_assert!(failures.is_empty());
+        Ok(snap_id)
+    }
 }
 
 #[cfg(test)]

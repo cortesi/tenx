@@ -49,6 +49,7 @@ pub struct Step {
 
     /// The response from the model
     pub model_response: Option<ModelResponse>,
+    rollback_id: u64,
 }
 
 impl Step {
@@ -61,6 +62,7 @@ impl Step {
             response_time: None,
             err: None,
             rollback_cache: HashMap::new(),
+            rollback_id: 0,
         }
     }
 
@@ -91,7 +93,7 @@ impl Step {
 pub struct Action {
     pub strategy: strategy::Strategy,
     /// The steps in the action
-    pub steps: Vec<Step>,
+    steps: Vec<Step>,
     pub state: state::State,
 }
 
@@ -108,6 +110,19 @@ impl Action {
     /// Returns a reference to the last step in the action
     pub fn last_step(&self) -> Option<&Step> {
         self.steps.last()
+    }
+
+    pub fn add_step(&mut self, mut step: Step) -> Result<()> {
+        if let Some(last_step) = self.steps.last() {
+            if last_step.model_response.is_none() && last_step.err.is_none() {
+                return Err(TenxError::Internal(
+                    "Cannot add a new prompt while the previous step has no response".into(),
+                ));
+            }
+        }
+        step.rollback_id = self.state.mark()?;
+        self.steps.push(step);
+        Ok(())
     }
 }
 
@@ -212,19 +227,8 @@ impl Session {
     ///
     /// Returns an error if the last step doesn't have either a patch or an error.
     pub fn add_step(&mut self, model: String, prompt: String) -> Result<()> {
-        if let Some(last_action) = self.actions.last() {
-            if let Some(last_step) = last_action.steps.last() {
-                if last_step.model_response.is_none() && last_step.err.is_none() {
-                    return Err(TenxError::Internal(
-                        "Cannot add a new prompt while the previous step has no response".into(),
-                    ));
-                }
-            }
-        }
-
-        // Add to existing action or create new Code action
         if let Some(action) = self.actions.last_mut() {
-            action.steps.push(Step::new(model, prompt));
+            action.add_step(Step::new(model, prompt))?;
         } else {
             Err(TenxError::Internal("No actions in session".into()))?
         }
