@@ -138,6 +138,24 @@ impl Tenx {
         Ok(count)
     }
 
+    /// Adds a user prompt to the session and sends it to the model.
+    pub async fn code(
+        &self,
+        session: &mut Session,
+        prompt: String,
+        sender: Option<EventSender>,
+        files: Option<&[String]>,
+    ) -> Result<()> {
+        self.add_files(session, files)?;
+        let _block = EventBlock::start(&sender)?;
+        let action = Action::new(
+            &self.config,
+            strategy::Strategy::Code(strategy::Code::new(prompt)),
+        )?;
+        session.add_action(action)?;
+        self.process_prompt(session, sender.clone()).await
+    }
+
     pub async fn fix(
         &self,
         session: &mut Session,
@@ -149,10 +167,12 @@ impl Tenx {
         let _block = EventBlock::start(&sender)?;
         let pre_result = self.run_pre_checks(session, &sender);
         if let Err(e) = pre_result {
-            session.add_action(Action::new(
+            let action = Action::new(
                 &self.config,
-                strategy::Strategy::Fix(strategy::Fix::new(e.clone(), prompt.clone())),
-            )?)?;
+                strategy::Strategy::Fix(strategy::Fix::new(e, prompt)),
+            )?;
+
+            session.add_action(action)?;
             self.save_session(session)?;
             self.process_prompt(session, sender.clone()).await
         } else {
@@ -193,23 +213,6 @@ impl Tenx {
                 step.prompt = p;
             }
         }
-        self.process_prompt(session, sender.clone()).await
-    }
-
-    /// Adds a user prompt to the session and sends it to the model.
-    pub async fn code(
-        &self,
-        session: &mut Session,
-        prompt: String,
-        sender: Option<EventSender>,
-        files: Option<&[String]>,
-    ) -> Result<()> {
-        self.add_files(session, files)?;
-        let _block = EventBlock::start(&sender)?;
-        session.add_action(Action::new(
-            &self.config,
-            strategy::Strategy::Code(strategy::Code::new(prompt)),
-        )?)?;
         self.process_prompt(session, sender.clone()).await
     }
 

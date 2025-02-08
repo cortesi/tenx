@@ -1,8 +1,8 @@
 STATE REFACTORING:
 
-    - Refactor State::add_action to take an Action
+    - Shift state onto Session object
     - Perform state manipulation before adding Action 
-
+    - Dispatch actions through State
 
     - Shift patch module into state
 
