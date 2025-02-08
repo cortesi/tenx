@@ -154,13 +154,13 @@ impl Trial {
                 for path in editable {
                     session.add_editable(&tenx.config, &path.to_string_lossy())?;
                 }
-                tenx.code(&mut session, prompt.clone(), sender).await
+                tenx.code(&mut session, prompt.clone(), sender, None).await
             }
             TrialOp::Fix { prompt, editable } => {
                 for path in editable {
                     session.add_editable(&tenx.config, &path.to_string_lossy())?;
                 }
-                tenx.fix(&mut session, sender, prompt.clone()).await
+                tenx.fix(&mut session, sender, prompt.clone(), None).await
             }
         };
 

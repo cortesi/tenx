@@ -110,12 +110,30 @@ impl Tenx {
     }
 
     /// Attempts to fix issues in the session by running pre checks and adding a new prompt if there's an error.
+    /// Helper function to add files to a session
+    fn add_files(&self, session: &mut Session, files: Option<&[String]>) -> Result<()> {
+        if let Some(file_list) = files {
+            for file in file_list {
+                let added = session.add_editable(&self.config, file)?;
+                if added == 0 {
+                    return Err(TenxError::Path(format!(
+                        "glob did not match any files: {}",
+                        file
+                    )));
+                }
+            }
+        }
+        Ok(())
+    }
+
     pub async fn fix(
         &self,
         session: &mut Session,
         sender: Option<EventSender>,
         prompt: Option<String>,
+        files: Option<&[String]>,
     ) -> Result<()> {
+        self.add_files(session, files)?;
         let _block = EventBlock::start(&sender)?;
         let pre_result = self.run_pre_checks(session, &sender);
         if let Err(e) = pre_result {
@@ -172,7 +190,9 @@ impl Tenx {
         session: &mut Session,
         prompt: String,
         sender: Option<EventSender>,
+        files: Option<&[String]>,
     ) -> Result<()> {
+        self.add_files(session, files)?;
         let _block = EventBlock::start(&sender)?;
         session.add_action(
             &self.config,

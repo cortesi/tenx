@@ -486,7 +486,6 @@ async fn main() -> anyhow::Result<()> {
                 let mut session = tx
                     .new_session_from_cwd(&Some(sender.clone()), *no_ctx)
                     .await?;
-                add_files_to_session(&mut session, &config, files)?;
                 let user_prompt = match get_prompt(
                     prompt,
                     prompt_file,
@@ -497,7 +496,7 @@ async fn main() -> anyhow::Result<()> {
                     Some(p) => p,
                     None => return Ok(()),
                 };
-                tx.code(&mut session, user_prompt, Some(sender.clone()))
+                tx.code(&mut session, user_prompt, Some(sender.clone()), Some(files))
                     .await?;
                 Ok(())
             }
@@ -513,9 +512,6 @@ async fn main() -> anyhow::Result<()> {
                         return Ok(());
                     }
                 };
-                if let Some(files) = files {
-                    add_files_to_session(&mut session, &config, files)?;
-                }
                 let user_prompt = match get_prompt(
                     prompt,
                     prompt_file,
@@ -526,7 +522,8 @@ async fn main() -> anyhow::Result<()> {
                     Some(p) => p,
                     None => return Ok(()),
                 };
-                tx.code(&mut session, user_prompt, Some(sender)).await?;
+                tx.code(&mut session, user_prompt, Some(sender), files.as_deref())
+                    .await?;
                 Ok(())
             }
             Commands::Session {
@@ -675,16 +672,13 @@ async fn main() -> anyhow::Result<()> {
                         .await?
                 };
 
-                if let Some(files) = files {
-                    add_files_to_session(&mut session, &config, files)?;
-                }
-
                 let prompt = if prompt.is_some() || prompt_file.is_some() || *edit {
                     get_prompt(prompt, prompt_file, &session, false, &Some(sender.clone()))?
                 } else {
                     None
                 };
-                tx.fix(&mut session, Some(sender.clone()), prompt).await?;
+                tx.fix(&mut session, Some(sender.clone()), prompt, files.as_deref())
+                    .await?;
                 Ok(())
             }
             Commands::Clear => {

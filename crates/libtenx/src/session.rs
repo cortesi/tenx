@@ -218,11 +218,6 @@ impl Session {
         }
     }
 
-    /// Return the error if the last step has one, else None.
-    pub fn last_step_error(&self) -> Option<&TenxError> {
-        self.last_step().and_then(|step| step.err.as_ref())
-    }
-
     /// Adds a new step to the last action in the session.
     ///
     /// Returns an error if the last step doesn't have either a patch or an error.
