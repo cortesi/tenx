@@ -1,8 +1,5 @@
 STATE REFACTORING:
 
-    - Shift adding files to sessions into code and fix commands
-    - Shift edit command into tenx
-
 
 UX:
 

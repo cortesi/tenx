@@ -110,37 +110,32 @@ impl Tenx {
     }
 
     /// Attempts to fix issues in the session by running pre checks and adding a new prompt if there's an error.
-    /// Helper function to add files to a session
-    fn add_files(&self, session: &mut Session, files: Option<&[String]>) -> Result<()> {
-        if let Some(file_list) = files {
-            for file in file_list {
-                let added = session.add_editable(&self.config, file)?;
-                if added == 0 {
-                    return Err(TenxError::Path(format!(
-                        "glob did not match any files: {}",
-                        file
-                    )));
+    /// Helper function to add files to a session, returning the count of files added
+    fn add_files(&self, session: &mut Session, files: Option<&[String]>) -> Result<usize> {
+        match files {
+            Some(file_list) => {
+                let mut total = 0;
+                for file in file_list {
+                    let added = session.add_editable(&self.config, file)?;
+                    if added == 0 {
+                        return Err(TenxError::Path(format!(
+                            "glob did not match any files: {}",
+                            file
+                        )));
+                    }
+                    total += added;
                 }
+                Ok(total)
             }
+            None => Ok(0),
         }
-        Ok(())
     }
 
     /// Add files to edit in the session and save it
     pub fn edit(&self, session: &mut Session, files: &[String]) -> Result<usize> {
-        let mut total = 0;
-        for file in files {
-            let added = session.add_editable(&self.config, file)?;
-            if added == 0 {
-                return Err(TenxError::Path(format!(
-                    "glob did not match any files: {}",
-                    file
-                )));
-            }
-            total += added;
-        }
+        let count = self.add_files(session, Some(files))?;
         self.save_session(session)?;
-        Ok(total)
+        Ok(count)
     }
 
     pub async fn fix(
@@ -150,7 +145,7 @@ impl Tenx {
         prompt: Option<String>,
         files: Option<&[String]>,
     ) -> Result<()> {
-        self.add_files(session, files)?;
+        let _ = self.add_files(session, files)?;
         let _block = EventBlock::start(&sender)?;
         let pre_result = self.run_pre_checks(session, &sender);
         if let Err(e) = pre_result {
