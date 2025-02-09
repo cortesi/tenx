@@ -66,29 +66,6 @@ impl Patch {
         }
         Ok(snapshot)
     }
-
-    /// Applies all changes in the patch, updating both the cache and the filesystem.
-    pub(crate) fn apply(&self, config: &Config) -> Result<()> {
-        // Next, make a clone copy of the cache
-        let mut modified_cache = self.snapshot(config)?;
-
-        // Apply all modifications to the cloned cache
-        for change in &self.changes {
-            match change {
-                Change::Replace(replace) => replace.apply_to_cache(&mut modified_cache)?,
-                Change::Write(write_file) => write_file.apply_to_cache(&mut modified_cache)?,
-                Change::View(_) => (),
-            }
-        }
-
-        // Finally, write all files to disk
-        for (path, content) in modified_cache {
-            let abs_path = config.abspath(&path)?;
-            fs_err::write(&abs_path, content)?;
-        }
-
-        Ok(())
-    }
 }
 
 #[cfg(test)]
@@ -113,30 +90,5 @@ mod tests {
         assert_eq!(changed_files.len(), 2);
         assert!(changed_files.contains(&PathBuf::from("file1.txt")));
         assert!(changed_files.contains(&PathBuf::from("file2.txt")));
-    }
-
-    #[test]
-    fn test_apply() {
-        use crate::testutils::test_project;
-        let test_project = test_project();
-        test_project.create_file_tree(&["file1.txt", "file2.txt"]);
-        test_project.write("file1.txt", "initial content");
-        test_project.write("file2.txt", "content with old text");
-
-        let mut patch = Patch::default();
-        patch.changes.push(Change::Write(write::WriteFile {
-            path: PathBuf::from("file1.txt"),
-            content: "new content".to_string(),
-        }));
-        patch.changes.push(Change::Replace(replace::Replace {
-            path: PathBuf::from("file2.txt"),
-            old: "content with old text".to_string(),
-            new: "content with new text".to_string(),
-        }));
-
-        patch.apply(&test_project.config).unwrap();
-
-        assert_eq!(test_project.read("file1.txt"), "new content");
-        assert_eq!(test_project.read("file2.txt"), "content with new text");
     }
 }

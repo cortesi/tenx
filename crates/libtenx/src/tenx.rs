@@ -114,18 +114,10 @@ impl Tenx {
     fn add_files(&self, session: &mut Session, files: Option<&[String]>) -> Result<usize> {
         match files {
             Some(file_list) => {
-                let mut total = 0;
-                for file in file_list {
-                    let added = session.add_editable(&self.config, file)?;
-                    if added == 0 {
-                        return Err(TenxError::Path(format!(
-                            "glob did not match any files: {}",
-                            file
-                        )));
-                    }
-                    total += added;
-                }
-                Ok(total)
+                let added = session
+                    .state
+                    .view(&self.config.cwd()?, file_list.to_vec())?;
+                Ok(added as usize)
             }
             None => Ok(0),
         }
@@ -206,8 +198,10 @@ impl Tenx {
         sender: Option<EventSender>,
     ) -> Result<()> {
         let _block = EventBlock::start(&sender)?;
+        if let Some(step) = session.last_step() {
+            session.state.revert(step.rollback_id)?;
+        }
         if let Some(step) = session.last_step_mut() {
-            step.rollback(&self.config)?;
             if let Some(p) = prompt {
                 step.prompt = p;
             }
@@ -435,7 +429,8 @@ mod tests {
             )?)
             .unwrap();
         session
-            .add_editable_path(&config, test_file_path.clone())
+            .state
+            .view(temp_dir.path().to_path_buf(), vec!["**".to_string()])
             .unwrap();
 
         tenx.process_prompt(&mut session, None).await.unwrap();

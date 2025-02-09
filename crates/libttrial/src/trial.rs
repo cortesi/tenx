@@ -152,13 +152,17 @@ impl Trial {
         let result = match &self.trial_conf.op {
             TrialOp::Code { prompt, editable } => {
                 for path in editable {
-                    session.add_editable(&tenx.config, &path.to_string_lossy())?;
+                    session
+                        .state
+                        .view(tenx.config.cwd()?, vec![path.to_string_lossy().to_string()])?;
                 }
                 tenx.code(&mut session, prompt.clone(), sender, None).await
             }
             TrialOp::Fix { prompt, editable } => {
                 for path in editable {
-                    session.add_editable(&tenx.config, &path.to_string_lossy())?;
+                    session
+                        .state
+                        .view(tenx.config.cwd()?, vec![path.to_string_lossy().to_string()])?;
                 }
                 tenx.fix(&mut session, sender, prompt.clone(), None).await
             }
