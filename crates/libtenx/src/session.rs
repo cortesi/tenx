@@ -23,10 +23,7 @@ pub struct ModelResponse {
 
 /// Operations requested by the model, other than patching.
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
-pub enum Operation {
-    /// Request to edit a file
-    Edit(PathBuf),
-}
+pub enum Operation {}
 
 /// A single step in the session - basically a prompt and a patch.
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -331,10 +328,6 @@ impl Session {
                         for path in patch.affected_files() {
                             most_recent_modified.insert(path.clone(), global_idx);
                         }
-                    }
-                    for op in &resp.operations {
-                        let Operation::Edit(path) = op;
-                        most_recent_modified.insert(path.clone(), global_idx);
                     }
                 }
                 global_idx += 1;

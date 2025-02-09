@@ -72,24 +72,13 @@ fn print_editables(_config: &Config, session: &Session) -> Result<String> {
     Ok(output)
 }
 
-fn print_operations(config: &Config, operations: &[Operation]) -> String {
+fn print_operations(_config: &Config, _operations: &[Operation]) -> String {
     let mut output = String::new();
     output.push_str(&format!(
         "{}{}\n",
         INDENT.repeat(2),
         "operations:".blue().bold()
     ));
-    for op in operations {
-        match op {
-            Operation::Edit(path) => {
-                output.push_str(&format!(
-                    "{}- edit: {}\n",
-                    INDENT.repeat(3),
-                    config.relpath(path).display()
-                ));
-            }
-        }
-    }
     output
 }
 

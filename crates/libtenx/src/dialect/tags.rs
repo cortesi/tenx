@@ -8,7 +8,7 @@ use crate::{
     config::Config,
     context::ContextProvider,
     patch::{Change, Patch, Replace, WriteFile},
-    session::{ModelResponse, Operation, Session},
+    session::{ModelResponse, Session},
     Result, TenxError,
 };
 use fs_err as fs;
@@ -124,7 +124,6 @@ impl DialectProvider for Tags {
     /// ignored.
     fn parse(&self, response: &str) -> Result<ModelResponse> {
         let mut patch = Patch::default();
-        let mut operations = vec![];
         let mut lines = response.lines().map(String::from).peekable();
         let mut comment = None;
 
@@ -180,7 +179,7 @@ impl DialectProvider for Tags {
                         for line in content {
                             let path = line.trim().to_string();
                             if !path.is_empty() {
-                                operations.push(Operation::Edit(PathBuf::from(path)));
+                                patch.changes.push(Change::View(path.clone().into()));
                             }
                         }
                     }
@@ -194,7 +193,7 @@ impl DialectProvider for Tags {
         }
         Ok(ModelResponse {
             patch: Some(patch),
-            operations,
+            operations: vec![],
             usage: None,
             comment,
             response_text: Some(response.to_string()),
@@ -216,10 +215,6 @@ impl DialectProvider for Tags {
             if let Some(comment) = &resp.comment {
                 rendered.push_str(&format!("<comment>\n{}\n</comment>\n\n", comment));
             }
-            for op in &resp.operations {
-                let Operation::Edit(path) = op;
-                rendered.push_str(&format!("<edit>\n{}\n</edit>\n\n", path.display()));
-            }
             if let Some(patch) = &resp.patch {
                 for change in &patch.changes {
                     match change {
@@ -238,7 +233,9 @@ impl DialectProvider for Tags {
                             replace.new
                         ));
                         }
-                        Change::View(_) => (),
+                        Change::View(v) => {
+                            rendered.push_str(&format!("<edit>\n{}\n</edit>\n", v.display()));
+                        }
                     }
                 }
             }
@@ -324,10 +321,10 @@ mod tests {
 
         let result = d.parse(input).unwrap();
         assert_eq!(
-            result.operations,
+            result.patch.unwrap().changes,
             vec![
-                Operation::Edit(PathBuf::from("src/main.rs")),
-                Operation::Edit(PathBuf::from("with/leading/spaces.rs")),
+                Change::View(PathBuf::from("src/main.rs")),
+                Change::View(PathBuf::from("with/leading/spaces.rs")),
             ]
         );
     }
@@ -340,11 +337,13 @@ mod tests {
 
         let response = ModelResponse {
             comment: Some("A comment".into()),
-            patch: None,
-            operations: vec![
-                Operation::Edit(PathBuf::from("src/main.rs")),
-                Operation::Edit(PathBuf::from("src/lib.rs")),
-            ],
+            patch: Some(Patch {
+                changes: vec![
+                    Change::View(PathBuf::from("src/main.rs")),
+                    Change::View(PathBuf::from("src/lib.rs")),
+                ],
+            }),
+            operations: vec![],
             usage: None,
             response_text: Some("Test response".into()),
         };
@@ -371,11 +370,9 @@ mod tests {
                 <edit>
                 src/main.rs
                 </edit>
-
                 <edit>
                 src/lib.rs
                 </edit>
-
             "#}
         );
         Ok(())
@@ -394,10 +391,10 @@ mod tests {
 
         let result = d.parse(input).unwrap();
         assert_eq!(
-            result.operations,
+            result.patch.unwrap().changes,
             vec![
-                Operation::Edit(PathBuf::from("/path/to/first")),
-                Operation::Edit(PathBuf::from("/path/to/second")),
+                Change::View(PathBuf::from("/path/to/first")),
+                Change::View(PathBuf::from("/path/to/second")),
             ]
         );
     }
