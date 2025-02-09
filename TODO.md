@@ -1,10 +1,7 @@
 STATE REFACTORING:
 
-
-    - Dispatch actions through State
-
+    - Properly handle patch errors
     - Refactor Conversation interface to use actions and steps
-
     - Shift patch module into state
 
 UX:

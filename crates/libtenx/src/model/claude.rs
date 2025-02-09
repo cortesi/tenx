@@ -191,7 +191,7 @@ impl Conversation<misanthropy::MessagesRequest> for Claude {
         dialect: &Dialect,
         step_offset: usize,
     ) -> Result<()> {
-        let editables = session.editables_for_step(step_offset)?;
+        let editables = session.editables_for_step_state(step_offset)?;
         if !editables.is_empty() {
             self.add_user_message(
                 req,

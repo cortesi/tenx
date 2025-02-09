@@ -37,8 +37,6 @@ pub struct Step {
     /// An associated error, for instance an error processing a model response. This may be
     /// retryable, in which case a new step will be synthesized to go back to the model.
     pub err: Option<TenxError>,
-    /// A cache of the file contents before the step was applied
-    pub rollback_cache: HashMap<PathBuf, String>,
 
     /// The response from the model
     pub model_response: Option<ModelResponse>,
@@ -55,7 +53,6 @@ impl Step {
             model_response: None,
             response_time: None,
             err: None,
-            rollback_cache: HashMap::new(),
         }
     }
 }
@@ -305,42 +302,6 @@ impl Session {
         }
         self.state
             .last_changed_between(prev_rollback_id, curr_rollback_id)
-    }
-
-    /// Return the list of files that should be included in the editable block before a given step.
-    pub fn editables_for_step(&self, step_offset: usize) -> Result<Vec<PathBuf>> {
-        let total_steps: usize = self.actions.iter().map(|a| a.steps.len()).sum();
-        if step_offset > total_steps {
-            return Err(TenxError::Internal("Invalid step offset".into()));
-        }
-
-        let mut most_recent_modified: HashMap<PathBuf, i32> = self
-            .editable
-            .iter()
-            .map(|path| (path.clone(), -1))
-            .collect();
-
-        let mut global_idx = 0;
-        for action in &self.actions {
-            for step in &action.steps {
-                if let Some(resp) = &step.model_response {
-                    if let Some(patch) = &resp.patch {
-                        for path in patch.affected_files() {
-                            most_recent_modified.insert(path.clone(), global_idx);
-                        }
-                    }
-                }
-                global_idx += 1;
-            }
-        }
-
-        let target_step = (step_offset as i32) - 1;
-        Ok(self
-            .editable
-            .iter()
-            .filter(|path| most_recent_modified.get(*path) == Some(&target_step))
-            .cloned()
-            .collect())
     }
 }
 
