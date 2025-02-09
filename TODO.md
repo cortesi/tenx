@@ -1,8 +1,9 @@
 STATE REFACTORING:
 
-    - Shift state onto Session object
-    - Perform state manipulation before adding Action 
+
     - Dispatch actions through State
+
+    - Refactor Conversation interface to use actions and steps
 
     - Shift patch module into state
 

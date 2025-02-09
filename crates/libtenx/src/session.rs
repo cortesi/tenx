@@ -368,6 +368,32 @@ impl Session {
         Ok(())
     }
 
+    pub fn editables_for_step_state(&self, step_offset: usize) -> Result<Vec<PathBuf>> {
+        // Convert step offset into a rollback ID range
+        let total_steps: usize = self.actions.iter().map(|a| a.steps.len()).sum();
+        if step_offset > total_steps {
+            return Err(TenxError::Internal("Invalid step offset".into()));
+        }
+
+        let mut prev_rollback_id = None;
+        let mut curr_rollback_id = None;
+        let mut curr_offset = 0;
+
+        // Find the rollback IDs for the target step
+        for action in &self.actions {
+            for step in &action.steps {
+                if curr_offset == step_offset {
+                    curr_rollback_id = Some(step.rollback_id);
+                } else if curr_offset == step_offset.saturating_sub(1) {
+                    prev_rollback_id = Some(step.rollback_id);
+                }
+                curr_offset += 1;
+            }
+        }
+        self.state
+            .last_changed_between(prev_rollback_id, curr_rollback_id)
+    }
+
     /// Return the list of files that should be included in the editable block before a given step.
     pub fn editables_for_step(&self, step_offset: usize) -> Result<Vec<PathBuf>> {
         let total_steps: usize = self.actions.iter().map(|a| a.steps.len()).sum();
