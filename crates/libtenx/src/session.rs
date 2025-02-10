@@ -1,5 +1,5 @@
 //! A Session is the context and a sequence of model interaction steps.
-use std::{collections::HashMap, path::PathBuf};
+use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 

@@ -31,6 +31,14 @@ trait SubStore: Debug {
     fn remove(&mut self, path: &Path) -> Result<()>;
 }
 
+/// Information about a patch operation, including success/failure counts and any errors.
+#[derive(Debug)]
+pub struct PatchInfo {
+    pub id: u64,
+    pub succeeded: usize,
+    pub failures: Vec<(Change, TenxError)>,
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 struct Snapshot {
     content: HashMap<PathBuf, String>,
@@ -175,14 +183,17 @@ impl State {
     /// Applies a patch by taking a snapshot of all files to be modified, then attempts to apply each change in the patch.
     /// If any change fails, the error is collected in a vector of (change, error) tuples.
     /// Returns a tuple containing the snapshot ID and a vector of failed changes.
-    pub fn patch(&mut self, patch: &Patch) -> Result<(u64, Vec<(Change, TenxError)>)> {
-        let snap_id = self.snapshot(&patch.affected_files())?;
+    pub fn patch(&mut self, patch: &Patch) -> Result<PatchInfo> {
+        let id = self.snapshot(&patch.affected_files())?;
         let mut failures = Vec::new();
+        let mut succeeded = 0;
         for change in &patch.changes {
             match change {
                 Change::Write(write_file) => {
                     if let Err(e) = self.write(write_file.path.as_path(), &write_file.content) {
                         failures.push((change.clone(), e));
+                    } else {
+                        succeeded += 1;
                     }
                 }
                 Change::Replace(replace) => {
@@ -193,12 +204,18 @@ impl State {
                     })();
                     if let Err(e) = res {
                         failures.push((change.clone(), e));
+                    } else {
+                        succeeded += 1;
                     }
                 }
-                Change::View(_) => (),
+                Change::View(_) => succeeded += 1,
             }
         }
-        Ok((snap_id, failures))
+        Ok(PatchInfo {
+            id,
+            succeeded,
+            failures,
+        })
     }
 
     /// Reverts all snapshots up to and including the given ID in reverse order, then removes them from the snapshots list.
@@ -331,19 +348,19 @@ impl State {
         let paths = self.find(cwd, patterns)?;
         let changes: Vec<Change> = paths.into_iter().map(Change::View).collect();
         let patch = Patch { changes };
-        let (snap_id, failures) = self.patch(&patch)?;
+        let patch_info = self.patch(&patch)?;
         // Failures for view changes should always be empty.
-        debug_assert!(failures.is_empty());
-        Ok(snap_id)
+        debug_assert!(patch_info.failures.is_empty());
+        Ok(patch_info.id)
     }
 
     /// Add an empty patch to the snapshot sequence and return a snapshot ID. Useful as a markder.
     pub fn mark(&mut self) -> Result<u64> {
         let patch = Patch { changes: vec![] };
-        let (snap_id, failures) = self.patch(&patch)?;
+        let patch_info = self.patch(&patch)?;
         // Failures for view changes should always be empty.
-        debug_assert!(failures.is_empty());
-        Ok(snap_id)
+        debug_assert!(patch_info.failures.is_empty());
+        Ok(patch_info.id)
     }
 }
 
@@ -711,9 +728,9 @@ mod tests {
 
             // Apply each patch to build up the snapshot history
             for patch in case.patches {
-                let (_, failures) = state.patch(&patch)?;
+                let patch_info = state.patch(&patch)?;
                 assert!(
-                    failures.is_empty(),
+                    patch_info.failures.is_empty(),
                     "{}: patch application failed",
                     case.name
                 );
