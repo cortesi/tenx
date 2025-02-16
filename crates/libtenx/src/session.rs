@@ -38,8 +38,14 @@ pub struct Step {
     /// retryable, in which case a new step will be synthesized to go back to the model.
     pub err: Option<TenxError>,
 
+    /// Information about the patch applied in this step, including failures if any.
+    pub patch_info: Option<state::PatchInfo>,
+
     /// The response from the model
     pub model_response: Option<ModelResponse>,
+
+    /// The rollback identifier for this step. Rolling back to this identifier will revert all
+    /// changes.
     pub rollback_id: u64,
 }
 
@@ -52,6 +58,7 @@ impl Step {
             rollback_id,
             model_response: None,
             response_time: None,
+            patch_info: None,
             err: None,
         }
     }
@@ -273,7 +280,11 @@ impl Session {
             .clone()
             .ok_or_else(|| TenxError::Internal("No response in the last step".into()))?;
         if let Some(patch) = &resp.patch {
-            self.state.patch(patch)?;
+            let patch_info = self.state.patch(patch)?;
+            let step = self
+                .last_step_mut()
+                .ok_or_else(|| TenxError::Internal("No steps in session".into()))?;
+            step.patch_info = Some(patch_info);
         }
         Ok(())
     }

@@ -32,11 +32,25 @@ trait SubStore: Debug {
 }
 
 /// Information about a patch operation, including success/failure counts and any errors.
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PatchInfo {
     pub id: u64,
     pub succeeded: usize,
+    /// All errors here are of type TenxError::Patch
     pub failures: Vec<(Change, TenxError)>,
+}
+
+impl PatchInfo {
+    pub fn add_failure(&mut self, change: Change, error: TenxError) -> Result<()> {
+        match error {
+            TenxError::Patch { user, model } => {
+                self.failures
+                    .push((change, TenxError::Patch { user, model }));
+                Ok(())
+            }
+            _ => Err(error),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -185,15 +199,18 @@ impl State {
     /// Returns a tuple containing the snapshot ID and a vector of failed changes.
     pub fn patch(&mut self, patch: &Patch) -> Result<PatchInfo> {
         let id = self.snapshot(&patch.affected_files())?;
-        let mut failures = Vec::new();
-        let mut succeeded = 0;
+        let mut pinfo = PatchInfo {
+            id,
+            succeeded: 0,
+            failures: Vec::new(),
+        };
         for change in &patch.changes {
             match change {
                 Change::Write(write_file) => {
                     if let Err(e) = self.write(write_file.path.as_path(), &write_file.content) {
-                        failures.push((change.clone(), e));
+                        pinfo.add_failure(change.clone(), e)?;
                     } else {
-                        succeeded += 1;
+                        pinfo.succeeded += 1;
                     }
                 }
                 Change::Replace(replace) => {
@@ -203,19 +220,15 @@ impl State {
                         self.write(replace.path.as_path(), &new_content)
                     })();
                     if let Err(e) = res {
-                        failures.push((change.clone(), e));
+                        pinfo.add_failure(change.clone(), e)?;
                     } else {
-                        succeeded += 1;
+                        pinfo.succeeded += 1;
                     }
                 }
-                Change::View(_) => succeeded += 1,
+                Change::View(_) => pinfo.succeeded += 1,
             }
         }
-        Ok(PatchInfo {
-            id,
-            succeeded,
-            failures,
-        })
+        Ok(pinfo)
     }
 
     /// Reverts all snapshots up to and including the given ID in reverse order, then removes them from the snapshots list.
