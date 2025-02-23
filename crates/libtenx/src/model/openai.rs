@@ -50,11 +50,7 @@ pub struct OpenAi {
 }
 
 impl Conversation<CreateChatCompletionRequest> for OpenAi {
-    fn set_system_prompt(
-        &self,
-        req: &mut CreateChatCompletionRequest,
-        prompt: String,
-    ) -> Result<()> {
+    fn set_system_prompt(&self, req: &mut CreateChatCompletionRequest, prompt: &str) -> Result<()> {
         if self.no_system_prompt {
             req.messages.push(
                 ChatCompletionRequestDeveloperMessageArgs::default()
@@ -73,7 +69,7 @@ impl Conversation<CreateChatCompletionRequest> for OpenAi {
         Ok(())
     }
 
-    fn add_user_message(&self, req: &mut CreateChatCompletionRequest, text: String) -> Result<()> {
+    fn add_user_message(&self, req: &mut CreateChatCompletionRequest, text: &str) -> Result<()> {
         req.messages.push(
             ChatCompletionRequestUserMessageArgs::default()
                 .content(text)

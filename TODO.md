@@ -1,7 +1,7 @@
 STATE REFACTORING:
 
-    - Render multiple patch errors
     - Properly handle patch errors
+        - Render multiple patch errors
     - Refactor Conversation interface to use actions and steps
     - Shift patch module into state
     - Update pretty to output actions

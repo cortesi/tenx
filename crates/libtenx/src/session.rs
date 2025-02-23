@@ -10,15 +10,17 @@ use crate::{config, context, model::Usage, patch::Patch, state, strategy, Result
 pub struct ModelResponse {
     /// Model's comment on changes
     pub comment: Option<String>,
+
     /// The unified patch in the response
     pub patch: Option<Patch>,
+
     /// Operations requested by the model, other than patching.
     pub operations: Vec<Operation>,
 
     /// Model-specific usage statistics
     pub usage: Option<Usage>,
 
-    /// The verbatim text response from the model
+    /// The raw text response from the model
     pub response_text: Option<String>,
 }
 
@@ -32,7 +34,7 @@ pub struct Step {
     /// The name of the model used for this step
     pub model: String,
 
-    /// The prompt provided to the model
+    /// The raw prompt provided to the model
     pub prompt: String,
 
     /// Time taken in seconds to receive the complete model response
@@ -42,7 +44,7 @@ pub struct Step {
     /// retryable, in which case a new step will be synthesized to go back to the model.
     pub err: Option<TenxError>,
 
-    /// Information about the patch applied in this step, including failures if any.
+    /// Information about the patch applied in this step, including any failures.
     pub patch_info: Option<state::PatchInfo>,
 
     /// The response from the model

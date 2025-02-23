@@ -261,17 +261,15 @@ impl State {
         Ok(files)
     }
 
-    /// Returns the files that were last changed between the given snapshot ids, inclusive.
+    /// Returns the files that were last changed between the given snapshot ids, inclusive. Returns
+    /// an empty list if no snapshots exist.
     pub fn last_changed_between(
         &self,
         start: Option<u64>,
         end: Option<u64>,
     ) -> Result<Vec<PathBuf>> {
-        if start.is_none() && end.is_none() {
-            return Ok(vec![]);
-        }
         if self.snapshots.is_empty() {
-            return Err(TenxError::Internal("No snapshots available".to_string()));
+            return Ok(vec![]);
         }
         let min_id = start.unwrap_or_else(|| self.snapshots.first().unwrap().0);
         let max_id = end.unwrap_or_else(|| self.snapshots.last().unwrap().0);
@@ -569,7 +567,7 @@ mod tests {
                 patches: vec![],
                 start: None,
                 end: None,
-                expected: Err(TenxError::Internal("No snapshots available".to_string())),
+                expected: Ok(vec![]),
             },
             TestCase {
                 name: "single snapshot",

@@ -12,8 +12,8 @@ pub const ACK: &str = "Got it.";
 /// Conversation lets us extact a generic strategy for dealing with conversational
 /// models, where there is a User/Assistant rlquest/response cycle.
 pub trait Conversation<R> {
-    fn set_system_prompt(&self, req: &mut R, prompt: String) -> Result<()>;
-    fn add_user_message(&self, req: &mut R, text: String) -> Result<()>;
+    fn set_system_prompt(&self, req: &mut R, prompt: &str) -> Result<()>;
+    fn add_user_message(&self, req: &mut R, text: &str) -> Result<()>;
     fn add_agent_message(&self, req: &mut R, text: &str) -> Result<()>;
 }
 
@@ -32,7 +32,7 @@ where
     if !editables.is_empty() {
         conversation.add_user_message(
             req,
-            format!(
+            &format!(
                 "{}\n{}",
                 EDITABLE_LEADIN,
                 dialect.render_editables(config, session, editables)?
@@ -54,10 +54,10 @@ pub fn build_conversation<C, R>(
 where
     C: Conversation<R>,
 {
-    conversation.set_system_prompt(req, dialect.system())?;
+    conversation.set_system_prompt(req, &dialect.system())?;
     conversation.add_user_message(
         req,
-        format!(
+        &format!(
             "{}\n{}",
             CONTEXT_LEADIN,
             dialect.render_context(config, session)?
@@ -66,7 +66,7 @@ where
     conversation.add_agent_message(req, ACK)?;
     for (i, step) in session.steps().iter().enumerate() {
         add_editables(conversation, req, config, session, dialect, i)?;
-        conversation.add_user_message(req, dialect.render_step_request(config, session, i)?)?;
+        conversation.add_user_message(req, &dialect.render_step_request(config, session, i)?)?;
         if step.model_response.is_some() {
             conversation
                 .add_agent_message(req, &dialect.render_step_response(config, session, i)?)?;
@@ -111,18 +111,18 @@ mod tests {
     struct DummyConversation;
 
     impl Conversation<DummyRequest> for DummyConversation {
-        fn set_system_prompt(&self, req: &mut DummyRequest, prompt: String) -> Result<()> {
+        fn set_system_prompt(&self, req: &mut DummyRequest, prompt: &str) -> Result<()> {
             match req.system_prompt {
                 None => {
-                    req.system_prompt = Some(prompt);
+                    req.system_prompt = Some(prompt.into());
                     Ok(())
                 }
                 Some(_) => panic!("system prompt already set"),
             }
         }
 
-        fn add_user_message(&self, req: &mut DummyRequest, text: String) -> Result<()> {
-            req.messages.push(Message::User(text));
+        fn add_user_message(&self, req: &mut DummyRequest, text: &str) -> Result<()> {
+            req.messages.push(Message::User(text.into()));
             Ok(())
         }
 

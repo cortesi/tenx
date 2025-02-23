@@ -158,16 +158,16 @@ impl Conversation<misanthropy::MessagesRequest> for Claude {
     fn set_system_prompt(
         &self,
         req: &mut misanthropy::MessagesRequest,
-        prompt: String,
+        prompt: &str,
     ) -> Result<()> {
         req.system = vec![misanthropy::Content::Text(misanthropy::Text {
-            text: prompt,
+            text: prompt.into(),
             cache_control: Some(misanthropy::CacheControl::Ephemeral),
         })];
         Ok(())
     }
 
-    fn add_user_message(&self, req: &mut misanthropy::MessagesRequest, text: String) -> Result<()> {
+    fn add_user_message(&self, req: &mut misanthropy::MessagesRequest, text: &str) -> Result<()> {
         req.messages.push(misanthropy::Message {
             role: misanthropy::Role::User,
             content: vec![misanthropy::Content::text(text)],

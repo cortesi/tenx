@@ -194,11 +194,11 @@ impl Google {
 }
 
 impl Conversation<Vec<Content>> for Google {
-    fn set_system_prompt(&self, _messages: &mut Vec<Content>, _prompt: String) -> Result<()> {
+    fn set_system_prompt(&self, _messages: &mut Vec<Content>, _prompt: &str) -> Result<()> {
         Ok(())
     }
 
-    fn add_user_message(&self, messages: &mut Vec<Content>, text: String) -> Result<()> {
+    fn add_user_message(&self, messages: &mut Vec<Content>, text: &str) -> Result<()> {
         messages.push(
             Content::default()
                 .parts(vec![Part::default().text(text)])
