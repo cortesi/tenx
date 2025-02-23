@@ -6,7 +6,7 @@ use tokio::sync::mpsc;
 
 use libtenx::{
     events::Event,
-    session::{Action, Session},
+    session::{Session, Step},
 };
 
 const SESSION_INFO_MARKER: &str = "\n** Only edit prompt text ABOVE this marker. **\n";
@@ -135,7 +135,11 @@ pub fn edit_prompt(
 mod tests {
     use super::*;
 
-    use libtenx::{patch::Patch, session::ModelResponse, strategy, testutils};
+    use libtenx::{
+        patch::Patch,
+        session::{Action, ModelResponse},
+        strategy, testutils,
+    };
 
     use pretty_assertions::assert_eq;
 
@@ -185,7 +189,7 @@ mod tests {
             ("Second prompt", "Second response"),
         ] {
             p.session
-                .add_step("test_model".into(), prompt.to_string())
+                .add_step(Step::new("test_model".into(), prompt.to_string()))
                 .unwrap();
             if let Some(step) = p.session.last_step_mut() {
                 step.model_response = Some(ModelResponse {

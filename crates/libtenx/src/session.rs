@@ -57,11 +57,11 @@ pub struct Step {
 
 impl Step {
     /// Creates a new Step with the given prompt and rollback ID.
-    pub fn new(model: String, prompt: String, rollback_id: u64) -> Self {
+    pub fn new(model: String, prompt: String) -> Self {
         Step {
             model,
             prompt,
-            rollback_id,
+            rollback_id: 0,
             model_response: None,
             response_time: None,
             patch_info: None,
@@ -198,10 +198,11 @@ impl Session {
     /// Adds a new step to the last action in the session.
     ///
     /// Returns an error if the last step doesn't have either a patch or an error.
-    pub fn add_step(&mut self, model: String, prompt: String) -> Result<()> {
+    pub fn add_step(&mut self, mut step: Step) -> Result<()> {
         if let Some(action) = self.actions.last_mut() {
             let rollback_id = self.state.mark()?;
-            action.add_step(Step::new(model, prompt, rollback_id))?;
+            step.rollback_id = rollback_id;
+            action.add_step(step)?;
         } else {
             Err(TenxError::Internal("No actions in session".into()))?
         }

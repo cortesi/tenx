@@ -38,7 +38,7 @@ fn handle_last_step(
                 },
             )?;
             debug!("Next step, based on error: {}", err);
-            return Ok(Some(Step::new(model, model_message.to_string(), 0)));
+            return Ok(Some(Step::new(model, model_message.to_string())));
         }
     } else if let Some(model_response) = &step.model_response {
         if !model_response.operations.is_empty() {
@@ -51,7 +51,7 @@ fn handle_last_step(
                 },
             )?;
             debug!("Next step, based on operations");
-            return Ok(Some(Step::new(model, model_message, 0)));
+            return Ok(Some(Step::new(model, model_message)));
         }
     }
     Ok(None)
@@ -70,7 +70,7 @@ impl ActionStrategy for Code {
             } else {
                 // Synthesize first step in the action
                 let model = config.models.default.clone();
-                return Ok(Some(Step::new(model, self.prompt.clone(), 0)));
+                return Ok(Some(Step::new(model, self.prompt.clone())));
             }
         }
         Ok(None)
@@ -106,7 +106,7 @@ impl ActionStrategy for Fix {
                     .prompt
                     .clone()
                     .unwrap_or_else(|| "Please fix the following errors.".to_string());
-                return Ok(Some(Step::new(model, prompt, 0)));
+                return Ok(Some(Step::new(model, prompt)));
             }
         }
         Ok(None)
@@ -139,7 +139,10 @@ mod test {
             .unwrap();
         assert_eq!(step.prompt, "Test");
 
-        session.add_step(test_project.config.models.default.clone(), "Test".into())?;
+        session.add_step(Step::new(
+            test_project.config.models.default.clone(),
+            "Test".into(),
+        ))?;
         let patch_err = TenxError::Patch {
             user: "Error".into(),
             model: "Retry".into(),
@@ -180,7 +183,10 @@ mod test {
         assert_eq!(step.prompt, "Fix prompt");
 
         // Retryable error
-        session.add_step(test_project.config.models.default.clone(), "Test".into())?;
+        session.add_step(Step::new(
+            test_project.config.models.default.clone(),
+            "Test".into(),
+        ))?;
         session.last_step_mut().unwrap().err = Some(TenxError::Patch {
             user: "Error".into(),
             model: "Retry".into(),

@@ -256,7 +256,7 @@ impl Tenx {
 
             match next_step {
                 Some(step) => {
-                    session.add_step(step.model, step.prompt)?;
+                    session.add_step(step)?;
                     self.save_session(session)?;
                 }
                 None => return Ok(()),

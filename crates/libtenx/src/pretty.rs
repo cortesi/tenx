@@ -367,7 +367,7 @@ mod tests {
             strategy::Strategy::Code(strategy::Code::new("test".into())),
         )?)?;
         p.session
-            .add_step("test_model".into(), "Test prompt".to_string())
+            .add_step(Step::new("test_model".into(), "Test prompt".to_string()))
             .unwrap();
         p.write("test_file.rs", "Test content");
         p.session
@@ -428,7 +428,6 @@ mod tests {
         let step = Step::new(
             "test_model".into(),
             "Test prompt\nwith multiple\nlines".to_string(),
-            0,
         );
         let full_result = render_step_prompt(&step, 80, true);
         assert!(full_result.contains("Test prompt"));

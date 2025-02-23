@@ -250,7 +250,10 @@ impl DialectProvider for Tags {
 mod tests {
     use super::*;
 
-    use crate::{session::Action, strategy, testutils};
+    use crate::{
+        session::{Action, Step},
+        strategy, testutils,
+    };
 
     use indoc::indoc;
     use pretty_assertions::assert_eq;
@@ -352,7 +355,8 @@ mod tests {
             &p.config,
             strategy::Strategy::Code(strategy::Code::new("test".into())),
         )?)?;
-        p.session.add_step("test_model".into(), "test".into())?;
+        p.session
+            .add_step(Step::new("test_model".into(), "test".into()))?;
         if let Some(step) = p.session.last_step_mut() {
             step.model_response = Some(response);
         }

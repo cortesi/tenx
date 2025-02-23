@@ -111,7 +111,7 @@ impl Trial {
         let path_buf = PathBuf::from(&self.trial_conf.project);
         let project_name = path_buf
             .components()
-            .last()
+            .next_back()
             .and_then(|c| c.as_os_str().to_str())
             .ok_or_else(|| TenxError::Internal("Invalid project name".to_string()))?;
 
