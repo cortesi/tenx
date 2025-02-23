@@ -1,5 +1,6 @@
 STATE REFACTORING:
 
+    - Render multiple patch errors
     - Properly handle patch errors
     - Refactor Conversation interface to use actions and steps
     - Shift patch module into state
@@ -14,6 +15,9 @@ UX:
     
 Model response robustness:
     
+    - When editing text, we frequently get patch errors from models. This is
+      because flowing text doesn't always preserve wrapping from models. Have a
+      more robust patch mode for this.
     - Allow write_file to create files
         - Ensure that newly created files are rolled back in rollback
     - Partial application of patches

@@ -9,7 +9,7 @@ use crate::{
     config::Config,
     dialect::{Dialect, DialectProvider},
     events::*,
-    model::conversation::{build_conversation, Conversation, ACK, EDITABLE_LEADIN},
+    model::conversation::{build_conversation, Conversation},
     model::ModelProvider,
     session::ModelResponse,
     session::Session,
@@ -213,29 +213,6 @@ impl Conversation<Vec<Content>> for Google {
                 .parts(vec![Part::default().text(text.to_string())])
                 .role("model"),
         );
-        Ok(())
-    }
-
-    fn add_editables(
-        &self,
-        messages: &mut Vec<Content>,
-        config: &Config,
-        session: &Session,
-        dialect: &Dialect,
-        step_offset: usize,
-    ) -> Result<()> {
-        let editables = session.editables_for_step_state(step_offset)?;
-        if !editables.is_empty() {
-            self.add_user_message(
-                messages,
-                format!(
-                    "{}\n{}",
-                    EDITABLE_LEADIN,
-                    dialect.render_editables(config, session, editables)?
-                ),
-            )?;
-            self.add_agent_message(messages, ACK)?;
-        }
         Ok(())
     }
 }

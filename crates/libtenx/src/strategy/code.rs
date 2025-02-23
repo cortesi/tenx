@@ -38,7 +38,6 @@ fn handle_existing_step(
                 },
             )?;
             debug!("Next step, based on error: {}", err);
-
             return Ok(Some(Step::new(model, model_message.to_string(), 0)));
         }
     } else if let Some(model_response) = &step.model_response {
@@ -52,7 +51,6 @@ fn handle_existing_step(
                 },
             )?;
             debug!("Next step, based on operations");
-
             return Ok(Some(Step::new(model, model_message, 0)));
         }
     }
@@ -70,6 +68,7 @@ impl ActionStrategy for Code {
             if let Some(step) = action.last_step() {
                 return handle_existing_step(config, step, events);
             } else {
+                // Synthesize first step in the action
                 let model = config.models.default.clone();
                 return Ok(Some(Step::new(model, self.prompt.clone(), 0)));
             }
@@ -101,6 +100,7 @@ impl ActionStrategy for Fix {
             if let Some(step) = action.last_step() {
                 return handle_existing_step(config, step, events);
             } else {
+                // Synthesize first step in the action
                 let model = config.models.default.clone();
                 let prompt = self
                     .prompt

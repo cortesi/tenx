@@ -267,6 +267,9 @@ impl State {
         start: Option<u64>,
         end: Option<u64>,
     ) -> Result<Vec<PathBuf>> {
+        if start.is_none() && end.is_none() {
+            return Ok(vec![]);
+        }
         if self.snapshots.is_empty() {
             return Err(TenxError::Internal("No snapshots available".to_string()));
         }

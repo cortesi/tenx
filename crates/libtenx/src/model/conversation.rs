@@ -15,14 +15,32 @@ pub trait Conversation<R> {
     fn set_system_prompt(&self, req: &mut R, prompt: String) -> Result<()>;
     fn add_user_message(&self, req: &mut R, text: String) -> Result<()>;
     fn add_agent_message(&self, req: &mut R, text: &str) -> Result<()>;
-    fn add_editables(
-        &self,
-        req: &mut R,
-        config: &Config,
-        session: &Session,
-        dialect: &Dialect,
-        step_offset: usize,
-    ) -> Result<()>;
+}
+
+fn add_editables<C, R>(
+    conversation: &C,
+    req: &mut R,
+    config: &Config,
+    session: &Session,
+    dialect: &Dialect,
+    step_offset: usize,
+) -> Result<()>
+where
+    C: Conversation<R>,
+{
+    let editables = session.editables_for_step_state(step_offset)?;
+    if !editables.is_empty() {
+        conversation.add_user_message(
+            req,
+            format!(
+                "{}\n{}",
+                EDITABLE_LEADIN,
+                dialect.render_editables(config, session, editables)?
+            ),
+        )?;
+        conversation.add_agent_message(req, ACK)?;
+    }
+    Ok(())
 }
 
 /// Builds a conversation following our standard pattern
@@ -47,7 +65,7 @@ where
     )?;
     conversation.add_agent_message(req, ACK)?;
     for (i, step) in session.steps().iter().enumerate() {
-        conversation.add_editables(req, config, session, dialect, i)?;
+        add_editables(conversation, req, config, session, dialect, i)?;
         conversation.add_user_message(req, dialect.render_step_request(config, session, i)?)?;
         if step.model_response.is_some() {
             conversation
@@ -61,7 +79,14 @@ where
             conversation.add_agent_message(req, "omitted due to error")?;
         }
     }
-    conversation.add_editables(req, config, session, dialect, session.steps().len())?;
+    add_editables(
+        conversation,
+        req,
+        config,
+        session,
+        dialect,
+        session.steps().len(),
+    )?;
     Ok(())
 }
 
@@ -103,18 +128,6 @@ mod tests {
 
         fn add_agent_message(&self, req: &mut DummyRequest, text: &str) -> Result<()> {
             req.messages.push(Message::Agent(text.to_string()));
-            Ok(())
-        }
-
-        fn add_editables(
-            &self,
-            req: &mut DummyRequest,
-            _config: &Config,
-            _session: &Session,
-            _dialect: &Dialect,
-            step_offset: usize,
-        ) -> Result<()> {
-            req.editable_calls.push(step_offset);
             Ok(())
         }
     }
@@ -168,7 +181,7 @@ mod tests {
         build_conversation(&conversation, &mut req, &p.config, &p.session, &dialect)?;
 
         assert!(req.system_prompt.is_some());
-        assert_eq!(req.editable_calls, vec![0]);
+        assert!(req.editable_calls.is_empty());
         assert_eq!(req.messages.len(), 2); // Context message and ACK only
         assert_flow(&req.messages);
 

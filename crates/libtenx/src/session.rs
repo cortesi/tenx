@@ -17,6 +17,7 @@ pub struct ModelResponse {
 
     /// Model-specific usage statistics
     pub usage: Option<Usage>,
+
     /// The verbatim text response from the model
     pub response_text: Option<String>,
 }
@@ -30,10 +31,13 @@ pub enum Operation {}
 pub struct Step {
     /// The name of the model used for this step
     pub model: String,
+
     /// The prompt provided to the model
     pub prompt: String,
+
     /// Time taken in seconds to receive the complete model response
     pub response_time: Option<f64>,
+
     /// An associated error, for instance an error processing a model response. This may be
     /// retryable, in which case a new step will be synthesized to go back to the model.
     pub err: Option<TenxError>,
@@ -271,7 +275,8 @@ impl Session {
         self.reset_steps(config, None)
     }
 
-    /// Apply the last step in the session, applying the patch and operations.
+    /// Apply the last step in the session, applying the patch and operations. The step must
+    /// already have a model response.
     pub fn apply_last_step(&mut self, _config: &config::Config) -> Result<()> {
         let resp = self
             .last_step()
