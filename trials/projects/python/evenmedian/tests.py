@@ -1,5 +1,6 @@
 import evenmedian
 
+
 def test_evenmedian():
     # median of [1,3,5]
     assert evenmedian.evenmedian([1, 2, 3, 4, 5]) == 3

@@ -2,4 +2,3 @@
 # Returns 0 if the list is empty.
 def evenmedian(v):
     pass
-

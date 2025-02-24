@@ -25,19 +25,52 @@ impl Code {
 /// step, or return None if we're done.
 fn next_step(config: &Config, step: &Step, events: Option<EventSender>) -> Result<Option<Step>> {
     let model = config.models.default.clone();
+    let mut messages = Vec::new();
+    let mut user_message = Vec::new();
+
+    // Check for errors in the step
     if let Some(err) = &step.err {
-        if let Some(model_message) = err.should_retry() {
-            send_event(
-                &events,
-                Event::NextStep {
-                    user: format!("{}", err),
-                    model: model_message.to_string(),
-                },
-            )?;
-            debug!("Next step, based on error: {}", err);
-            return Ok(Some(Step::new(model, model_message.to_string())));
+        if let Some(err_message) = err.should_retry() {
+            messages.push(err_message.to_string());
+            user_message.push(format!("{}", err));
         }
-    } else if let Some(model_response) = &step.model_response {
+    }
+
+    // Check for patch_info failures
+    if let Some(patch_info) = &step.patch_info {
+        if !patch_info.failures.is_empty() {
+            let failure_messages: Vec<String> = patch_info
+                .failures
+                .iter()
+                .map(|(change, err)| format!("Failed to apply change {:?}: {}", change, err))
+                .collect();
+
+            messages.push(format!(
+                "Please fix the following issues with your changes:\n\n{}",
+                failure_messages.join("\n\n")
+            ));
+            user_message.push("patch failures".into());
+        }
+    }
+
+    // If we have errors or patch failures, send a combined message
+    if !messages.is_empty() {
+        let model_message = messages.join("\n\n");
+        let user = user_message.join(", ");
+
+        send_event(
+            &events,
+            Event::NextStep {
+                user,
+                model: model_message.clone(),
+            },
+        )?;
+        debug!("Next step, based on errors and/or patch failures");
+        return Ok(Some(Step::new(model, model_message)));
+    }
+
+    // Check for operations in model response
+    if let Some(model_response) = &step.model_response {
         if !model_response.operations.is_empty() {
             let model_message = "OK".to_string();
             send_event(
@@ -51,6 +84,7 @@ fn next_step(config: &Config, step: &Step, events: Option<EventSender>) -> Resul
             return Ok(Some(Step::new(model, model_message)));
         }
     }
+
     Ok(None)
 }
 
