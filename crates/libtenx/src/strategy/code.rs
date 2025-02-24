@@ -21,12 +21,9 @@ impl Code {
     }
 }
 
-/// Common logic for handling steps in both Code and Fix strategies
-fn handle_last_step(
-    config: &Config,
-    step: &Step,
-    events: Option<EventSender>,
-) -> Result<Option<Step>> {
+/// Common logic for the last step in both Code and Fix strategies. We either synthesize the next
+/// step, or return None if we're done.
+fn next_step(config: &Config, step: &Step, events: Option<EventSender>) -> Result<Option<Step>> {
     let model = config.models.default.clone();
     if let Some(err) = &step.err {
         if let Some(model_message) = err.should_retry() {
@@ -66,7 +63,7 @@ impl ActionStrategy for Code {
     ) -> Result<Option<Step>> {
         if let Some(action) = session.last_action() {
             if let Some(step) = action.last_step() {
-                return handle_last_step(config, step, events);
+                return next_step(config, step, events);
             } else {
                 // Synthesize first step in the action
                 let model = config.models.default.clone();
@@ -98,7 +95,7 @@ impl ActionStrategy for Fix {
     ) -> Result<Option<Step>> {
         if let Some(action) = session.last_action() {
             if let Some(step) = action.last_step() {
-                return handle_last_step(config, step, events);
+                return next_step(config, step, events);
             } else {
                 // Synthesize first step in the action
                 let model = config.models.default.clone();

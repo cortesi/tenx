@@ -6,7 +6,8 @@ use super::config::*;
 const DEFAULT_STEP_LIMIT: usize = 16;
 
 const ANTHROPIC_API_KEY: &str = "ANTHROPIC_API_KEY";
-const ANTHROPIC_CLAUDE_SONNET: &str = "claude-3-5-sonnet-latest";
+const ANTHROPIC_CLAUDE_SONNET: &str = "claude-3-7-sonnet-latest";
+const ANTHROPIC_CLAUDE_SONNET35: &str = "claude-3-5-sonnet-latest";
 const ANTHROPIC_CLAUDE_HAIKU: &str = "claude-3-5-haiku-latest";
 
 const OPENAI_API_BASE: &str = "https://api.openai.com/v1";
@@ -70,6 +71,12 @@ fn default_models() -> Vec<Model> {
             Model::Claude {
                 name: "sonnet".to_string(),
                 api_model: ANTHROPIC_CLAUDE_SONNET.to_string(),
+                key: "".to_string(),
+                key_env: ANTHROPIC_API_KEY.to_string(),
+            },
+            Model::Claude {
+                name: "sonnet35".to_string(),
+                api_model: ANTHROPIC_CLAUDE_SONNET35.to_string(),
                 key: "".to_string(),
                 key_env: ANTHROPIC_API_KEY.to_string(),
             },
