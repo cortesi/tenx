@@ -5,6 +5,7 @@ use crate::{
     context::ContextProvider,
     model, patch,
     session::{Operation, Session, Step},
+    strategy::ActionStrategy,
     Result, TenxError,
 };
 use colored::*;
@@ -86,68 +87,94 @@ fn print_steps(config: &Config, session: &Session, full: bool, width: usize) -> 
     if session.steps().is_empty() {
         return Ok(String::new());
     }
+
     let mut output = String::new();
-    for (i, step) in session.steps().iter().enumerate() {
+
+    // Group steps by action
+    for (action_idx, action) in session.actions().iter().enumerate() {
+        // Print action header with strategy name
         output.push_str(&format!("\n{}\n", "=".repeat(width)));
-        output.push_str(&format!("{}\n", format!("Step {}", i).cyan().bold()));
+        output.push_str(&format!(
+            "{} {}\n",
+            format!("Action {}", action_idx).cyan().bold(),
+            format!("({})", action.strategy.name()).yellow()
+        ));
         output.push_str(&format!("{}\n", "=".repeat(width)));
-        output.push_str(&render_step_prompt(step, width, full));
-        output.push('\n');
-        if let Some(response) = &step.model_response {
-            if let Some(comment) = &response.comment {
-                output.push_str(&format!(
-                    "{}{}\n",
-                    INDENT.repeat(2),
-                    "model comment:".blue().bold()
-                ));
-                let comment_text = if full {
-                    comment.clone()
-                } else {
-                    comment.lines().next().unwrap_or("").to_string()
-                };
-                output.push_str(&wrapped_block(&comment_text, width, INDENT.len() * 3));
-                output.push('\n');
-            }
-            if let Some(text) = &response.response_text {
-                if full {
+
+        // Print each step in this action
+        let action_steps = action.steps();
+        for (local_step_idx, step) in action_steps.iter().enumerate() {
+            // Print step header
+            output.push_str(&format!("\n{}\n", "-".repeat(width - 10)));
+            output.push_str(&format!(
+                "{}\n",
+                format!("Step {}.{}", action_idx, local_step_idx)
+                    .blue()
+                    .bold()
+            ));
+            output.push_str(&format!("{}\n", "-".repeat(width - 10)));
+
+            // Print step content
+            output.push_str(&render_step_prompt(step, width, full));
+            output.push('\n');
+
+            if let Some(response) = &step.model_response {
+                if let Some(comment) = &response.comment {
                     output.push_str(&format!(
                         "{}{}\n",
                         INDENT.repeat(2),
-                        "raw model response:".blue().bold()
+                        "model comment:".blue().bold()
                     ));
-                    output.push_str(&wrapped_block(&text.clone(), width, INDENT.len() * 3));
+                    let comment_text = if full {
+                        comment.clone()
+                    } else {
+                        comment.lines().next().unwrap_or("").to_string()
+                    };
+                    output.push_str(&wrapped_block(&comment_text, width, INDENT.len() * 3));
                     output.push('\n');
                 }
-            }
+                if let Some(text) = &response.response_text {
+                    if full {
+                        output.push_str(&format!(
+                            "{}{}\n",
+                            INDENT.repeat(2),
+                            "raw model response:".blue().bold()
+                        ));
+                        output.push_str(&wrapped_block(&text.clone(), width, INDENT.len() * 3));
+                        output.push('\n');
+                    }
+                }
 
-            if !response.operations.is_empty() {
-                output.push_str(&print_operations(config, &response.operations));
-            }
-            if let Some(patch) = &response.patch {
-                output.push_str(&print_patch(config, patch, full, width));
-            }
-            if let Some(usage) = &response.usage {
-                output.push_str(&format!("{}{}\n", INDENT.repeat(2), "usage:".blue().bold()));
-                for line in format_usage(usage).lines() {
-                    output.push_str(&format!("{}{}\n", INDENT.repeat(3), line));
+                if !response.operations.is_empty() {
+                    output.push_str(&print_operations(config, &response.operations));
+                }
+                if let Some(patch) = &response.patch {
+                    output.push_str(&print_patch(config, patch, full, width));
+                }
+                if let Some(usage) = &response.usage {
+                    output.push_str(&format!("{}{}\n", INDENT.repeat(2), "usage:".blue().bold()));
+                    for line in format_usage(usage).lines() {
+                        output.push_str(&format!("{}{}\n", INDENT.repeat(3), line));
+                    }
                 }
             }
-        }
-        if let Some(err) = &step.err {
-            output.push_str(&format!(
-                "{}{}\n",
-                INDENT.repeat(2),
-                "error:".yellow().bold()
-            ));
-            let error_text = if full {
-                full_error(err)
-            } else {
-                format!("{}", err)
-            };
-            output.push_str(&wrapped_block(&error_text, width, INDENT.len() * 3));
-            output.push('\n');
+            if let Some(err) = &step.err {
+                output.push_str(&format!(
+                    "{}{}\n",
+                    INDENT.repeat(2),
+                    "error:".yellow().bold()
+                ));
+                let error_text = if full {
+                    full_error(err)
+                } else {
+                    format!("{}", err)
+                };
+                output.push_str(&wrapped_block(&error_text, width, INDENT.len() * 3));
+                output.push('\n');
+            }
         }
     }
+
     Ok(output)
 }
 

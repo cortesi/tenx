@@ -92,6 +92,11 @@ impl Action {
         self.steps.last()
     }
 
+    /// Returns all steps in the action.
+    pub fn steps(&self) -> &Vec<Step> {
+        &self.steps
+    }
+
     pub fn add_step(&mut self, step: Step) -> Result<()> {
         if let Some(last_step) = self.steps.last() {
             if last_step.model_response.is_none() && last_step.err.is_none() {
@@ -145,6 +150,11 @@ impl Session {
             .iter()
             .flat_map(|action| &action.steps)
             .collect()
+    }
+
+    /// Returns all actions in the session.
+    pub fn actions(&self) -> &Vec<Action> {
+        &self.actions
     }
 
     /// Returns a reference to the last step in the session.
