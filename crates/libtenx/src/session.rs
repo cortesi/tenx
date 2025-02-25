@@ -21,7 +21,7 @@ pub struct ModelResponse {
     pub usage: Option<Usage>,
 
     /// The raw text response from the model
-    pub response_text: Option<String>,
+    pub raw_response: Option<String>,
 }
 
 /// Operations requested by the model, other than patching.
@@ -35,7 +35,7 @@ pub struct Step {
     pub model: String,
 
     /// The raw prompt provided to the model
-    pub prompt: String,
+    pub raw_prompt: String,
 
     /// Time taken in seconds to receive the complete model response
     pub response_time: Option<f64>,
@@ -60,7 +60,7 @@ impl Step {
     pub fn new(model: String, prompt: String) -> Self {
         Step {
             model,
-            prompt,
+            raw_prompt: prompt,
             rollback_id: 0,
             model_response: None,
             response_time: None,

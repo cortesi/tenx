@@ -29,7 +29,7 @@ fn render_step(session: &Session, step_offset: usize) -> String {
     text.push_str(&format!("## Step {}\n\n", step_offset));
     text.push_str("### Prompt");
     text.push_str("\n```\n");
-    for line in step.prompt.lines() {
+    for line in step.raw_prompt.lines() {
         text.push_str(&format!("    {}\n", line));
     }
     text.push_str("```\n");
@@ -76,7 +76,7 @@ fn render_edit_text(session: &Session, retry: bool) -> Result<String> {
             anyhow::bail!("Cannot retry without at least one step");
         }
         let last = steps.last().unwrap();
-        text.push_str(&last.prompt);
+        text.push_str(&last.raw_prompt);
     }
     text.push('\n');
     text.push_str(SESSION_INFO_MARKER);
@@ -194,7 +194,7 @@ mod tests {
                     operations: vec![],
                     usage: None,
                     comment: Some(response.to_string()),
-                    response_text: Some(response.to_string()),
+                    raw_response: Some(response.to_string()),
                 });
             }
         }

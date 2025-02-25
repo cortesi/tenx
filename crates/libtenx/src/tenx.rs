@@ -203,7 +203,7 @@ impl Tenx {
         }
         if let Some(step) = session.last_step_mut() {
             if let Some(p) = prompt {
-                step.prompt = p;
+                step.raw_prompt = p;
             }
         }
         self.process_prompt(session, sender.clone()).await
@@ -407,7 +407,7 @@ mod tests {
                     }),
                     operations: vec![],
                     usage: None,
-                    response_text: Some("Test comment".to_string()),
+                    raw_response: Some("Test comment".to_string()),
                 },
             ))
             .with_root(temp_dir.path());

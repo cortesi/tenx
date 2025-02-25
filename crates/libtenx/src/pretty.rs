@@ -133,7 +133,7 @@ fn print_steps(config: &Config, session: &Session, full: bool, width: usize) -> 
                     output.push_str(&wrapped_block(&comment_text, width, INDENT.len() * 3));
                     output.push('\n');
                 }
-                if let Some(text) = &response.response_text {
+                if let Some(text) = &response.raw_response {
                     if full {
                         output.push_str(&format!(
                             "{}{}\n",
@@ -180,7 +180,7 @@ fn print_steps(config: &Config, session: &Session, full: bool, width: usize) -> 
 
 fn render_step_prompt(step: &Step, width: usize, _full: bool) -> String {
     let prompt_header = format!("{}{}\n", INDENT.repeat(2), "prompt:".blue().bold());
-    let text = &step.prompt;
+    let text = &step.raw_prompt;
     format!(
         "{}{}",
         prompt_header,
@@ -424,7 +424,7 @@ mod tests {
                 operations: vec![],
                 usage: None,
                 comment: Some("Test comment".to_string()),
-                response_text: Some("Test comment".to_string()),
+                raw_response: Some("Test comment".to_string()),
             });
         }
         let output = print_steps(&config, &p.session, false, 80)?;

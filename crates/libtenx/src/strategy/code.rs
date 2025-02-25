@@ -109,6 +109,15 @@ impl ActionStrategy for Code {
     fn name(&self) -> &'static str {
         "code"
     }
+
+    fn input_required(&self, _config: &Config, session: &Session) -> InputRequired {
+        if let Some(action) = session.last_action() {
+            if action.steps().is_empty() {
+                return InputRequired::Yes;
+            }
+        }
+        InputRequired::No
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -124,6 +133,10 @@ impl Fix {
 }
 
 impl ActionStrategy for Fix {
+    fn name(&self) -> &'static str {
+        "fix"
+    }
+
     fn next_step(
         &self,
         config: &Config,
@@ -146,8 +159,13 @@ impl ActionStrategy for Fix {
         Ok(None)
     }
 
-    fn name(&self) -> &'static str {
-        "fix"
+    fn input_required(&self, _config: &Config, session: &Session) -> InputRequired {
+        if let Some(action) = session.last_action() {
+            if action.steps().is_empty() {
+                return InputRequired::Optional;
+            }
+        }
+        InputRequired::No
     }
 }
 
@@ -175,7 +193,7 @@ mod test {
         let step = code
             .next_step(&test_project.config, &session, None)?
             .unwrap();
-        assert_eq!(step.prompt, "Test");
+        assert_eq!(step.raw_prompt, "Test");
 
         session.add_step(Step::new(
             test_project.config.models.default.clone(),
@@ -189,7 +207,7 @@ mod test {
         let step = code
             .next_step(&test_project.config, &session, None)?
             .unwrap();
-        assert_eq!(step.prompt, "Retry");
+        assert_eq!(step.raw_prompt, "Retry");
 
         session.last_step_mut().unwrap().err = Some(TenxError::Config("Error".into()));
         assert!(code
@@ -218,7 +236,7 @@ mod test {
             .strategy
             .next_step(&test_project.config, &session, None)?
             .unwrap();
-        assert_eq!(step.prompt, "Fix prompt");
+        assert_eq!(step.raw_prompt, "Fix prompt");
 
         // Retryable error
         session.add_step(Step::new(
@@ -235,7 +253,7 @@ mod test {
             .strategy
             .next_step(&test_project.config, &session, None)?
             .unwrap();
-        assert_eq!(step.prompt, "Retry");
+        assert_eq!(step.raw_prompt, "Retry");
 
         // Default prompt
         let fix = Fix::new(TenxError::Config("Error".into()), None);
@@ -246,7 +264,7 @@ mod test {
             .strategy
             .next_step(&test_project.config, &session, None)?
             .unwrap();
-        assert_eq!(step.prompt, "Please fix the following errors.");
+        assert_eq!(step.raw_prompt, "Please fix the following errors.");
 
         Ok(())
     }

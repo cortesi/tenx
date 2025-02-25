@@ -157,7 +157,7 @@ impl TrialReport {
             .steps()
             .iter()
             .filter_map(|s| s.model_response.as_ref())
-            .filter_map(|r| r.response_text.as_ref())
+            .filter_map(|r| r.raw_response.as_ref())
             .map(|s| s.split_whitespace().count())
             .sum();
 

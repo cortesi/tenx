@@ -10,7 +10,7 @@ pub const CONTEXT_LEADIN: &str = "Here is some immutable context that you may no
 pub const ACK: &str = "Got it.";
 
 /// Conversation lets us extact a generic strategy for dealing with conversational
-/// models, where there is a User/Assistant rlquest/response cycle.
+/// models, where there is a User/Assistant request/response cycle.
 pub trait Conversation<R> {
     fn set_system_prompt(&self, req: &mut R, prompt: &str) -> Result<()>;
     fn add_user_message(&self, req: &mut R, text: &str) -> Result<()>;

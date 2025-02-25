@@ -95,7 +95,10 @@ impl DialectProvider for Tags {
             .get(offset)
             .ok_or_else(|| TenxError::Internal("Invalid prompt offset".into()))?;
         let mut rendered = String::new();
-        rendered.push_str(&format!("\n<prompt>\n{}\n</prompt>\n\n", &prompt.prompt));
+        rendered.push_str(&format!(
+            "\n<prompt>\n{}\n</prompt>\n\n",
+            &prompt.raw_prompt
+        ));
         Ok(rendered)
     }
 
@@ -196,7 +199,7 @@ impl DialectProvider for Tags {
             operations: vec![],
             usage: None,
             comment,
-            response_text: Some(response.to_string()),
+            raw_response: Some(response.to_string()),
         })
     }
 
@@ -299,7 +302,7 @@ mod tests {
             operations: vec![],
             usage: None,
             comment: Some("This is a comment.".to_string()),
-            response_text: Some(input.to_string()),
+            raw_response: Some(input.to_string()),
         };
 
         let result = d.parse(input).unwrap();
@@ -348,7 +351,7 @@ mod tests {
             }),
             operations: vec![],
             usage: None,
-            response_text: Some("Test response".into()),
+            raw_response: Some("Test response".into()),
         };
 
         p.session.add_action(Action::new(
