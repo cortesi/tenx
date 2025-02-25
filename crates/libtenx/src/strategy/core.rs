@@ -19,4 +19,7 @@ pub trait ActionStrategy {
         session: &Session,
         sender: Option<EventSender>,
     ) -> Result<Option<Step>>;
+
+    /// Returns the name of the strategy.
+    fn name(&self) -> &'static str;
 }

@@ -4,10 +4,7 @@ use anyhow::{Context as AnyhowContext, Result};
 use tempfile::NamedTempFile;
 use tokio::sync::mpsc;
 
-use libtenx::{
-    events::Event,
-    session::{Session, Step},
-};
+use libtenx::{events::Event, session::Session};
 
 const SESSION_INFO_MARKER: &str = "\n** Only edit prompt text ABOVE this marker. **\n";
 
@@ -137,7 +134,7 @@ mod tests {
 
     use libtenx::{
         patch::Patch,
-        session::{Action, ModelResponse},
+        session::{Action, ModelResponse, Step},
         strategy, testutils,
     };
 

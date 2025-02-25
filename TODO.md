@@ -39,6 +39,7 @@ Features:
     - graceful error handling for contexts, e.g. unfetchable urls
     - configurable modes with pre-defined models and contexts
     - token count estimation
+    - cost estimation
     - reassess udiff format
 
 Internals:

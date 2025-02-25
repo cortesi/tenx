@@ -31,4 +31,11 @@ impl ActionStrategy for Strategy {
             Strategy::Fix(fix) => fix.next_step(config, session, sender),
         }
     }
+
+    fn name(&self) -> &'static str {
+        match self {
+            Strategy::Code(code) => code.name(),
+            Strategy::Fix(fix) => fix.name(),
+        }
+    }
 }

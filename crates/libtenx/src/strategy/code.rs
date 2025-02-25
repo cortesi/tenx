@@ -84,7 +84,6 @@ fn next_step(config: &Config, step: &Step, events: Option<EventSender>) -> Resul
             return Ok(Some(Step::new(model, model_message)));
         }
     }
-
     Ok(None)
 }
 
@@ -105,6 +104,10 @@ impl ActionStrategy for Code {
             }
         }
         Ok(None)
+    }
+
+    fn name(&self) -> &'static str {
+        "code"
     }
 }
 
@@ -141,6 +144,10 @@ impl ActionStrategy for Fix {
             }
         }
         Ok(None)
+    }
+
+    fn name(&self) -> &'static str {
+        "fix"
     }
 }
 
