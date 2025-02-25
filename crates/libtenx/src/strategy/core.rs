@@ -7,12 +7,40 @@ use crate::{
     session::{Session, Step},
 };
 
-/// The type of user input required for the next step.
+/// Is the current action complete?
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum Completion {
+    /// The action is complete.
+    Complete,
+
+    /// The action is not complete.
+    Incomplete,
+
+    /// The action is complete, but can continue if requested.
+    CompleteContinue,
+}
+
+/// Is user input required to create the next step?
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum InputRequired {
+    /// User input is mandatory to generate the next step.
     Yes,
+
+    /// User input is invalid to generate the next step.
     No,
+
+    /// User input is optional to generate the next step.
     Optional,
+}
+
+/// The state of the current action.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct State {
+    /// Is the action complete?
+    pub completion: Completion,
+
+    /// Is user input required to create the next step?
+    pub input_required: InputRequired,
 }
 
 pub trait ActionStrategy {
@@ -20,9 +48,9 @@ pub trait ActionStrategy {
     fn name(&self) -> &'static str;
 
     /// Given a session, calculate the next step. This may involve complex actions like executing
-    /// checks, making external requests, asking for user input. The returned step is ready to be
-    /// sent to the upstream model. The action's steps my currently be empty, in which case the
-    /// first step is synthesized.
+    /// checks, making external requests. The returned step is ready to be sent to the upstream
+    /// model. The action's steps my currently be empty, in which case the first step is
+    /// synthesized.
     ///
     /// If the action is complete, return None. The current action is presumed to be the last one
     /// in the session.
@@ -31,10 +59,14 @@ pub trait ActionStrategy {
         config: &Config,
         session: &Session,
         sender: Option<EventSender>,
+        user_input: Option<String>,
     ) -> Result<Option<Step>>;
 
-    /// Does generating the next step require user input?
-    fn input_required(&self, _config: &Config, _session: &Session) -> InputRequired {
-        InputRequired::No
+    /// Returns the current state of the action, including completion status and input requirements.
+    fn state(&self, _config: &Config, _session: &Session) -> State {
+        State {
+            completion: Completion::Incomplete,
+            input_required: InputRequired::No,
+        }
     }
 }

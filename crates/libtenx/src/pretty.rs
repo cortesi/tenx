@@ -391,7 +391,7 @@ mod tests {
         let mut p = testutils::test_project();
         p.session.add_action(Action::new(
             &p.config,
-            strategy::Strategy::Code(strategy::Code::new("test".into())),
+            strategy::Strategy::Code(strategy::Code::new()),
         )?)?;
         p.session
             .add_step(Step::new("test_model".into(), "Test prompt".to_string()))

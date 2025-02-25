@@ -161,7 +161,7 @@ mod tests {
 
         p.session.add_action(Action::new(
             &p.config,
-            strategy::Strategy::Code(strategy::Code::new("test".into())),
+            strategy::Strategy::Code(strategy::Code::new()),
         )?)?;
         p.session
             .add_step(Step::new("test_model".into(), "test prompt".to_string()))?;

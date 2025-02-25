@@ -10,7 +10,7 @@ use crate::{
     session::{Action, Session},
     session_store::{path_to_filename, SessionStore},
     strategy,
-    strategy::ActionStrategy,
+    strategy::{ActionStrategy, Completion},
     Result, TenxError,
 };
 
@@ -142,10 +142,11 @@ impl Tenx {
         let _block = EventBlock::start(&sender)?;
         let action = Action::new(
             &self.config,
-            strategy::Strategy::Code(strategy::Code::new(prompt)),
+            strategy::Strategy::Code(strategy::Code::new()),
         )?;
         session.add_action(action)?;
-        self.process_prompt(session, sender.clone()).await
+        self.process_prompt(session, Some(prompt), sender.clone())
+            .await
     }
 
     pub async fn fix(
@@ -159,13 +160,10 @@ impl Tenx {
         let _block = EventBlock::start(&sender)?;
         let pre_result = self.run_pre_checks(session, &sender);
         if let Err(e) = pre_result {
-            let action = Action::new(
-                &self.config,
-                strategy::Strategy::Fix(strategy::Fix::new(e, prompt)),
-            )?;
+            let action = Action::new(&self.config, strategy::Strategy::Fix(strategy::Fix::new(e)))?;
             session.add_action(action)?;
             self.save_session(session)?;
-            self.process_prompt(session, sender.clone()).await
+            self.process_prompt(session, prompt, sender.clone()).await
         } else {
             Err(TenxError::Internal("No errors found".to_string()))
         }
@@ -201,12 +199,7 @@ impl Tenx {
         if let Some(step) = session.last_step() {
             session.state.revert(step.rollback_id)?;
         }
-        if let Some(step) = session.last_step_mut() {
-            if let Some(p) = prompt {
-                step.raw_prompt = p;
-            }
-        }
-        self.process_prompt(session, sender.clone()).await
+        self.process_prompt(session, prompt, sender.clone()).await
     }
 
     /// Resets the session to a specific step.
@@ -233,11 +226,57 @@ impl Tenx {
         session.state.view(cwd, patterns)
     }
 
+    /// Take the next step for the current action.
+    pub async fn next_step(
+        &self,
+        session: &mut Session,
+        prompt: Option<String>,
+        sender: Option<EventSender>,
+    ) -> Result<()> {
+        self.save_session(session)?;
+
+        let next_step = if let Some(action) = session.last_action() {
+            let state = action.strategy.state(&self.config, session);
+            if matches!(state.completion, Completion::Complete) {
+                return Ok(());
+            }
+
+            action
+                .strategy
+                .next_step(&self.config, session, sender.clone(), prompt)?
+        } else {
+            return Ok(());
+        };
+
+        match next_step {
+            Some(step) => {
+                session.add_step(step)?;
+                self.save_session(session)?;
+            }
+            None => return Ok(()),
+        }
+
+        // Execute the step
+        match self.execute_prompt_cycle(session, sender.clone()).await {
+            Ok(()) => {
+                self.save_session(session)?;
+            }
+            Err(e) => {
+                if let Some(step) = session.last_step_mut() {
+                    step.err = Some(e.clone());
+                    self.save_session(session)?;
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Common logic for processing a prompt and updating the state. The prompt that will be
     /// processed is the final prompt in the step list.
     async fn process_prompt(
         &self,
         session: &mut Session,
+        prompt: Option<String>,
         sender: Option<EventSender>,
     ) -> Result<()> {
         self.save_session(session)?;
@@ -247,9 +286,20 @@ impl Tenx {
             step_count += 1;
 
             let next_step = if let Some(action) = session.last_action() {
+                let state = action.strategy.state(&self.config, session);
+                if matches!(state.completion, Completion::Complete) {
+                    return Ok(());
+                }
+
+                // Only pass the prompt on the first iteration of the loop
+                let current_prompt = if step_count == 1 {
+                    prompt.clone()
+                } else {
+                    None
+                };
                 action
                     .strategy
-                    .next_step(&self.config, session, sender.clone())?
+                    .next_step(&self.config, session, sender.clone(), current_prompt)?
             } else {
                 return Ok(());
             };
@@ -425,7 +475,7 @@ mod tests {
         session
             .add_action(Action::new(
                 &config,
-                strategy::Strategy::Code(strategy::Code::new("test".into())),
+                strategy::Strategy::Code(strategy::Code::new()),
             )?)
             .unwrap();
         session
@@ -433,7 +483,9 @@ mod tests {
             .view(temp_dir.path().to_path_buf(), vec!["**".to_string()])
             .unwrap();
 
-        tenx.process_prompt(&mut session, None).await.unwrap();
+        tenx.process_prompt(&mut session, Some("test".into()), None)
+            .await
+            .unwrap();
 
         assert_eq!(session.steps().len(), 1);
         assert!(session.steps()[0].model_response.is_some());

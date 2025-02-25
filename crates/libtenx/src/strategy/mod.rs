@@ -25,10 +25,11 @@ impl ActionStrategy for Strategy {
         config: &Config,
         session: &Session,
         sender: Option<EventSender>,
+        prompt: Option<String>,
     ) -> Result<Option<Step>> {
         match self {
-            Strategy::Code(code) => code.next_step(config, session, sender),
-            Strategy::Fix(fix) => fix.next_step(config, session, sender),
+            Strategy::Code(code) => code.next_step(config, session, sender, prompt),
+            Strategy::Fix(fix) => fix.next_step(config, session, sender, prompt),
         }
     }
 
@@ -36,6 +37,13 @@ impl ActionStrategy for Strategy {
         match self {
             Strategy::Code(code) => code.name(),
             Strategy::Fix(fix) => fix.name(),
+        }
+    }
+
+    fn state(&self, config: &Config, session: &Session) -> State {
+        match self {
+            Strategy::Code(code) => code.state(config, session),
+            Strategy::Fix(fix) => fix.state(config, session),
         }
     }
 }
