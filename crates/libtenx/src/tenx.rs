@@ -227,33 +227,47 @@ impl Tenx {
     }
 
     /// Take the next step for the current action.
+    /// Returns the State of the current action after execution.
     pub async fn next_step(
         &self,
         session: &mut Session,
         prompt: Option<String>,
         sender: Option<EventSender>,
-    ) -> Result<()> {
+    ) -> Result<strategy::State> {
         self.save_session(session)?;
 
-        let next_step = if let Some(action) = session.last_action() {
+        // If no action exists, we can't get a state, so return an error
+        if session.last_action().is_none() {
+            return Err(TenxError::Internal("No current action".to_string()));
+        }
+
+        // Get the initial state, and check if we're already complete
+        {
+            let action = session.last_action().unwrap();
             let state = action.strategy.state(&self.config, session);
             if matches!(state.completion, Completion::Complete) {
-                return Ok(());
+                return Ok(state);
             }
+        }
 
+        // Get the next step from the strategy
+        let next_step = {
+            let action = session.last_action().unwrap();
             action
                 .strategy
                 .next_step(&self.config, session, sender.clone(), prompt)?
-        } else {
-            return Ok(());
         };
 
+        // If there's no next step, just return the current state
         match next_step {
             Some(step) => {
                 session.add_step(step)?;
                 self.save_session(session)?;
             }
-            None => return Ok(()),
+            None => {
+                let action = session.last_action().unwrap();
+                return Ok(action.strategy.state(&self.config, session));
+            }
         }
 
         // Execute the step
@@ -268,7 +282,10 @@ impl Tenx {
                 }
             }
         }
-        Ok(())
+
+        // Always return the current state from the action's strategy
+        let action = session.last_action().unwrap();
+        Ok(action.strategy.state(&self.config, session))
     }
 
     /// Common logic for processing a prompt and updating the state. The prompt that will be
@@ -297,9 +314,23 @@ impl Tenx {
                 } else {
                     None
                 };
-                action
-                    .strategy
-                    .next_step(&self.config, session, sender.clone(), current_prompt)?
+                let next_step_result = action.strategy.next_step(
+                    &self.config,
+                    session,
+                    sender.clone(),
+                    current_prompt,
+                )?;
+
+                if next_step_result.is_none()
+                    && matches!(
+                        action.strategy.state(&self.config, session).completion,
+                        Completion::Complete
+                    )
+                {
+                    return Ok(());
+                }
+
+                next_step_result
             } else {
                 return Ok(());
             };
@@ -411,6 +442,7 @@ mod tests {
 
     use crate::patch::{Change, Patch, WriteFile};
     use crate::session::ModelResponse;
+    use crate::strategy::{Completion, InputRequired};
 
     use fs_err as fs;
     use tempfile::tempdir;
@@ -496,6 +528,64 @@ mod tests {
 
         let file_content = fs::read_to_string(&test_file_path).unwrap();
         assert_eq!(file_content, "Updated content");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_next_step_returns_state() -> Result<()> {
+        let temp_dir = tempdir().unwrap();
+        let mut config = Config::default()
+            .with_dummy_model(crate::model::DummyModel::from_model_response(
+                ModelResponse {
+                    comment: Some("Test comment".to_string()),
+                    patch: Some(Patch {
+                        changes: vec![Change::Write(WriteFile {
+                            path: PathBuf::from("test.txt"),
+                            content: "Updated content".to_string(),
+                        })],
+                    }),
+                    operations: vec![],
+                    usage: None,
+                    raw_response: Some("Test comment".to_string()),
+                },
+            ))
+            .with_root(temp_dir.path());
+
+        config.session_store_dir = temp_dir.path().join("sess");
+        config.step_limit = 1;
+        config.project.include.push("**".to_string());
+
+        let tenx = Tenx::new(config.clone());
+        let test_file_path = temp_dir.path().join("test.txt");
+        fs::write(&test_file_path, "Initial content").unwrap();
+
+        let mut session = Session::new(&config).unwrap();
+
+        session
+            .add_action(Action::new(
+                &config,
+                strategy::Strategy::Code(strategy::Code::new()),
+            )?)
+            .unwrap();
+        session
+            .state
+            .view(temp_dir.path().to_path_buf(), vec!["**".to_string()])
+            .unwrap();
+
+        let state = tenx
+            .next_step(&mut session, Some("test".into()), None)
+            .await?;
+
+        // Verify the returned state matches what we expect
+        assert!(matches!(state.completion, Completion::Complete));
+        assert!(matches!(state.input_required, InputRequired::No));
+
+        // Also verify the step was executed properly
+        assert_eq!(session.steps().len(), 1);
+        assert!(session.steps()[0].model_response.is_some());
+        let file_content = fs::read_to_string(&test_file_path).unwrap();
+        assert_eq!(file_content, "Updated content");
+
         Ok(())
     }
 }
