@@ -124,15 +124,14 @@ impl ActionStrategy for Code {
                 };
             }
 
-            // Check if the last step completed without errors
+            // Check if the last step should continue
             if let Some(step) = action.last_step() {
-                let has_errors = step.err.is_some()
-                    || step
-                        .patch_info
-                        .as_ref()
-                        .is_some_and(|p| !p.failures.is_empty());
-
-                if !has_errors {
+                if step.should_continue() {
+                    return State {
+                        completion: Completion::Incomplete,
+                        input_required: InputRequired::No,
+                    };
+                } else {
                     return State {
                         completion: Completion::Complete,
                         input_required: InputRequired::No,
@@ -193,15 +192,14 @@ impl ActionStrategy for Fix {
                 };
             }
 
-            // Check if the last step completed without errors
+            // Check if the last step should continue
             if let Some(step) = action.last_step() {
-                let has_errors = step.err.is_some()
-                    || step
-                        .patch_info
-                        .as_ref()
-                        .is_some_and(|p| !p.failures.is_empty());
-
-                if !has_errors {
+                if step.should_continue() {
+                    return State {
+                        completion: Completion::Incomplete,
+                        input_required: InputRequired::No,
+                    };
+                } else {
                     return State {
                         completion: Completion::Complete,
                         input_required: InputRequired::No,
