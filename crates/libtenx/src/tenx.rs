@@ -145,8 +145,9 @@ impl Tenx {
             strategy::Strategy::Code(strategy::Code::new()),
         )?;
         session.add_action(action)?;
-        self.process_prompt(session, Some(prompt), sender.clone())
-            .await
+        self.iterate_steps(session, Some(prompt), sender.clone())
+            .await?;
+        Ok(())
     }
 
     pub async fn fix(
@@ -163,7 +164,8 @@ impl Tenx {
             let action = Action::new(&self.config, strategy::Strategy::Fix(strategy::Fix::new(e)))?;
             session.add_action(action)?;
             self.save_session(session)?;
-            self.process_prompt(session, prompt, sender.clone()).await
+            self.iterate_steps(session, prompt, sender.clone()).await?;
+            Ok(())
         } else {
             Err(TenxError::Internal("No errors found".to_string()))
         }
@@ -199,7 +201,8 @@ impl Tenx {
         if let Some(step) = session.last_step() {
             session.state.revert(step.rollback_id)?;
         }
-        self.process_prompt(session, prompt, sender.clone()).await
+        self.iterate_steps(session, prompt, sender.clone()).await?;
+        Ok(())
     }
 
     /// Resets the session to a specific step.
@@ -288,81 +291,43 @@ impl Tenx {
         Ok(action.strategy.state(&self.config, session))
     }
 
-    /// Common logic for processing a prompt and updating the state. The prompt that will be
-    /// processed is the final prompt in the step list.
-    async fn process_prompt(
+    /// Iterate on steps until the action is complete.
+    /// Returns the final state of the action.
+    async fn iterate_steps(
         &self,
         session: &mut Session,
         prompt: Option<String>,
         sender: Option<EventSender>,
-    ) -> Result<()> {
+    ) -> Result<strategy::State> {
         self.save_session(session)?;
         let mut step_count = 0;
 
         loop {
             step_count += 1;
 
-            let next_step = if let Some(action) = session.last_action() {
-                let state = action.strategy.state(&self.config, session);
-                if matches!(state.completion, Completion::Complete) {
-                    return Ok(());
-                }
-
-                // Only pass the prompt on the first iteration of the loop
-                let current_prompt = if step_count == 1 {
-                    prompt.clone()
-                } else {
-                    None
-                };
-                let next_step_result = action.strategy.next_step(
-                    &self.config,
+            // Use next_step to handle the strategy logic
+            let state = self
+                .next_step(
                     session,
+                    if step_count == 1 {
+                        prompt.clone()
+                    } else {
+                        None
+                    },
                     sender.clone(),
-                    current_prompt,
-                )?;
+                )
+                .await?;
 
-                if next_step_result.is_none()
-                    && matches!(
-                        action.strategy.state(&self.config, session).completion,
-                        Completion::Complete
-                    )
-                {
-                    return Ok(());
-                }
-
-                next_step_result
-            } else {
-                return Ok(());
-            };
-
-            match next_step {
-                Some(step) => {
-                    session.add_step(step)?;
-                    self.save_session(session)?;
-                }
-                None => return Ok(()),
+            // If the action is complete, we're done
+            if matches!(state.completion, Completion::Complete) {
+                return Ok(state);
             }
 
-            // Execute the step
-            match self.execute_prompt_cycle(session, sender.clone()).await {
-                Ok(()) => {
-                    self.save_session(session)?;
-                }
-                Err(e) => {
-                    if let Some(step) = session.last_step_mut() {
-                        step.err = Some(e.clone());
-                        self.save_session(session)?;
-                    }
-
-                    if step_count >= self.config.step_limit {
-                        warn!("Step count limit reached. Last error: {}", e);
-                        send_event(
-                            &sender,
-                            Event::Fatal(format!("Step count limit reached. Last error: {}", e)),
-                        )?;
-                        return Err(e);
-                    }
-                }
+            // Check step limit
+            if step_count >= self.config.step_limit {
+                warn!("Step count limit reached");
+                send_event(&sender, Event::IterationLimit)?;
+                return Ok(state);
             }
         }
     }
@@ -515,7 +480,7 @@ mod tests {
             .view(temp_dir.path().to_path_buf(), vec!["**".to_string()])
             .unwrap();
 
-        tenx.process_prompt(&mut session, Some("test".into()), None)
+        tenx.iterate_steps(&mut session, Some("test".into()), None)
             .await
             .unwrap();
 

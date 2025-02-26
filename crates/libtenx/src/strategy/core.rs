@@ -20,6 +20,12 @@ pub enum Completion {
     CompleteContinue,
 }
 
+impl Completion {
+    pub fn is_complete(&self) -> bool {
+        matches!(self, Completion::Complete | Completion::CompleteContinue)
+    }
+}
+
 /// Is user input required to create the next step?
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum InputRequired {

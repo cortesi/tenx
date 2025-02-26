@@ -80,6 +80,9 @@ pub async fn output_logs(mut receiver: EventReceiver, mut kill_signal: mpsc::Rec
                         };
                         println!("{}: {}", severity, message);
                     }
+                    Event::IterationLimit => {
+                        println!("{}: step limit reached", "warn".yellow());
+                    }
                     _ => {
                         let name = event.name().to_string();
                         let display = event.display();
@@ -164,6 +167,10 @@ pub async fn output_progress(
                             println!("{:>width$}Model message:", "", width=spinner_indent);
                             println!("{}", wrapped.yellow());
                         }
+                    }
+                    Event::IterationLimit => {
+                        finish_spinner(&mut current_spinner);
+                        println!("{:>width$}{}", "", "step limit reached".yellow(), width=spinner_indent);
                     }
                     Event::Fatal(ref message) => {
                         finish_spinner(&mut current_spinner);

@@ -83,6 +83,9 @@ pub enum Event {
     /// This is needed in some cases to, for instance, stop a spinner.
     Interact,
 
+    /// We've hit a limit on the number of iterations
+    IterationLimit,
+
     /// A log message with a specified log level
     Log(LogLevel, String),
 
@@ -141,6 +144,7 @@ impl Event {
             Event::CheckStart(name) => Some(format!("Check {}...", name)),
             Event::PromptStart(model) => Some(format!("Prompting {}...", model)),
             Event::ApplyPatch => Some("Applying patch...".to_string()),
+            Event::IterationLimit => Some("Step limit reached".to_string()),
             _ => None,
         }
     }
