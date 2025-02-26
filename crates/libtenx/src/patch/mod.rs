@@ -13,11 +13,15 @@ use serde::{Deserialize, Serialize};
 
 use crate::{config::Config, error::Result};
 
-/// A change to be applied to a file.
+/// A change to be applied to the state.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum Change {
+    /// Wrhite a complete file.
     Write(write::WriteFile),
+    /// Replace one piece of text with another.
     Replace(replace::Replace),
+    /// View is basically a NoOp, it just enters the path as an affected file, which in turn
+    /// causes it to be output by the dialect at the appropriate point.
     View(PathBuf),
 }
 

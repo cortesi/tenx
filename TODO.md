@@ -12,6 +12,7 @@ UX:
     - indicate tenx version clearly in manual
     - execute pre-checks before asking the user for input
     - audio cues for model responses and completion
+    - Change the name of Config::step_limit (maybe iteration_limit? auto_step_limit?)
 
     
 Model response robustness:

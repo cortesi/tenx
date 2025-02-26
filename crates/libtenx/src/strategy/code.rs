@@ -115,10 +115,10 @@ impl ActionStrategy for Code {
         "code"
     }
 
-    fn state(&self, _config: &Config, session: &Session) -> State {
+    fn state(&self, _config: &Config, session: &Session) -> ActionState {
         if let Some(action) = session.last_action() {
             if action.steps().is_empty() {
-                return State {
+                return ActionState {
                     completion: Completion::Incomplete,
                     input_required: InputRequired::Yes,
                 };
@@ -127,12 +127,12 @@ impl ActionStrategy for Code {
             // Check if the last step should continue
             if let Some(step) = action.last_step() {
                 if step.should_continue() {
-                    return State {
+                    return ActionState {
                         completion: Completion::Incomplete,
                         input_required: InputRequired::No,
                     };
                 } else {
-                    return State {
+                    return ActionState {
                         completion: Completion::Complete,
                         input_required: InputRequired::No,
                     };
@@ -140,7 +140,7 @@ impl ActionStrategy for Code {
             }
         }
 
-        State {
+        ActionState {
             completion: Completion::Incomplete,
             input_required: InputRequired::No,
         }
@@ -183,10 +183,10 @@ impl ActionStrategy for Fix {
         Ok(None)
     }
 
-    fn state(&self, _config: &Config, session: &Session) -> State {
+    fn state(&self, _config: &Config, session: &Session) -> ActionState {
         if let Some(action) = session.last_action() {
             if action.steps().is_empty() {
-                return State {
+                return ActionState {
                     completion: Completion::Incomplete,
                     input_required: InputRequired::Optional,
                 };
@@ -195,12 +195,12 @@ impl ActionStrategy for Fix {
             // Check if the last step should continue
             if let Some(step) = action.last_step() {
                 if step.should_continue() {
-                    return State {
+                    return ActionState {
                         completion: Completion::Incomplete,
                         input_required: InputRequired::No,
                     };
                 } else {
-                    return State {
+                    return ActionState {
                         completion: Completion::Complete,
                         input_required: InputRequired::No,
                     };
@@ -208,7 +208,7 @@ impl ActionStrategy for Fix {
             }
         }
 
-        State {
+        ActionState {
             completion: Completion::Incomplete,
             input_required: InputRequired::No,
         }

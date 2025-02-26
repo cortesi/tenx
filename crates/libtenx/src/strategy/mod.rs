@@ -40,7 +40,7 @@ impl ActionStrategy for Strategy {
         }
     }
 
-    fn state(&self, config: &Config, session: &Session) -> State {
+    fn state(&self, config: &Config, session: &Session) -> ActionState {
         match self {
             Strategy::Code(code) => code.state(config, session),
             Strategy::Fix(fix) => fix.state(config, session),

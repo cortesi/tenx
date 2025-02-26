@@ -109,7 +109,6 @@ impl Tenx {
         Ok(())
     }
 
-    /// Attempts to fix issues in the session by running pre checks and adding a new prompt if there's an error.
     /// Helper function to add files to a session, returning the count of files added
     fn add_files(&self, session: &mut Session, files: Option<&[String]>) -> Result<usize> {
         match files {
@@ -139,7 +138,6 @@ impl Tenx {
         files: Option<&[String]>,
     ) -> Result<()> {
         self.add_files(session, files)?;
-        let _block = EventBlock::start(&sender)?;
         let action = Action::new(
             &self.config,
             strategy::Strategy::Code(strategy::Code::new()),
@@ -158,7 +156,6 @@ impl Tenx {
         files: Option<&[String]>,
     ) -> Result<()> {
         let _ = self.add_files(session, files)?;
-        let _block = EventBlock::start(&sender)?;
         let pre_result = self.run_pre_checks(session, &sender);
         if let Err(e) = pre_result {
             let action = Action::new(&self.config, strategy::Strategy::Fix(strategy::Fix::new(e)))?;
@@ -197,7 +194,6 @@ impl Tenx {
         prompt: Option<String>,
         sender: Option<EventSender>,
     ) -> Result<()> {
-        let _block = EventBlock::start(&sender)?;
         if let Some(step) = session.last_step() {
             session.state.revert(step.rollback_id)?;
         }
@@ -236,7 +232,7 @@ impl Tenx {
         session: &mut Session,
         prompt: Option<String>,
         sender: Option<EventSender>,
-    ) -> Result<strategy::State> {
+    ) -> Result<strategy::ActionState> {
         self.save_session(session)?;
 
         // If no action exists, we can't get a state, so return an error
@@ -293,12 +289,13 @@ impl Tenx {
 
     /// Iterate on steps until the action is complete.
     /// Returns the final state of the action.
-    async fn iterate_steps(
+    pub async fn iterate_steps(
         &self,
         session: &mut Session,
         prompt: Option<String>,
         sender: Option<EventSender>,
-    ) -> Result<strategy::State> {
+    ) -> Result<strategy::ActionState> {
+        let _block = EventBlock::start(&sender)?;
         self.save_session(session)?;
         let mut step_count = 0;
 
@@ -319,7 +316,7 @@ impl Tenx {
                 .await?;
 
             // If the action is complete, we're done
-            if matches!(state.completion, Completion::Complete) {
+            if state.should_stop_iteration() {
                 return Ok(state);
             }
 

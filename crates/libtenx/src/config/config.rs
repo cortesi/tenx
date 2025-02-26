@@ -516,9 +516,8 @@ pub struct Config {
     /// The directory to store session state. Defaults to ~/.config/tenx/state
     pub session_store_dir: PathBuf,
 
-    /// The number of steps we can take in a single interaction. This is reset
-    /// every time the user issues another prompt, so doesn't limit the total
-    /// number of steps in a session.
+    /// The number of steps we can take autonomously without user input. This doesn't limit the
+    /// total number of steps in a session.
     pub step_limit: usize,
 
     /// The tags dialect configuration.

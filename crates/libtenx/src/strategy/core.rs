@@ -8,7 +8,7 @@ use crate::{
 };
 
 /// Is the current action complete?
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum Completion {
     /// The action is complete.
     Complete,
@@ -27,7 +27,7 @@ impl Completion {
 }
 
 /// Is user input required to create the next step?
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum InputRequired {
     /// User input is mandatory to generate the next step.
     Yes,
@@ -41,12 +41,19 @@ pub enum InputRequired {
 
 /// The state of the current action.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct State {
+pub struct ActionState {
     /// Is the action complete?
     pub completion: Completion,
 
     /// Is user input required to create the next step?
     pub input_required: InputRequired,
+}
+
+impl ActionState {
+    /// Should the action stop iteration?
+    pub fn should_stop_iteration(&self) -> bool {
+        self.input_required == InputRequired::Yes || self.completion.is_complete()
+    }
 }
 
 pub trait ActionStrategy {
@@ -69,8 +76,8 @@ pub trait ActionStrategy {
     ) -> Result<Option<Step>>;
 
     /// Returns the current state of the action, including completion status and input requirements.
-    fn state(&self, _config: &Config, _session: &Session) -> State {
-        State {
+    fn state(&self, _config: &Config, _session: &Session) -> ActionState {
+        ActionState {
             completion: Completion::Incomplete,
             input_required: InputRequired::No,
         }
