@@ -109,59 +109,48 @@ impl Tenx {
         Ok(())
     }
 
-    /// Helper function to add files to a session, returning the count of files added
-    fn add_files(&self, session: &mut Session, files: Option<&[String]>) -> Result<usize> {
-        match files {
-            Some(file_list) => {
-                let (_, added) = session
-                    .state
-                    .view(&self.config.cwd()?, file_list.to_vec())?;
-                Ok(added)
-            }
-            None => Ok(0),
-        }
-    }
-
     /// Add files to edit in the session and save it
     pub fn edit(&self, session: &mut Session, files: &[String]) -> Result<usize> {
-        let count = self.add_files(session, Some(files))?;
+        let (_, count) = session.state.view(&self.config.cwd()?, files.to_vec())?;
         self.save_session(session)?;
         Ok(count)
     }
 
     /// Adds a user prompt to the session and sends it to the model.
+    /// Files must be already added to the session with session.state.view() before calling this.
     pub async fn code(
         &self,
         session: &mut Session,
         prompt: String,
         sender: Option<EventSender>,
-        files: Option<&[String]>,
+        timeout: Option<std::time::Duration>,
     ) -> Result<()> {
-        self.add_files(session, files)?;
         let action = Action::new(
             &self.config,
             strategy::Strategy::Code(strategy::Code::new()),
         )?;
         session.add_action(action)?;
-        self.iterate_steps(session, Some(prompt), sender.clone())
+        self.iterate_steps(session, Some(prompt), sender.clone(), timeout)
             .await?;
         Ok(())
     }
 
+    /// Runs the fix action on the session.
+    /// Files must be already added to the session with session.state.view() before calling this.
     pub async fn fix(
         &self,
         session: &mut Session,
         sender: Option<EventSender>,
         prompt: Option<String>,
-        files: Option<&[String]>,
+        timeout: Option<std::time::Duration>,
     ) -> Result<()> {
-        let _ = self.add_files(session, files)?;
         let pre_result = self.run_pre_checks(session, &sender);
         if let Err(e) = pre_result {
             let action = Action::new(&self.config, strategy::Strategy::Fix(strategy::Fix::new(e)))?;
             session.add_action(action)?;
             self.save_session(session)?;
-            self.iterate_steps(session, prompt, sender.clone()).await?;
+            self.iterate_steps(session, prompt, sender.clone(), timeout)
+                .await?;
             Ok(())
         } else {
             Err(TenxError::Internal("No errors found".to_string()))
@@ -197,7 +186,8 @@ impl Tenx {
         if let Some(step) = session.last_step() {
             session.state.revert(step.rollback_id)?;
         }
-        self.iterate_steps(session, prompt, sender.clone()).await?;
+        self.iterate_steps(session, prompt, sender.clone(), None)
+            .await?;
         Ok(())
     }
 
@@ -288,11 +278,13 @@ impl Tenx {
         session: &mut Session,
         prompt: Option<String>,
         sender: Option<EventSender>,
+        timeout: Option<std::time::Duration>,
     ) -> Result<strategy::ActionState> {
         let _block = EventBlock::start(&sender)?;
         self.save_session(session)?;
         let mut step_count = 0;
 
+        let start_time = std::time::Instant::now();
         loop {
             step_count += 1;
 
@@ -319,6 +311,14 @@ impl Tenx {
                 warn!("Step count limit reached");
                 send_event(&sender, Event::IterationLimit)?;
                 return Ok(state);
+            }
+
+            // Check timeout
+            if let Some(timeout) = timeout {
+                if start_time.elapsed() > timeout {
+                    warn!("Timeout reached");
+                    return Ok(state);
+                }
             }
         }
     }
@@ -460,18 +460,21 @@ mod tests {
 
         let mut session = Session::new(&config).unwrap();
 
+        // Add files to session first
+        session
+            .state
+            .view(temp_dir.path().to_path_buf(), vec!["**".to_string()])
+            .unwrap();
+
+        // Then add action
         session
             .add_action(Action::new(
                 &config,
                 strategy::Strategy::Code(strategy::Code::new()),
             )?)
             .unwrap();
-        session
-            .state
-            .view(temp_dir.path().to_path_buf(), vec!["**".to_string()])
-            .unwrap();
 
-        tenx.iterate_steps(&mut session, Some("test".into()), None)
+        tenx.iterate_steps(&mut session, Some("test".into()), None, None)
             .await
             .unwrap();
 
@@ -517,15 +520,18 @@ mod tests {
 
         let mut session = Session::new(&config).unwrap();
 
+        // Add files to session first
+        session
+            .state
+            .view(temp_dir.path().to_path_buf(), vec!["**".to_string()])
+            .unwrap();
+
+        // Then add action
         session
             .add_action(Action::new(
                 &config,
                 strategy::Strategy::Code(strategy::Code::new()),
             )?)
-            .unwrap();
-        session
-            .state
-            .view(temp_dir.path().to_path_buf(), vec!["**".to_string()])
             .unwrap();
 
         let state = tenx

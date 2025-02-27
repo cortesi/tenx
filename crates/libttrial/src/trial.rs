@@ -149,21 +149,24 @@ impl Trial {
         let mut session = tenx.new_session_from_cwd(&sender, false).await?;
 
         info!("trial setup complete: {}", self.name);
-        let result = match &self.trial_conf.op {
-            TrialOp::Code { prompt, editable } => {
+
+        // First add any editable files to the session regardless of operation type
+        match &self.trial_conf.op {
+            TrialOp::Code { editable, .. } | TrialOp::Fix { editable, .. } => {
                 for path in editable {
                     session
                         .state
                         .view(tenx.config.cwd()?, vec![path.to_string_lossy().to_string()])?;
                 }
+            }
+        }
+
+        // Then execute the appropriate operation
+        let result = match &self.trial_conf.op {
+            TrialOp::Code { prompt, .. } => {
                 tenx.code(&mut session, prompt.clone(), sender, None).await
             }
-            TrialOp::Fix { prompt, editable } => {
-                for path in editable {
-                    session
-                        .state
-                        .view(tenx.config.cwd()?, vec![path.to_string_lossy().to_string()])?;
-                }
+            TrialOp::Fix { prompt, .. } => {
                 tenx.fix(&mut session, sender, prompt.clone(), None).await
             }
         };
