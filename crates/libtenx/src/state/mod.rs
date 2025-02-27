@@ -352,20 +352,21 @@ impl State {
         Ok(result_vec)
     }
 
-    /// Creates and dispatches a view patch for files matching the provided patterns.
-    /// Expands the patterns using the current working directory, creates a Change::View for each matched path,
-    /// and applies the patch. Returns the snapshot ID from applying the patch.
-    pub fn view<P>(&mut self, cwd: P, patterns: Vec<String>) -> Result<u64>
+    /// Creates and dispatches a view patch for files matching the provided patterns. Expands the
+    /// patterns using the current working directory, creates a Change::View for each matched path,
+    /// and applies the patch. Returns a tuple of (snapshot ID, file count) from applying the patch.
+    pub fn view<P>(&mut self, cwd: P, patterns: Vec<String>) -> Result<(u64, usize)>
     where
         P: abspath::IntoAbsPath,
     {
         let paths = self.find(cwd, patterns)?;
+        let file_count = paths.len();
         let changes: Vec<Change> = paths.into_iter().map(Change::View).collect();
         let patch = Patch { changes };
         let patch_info = self.patch(&patch)?;
         // Failures for view changes should always be empty.
         debug_assert!(patch_info.failures.is_empty());
-        Ok(patch_info.id)
+        Ok((patch_info.id, file_count))
     }
 
     /// Add an empty patch to the snapshot sequence and return a snapshot ID. Useful as a markder.

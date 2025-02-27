@@ -113,10 +113,10 @@ impl Tenx {
     fn add_files(&self, session: &mut Session, files: Option<&[String]>) -> Result<usize> {
         match files {
             Some(file_list) => {
-                let added = session
+                let (_, added) = session
                     .state
                     .view(&self.config.cwd()?, file_list.to_vec())?;
-                Ok(added as usize)
+                Ok(added)
             }
             None => Ok(0),
         }
@@ -217,12 +217,6 @@ impl Tenx {
     pub fn check(&self, paths: Vec<PathBuf>, sender: &Option<EventSender>) -> Result<()> {
         let _block = EventBlock::start(sender)?;
         check_paths(&self.config, &paths, CheckMode::Both, sender)
-    }
-
-    /// Creates a view patch for files matching the given patterns using the last action's state.
-    pub fn view(&self, session: &mut Session, patterns: Vec<String>) -> Result<u64> {
-        let cwd = self.config.cwd()?;
-        session.state.view(cwd, patterns)
     }
 
     /// Take the next step for the current action.
