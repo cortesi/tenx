@@ -486,7 +486,8 @@ async fn main() -> anyhow::Result<()> {
                     Some(p) => p,
                     None => return Ok(()),
                 };
-                tx.code(&mut session, user_prompt, Some(sender.clone()), None)
+                tx.code(&mut session)?;
+                tx.iterate_steps(&mut session, Some(user_prompt), Some(sender.clone()), None)
                     .await?;
                 Ok(())
             }
@@ -520,7 +521,8 @@ async fn main() -> anyhow::Result<()> {
                     Some(p) => p,
                     None => return Ok(()),
                 };
-                tx.code(&mut session, user_prompt, Some(sender), None)
+                tx.code(&mut session)?;
+                tx.iterate_steps(&mut session, Some(user_prompt), Some(sender), None)
                     .await?;
                 Ok(())
             }
@@ -640,7 +642,9 @@ async fn main() -> anyhow::Result<()> {
                     None
                 };
 
-                tx.retry(&mut session, prompt, Some(sender.clone())).await?;
+                tx.retry(&mut session)?;
+                tx.iterate_steps(&mut session, prompt, Some(sender.clone()), None)
+                    .await?;
                 Ok(())
             }
             Commands::New { no_ctx } => {
@@ -676,12 +680,13 @@ async fn main() -> anyhow::Result<()> {
                     }
                 }
 
-                let prompt = if prompt.is_some() || prompt_file.is_some() || *edit {
+                let user_prompt = if prompt.is_some() || prompt_file.is_some() || *edit {
                     get_prompt(prompt, prompt_file, &session, false, &Some(sender.clone()))?
                 } else {
                     None
                 };
-                tx.fix(&mut session, Some(sender.clone()), prompt, None)
+                tx.fix(&mut session, &Some(sender.clone()))?;
+                tx.iterate_steps(&mut session, user_prompt, Some(sender.clone()), None)
                     .await?;
                 Ok(())
             }

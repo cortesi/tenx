@@ -116,41 +116,26 @@ impl Tenx {
         Ok(count)
     }
 
-    /// Adds a user prompt to the session and sends it to the model.
+    /// Adds a code action with the given prompt to the session.
     /// Files must be already added to the session with session.state.view() before calling this.
-    pub async fn code(
-        &self,
-        session: &mut Session,
-        prompt: String,
-        sender: Option<EventSender>,
-        timeout: Option<std::time::Duration>,
-    ) -> Result<()> {
+    pub fn code(&self, session: &mut Session) -> Result<()> {
         let action = Action::new(
             &self.config,
             strategy::Strategy::Code(strategy::Code::new()),
         )?;
         session.add_action(action)?;
-        self.iterate_steps(session, Some(prompt), sender.clone(), timeout)
-            .await?;
+        self.save_session(session)?;
         Ok(())
     }
 
-    /// Runs the fix action on the session.
+    /// Adds a fix action to the session.
     /// Files must be already added to the session with session.state.view() before calling this.
-    pub async fn fix(
-        &self,
-        session: &mut Session,
-        sender: Option<EventSender>,
-        prompt: Option<String>,
-        timeout: Option<std::time::Duration>,
-    ) -> Result<()> {
-        let pre_result = self.run_pre_checks(session, &sender);
+    pub fn fix(&self, session: &mut Session, sender: &Option<EventSender>) -> Result<()> {
+        let pre_result = self.run_pre_checks(session, sender);
         if let Err(e) = pre_result {
             let action = Action::new(&self.config, strategy::Strategy::Fix(strategy::Fix::new(e)))?;
             session.add_action(action)?;
             self.save_session(session)?;
-            self.iterate_steps(session, prompt, sender.clone(), timeout)
-                .await?;
             Ok(())
         } else {
             Err(TenxError::Internal("No errors found".to_string()))
@@ -176,18 +161,12 @@ impl Tenx {
         session_store.load(name)
     }
 
-    /// Retries the last prompt, optionally replacing it with a new one.
-    pub async fn retry(
-        &self,
-        session: &mut Session,
-        prompt: Option<String>,
-        sender: Option<EventSender>,
-    ) -> Result<()> {
+    /// Reverts the last step and prepares for retry.
+    pub fn retry(&self, session: &mut Session) -> Result<()> {
         if let Some(step) = session.last_step() {
             session.state.revert(step.rollback_id)?;
         }
-        self.iterate_steps(session, prompt, sender.clone(), None)
-            .await?;
+        self.save_session(session)?;
         Ok(())
     }
 
@@ -466,14 +445,10 @@ mod tests {
             .view(temp_dir.path().to_path_buf(), vec!["**".to_string()])
             .unwrap();
 
-        // Then add action
-        session
-            .add_action(Action::new(
-                &config,
-                strategy::Strategy::Code(strategy::Code::new()),
-            )?)
-            .unwrap();
+        // Create code action
+        tenx.code(&mut session)?;
 
+        // Run the steps
         tenx.iterate_steps(&mut session, Some("test".into()), None, None)
             .await
             .unwrap();

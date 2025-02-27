@@ -164,10 +164,14 @@ impl Trial {
         // Then execute the appropriate operation
         let result = match &self.trial_conf.op {
             TrialOp::Code { prompt, .. } => {
-                tenx.code(&mut session, prompt.clone(), sender, None).await
+                tenx.code(&mut session, prompt.clone())?;
+                tenx.iterate_steps(&mut session, Some(prompt.clone()), sender, None)
+                    .await
             }
             TrialOp::Fix { prompt, .. } => {
-                tenx.fix(&mut session, sender, prompt.clone(), None).await
+                tenx.fix(&mut session, &sender)?;
+                tenx.iterate_steps(&mut session, prompt.clone(), sender, None)
+                    .await
             }
         };
 
