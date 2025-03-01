@@ -300,6 +300,24 @@ impl State {
         Ok(result)
     }
 
+    /// Returns a unique, sorted list of all files touched in the current session.
+    /// This includes all files that have been modified in any snapshot.
+    pub fn touched(&self) -> Result<Vec<PathBuf>> {
+        if self.snapshots.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let mut files = std::collections::BTreeSet::new();
+
+        for (_, snap) in &self.snapshots {
+            for path in snap.touched() {
+                files.insert(path);
+            }
+        }
+
+        Ok(files.into_iter().collect())
+    }
+
     /// Matches files in both the memory and directory stores based on the provided patterns.
     /// The patterns are normalized using the substore's root (empty for memory) and the given current
     /// working directory, and matched using globset.
@@ -924,6 +942,181 @@ mod tests {
                 "{}: expected {:?}, got {:?}",
                 case.name, expected, result_strs
             );
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_touched() -> Result<()> {
+        use crate::patch::{Change, Patch, WriteFile};
+
+        struct TestCase {
+            name: &'static str,
+            patches: Vec<Patch>,
+            expected: Result<Vec<&'static str>>,
+        }
+
+        let cases = vec![
+            TestCase {
+                name: "empty snapshots list",
+                patches: vec![],
+                expected: Ok(vec![]),
+            },
+            TestCase {
+                name: "single snapshot with multiple files",
+                patches: vec![Patch {
+                    changes: vec![
+                        Change::Write(WriteFile {
+                            path: PathBuf::from("::a.txt"),
+                            content: "A0".to_string(),
+                        }),
+                        Change::Write(WriteFile {
+                            path: PathBuf::from("::b.txt"),
+                            content: "B0".to_string(),
+                        }),
+                    ],
+                }],
+                expected: Ok(vec!["::a.txt", "::b.txt"]),
+            },
+            TestCase {
+                name: "multiple snapshots with unique files",
+                patches: vec![
+                    Patch {
+                        changes: vec![Change::Write(WriteFile {
+                            path: PathBuf::from("::a.txt"),
+                            content: "A0".to_string(),
+                        })],
+                    },
+                    Patch {
+                        changes: vec![Change::Write(WriteFile {
+                            path: PathBuf::from("::b.txt"),
+                            content: "B0".to_string(),
+                        })],
+                    },
+                    Patch {
+                        changes: vec![Change::Write(WriteFile {
+                            path: PathBuf::from("::c.txt"),
+                            content: "C0".to_string(),
+                        })],
+                    },
+                ],
+                expected: Ok(vec!["::a.txt", "::b.txt", "::c.txt"]),
+            },
+            TestCase {
+                name: "multiple snapshots with overlapping files",
+                patches: vec![
+                    Patch {
+                        changes: vec![Change::Write(WriteFile {
+                            path: PathBuf::from("::a.txt"),
+                            content: "A0".to_string(),
+                        })],
+                    },
+                    Patch {
+                        changes: vec![Change::Write(WriteFile {
+                            path: PathBuf::from("::b.txt"),
+                            content: "B0".to_string(),
+                        })],
+                    },
+                    Patch {
+                        changes: vec![Change::Write(WriteFile {
+                            path: PathBuf::from("::a.txt"),
+                            content: "A1".to_string(),
+                        })],
+                    },
+                ],
+                expected: Ok(vec!["::a.txt", "::b.txt"]),
+            },
+            TestCase {
+                name: "multiple snapshots with multiple files per snapshot",
+                patches: vec![
+                    Patch {
+                        changes: vec![
+                            Change::Write(WriteFile {
+                                path: PathBuf::from("::a.txt"),
+                                content: "A0".to_string(),
+                            }),
+                            Change::Write(WriteFile {
+                                path: PathBuf::from("::b.txt"),
+                                content: "B0".to_string(),
+                            }),
+                        ],
+                    },
+                    Patch {
+                        changes: vec![
+                            Change::Write(WriteFile {
+                                path: PathBuf::from("::c.txt"),
+                                content: "C0".to_string(),
+                            }),
+                            Change::Write(WriteFile {
+                                path: PathBuf::from("::d.txt"),
+                                content: "D0".to_string(),
+                            }),
+                        ],
+                    },
+                    Patch {
+                        changes: vec![
+                            Change::Write(WriteFile {
+                                path: PathBuf::from("::b.txt"),
+                                content: "B1".to_string(),
+                            }),
+                            Change::Write(WriteFile {
+                                path: PathBuf::from("::d.txt"),
+                                content: "D1".to_string(),
+                            }),
+                        ],
+                    },
+                ],
+                expected: Ok(vec!["::a.txt", "::b.txt", "::c.txt", "::d.txt"]),
+            },
+            TestCase {
+                name: "view changes included",
+                patches: vec![
+                    Patch {
+                        changes: vec![Change::View(PathBuf::from("::view1.txt"))],
+                    },
+                    Patch {
+                        changes: vec![
+                            Change::View(PathBuf::from("::view2.txt")),
+                            Change::Write(WriteFile {
+                                path: PathBuf::from("::a.txt"),
+                                content: "A0".to_string(),
+                            }),
+                        ],
+                    },
+                ],
+                expected: Ok(vec!["::a.txt", "::view1.txt", "::view2.txt"]),
+            },
+        ];
+
+        for case in cases {
+            let mut state = State::default();
+
+            // Apply each patch to build up the snapshot history
+            for patch in case.patches {
+                let patch_info = state.patch(&patch)?;
+                assert!(
+                    patch_info.failures.is_empty(),
+                    "{}: patch application failed",
+                    case.name
+                );
+            }
+
+            // Test touched
+            let result = state.touched();
+
+            match (result, case.expected) {
+                (Ok(got), Ok(expected)) => {
+                    let got: Vec<&str> = got.iter().map(|p| p.to_str().unwrap()).collect();
+                    assert_eq!(got, expected, "{}: got wrong paths", case.name);
+                }
+                (Err(TenxError::Internal(got)), Err(TenxError::Internal(expected))) => {
+                    assert_eq!(got, expected, "{}: got wrong error message", case.name);
+                }
+                (got, expected) => {
+                    panic!("{}: got {:?}, expected {:?}", case.name, got, expected);
+                }
+            }
         }
 
         Ok(())
