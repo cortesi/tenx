@@ -164,7 +164,7 @@ impl Trial {
         // Then execute the appropriate operation
         let result = match &self.trial_conf.op {
             TrialOp::Code { prompt, .. } => {
-                tenx.code(&mut session, prompt.clone())?;
+                tenx.code(&mut session)?;
                 tenx.iterate_steps(&mut session, Some(prompt.clone()), sender, None)
                     .await
             }

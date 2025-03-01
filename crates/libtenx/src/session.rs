@@ -37,7 +37,7 @@ pub struct Step {
     /// The raw prompt provided to the model
     pub raw_prompt: String,
 
-    /// Time taken in seconds to receive the complete model response
+    /// Time in seconds to receive the complete model response
     pub response_time: Option<f64>,
 
     /// An associated error, for instance an error processing a model response. This may be

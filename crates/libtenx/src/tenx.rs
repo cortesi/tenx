@@ -190,7 +190,7 @@ impl Tenx {
 
     /// Take the next step for the current action.
     /// Returns the State of the current action after execution.
-    pub async fn next_step(
+    async fn next_step(
         &self,
         session: &mut Session,
         prompt: Option<String>,
@@ -251,6 +251,7 @@ impl Tenx {
     }
 
     /// Iterate on steps until the action is complete.
+    /// The optional prompt is passed to the first step.
     /// Returns the final state of the action.
     pub async fn iterate_steps(
         &self,
@@ -307,7 +308,7 @@ impl Tenx {
         session: &mut Session,
         sender: Option<EventSender>,
     ) -> Result<()> {
-        self.prompt(session, sender.clone()).await?;
+        self.prompt_model(session, sender.clone()).await?;
         send_event(&sender, Event::ApplyPatch)?;
         session.apply_last_step(&self.config)?;
         if !session.should_continue() {
@@ -318,7 +319,7 @@ impl Tenx {
     }
 
     /// Prompts the current model with the session's state and sets the resulting patch and usage.
-    async fn prompt(&self, session: &mut Session, sender: Option<EventSender>) -> Result<()> {
+    async fn prompt_model(&self, session: &mut Session, sender: Option<EventSender>) -> Result<()> {
         // FIXME: Get the model from the last step
         let mut model = self.config.active_model()?;
         let _block = EventBlock::prompt(&sender, &model.name())?;
