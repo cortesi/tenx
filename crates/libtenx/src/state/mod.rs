@@ -108,6 +108,17 @@ impl State {
         Ok(self)
     }
 
+    /// Initialize the state with pre-populated memory contents.
+    ///
+    /// This method takes a HashMap mapping file paths to their contents and
+    /// adds these files to the memory store of the State.
+    pub fn with_memory(mut self, files: HashMap<PathBuf, String>) -> Result<Self> {
+        for (path, content) in files {
+            self.memory.write(&path, &content)?;
+        }
+        Ok(self)
+    }
+
     /// Dispatches an operation to the appropriate immutable store based on the path prefix.
     fn dispatch_ro<T, F>(&self, path: &Path, f: F) -> Result<T>
     where
@@ -316,6 +327,32 @@ impl State {
         }
 
         Ok(files.into_iter().collect())
+    }
+
+    /// Returns the original content of a file from the first snapshot where it appears.
+    /// If the file was created in the first snapshot, returns an empty string.
+    /// If the file does not occur in any snapshot, returns None.
+    pub fn original(&self, path: &Path) -> Option<String> {
+        if self.snapshots.is_empty() {
+            return None;
+        }
+
+        // Sort snapshots by ID to find the first one
+        let mut sorted_snapshots: Vec<&(u64, Snapshot)> = self.snapshots.iter().collect();
+        sorted_snapshots.sort_by_key(|(id, _)| *id);
+
+        for (_, snap) in sorted_snapshots {
+            // First check if there's content for this file
+            if let Some(content) = snap.content.get(path) {
+                return Some(content.clone());
+            }
+            // If there's no content but file is in created list, it was a new empty file
+            else if snap.created.contains(&path.to_path_buf()) {
+                return Some(String::new());
+            }
+        }
+
+        None
     }
 
     /// Matches files in both the memory and directory stores based on the provided patterns.
@@ -942,6 +979,150 @@ mod tests {
                 "{}: expected {:?}, got {:?}",
                 case.name, expected, result_strs
             );
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_original() -> Result<()> {
+        use crate::patch::{Change, Patch, WriteFile};
+
+        struct TestCase {
+            name: &'static str,
+            initial_files: HashMap<PathBuf, String>,
+            patches: Vec<Patch>,
+            path: &'static str,
+            expected: Option<&'static str>,
+        }
+
+        let cases = vec![
+            TestCase {
+                name: "empty snapshots list",
+                initial_files: HashMap::new(),
+                patches: vec![],
+                path: "::nonexistent.txt",
+                expected: None,
+            },
+            TestCase {
+                name: "newly created file in patch",
+                initial_files: HashMap::new(),
+                patches: vec![
+                    Patch {
+                        changes: vec![Change::Write(WriteFile {
+                            path: PathBuf::from("::a.txt"),
+                            content: "A0".to_string(),
+                        })],
+                    },
+                    Patch {
+                        changes: vec![Change::Write(WriteFile {
+                            path: PathBuf::from("::a.txt"),
+                            content: "A1".to_string(),
+                        })],
+                    },
+                ],
+                path: "::a.txt",
+                expected: Some(""),
+            },
+            TestCase {
+                name: "file with initial content modified in patches",
+                initial_files: {
+                    let mut files = HashMap::new();
+                    files.insert(PathBuf::from("::a.txt"), "Original".to_string());
+                    files
+                },
+                patches: vec![
+                    Patch {
+                        changes: vec![Change::Write(WriteFile {
+                            path: PathBuf::from("::a.txt"),
+                            content: "A0".to_string(),
+                        })],
+                    },
+                    Patch {
+                        changes: vec![Change::Write(WriteFile {
+                            path: PathBuf::from("::a.txt"),
+                            content: "A1".to_string(),
+                        })],
+                    },
+                ],
+                path: "::a.txt",
+                expected: Some("Original"),
+            },
+            TestCase {
+                name: "file in second snapshot only",
+                initial_files: HashMap::new(),
+                patches: vec![
+                    Patch {
+                        changes: vec![Change::Write(WriteFile {
+                            path: PathBuf::from("::a.txt"),
+                            content: "A0".to_string(),
+                        })],
+                    },
+                    Patch {
+                        changes: vec![Change::Write(WriteFile {
+                            path: PathBuf::from("::b.txt"),
+                            content: "B0".to_string(),
+                        })],
+                    },
+                ],
+                path: "::b.txt",
+                expected: Some(""),
+            },
+            TestCase {
+                name: "file created in first snapshot",
+                initial_files: HashMap::new(),
+                patches: vec![Patch {
+                    changes: vec![Change::View(PathBuf::from("::created.txt"))],
+                }],
+                path: "::created.txt",
+                expected: Some(""),
+            },
+            TestCase {
+                name: "file not in any snapshot",
+                initial_files: {
+                    let mut files = HashMap::new();
+                    files.insert(PathBuf::from("::a.txt"), "A0".to_string());
+                    files
+                },
+                patches: vec![Patch {
+                    changes: vec![Change::Write(WriteFile {
+                        path: PathBuf::from("::a.txt"),
+                        content: "A1".to_string(),
+                    })],
+                }],
+                path: "::nonexistent.txt",
+                expected: None,
+            },
+        ];
+
+        for case in cases {
+            // Initialize state with pre-populated memory content
+            let mut state = State::default().with_memory(case.initial_files)?;
+
+            // Apply each patch to build up the snapshot history
+            for patch in case.patches {
+                let patch_info = state.patch(&patch)?;
+                assert!(
+                    patch_info.failures.is_empty(),
+                    "{}: patch application failed",
+                    case.name
+                );
+            }
+
+            // Test original method
+            let result = state.original(Path::new(case.path));
+
+            match (result, case.expected) {
+                (Some(got), Some(expected)) => {
+                    assert_eq!(got, expected, "{}: got wrong content", case.name);
+                }
+                (None, None) => {
+                    // Both are None, that's correct
+                }
+                (got, expected) => {
+                    panic!("{}: got {:?}, expected {:?}", case.name, got, expected);
+                }
+            }
         }
 
         Ok(())
