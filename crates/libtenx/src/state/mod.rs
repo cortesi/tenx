@@ -2,6 +2,9 @@
 //!
 //! All modifications are made through `Patch` operations, and return an ID that can be used
 //! to revert the state to a previous snapshot.
+//!
+//! The actual state consists of a filesystem directory and an in-memory store. Files in the
+//! in-memory store are prefixed with `::`.
 pub mod abspath;
 mod directory;
 pub mod files;
@@ -13,6 +16,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use diffy;
 use globset::Glob;
 use serde::{Deserialize, Serialize};
 
@@ -95,6 +99,70 @@ pub struct State {
 }
 
 impl State {
+    /// Generate a diff of changes made to a file since the first snapshot.
+    ///
+    /// If the file has changed significantly (more than 50% of lines), a single
+    /// WriteFile operation will be used instead of multiple Replace operations.
+    pub fn diff_path(&self, path: PathBuf) -> Result<Patch> {
+        // Get original and current content
+        let original_content = self.original(path.as_path()).unwrap_or_default();
+        let current_content = self.read(path.as_path())?;
+
+        // Generate a diff using diffy
+        let diff = diffy::create_patch(&original_content, &current_content);
+
+        let mut changes = Vec::new();
+        let mut total_replaced_lines = 0;
+        let total_lines = current_content.lines().count();
+
+        // Convert diff hunks to Change::Replace operations
+        for hunk in diff.hunks() {
+            let mut old_content = String::new();
+            let mut new_content = String::new();
+            let mut hunk_replaced_lines = 0;
+
+            for line in hunk.lines() {
+                match line {
+                    diffy::Line::Context(text) => {
+                        old_content.push_str(text);
+                        new_content.push_str(text);
+                    }
+                    diffy::Line::Delete(text) => {
+                        old_content.push_str(text);
+                        hunk_replaced_lines += 1;
+                    }
+                    diffy::Line::Insert(text) => {
+                        new_content.push_str(text);
+                        hunk_replaced_lines += 1;
+                    }
+                }
+            }
+
+            total_replaced_lines += hunk_replaced_lines;
+
+            changes.push(Change::Replace(crate::patch::Replace {
+                path: path.clone(),
+                old: old_content,
+                new: new_content,
+            }));
+        }
+
+        // If more than half the file has changed, or if file is being completely emptied or filled,
+        // use a single Write operation instead
+        if total_lines == 0
+            || original_content.is_empty()
+            || current_content.is_empty()
+            || (total_lines > 0 && (total_replaced_lines as f64) / (total_lines as f64) > 0.5)
+        {
+            changes = vec![Change::Write(crate::patch::WriteFile {
+                path,
+                content: current_content,
+            })];
+        }
+
+        Ok(Patch { changes })
+    }
+
     /// Set the directory path and glob patterns for file operations.
     ///
     /// Glob patterns can be positive (equivalent to --include) or negative (prefixed with `!`,
@@ -438,7 +506,8 @@ impl State {
 mod tests {
     use super::abspath::AbsPath;
     use super::*;
-    use std::{fs, path::PathBuf};
+    // test imports are used below
+    use std::{collections::HashMap, fs, path::PathBuf};
     use tempfile::TempDir;
 
     #[test]
@@ -1298,6 +1367,156 @@ mod tests {
                     panic!("{}: got {:?}, expected {:?}", case.name, got, expected);
                 }
             }
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_diff_path() -> Result<()> {
+        use crate::patch::Change;
+
+        struct TestCase {
+            name: &'static str,
+            orig_content: &'static str,
+            current_content: &'static str,
+            expected_type: PatchType,
+            path: &'static str,
+        }
+
+        #[allow(dead_code)]
+        enum PatchType {
+            Write,
+            Replace(usize), // number of replace operations
+        }
+
+        let cases = vec![
+            TestCase {
+                name: "small change - single line",
+                orig_content: "Hello world",
+                current_content: "Hello there",
+                expected_type: PatchType::Write, // Single line changes also use Write
+                path: "::test.txt",
+            },
+            TestCase {
+                name: "small changes - multiple lines",
+                orig_content: "Line 1\nLine 2\nLine 3\nLine 4\n",
+                current_content: "Line 1\nLine 2 modified\nLine 3\nLine 4 modified\n",
+                expected_type: PatchType::Write, // Use Write when 50% of lines change
+                path: "::test.txt",
+            },
+            TestCase {
+                name: "majority changed - use write",
+                orig_content: "Line 1\nLine 2\nLine 3\nLine 4\n",
+                current_content: "Line 1 changed\nLine 2 changed\nLine 3 changed\nLine 4\n",
+                expected_type: PatchType::Write,
+                path: "::test.txt",
+            },
+            TestCase {
+                name: "completely different content",
+                orig_content: "Original content",
+                current_content: "Totally different content",
+                expected_type: PatchType::Write,
+                path: "::test.txt",
+            },
+            TestCase {
+                name: "empty to non-empty",
+                orig_content: "",
+                current_content: "New content added",
+                expected_type: PatchType::Write, // Empty to non-empty is a complete change
+                path: "::test.txt",
+            },
+            TestCase {
+                name: "non-empty to empty",
+                orig_content: "Content to be removed",
+                current_content: "",
+                expected_type: PatchType::Write, // Complete removal is a 100% change
+                path: "::test.txt",
+            },
+        ];
+
+        for case in cases {
+            let mut state = State::default();
+            let path = PathBuf::from(case.path);
+
+            // Setup initial state with original content
+            let mut initial_files = HashMap::new();
+            initial_files.insert(path.clone(), case.orig_content.to_string());
+            state = state.with_memory(initial_files)?;
+
+            // Take a snapshot of the initial state
+            state.snapshot(&[path.clone()])?;
+
+            // Update to current content
+            state.write(&path, case.current_content)?;
+
+            // Generate diff
+            let patch = state.diff_path(path.clone())?;
+
+            // Verify patch structure based on expected type
+            match case.expected_type {
+                PatchType::Write => {
+                    assert_eq!(
+                        patch.changes.len(),
+                        1,
+                        "{}: expected 1 change (Write), got {}",
+                        case.name,
+                        patch.changes.len()
+                    );
+
+                    match &patch.changes[0] {
+                        Change::Write(w) => {
+                            assert_eq!(
+                                w.content, case.current_content,
+                                "{}: Write content doesn't match expected",
+                                case.name
+                            );
+                        }
+                        _ => panic!(
+                            "{}: expected Write change, got {:?}",
+                            case.name, patch.changes[0]
+                        ),
+                    }
+                }
+                PatchType::Replace(count) => {
+                    assert_eq!(
+                        patch.changes.len(),
+                        count,
+                        "{}: expected {} Replace changes, got {}",
+                        case.name,
+                        count,
+                        patch.changes.len()
+                    );
+
+                    for change in &patch.changes {
+                        match change {
+                            Change::Replace(_) => {} // This is expected
+                            _ => panic!("{}: expected Replace change, got {:?}", case.name, change),
+                        }
+                    }
+                }
+            }
+
+            // Verify the patch can transform original to current
+            let mut new_state = State::default();
+            let mut initial_files = HashMap::new();
+            initial_files.insert(path.clone(), case.orig_content.to_string());
+            new_state = new_state.with_memory(initial_files)?;
+
+            let patch_info = new_state.patch(&patch)?;
+            assert!(
+                patch_info.failures.is_empty(),
+                "{}: failed to apply patch: {:?}",
+                case.name,
+                patch_info.failures
+            );
+
+            let result = new_state.read(&path)?;
+            assert_eq!(
+                result, case.current_content,
+                "{}: patched content doesn't match expected",
+                case.name
+            );
         }
 
         Ok(())

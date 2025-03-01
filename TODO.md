@@ -1,5 +1,6 @@
 STATE REFACTORING:
 
+    - Diff summary line in state
     - tenx continue
         - Continues with the current action
         - If the action cannot continue, raises an error
@@ -13,6 +14,7 @@ UX:
     - execute pre-checks before asking the user for input
     - audio cues for model responses and completion
     - Change the name of Config::step_limit (maybe iteration_limit? auto_step_limit?)
+    - We don't capture user edits in the state history. This leads to some counter-intuitive behavior.
 
     
 Model response robustness:
