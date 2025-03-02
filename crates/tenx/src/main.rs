@@ -471,11 +471,6 @@ async fn main() -> anyhow::Result<()> {
                     .new_session_from_cwd(&Some(sender.clone()), *no_ctx)
                     .await?;
 
-                // Add files to the session
-                if !files.is_empty() {
-                    session.state.view(&config.cwd()?, files.to_vec())?;
-                }
-
                 let user_prompt = match get_prompt(
                     prompt,
                     prompt_file,
@@ -487,6 +482,13 @@ async fn main() -> anyhow::Result<()> {
                     None => return Ok(()),
                 };
                 tx.code(&mut session)?;
+                // Add files to the session
+                if !files.is_empty() {
+                    session
+                        .last_action_mut()?
+                        .state
+                        .view(&config.cwd()?, files.to_vec())?;
+                }
                 tx.iterate_steps(&mut session, Some(user_prompt), Some(sender.clone()), None)
                     .await?;
                 Ok(())
@@ -504,13 +506,6 @@ async fn main() -> anyhow::Result<()> {
                     }
                 };
 
-                // Add files to the session if provided
-                if let Some(file_list) = &files {
-                    if !file_list.is_empty() {
-                        session.state.view(&config.cwd()?, file_list.to_vec())?;
-                    }
-                }
-
                 let user_prompt = match get_prompt(
                     prompt,
                     prompt_file,
@@ -522,6 +517,17 @@ async fn main() -> anyhow::Result<()> {
                     None => return Ok(()),
                 };
                 tx.code(&mut session)?;
+
+                // Add files to the action if provided
+                if let Some(file_list) = &files {
+                    if !file_list.is_empty() {
+                        session
+                            .last_action_mut()?
+                            .state
+                            .view(&config.cwd()?, file_list.to_vec())?;
+                    }
+                }
+
                 tx.iterate_steps(&mut session, Some(user_prompt), Some(sender), None)
                     .await?;
                 Ok(())
@@ -673,19 +679,22 @@ async fn main() -> anyhow::Result<()> {
                         .await?
                 };
 
-                // Add files to the session if provided
-                if let Some(file_list) = &files {
-                    if !file_list.is_empty() {
-                        session.state.view(&config.cwd()?, file_list.to_vec())?;
-                    }
-                }
-
                 let user_prompt = if prompt.is_some() || prompt_file.is_some() || *edit {
                     get_prompt(prompt, prompt_file, &session, false, &Some(sender.clone()))?
                 } else {
                     None
                 };
                 tx.fix(&mut session, &Some(sender.clone()))?;
+                // Add files to the session if provided
+                if let Some(file_list) = &files {
+                    if !file_list.is_empty() {
+                        session
+                            .last_action_mut()?
+                            .state
+                            .view(&config.cwd()?, file_list.to_vec())?;
+                    }
+                }
+
                 tx.iterate_steps(&mut session, user_prompt, Some(sender.clone()), None)
                     .await?;
                 Ok(())

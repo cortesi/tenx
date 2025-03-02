@@ -111,7 +111,10 @@ impl Tenx {
 
     /// Add files to edit in the session and save it
     pub fn edit(&self, session: &mut Session, files: &[String]) -> Result<usize> {
-        let (_, count) = session.state.view(&self.config.cwd()?, files.to_vec())?;
+        let (_, count) = session
+            .last_action_mut()?
+            .state
+            .view(&self.config.cwd()?, files.to_vec())?;
         self.save_session(session)?;
         Ok(count)
     }
@@ -164,7 +167,8 @@ impl Tenx {
     /// Reverts the last step and prepares for retry.
     pub fn retry(&self, session: &mut Session) -> Result<()> {
         if let Some(step) = session.last_step() {
-            session.state.revert(step.rollback_id)?;
+            // FIXME
+            // session.state.revert(step.rollback_id)?;
         }
         self.save_session(session)?;
         Ok(())
@@ -198,18 +202,10 @@ impl Tenx {
     ) -> Result<strategy::ActionState> {
         self.save_session(session)?;
 
-        // If no action exists, we can't get a state, so return an error
-        if session.last_action().is_none() {
-            return Err(TenxError::Internal("No current action".to_string()));
-        }
-
-        // Get the initial state, and check if we're already complete
-        {
-            let action = session.last_action().unwrap();
-            let state = action.strategy.state(&self.config, session);
-            if matches!(state.completion, Completion::Complete) {
-                return Ok(state);
-            }
+        let action = session.last_action()?;
+        let state = action.strategy.state(&self.config, session);
+        if matches!(state.completion, Completion::Complete) {
+            return Ok(state);
         }
 
         // Get the next step from the strategy
@@ -440,14 +436,16 @@ mod tests {
 
         let mut session = Session::new(&config).unwrap();
 
-        // Add files to session first
+        // Create code action
+        tenx.code(&mut session)?;
+
+        // Then add files to session first
         session
+            .last_action_mut()
+            .unwrap()
             .state
             .view(temp_dir.path().to_path_buf(), vec!["**".to_string()])
             .unwrap();
-
-        // Create code action
-        tenx.code(&mut session)?;
 
         // Run the steps
         tenx.iterate_steps(&mut session, Some("test".into()), None, None)
@@ -496,18 +494,20 @@ mod tests {
 
         let mut session = Session::new(&config).unwrap();
 
-        // Add files to session first
-        session
-            .state
-            .view(temp_dir.path().to_path_buf(), vec!["**".to_string()])
-            .unwrap();
-
-        // Then add action
+        // Add action
         session
             .add_action(Action::new(
                 &config,
                 strategy::Strategy::Code(strategy::Code::new()),
             )?)
+            .unwrap();
+
+        // Then add files to session
+        session
+            .last_action_mut()
+            .unwrap()
+            .state
+            .view(temp_dir.path().to_path_buf(), vec!["**".to_string()])
             .unwrap();
 
         let state = tenx

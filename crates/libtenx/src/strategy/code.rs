@@ -93,7 +93,7 @@ impl ActionStrategy for Code {
         events: Option<EventSender>,
         prompt: Option<String>,
     ) -> Result<Option<Step>> {
-        if let Some(action) = session.last_action() {
+        if let Ok(action) = session.last_action() {
             if let Some(step) = action.last_step() {
                 return next_step(config, step, events);
             } else {
@@ -116,7 +116,7 @@ impl ActionStrategy for Code {
     }
 
     fn state(&self, _config: &Config, session: &Session) -> ActionState {
-        if let Some(action) = session.last_action() {
+        if let Ok(action) = session.last_action() {
             if action.steps().is_empty() {
                 return ActionState {
                     completion: Completion::Incomplete,
@@ -170,7 +170,7 @@ impl ActionStrategy for Fix {
         events: Option<EventSender>,
         prompt: Option<String>,
     ) -> Result<Option<Step>> {
-        if let Some(action) = session.last_action() {
+        if let Ok(action) = session.last_action() {
             if let Some(step) = action.last_step() {
                 return next_step(config, step, events);
             } else {
@@ -184,7 +184,7 @@ impl ActionStrategy for Fix {
     }
 
     fn state(&self, _config: &Config, session: &Session) -> ActionState {
-        if let Some(action) = session.last_action() {
+        if let Ok(action) = session.last_action() {
             if action.steps().is_empty() {
                 return ActionState {
                     completion: Completion::Incomplete,

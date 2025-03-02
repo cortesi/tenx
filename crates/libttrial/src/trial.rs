@@ -155,6 +155,7 @@ impl Trial {
             TrialOp::Code { editable, .. } | TrialOp::Fix { editable, .. } => {
                 for path in editable {
                     session
+                        .last_action_mut()?
                         .state
                         .view(tenx.config.cwd()?, vec![path.to_string_lossy().to_string()])?;
                 }

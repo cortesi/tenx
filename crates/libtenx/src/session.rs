@@ -95,16 +95,18 @@ impl Step {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Action {
     pub strategy: strategy::Strategy,
+    pub state: state::State,
     /// The steps in the action
     steps: Vec<Step>,
 }
 
 impl Action {
     /// Creates a new Action with the given strategy.
-    pub fn new(_config: &config::Config, strategy: strategy::Strategy) -> Result<Self> {
+    pub fn new(config: &config::Config, strategy: strategy::Strategy) -> Result<Self> {
         Ok(Action {
             strategy,
             steps: Vec::new(),
+            state: config.state()?,
         })
     }
 
@@ -137,7 +139,6 @@ impl Action {
 pub struct Session {
     editable: Vec<PathBuf>,
     actions: Vec<Action>,
-    pub state: state::State,
     pub contexts: Vec<context::Context>,
 }
 
@@ -146,12 +147,11 @@ impl Session {
     ///
     /// If `dir` is provided, it is used as the project root; otherwise the configuration's
     /// project root is used.
-    pub fn new(config: &config::Config) -> Result<Self> {
+    pub fn new(_config: &config::Config) -> Result<Self> {
         Ok(Session {
             editable: vec![],
             actions: vec![],
             contexts: Vec::new(),
-            state: config.state()?,
         })
     }
 
@@ -188,13 +188,18 @@ impl Session {
     }
 
     /// Returns a reference to the last action in the session.
-    pub fn last_action(&self) -> Option<&Action> {
-        self.actions.last()
+    pub fn last_action(&self) -> Result<&Action> {
+        self.actions
+            .last()
+            .ok_or_else(|| TenxError::Internal("No actions in session".into()))
     }
 
     /// Returns a reference to the last action in the session.
-    pub fn last_action_mut(&mut self) -> Option<&mut Action> {
-        self.actions.iter_mut().last()
+    pub fn last_action_mut(&mut self) -> Result<&mut Action> {
+        self.actions
+            .iter_mut()
+            .last()
+            .ok_or_else(|| TenxError::Internal("No actions in session".into()))
     }
 
     /// Returns a mutable reference to the last step in the session.
@@ -231,7 +236,7 @@ impl Session {
     /// Returns an error if the last step doesn't have either a patch or an error.
     pub fn add_step(&mut self, mut step: Step) -> Result<()> {
         if let Some(action) = self.actions.last_mut() {
-            let rollback_id = self.state.mark()?;
+            let rollback_id = action.state.mark()?;
             step.rollback_id = rollback_id;
             action.add_step(step)?;
         } else {
@@ -279,7 +284,7 @@ impl Session {
                         if keep_steps < action.steps.len() {
                             // Rollback steps being removed
                             for step in action.steps[keep_steps..].iter_mut().rev() {
-                                self.state.revert(step.rollback_id)?;
+                                action.state.revert(step.rollback_id)?;
                             }
                             action.steps.truncate(keep_steps);
                         }
@@ -292,7 +297,9 @@ impl Session {
                 self.actions = new_actions;
             }
             None => {
-                self.state.revert(0)?;
+                if let Some(action) = self.actions.first_mut() {
+                    action.state.revert(0)?;
+                }
                 self.actions.clear();
             }
         }
@@ -319,7 +326,7 @@ impl Session {
             .clone()
             .ok_or_else(|| TenxError::Internal("No response in the last step".into()))?;
         if let Some(patch) = &resp.patch {
-            let patch_info = self.state.patch(patch)?;
+            let patch_info = self.actions.last_mut().unwrap().state.patch(patch)?;
             let step = self
                 .last_step_mut()
                 .ok_or_else(|| TenxError::Internal("No steps in session".into()))?;
@@ -350,8 +357,13 @@ impl Session {
                 curr_offset += 1;
             }
         }
-        self.state
-            .last_changed_between(prev_rollback_id, curr_rollback_id)
+        if let Ok(action) = self.last_action() {
+            action
+                .state
+                .last_changed_between(prev_rollback_id, curr_rollback_id)
+        } else {
+            Ok(vec![])
+        }
     }
 }
 
