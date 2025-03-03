@@ -1,4 +1,4 @@
-//! A Session is the context and a sequence of model interaction steps.
+//! l Session is the context and a sequence of model interaction steps.
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
@@ -262,58 +262,84 @@ impl Session {
         }
     }
 
-    fn reset_steps(&mut self, _config: &config::Config, keep: Option<usize>) -> Result<()> {
-        let total_steps: usize = self.actions.iter().map(|a| a.steps.len()).sum();
-        match keep {
-            Some(offset) if offset >= total_steps => {
-                return Err(TenxError::Internal("Invalid rollback offset".into()));
-            }
-            Some(offset) => {
-                let mut steps_remaining = offset + 1;
+    /// Reset the session to a specific action and step, removing all subsequent steps.
+    ///
+    /// * `action_idx` - The 0-based index of the action to keep steps for
+    /// * `step_idx` - The 0-based index of the step within the action to keep
+    pub fn reset(&mut self, action_idx: usize, step_idx: Option<usize>) -> Result<()> {
+        if action_idx >= self.actions.len() {
+            return Err(TenxError::Internal(format!(
+                "Invalid action index: {}",
+                action_idx
+            )));
+        }
+
+        match step_idx {
+            Some(step_idx) => {
                 let mut new_actions = Vec::new();
 
-                // Preserve actions until we reach the required step count
-                for action in &mut self.actions {
-                    if steps_remaining == 0 {
-                        break;
-                    }
+                // Process actions up to action_idx
+                for (idx, action) in self.actions.iter_mut().enumerate() {
+                    match idx.cmp(&action_idx) {
+                        std::cmp::Ordering::Less => {
+                            // Keep this action entirely
+                            new_actions.push(action.clone());
+                        }
+                        std::cmp::Ordering::Equal => {
+                            // For the target action, keep steps up to step_idx
+                            if step_idx >= action.steps.len() {
+                                return Err(TenxError::Internal(format!(
+                                    "Invalid step index {} for action {}, which has {} steps",
+                                    step_idx,
+                                    action_idx,
+                                    action.steps.len()
+                                )));
+                            }
 
-                    let keep_steps = std::cmp::min(action.steps.len(), steps_remaining);
-                    // Keep first 'keep_steps' steps in this action
-                    if keep_steps > 0 {
-                        if keep_steps < action.steps.len() {
-                            // Rollback steps being removed
-                            for step in action.steps[keep_steps..].iter_mut().rev() {
+                            // Rollback steps being removed (after step_idx)
+                            for step in action.steps[(step_idx + 1)..].iter_mut().rev() {
                                 action.state.revert(step.rollback_id)?;
                             }
-                            action.steps.truncate(keep_steps);
-                        }
-                        new_actions.push(action.clone());
-                    }
 
-                    steps_remaining = steps_remaining.saturating_sub(action.steps.len());
+                            // Truncate the steps and add the action
+                            let mut new_action = action.clone();
+                            new_action.steps.truncate(step_idx + 1);
+                            new_actions.push(new_action);
+
+                            // We've processed the target action, so break
+                            break;
+                        }
+                        std::cmp::Ordering::Greater => {
+                            // Any actions after action_idx will be discarded
+                            break;
+                        }
+                    }
                 }
 
                 self.actions = new_actions;
             }
             None => {
-                if let Some(action) = self.actions.first_mut() {
-                    action.state.revert(0)?;
+                // Keep all actions up to and including action_idx
+                let mut new_actions = Vec::new();
+                for (idx, action) in self.actions.iter().enumerate() {
+                    if idx <= action_idx {
+                        new_actions.push(action.clone());
+                    }
                 }
-                self.actions.clear();
+                self.actions = new_actions;
             }
         }
+
         Ok(())
     }
 
-    /// Resets the session to a specific step, removing and rolling back all subsequent steps.
-    pub fn reset(&mut self, config: &config::Config, offset: usize) -> Result<()> {
-        self.reset_steps(config, Some(offset))
-    }
-
     /// Rolls back and removes all steps in the session.
-    pub fn reset_all(&mut self, config: &config::Config) -> Result<()> {
-        self.reset_steps(config, None)
+    pub fn reset_all(&mut self) -> Result<()> {
+        if let Some(action) = self.actions.first_mut() {
+            action.state.revert(0)?;
+        }
+        self.actions.clear();
+        Ok(())
     }
 
     /// Apply the last step in the session, applying the patch and operations. The step must
@@ -335,35 +361,45 @@ impl Session {
         Ok(())
     }
 
-    pub fn editables_for_step_state(&self, step_offset: usize) -> Result<Vec<PathBuf>> {
-        // Convert step offset into a rollback ID range
-        let total_steps: usize = self.actions.iter().map(|a| a.steps.len()).sum();
-        if step_offset > total_steps {
-            return Err(TenxError::Internal("Invalid step offset".into()));
+    /// Get editables for a specific action and step in the session
+    pub fn editables_for_step_state(
+        &self,
+        action_idx: usize,
+        step_idx: usize,
+    ) -> Result<Vec<PathBuf>> {
+        if action_idx >= self.actions.len() {
+            return Err(TenxError::Internal(format!(
+                "Invalid action index: {}",
+                action_idx
+            )));
         }
 
-        let mut prev_rollback_id = None;
-        let mut curr_rollback_id = None;
-        let mut curr_offset = 0;
-
-        // Find the rollback IDs for the target step
-        for action in &self.actions {
-            for step in &action.steps {
-                if curr_offset == step_offset {
-                    curr_rollback_id = Some(step.rollback_id);
-                } else if curr_offset == step_offset.saturating_sub(1) {
-                    prev_rollback_id = Some(step.rollback_id);
-                }
-                curr_offset += 1;
-            }
+        let action = &self.actions[action_idx];
+        if step_idx >= action.steps.len() {
+            return Err(TenxError::Internal(format!(
+                "Invalid step index {} for action {}, which has {} steps",
+                step_idx,
+                action_idx,
+                action.steps.len()
+            )));
         }
-        if let Ok(action) = self.last_action() {
-            action
-                .state
-                .last_changed_between(prev_rollback_id, curr_rollback_id)
+
+        let curr_rollback_id = Some(action.steps[step_idx].rollback_id);
+
+        // Get the previous rollback id (if this isn't the first step)
+        let prev_rollback_id = if step_idx > 0 {
+            Some(action.steps[step_idx - 1].rollback_id)
+        } else if action_idx > 0 {
+            // Get the last step of the previous action
+            let prev_action = &self.actions[action_idx - 1];
+            prev_action.steps.last().map(|s| s.rollback_id)
         } else {
-            Ok(vec![])
-        }
+            None
+        };
+
+        action
+            .state
+            .last_changed_between(prev_rollback_id, curr_rollback_id)
     }
 }
 

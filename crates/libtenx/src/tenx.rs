@@ -166,7 +166,7 @@ impl Tenx {
 
     /// Reverts the last step and prepares for retry.
     pub fn retry(&self, session: &mut Session) -> Result<()> {
-        if let Some(step) = session.last_step() {
+        if let Some(_step) = session.last_step() {
             // FIXME
             // session.state.revert(step.rollback_id)?;
         }
@@ -174,15 +174,23 @@ impl Tenx {
         Ok(())
     }
 
-    /// Resets the session to a specific step.
-    pub fn reset(&self, session: &mut Session, offset: usize) -> Result<()> {
-        session.reset(&self.config, offset)?;
+    /// Resets the session to a specific action and step.
+    ///
+    /// * `action_idx` - The 0-based index of the action
+    /// * `step_idx` - The 0-based index of the step within the action
+    pub fn reset(
+        &self,
+        session: &mut Session,
+        action_idx: usize,
+        step_idx: Option<usize>,
+    ) -> Result<()> {
+        session.reset(action_idx, step_idx)?;
         self.save_session(session)
     }
 
     /// Resets all steps in the session.
     pub fn reset_all(&self, session: &mut Session) -> Result<()> {
-        session.reset_all(&self.config)?;
+        session.reset_all()?;
         self.save_session(session)
     }
 

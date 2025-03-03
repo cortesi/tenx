@@ -21,6 +21,26 @@ use libtenx::{
 
 mod edit;
 
+/// Parse a step offset string in format "action:step" and return the parsed indices
+fn parse_step_offset(offset_str: &str) -> Result<(usize, usize)> {
+    // Parse the action:step format
+    let parts: Vec<&str> = offset_str.split(':').collect();
+    if parts.len() != 2 {
+        return Err(anyhow!(
+            "Step offset must be in format 'action:step', e.g. '0:3'"
+        ));
+    }
+
+    let action_idx = parts[0]
+        .parse::<usize>()
+        .map_err(|_| anyhow!("Invalid action index: {}", parts[0]))?;
+    let step_idx = parts[1]
+        .parse::<usize>()
+        .map_err(|_| anyhow!("Invalid step index: {}", parts[1]))?;
+
+    Ok((action_idx, step_idx))
+}
+
 fn get_prompt(
     prompt: &Option<String>,
     prompt_file: &Option<PathBuf>,
@@ -269,16 +289,16 @@ enum Commands {
     },
     /// Reset the session to a specific step, undoing changes
     Reset {
-        /// The step offset to reset to
-        step_offset: Option<usize>,
+        /// The step offset to reset to, in format "action:step" (e.g. "0:3")
+        step_offset: Option<String>,
         /// Reset all steps in the session
         #[clap(long)]
         all: bool,
     },
     /// Retry a prompt
     Retry {
-        /// The step offset to retry from
-        step_offset: Option<usize>,
+        /// The step offset to retry from, in format "action:step" (e.g. "0:3")
+        step_offset: Option<String>,
         /// Edit the prompt before retrying
         #[clap(long)]
         edit: bool,
@@ -386,351 +406,369 @@ async fn main() -> anyhow::Result<()> {
     };
 
     let result = match &cli.command {
-        Some(cmd) => match cmd {
-            Commands::Models { full } => {
-                for model in &config.model_confs() {
-                    println!("{}", model.name().blue().bold());
-                    println!("    kind: {}", model.kind());
-                    for line in model.text_config(*full).lines() {
-                        println!("    {}", line);
+        Some(cmd) => {
+            match cmd {
+                Commands::Models { full } => {
+                    for model in &config.model_confs() {
+                        println!("{}", model.name().blue().bold());
+                        println!("    kind: {}", model.kind());
+                        for line in model.text_config(*full).lines() {
+                            println!("    {}", line);
+                        }
+                        println!();
                     }
-                    println!();
+                    Ok(())
                 }
-                Ok(())
-            }
-            Commands::Conf { defaults } => {
-                let conf = if *defaults {
-                    config::default_config(std::env::current_dir()?)
-                } else {
-                    config.clone()
-                };
-                println!("{}", conf.to_ron()?);
-                Ok(()) as anyhow::Result<()>
-            }
-            Commands::Project => {
-                print!("{}", pretty::print_project(&config));
-                Ok(())
-            }
-            Commands::Files { pattern } => {
-                let state = config.state()?;
-                let files = if let Some(p) = pattern {
-                    state.find(std::env::current_dir()?, vec![p.to_string()])?
-                } else {
-                    state.list()?
-                };
-                for file in files {
-                    println!("{}", file.display());
-                }
-                Ok(())
-            }
-            Commands::Checks { all } => {
-                let checks = if *all {
-                    config.all_checks()
-                } else {
-                    config.enabled_checks()
-                };
-                for check in checks {
-                    let name = &check.name;
-                    let enabled = config.is_check_enabled(name);
-
-                    let status = if !enabled {
-                        " (disabled)".yellow().to_string()
+                Commands::Conf { defaults } => {
+                    let conf = if *defaults {
+                        config::default_config(std::env::current_dir()?)
                     } else {
-                        String::new()
+                        config.clone()
                     };
-
-                    println!("{}{}", name.blue().bold(), status);
-                    println!("    globs: {:?}", check.globs);
-                    println!("    pre: {}", check.mode.is_pre());
-                    println!("    post: {}", check.mode.is_post());
-                    println!();
+                    println!("{}", conf.to_ron()?);
+                    Ok(()) as anyhow::Result<()>
                 }
-                Ok(())
-            }
-            Commands::Dialect { command } => {
-                let dialect = config.dialect()?;
-                match command {
-                    DialectCommands::Info => {
-                        println!("Current dialect: {}", dialect.name());
-                        println!("\nSettings:\n{:#?}", config.tags);
-                    }
-                    DialectCommands::System => {
-                        println!("Current dialect: {}", dialect.name());
-                        println!("\nSystem prompt:\n{}", dialect.system());
-                    }
+                Commands::Project => {
+                    print!("{}", pretty::print_project(&config));
+                    Ok(())
                 }
-                Ok(())
-            }
-            Commands::Quick {
-                files,
-                no_ctx,
-                prompt,
-                prompt_file,
-            } => {
-                let mut session = tx
-                    .new_session_from_cwd(&Some(sender.clone()), *no_ctx)
-                    .await?;
+                Commands::Files { pattern } => {
+                    let state = config.state()?;
+                    let files = if let Some(p) = pattern {
+                        state.find(std::env::current_dir()?, vec![p.to_string()])?
+                    } else {
+                        state.list()?
+                    };
+                    for file in files {
+                        println!("{}", file.display());
+                    }
+                    Ok(())
+                }
+                Commands::Checks { all } => {
+                    let checks = if *all {
+                        config.all_checks()
+                    } else {
+                        config.enabled_checks()
+                    };
+                    for check in checks {
+                        let name = &check.name;
+                        let enabled = config.is_check_enabled(name);
 
-                let user_prompt = match get_prompt(
+                        let status = if !enabled {
+                            " (disabled)".yellow().to_string()
+                        } else {
+                            String::new()
+                        };
+
+                        println!("{}{}", name.blue().bold(), status);
+                        println!("    globs: {:?}", check.globs);
+                        println!("    pre: {}", check.mode.is_pre());
+                        println!("    post: {}", check.mode.is_post());
+                        println!();
+                    }
+                    Ok(())
+                }
+                Commands::Dialect { command } => {
+                    let dialect = config.dialect()?;
+                    match command {
+                        DialectCommands::Info => {
+                            println!("Current dialect: {}", dialect.name());
+                            println!("\nSettings:\n{:#?}", config.tags);
+                        }
+                        DialectCommands::System => {
+                            println!("Current dialect: {}", dialect.name());
+                            println!("\nSystem prompt:\n{}", dialect.system());
+                        }
+                    }
+                    Ok(())
+                }
+                Commands::Quick {
+                    files,
+                    no_ctx,
                     prompt,
                     prompt_file,
-                    &session,
-                    false,
-                    &Some(sender.clone()),
-                )? {
-                    Some(p) => p,
-                    None => return Ok(()),
-                };
-                tx.code(&mut session)?;
-                // Add files to the session
-                if !files.is_empty() {
-                    session
-                        .last_action_mut()?
-                        .state
-                        .view(&config.cwd()?, files.to_vec())?;
-                }
-                tx.iterate_steps(&mut session, Some(user_prompt), Some(sender.clone()), None)
-                    .await?;
-                Ok(())
-            }
-            Commands::Code {
-                files,
-                prompt,
-                prompt_file,
-            } => {
-                let mut session = match tx.load_session() {
-                    Ok(sess) => sess,
-                    Err(_) => {
-                        println!("No existing session to check.");
-                        return Ok(());
-                    }
-                };
+                } => {
+                    let mut session = tx
+                        .new_session_from_cwd(&Some(sender.clone()), *no_ctx)
+                        .await?;
 
-                let user_prompt = match get_prompt(
-                    prompt,
-                    prompt_file,
-                    &session,
-                    false,
-                    &Some(sender.clone()),
-                )? {
-                    Some(p) => p,
-                    None => return Ok(()),
-                };
-                tx.code(&mut session)?;
-
-                // Add files to the action if provided
-                if let Some(file_list) = &files {
-                    if !file_list.is_empty() {
+                    let user_prompt = match get_prompt(
+                        prompt,
+                        prompt_file,
+                        &session,
+                        false,
+                        &Some(sender.clone()),
+                    )? {
+                        Some(p) => p,
+                        None => return Ok(()),
+                    };
+                    tx.code(&mut session)?;
+                    // Add files to the session
+                    if !files.is_empty() {
                         session
                             .last_action_mut()?
                             .state
-                            .view(&config.cwd()?, file_list.to_vec())?;
+                            .view(&config.cwd()?, files.to_vec())?;
                     }
+                    tx.iterate_steps(&mut session, Some(user_prompt), Some(sender.clone()), None)
+                        .await?;
+                    Ok(())
                 }
-
-                tx.iterate_steps(&mut session, Some(user_prompt), Some(sender), None)
-                    .await?;
-                Ok(())
-            }
-            Commands::Session {
-                session_file,
-                raw,
-                render,
-                full,
-            } => {
-                let model = config.active_model()?;
-                let session = if let Some(path) = session_file {
-                    libtenx::session_store::load_session(path)?
-                } else {
-                    tx.load_session()?
-                };
-                if *raw {
-                    println!("{:#?}", session);
-                } else if *render {
-                    println!("{}", model.render(&config, &session)?);
-                } else {
-                    println!("{}", pretty::print_session(&config, &session, *full)?);
-                }
-                Ok(())
-            }
-            Commands::Edit { files } => {
-                let mut session = tx.load_session()?;
-                let total = tx.edit(&mut session, files)?;
-                println!("{} files added for editing", total);
-                Ok(())
-            }
-            Commands::Context { command } => {
-                let mut session = tx.load_session()?;
-                match command {
-                    ContextCommands::Clear => {
-                        session.clear_ctx();
-                        println!("All context cleared from session");
-                    }
-                    ContextCommands::Ruskel { items } => {
-                        for item in items {
-                            session.add_context(Context::new_ruskel(item));
-                        }
-                    }
-                    ContextCommands::Refresh => {
-                        tx.refresh_contexts(&mut session, &Some(sender.clone()))
-                            .await?;
-                        tx.save_session(&session)?;
-                        println!("Contexts refreshed.");
-                    }
-                    ContextCommands::File { items } => {
-                        for item in items {
-                            session.add_context(Context::new_path(&config, item)?);
-                        }
-                    }
-                    ContextCommands::Url { items } => {
-                        for item in items {
-                            session.add_context(Context::new_url(item));
-                        }
-                    }
-                    ContextCommands::Text { name, file } => {
-                        let text = if let Some(path) = file {
-                            fs::read_to_string(path).context("Failed to read text file")?
-                        } else {
-                            let mut buffer = String::new();
-                            std::io::stdin().read_to_string(&mut buffer)?;
-                            buffer
-                        };
-                        let name = name.as_deref().unwrap_or("<anonymous>");
-                        session.add_context(Context::new_text(name, &text));
-                    }
-                    ContextCommands::Cmd { command } => {
-                        session.add_context(Context::new_cmd(command));
-                    }
-                    ContextCommands::Show => {
-                        if session.contexts().is_empty() {
-                            println!("No contexts in session");
+                Commands::Code {
+                    files,
+                    prompt,
+                    prompt_file,
+                } => {
+                    let mut session = match tx.load_session() {
+                        Ok(sess) => sess,
+                        Err(_) => {
+                            println!("No existing session to check.");
                             return Ok(());
                         }
-                        println!("{}", pretty::print_contexts(&config, &session)?);
-                        return Ok(());
+                    };
+
+                    let user_prompt = match get_prompt(
+                        prompt,
+                        prompt_file,
+                        &session,
+                        false,
+                        &Some(sender.clone()),
+                    )? {
+                        Some(p) => p,
+                        None => return Ok(()),
+                    };
+                    tx.code(&mut session)?;
+
+                    // Add files to the action if provided
+                    if let Some(file_list) = &files {
+                        if !file_list.is_empty() {
+                            session
+                                .last_action_mut()?
+                                .state
+                                .view(&config.cwd()?, file_list.to_vec())?;
+                        }
                     }
-                };
-                tx.refresh_needed_contexts(&mut session, &Some(sender.clone()))
-                    .await?;
-                tx.save_session(&session)?;
-                Ok(())
-            }
-            Commands::Reset { step_offset, all } => {
-                if *all && step_offset.is_some() {
-                    return Err(anyhow!("Cannot specify both --all and a step offset"));
+
+                    tx.iterate_steps(&mut session, Some(user_prompt), Some(sender), None)
+                        .await?;
+                    Ok(())
                 }
-                let mut session = tx.load_session()?;
-                if *all {
-                    tx.reset_all(&mut session)?;
-                    println!("All steps reset");
-                } else {
-                    let offset = step_offset
-                        .ok_or_else(|| anyhow!("Must specify either --all or a step offset"))?;
-                    tx.reset(&mut session, offset)?;
-                    println!("Session reset to step {}", offset);
+                Commands::Session {
+                    session_file,
+                    raw,
+                    render,
+                    full,
+                } => {
+                    let model = config.active_model()?;
+                    let session = if let Some(path) = session_file {
+                        libtenx::session_store::load_session(path)?
+                    } else {
+                        tx.load_session()?
+                    };
+                    if *raw {
+                        println!("{:#?}", session);
+                    } else if *render {
+                        println!("{}", model.render(&config, &session)?);
+                    } else {
+                        println!("{}", pretty::print_session(&config, &session, *full)?);
+                    }
+                    Ok(())
                 }
-                Ok(())
-            }
-            Commands::Retry {
-                step_offset,
-                edit,
-                prompt,
-                prompt_file,
-            } => {
-                let mut session = tx.load_session()?;
+                Commands::Edit { files } => {
+                    let mut session = tx.load_session()?;
+                    let total = tx.edit(&mut session, files)?;
+                    println!("{} files added for editing", total);
+                    Ok(())
+                }
+                Commands::Context { command } => {
+                    let mut session = tx.load_session()?;
+                    match command {
+                        ContextCommands::Clear => {
+                            session.clear_ctx();
+                            println!("All context cleared from session");
+                        }
+                        ContextCommands::Ruskel { items } => {
+                            for item in items {
+                                session.add_context(Context::new_ruskel(item));
+                            }
+                        }
+                        ContextCommands::Refresh => {
+                            tx.refresh_contexts(&mut session, &Some(sender.clone()))
+                                .await?;
+                            tx.save_session(&session)?;
+                            println!("Contexts refreshed.");
+                        }
+                        ContextCommands::File { items } => {
+                            for item in items {
+                                session.add_context(Context::new_path(&config, item)?);
+                            }
+                        }
+                        ContextCommands::Url { items } => {
+                            for item in items {
+                                session.add_context(Context::new_url(item));
+                            }
+                        }
+                        ContextCommands::Text { name, file } => {
+                            let text = if let Some(path) = file {
+                                fs::read_to_string(path).context("Failed to read text file")?
+                            } else {
+                                let mut buffer = String::new();
+                                std::io::stdin().read_to_string(&mut buffer)?;
+                                buffer
+                            };
+                            let name = name.as_deref().unwrap_or("<anonymous>");
+                            session.add_context(Context::new_text(name, &text));
+                        }
+                        ContextCommands::Cmd { command } => {
+                            session.add_context(Context::new_cmd(command));
+                        }
+                        ContextCommands::Show => {
+                            if session.contexts().is_empty() {
+                                println!("No contexts in session");
+                                return Ok(());
+                            }
+                            println!("{}", pretty::print_contexts(&config, &session)?);
+                            return Ok(());
+                        }
+                    };
+                    tx.refresh_needed_contexts(&mut session, &Some(sender.clone()))
+                        .await?;
+                    tx.save_session(&session)?;
+                    Ok(())
+                }
+                Commands::Reset { step_offset, all } => {
+                    if *all && step_offset.is_some() {
+                        return Err(anyhow!("Cannot specify both --all and a step offset"));
+                    }
+                    let mut session = tx.load_session()?;
+                    if *all {
+                        tx.reset_all(&mut session)?;
+                        println!("All steps reset");
+                    } else {
+                        let offset_str = step_offset
+                        .as_ref()
+                        .ok_or_else(|| anyhow!("Must specify either --all or a step offset in format 'action:step'"))?;
 
-                let offset = step_offset.unwrap_or(session.steps().len() - 1);
-                tx.reset(&mut session, offset)?;
+                        let (action_idx, step_idx) = parse_step_offset(offset_str)?;
 
-                let prompt = if *edit || prompt.is_some() || prompt_file.is_some() {
-                    get_prompt(prompt, prompt_file, &session, true, &Some(sender.clone()))?
-                } else {
-                    None
-                };
+                        tx.reset(&mut session, action_idx, Some(step_idx))?;
+                        println!("Session reset to action {}, step {}", action_idx, step_idx);
+                    }
+                    Ok(())
+                }
+                Commands::Retry {
+                    step_offset,
+                    edit,
+                    prompt,
+                    prompt_file,
+                } => {
+                    let mut session = tx.load_session()?;
 
-                tx.retry(&mut session)?;
-                tx.iterate_steps(&mut session, prompt, Some(sender.clone()), None)
-                    .await?;
-                Ok(())
-            }
-            Commands::New { no_ctx } => {
-                let session = tx
-                    .new_session_from_cwd(&Some(sender.clone()), *no_ctx)
-                    .await?;
-                tx.save_session(&session)?;
+                    // If no step offset is provided, use the last step of the last action
+                    if let Some(offset_str) = step_offset {
+                        let (action_idx, step_idx) = parse_step_offset(offset_str)?;
 
-                println!("{}", pretty::print_session(&config, &session, false)?);
-                Ok(())
-            }
-            Commands::Fix {
-                clear,
-                no_ctx,
-                prompt,
-                prompt_file,
-                edit,
-                files,
-            } => {
-                let mut session = if *clear {
-                    let mut current_session = tx.load_session()?;
-                    current_session.clear();
-                    current_session
-                } else {
-                    tx.new_session_from_cwd(&Some(sender.clone()), *no_ctx)
-                        .await?
-                };
+                        tx.reset(&mut session, action_idx, Some(step_idx))?;
+                    } else if !session.actions().is_empty() {
+                        // Use the last step of the last action
+                        let action_idx = session.actions().len() - 1;
+                        let action = &session.actions()[action_idx];
+                        if !action.steps().is_empty() {
+                            let step_idx = action.steps().len() - 1;
+                            tx.reset(&mut session, action_idx, Some(step_idx))?;
+                        }
+                    }
 
-                let user_prompt = if prompt.is_some() || prompt_file.is_some() || *edit {
-                    get_prompt(prompt, prompt_file, &session, false, &Some(sender.clone()))?
-                } else {
-                    None
-                };
-                tx.fix(&mut session, &Some(sender.clone()))?;
-                // Add files to the session if provided
-                if let Some(file_list) = &files {
-                    if !file_list.is_empty() {
-                        session
-                            .last_action_mut()?
-                            .state
-                            .view(&config.cwd()?, file_list.to_vec())?;
+                    let prompt = if *edit || prompt.is_some() || prompt_file.is_some() {
+                        get_prompt(prompt, prompt_file, &session, true, &Some(sender.clone()))?
+                    } else {
+                        None
+                    };
+
+                    tx.retry(&mut session)?;
+                    tx.iterate_steps(&mut session, prompt, Some(sender.clone()), None)
+                        .await?;
+                    Ok(())
+                }
+                Commands::New { no_ctx } => {
+                    let session = tx
+                        .new_session_from_cwd(&Some(sender.clone()), *no_ctx)
+                        .await?;
+                    tx.save_session(&session)?;
+
+                    println!("{}", pretty::print_session(&config, &session, false)?);
+                    Ok(())
+                }
+                Commands::Fix {
+                    clear,
+                    no_ctx,
+                    prompt,
+                    prompt_file,
+                    edit,
+                    files,
+                } => {
+                    let mut session = if *clear {
+                        let mut current_session = tx.load_session()?;
+                        current_session.clear();
+                        current_session
+                    } else {
+                        tx.new_session_from_cwd(&Some(sender.clone()), *no_ctx)
+                            .await?
+                    };
+
+                    let user_prompt = if prompt.is_some() || prompt_file.is_some() || *edit {
+                        get_prompt(prompt, prompt_file, &session, false, &Some(sender.clone()))?
+                    } else {
+                        None
+                    };
+                    tx.fix(&mut session, &Some(sender.clone()))?;
+                    // Add files to the session if provided
+                    if let Some(file_list) = &files {
+                        if !file_list.is_empty() {
+                            session
+                                .last_action_mut()?
+                                .state
+                                .view(&config.cwd()?, file_list.to_vec())?;
+                        }
+                    }
+
+                    tx.iterate_steps(&mut session, user_prompt, Some(sender.clone()), None)
+                        .await?;
+                    Ok(())
+                }
+                Commands::Clear => {
+                    let mut session = tx.load_session()?;
+                    session.clear();
+                    tx.save_session(&session)?;
+                    println!("Session cleared");
+                    Ok(())
+                }
+                Commands::Check { files } => {
+                    let paths = if let Some(files) = files {
+                        let mut matched = Vec::new();
+                        for pattern in files {
+                            let glob_matches = config.match_files_with_glob(pattern)?;
+                            matched.extend(glob_matches);
+                        }
+                        matched
+                    } else {
+                        config.project_files()?
+                    };
+                    match tx.check(paths, &Some(sender.clone())) {
+                        Ok(_) => Ok(()),
+                        Err(e) => match e {
+                            libtenx::TenxError::Check { name, user, model } => Err(anyhow!(
+                                "Check '{}' failed: {}\nfull output:\n{}",
+                                name,
+                                user,
+                                model
+                            )),
+                            other => Err(other.into()),
+                        },
                     }
                 }
-
-                tx.iterate_steps(&mut session, user_prompt, Some(sender.clone()), None)
-                    .await?;
-                Ok(())
             }
-            Commands::Clear => {
-                let mut session = tx.load_session()?;
-                session.clear();
-                tx.save_session(&session)?;
-                println!("Session cleared");
-                Ok(())
-            }
-            Commands::Check { files } => {
-                let paths = if let Some(files) = files {
-                    let mut matched = Vec::new();
-                    for pattern in files {
-                        let glob_matches = config.match_files_with_glob(pattern)?;
-                        matched.extend(glob_matches);
-                    }
-                    matched
-                } else {
-                    config.project_files()?
-                };
-                match tx.check(paths, &Some(sender.clone())) {
-                    Ok(_) => Ok(()),
-                    Err(e) => match e {
-                        libtenx::TenxError::Check { name, user, model } => Err(anyhow!(
-                            "Check '{}' failed: {}\nfull output:\n{}",
-                            name,
-                            user,
-                            model
-                        )),
-                        other => Err(other.into()),
-                    },
-                }
-            }
-        },
+        }
         None => {
             // This incredibly clunky way of doing things is because Clap is just broken when it
             // comes to specifying required subcommands in combination with Optional flags. The

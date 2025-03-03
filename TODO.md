@@ -1,5 +1,7 @@
 STATE REFACTORING:
 
+    - Move reset mechanism to use action/step offsets
+
     - Diff summary line in state
     - tenx continue
         - Continues with the current action
