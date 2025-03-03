@@ -211,7 +211,8 @@ impl Tenx {
         self.save_session(session)?;
 
         let action = session.last_action()?;
-        let state = action.strategy.state(&self.config, session);
+        let action_offset = session.actions().len() - 1;
+        let state = action.strategy.state(&self.config, session, action_offset);
         if matches!(state.completion, Completion::Complete) {
             return Ok(state);
         }
@@ -219,9 +220,14 @@ impl Tenx {
         // Get the next step from the strategy
         let next_step = {
             let action = session.last_action().unwrap();
-            action
-                .strategy
-                .next_step(&self.config, session, sender.clone(), prompt)?
+            let action_offset = session.actions().len() - 1;
+            action.strategy.next_step(
+                &self.config,
+                session,
+                action_offset,
+                sender.clone(),
+                prompt,
+            )?
         };
 
         // If there's no next step, just return the current state
@@ -232,7 +238,8 @@ impl Tenx {
             }
             None => {
                 let action = session.last_action().unwrap();
-                return Ok(action.strategy.state(&self.config, session));
+                let action_offset = session.actions().len() - 1;
+                return Ok(action.strategy.state(&self.config, session, action_offset));
             }
         }
 
@@ -251,7 +258,8 @@ impl Tenx {
 
         // Always return the current state from the action's strategy
         let action = session.last_action().unwrap();
-        Ok(action.strategy.state(&self.config, session))
+        let action_offset = session.actions().len() - 1;
+        Ok(action.strategy.state(&self.config, session, action_offset))
     }
 
     /// Iterate on steps until the action is complete.
@@ -273,7 +281,7 @@ impl Tenx {
             step_count += 1;
 
             // Use next_step to handle the strategy logic
-            let state = self
+            let action_state = self
                 .next_step(
                     session,
                     if step_count == 1 {
@@ -286,22 +294,22 @@ impl Tenx {
                 .await?;
 
             // If the action is complete, we're done
-            if state.should_stop_iteration() {
-                return Ok(state);
+            if action_state.should_stop_iteration() {
+                return Ok(action_state);
             }
 
             // Check step limit
             if step_count >= self.config.step_limit {
                 warn!("Step count limit reached");
                 send_event(&sender, Event::IterationLimit)?;
-                return Ok(state);
+                return Ok(action_state);
             }
 
             // Check timeout
             if let Some(timeout) = timeout {
                 if start_time.elapsed() > timeout {
                     warn!("Timeout reached");
-                    return Ok(state);
+                    return Ok(action_state);
                 }
             }
         }

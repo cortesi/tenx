@@ -20,19 +20,7 @@ pub enum Strategy {
 }
 
 impl ActionStrategy for Strategy {
-    fn next_step(
-        &self,
-        config: &Config,
-        session: &Session,
-        sender: Option<EventSender>,
-        prompt: Option<String>,
-    ) -> Result<Option<Step>> {
-        match self {
-            Strategy::Code(code) => code.next_step(config, session, sender, prompt),
-            Strategy::Fix(fix) => fix.next_step(config, session, sender, prompt),
-        }
-    }
-
+    /// The name of this strategy.
     fn name(&self) -> &'static str {
         match self {
             Strategy::Code(code) => code.name(),
@@ -40,10 +28,25 @@ impl ActionStrategy for Strategy {
         }
     }
 
-    fn state(&self, config: &Config, session: &Session) -> ActionState {
+    fn next_step(
+        &self,
+        config: &Config,
+        session: &Session,
+        action_offset: usize,
+        sender: Option<EventSender>,
+        prompt: Option<String>,
+    ) -> Result<Option<Step>> {
         match self {
-            Strategy::Code(code) => code.state(config, session),
-            Strategy::Fix(fix) => fix.state(config, session),
+            Strategy::Code(code) => code.next_step(config, session, action_offset, sender, prompt),
+            Strategy::Fix(fix) => fix.next_step(config, session, action_offset, sender, prompt),
+        }
+    }
+
+    /// The current action state for this action.
+    fn state(&self, config: &Config, session: &Session, action_offset: usize) -> ActionState {
+        match self {
+            Strategy::Code(code) => code.state(config, session, action_offset),
+            Strategy::Fix(fix) => fix.state(config, session, action_offset),
         }
     }
 }

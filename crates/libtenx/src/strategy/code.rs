@@ -19,7 +19,7 @@ impl Code {
     }
 }
 
-/// Common logic for the last step in both Code and Fix strategies. We either synthesize the next
+/// Common logic for processing a step in both Code and Fix strategies. We either synthesize the next
 /// step, or return None if we're done.
 fn next_step(config: &Config, step: &Step, events: Option<EventSender>) -> Result<Option<Step>> {
     let model = config.models.default.clone();
@@ -90,59 +90,70 @@ impl ActionStrategy for Code {
         &self,
         config: &Config,
         session: &Session,
+        action_offset: usize,
         events: Option<EventSender>,
         prompt: Option<String>,
     ) -> Result<Option<Step>> {
-        if let Ok(action) = session.last_action() {
-            if let Some(step) = action.last_step() {
-                return next_step(config, step, events);
+        let action = session.actions().get(action_offset).ok_or_else(|| {
+            TenxError::Internal(format!("Invalid action offset: {}", action_offset))
+        })?;
+
+        if let Some(step) = action.last_step() {
+            next_step(config, step, events)
+        } else {
+            // Synthesize first step in the action
+            if let Some(p) = prompt {
+                let model = config.models.default.clone();
+                Ok(Some(Step::new(model, p)))
             } else {
-                // Synthesize first step in the action
-                if let Some(p) = prompt {
-                    let model = config.models.default.clone();
-                    return Ok(Some(Step::new(model, p)));
-                } else {
-                    return Err(TenxError::Internal(
-                        "No prompt provided for code action".to_string(),
-                    ));
-                }
+                Err(TenxError::Internal(
+                    "No prompt provided for code action".to_string(),
+                ))
             }
         }
-        Ok(None)
     }
 
     fn name(&self) -> &'static str {
         "code"
     }
 
-    fn state(&self, _config: &Config, session: &Session) -> ActionState {
-        if let Ok(action) = session.last_action() {
-            if action.steps().is_empty() {
-                return ActionState {
-                    completion: Completion::Incomplete,
-                    input_required: InputRequired::Yes,
-                };
-            }
-
-            // Check if the last step should continue
-            if let Some(step) = action.last_step() {
-                if step.should_continue() {
+    fn state(&self, _config: &Config, session: &Session, action_offset: usize) -> ActionState {
+        // Use match to handle the None case explicitly
+        match session.actions().get(action_offset) {
+            Some(action) => {
+                if action.steps().is_empty() {
                     return ActionState {
                         completion: Completion::Incomplete,
-                        input_required: InputRequired::No,
-                    };
-                } else {
-                    return ActionState {
-                        completion: Completion::Complete,
-                        input_required: InputRequired::No,
+                        input_required: InputRequired::Yes,
                     };
                 }
-            }
-        }
 
-        ActionState {
-            completion: Completion::Incomplete,
-            input_required: InputRequired::No,
+                // Check if the last step should continue
+                if let Some(step) = action.last_step() {
+                    if step.should_continue() {
+                        return ActionState {
+                            completion: Completion::Incomplete,
+                            input_required: InputRequired::No,
+                        };
+                    } else {
+                        return ActionState {
+                            completion: Completion::Complete,
+                            input_required: InputRequired::No,
+                        };
+                    }
+                }
+
+                // This would only happen if action.steps() is non-empty but action.last_step() is None
+                // which shouldn't be possible, but we handle it anyway
+                ActionState {
+                    completion: Completion::Incomplete,
+                    input_required: InputRequired::No,
+                }
+            }
+            None => ActionState {
+                completion: Completion::Incomplete,
+                input_required: InputRequired::No,
+            },
         }
     }
 }
@@ -167,50 +178,60 @@ impl ActionStrategy for Fix {
         &self,
         config: &Config,
         session: &Session,
+        action_offset: usize,
         events: Option<EventSender>,
         prompt: Option<String>,
     ) -> Result<Option<Step>> {
-        if let Ok(action) = session.last_action() {
-            if let Some(step) = action.last_step() {
-                return next_step(config, step, events);
-            } else {
-                // Synthesize first step in the action
-                let model = config.models.default.clone();
-                let default_prompt = "Please fix the following errors.".to_string();
-                return Ok(Some(Step::new(model, prompt.unwrap_or(default_prompt))));
-            }
+        let action = session.actions().get(action_offset).ok_or_else(|| {
+            TenxError::Internal(format!("Invalid action offset: {}", action_offset))
+        })?;
+
+        if let Some(step) = action.last_step() {
+            next_step(config, step, events)
+        } else {
+            // Synthesize first step in the action
+            let model = config.models.default.clone();
+            let default_prompt = "Please fix the following errors.".to_string();
+            Ok(Some(Step::new(model, prompt.unwrap_or(default_prompt))))
         }
-        Ok(None)
     }
 
-    fn state(&self, _config: &Config, session: &Session) -> ActionState {
-        if let Ok(action) = session.last_action() {
-            if action.steps().is_empty() {
-                return ActionState {
-                    completion: Completion::Incomplete,
-                    input_required: InputRequired::Optional,
-                };
-            }
-
-            // Check if the last step should continue
-            if let Some(step) = action.last_step() {
-                if step.should_continue() {
+    fn state(&self, _config: &Config, session: &Session, action_offset: usize) -> ActionState {
+        match session.actions().get(action_offset) {
+            Some(action) => {
+                if action.steps().is_empty() {
                     return ActionState {
                         completion: Completion::Incomplete,
-                        input_required: InputRequired::No,
-                    };
-                } else {
-                    return ActionState {
-                        completion: Completion::Complete,
-                        input_required: InputRequired::No,
+                        input_required: InputRequired::Optional,
                     };
                 }
-            }
-        }
 
-        ActionState {
-            completion: Completion::Incomplete,
-            input_required: InputRequired::No,
+                // Check if the last step should continue
+                if let Some(step) = action.last_step() {
+                    if step.should_continue() {
+                        return ActionState {
+                            completion: Completion::Incomplete,
+                            input_required: InputRequired::No,
+                        };
+                    } else {
+                        return ActionState {
+                            completion: Completion::Complete,
+                            input_required: InputRequired::No,
+                        };
+                    }
+                }
+
+                // This would only happen if action.steps() is non-empty but action.last_step() is None
+                // which shouldn't be possible, but we handle it anyway
+                ActionState {
+                    completion: Completion::Incomplete,
+                    input_required: InputRequired::No,
+                }
+            }
+            None => ActionState {
+                completion: Completion::Incomplete,
+                input_required: InputRequired::No,
+            },
         }
     }
 }
@@ -228,23 +249,31 @@ mod test {
         let code = Code::new();
         let mut session = Session::new(&test_project.config)?;
 
-        assert!(code
-            .next_step(&test_project.config, &session, None, None)?
-            .is_none());
+        // Empty session should return an error now
+        let result = code.next_step(&test_project.config, &session, 0, None, None);
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), TenxError::Internal(_)));
 
         session.add_action(Action::new(
             &test_project.config,
             Strategy::Code(code.clone()),
         )?)?;
+        let action_idx = session.actions().len() - 1;
 
         // Should fail without a prompt
         assert!(code
-            .next_step(&test_project.config, &session, None, None)
+            .next_step(&test_project.config, &session, action_idx, None, None)
             .is_err());
 
         // With prompt
         let step = code
-            .next_step(&test_project.config, &session, None, Some("Test".into()))?
+            .next_step(
+                &test_project.config,
+                &session,
+                action_idx,
+                None,
+                Some("Test".into()),
+            )?
             .unwrap();
         assert_eq!(step.raw_prompt, "Test");
 
@@ -258,13 +287,13 @@ mod test {
         };
         session.last_step_mut().unwrap().err = Some(patch_err);
         let step = code
-            .next_step(&test_project.config, &session, None, None)?
+            .next_step(&test_project.config, &session, action_idx, None, None)?
             .unwrap();
         assert_eq!(step.raw_prompt, "Retry");
 
         session.last_step_mut().unwrap().err = Some(TenxError::Config("Error".into()));
         assert!(code
-            .next_step(&test_project.config, &session, None, None)?
+            .next_step(&test_project.config, &session, action_idx, None, None)?
             .is_none());
 
         Ok(())
@@ -275,21 +304,25 @@ mod test {
         let test_project = test_project();
         let mut session = Session::new(&test_project.config)?;
 
-        // Empty session
+        // Empty session should return an error now
         let fix = Fix::new(TenxError::Config("Error".into()));
-        assert!(fix
-            .next_step(&test_project.config, &session, None, None)?
-            .is_none());
+        let result = fix.next_step(&test_project.config, &session, 0, None, None);
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), TenxError::Internal(_)));
 
         // Custom prompt
         session.add_action(Action::new(&test_project.config, Strategy::Fix(fix))?)?;
+        let action_idx = session.actions().len() - 1;
+
         let step = session
-            .last_action()
+            .actions()
+            .get(action_idx)
             .unwrap()
             .strategy
             .next_step(
                 &test_project.config,
                 &session,
+                action_idx,
                 None,
                 Some("Fix prompt".into()),
             )?
@@ -306,21 +339,25 @@ mod test {
             model: "Retry".into(),
         });
         let step = session
-            .last_action()
+            .actions()
+            .get(action_idx)
             .unwrap()
             .strategy
-            .next_step(&test_project.config, &session, None, None)?
+            .next_step(&test_project.config, &session, action_idx, None, None)?
             .unwrap();
         assert_eq!(step.raw_prompt, "Retry");
 
         // Default prompt
         let fix = Fix::new(TenxError::Config("Error".into()));
         session.add_action(Action::new(&test_project.config, Strategy::Fix(fix))?)?;
+        let action_idx = session.actions().len() - 1;
+
         let step = session
-            .last_action()
+            .actions()
+            .get(action_idx)
             .unwrap()
             .strategy
-            .next_step(&test_project.config, &session, None, None)?
+            .next_step(&test_project.config, &session, action_idx, None, None)?
             .unwrap();
         assert_eq!(step.raw_prompt, "Please fix the following errors.");
 

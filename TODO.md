@@ -1,6 +1,8 @@
 STATE REFACTORING:
 
-    - Move reset mechanism to use action/step offsets
+    - Continue command
+        - If the current step is incomplete, continues with that step
+        - Otherwise, syntehsizes the next step
 
     - Diff summary line in state
     - tenx continue

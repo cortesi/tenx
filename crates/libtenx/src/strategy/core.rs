@@ -60,23 +60,28 @@ pub trait ActionStrategy {
     /// Returns the name of the strategy.
     fn name(&self) -> &'static str;
 
-    /// Given a session, calculate the next step. This may involve complex actions like executing
+    /// Given a session and action offset, calculate the next step. This may involve complex actions like executing
     /// checks, making external requests. The returned step is ready to be sent to the upstream
-    /// model. The action's steps my currently be empty, in which case the first step is
-    /// synthesized.
+    /// model. The action's steps may currently be empty, in which case the first step is
+    /// synthesized. The strategy may choose to leave the current steps intact, or to edit the
+    /// current step history to progress.
     ///
-    /// If the action is complete, return None. The current action is presumed to be the last one
-    /// in the session.
+    /// If the action is complete, return None.
+    ///
+    /// * `action_offset` - The index of the action in the session's actions list
     fn next_step(
         &self,
         config: &Config,
         session: &Session,
+        action_offset: usize,
         sender: Option<EventSender>,
         user_input: Option<String>,
     ) -> Result<Option<Step>>;
 
     /// Returns the current state of the action, including completion status and input requirements.
-    fn state(&self, _config: &Config, _session: &Session) -> ActionState {
+    ///
+    /// * `action_offset` - The index of the action in the session's actions list
+    fn state(&self, _config: &Config, _session: &Session, _action_offset: usize) -> ActionState {
         ActionState {
             completion: Completion::Incomplete,
             input_required: InputRequired::No,
