@@ -1,4 +1,4 @@
-//! l Session is the context and a sequence of model interaction steps.
+//! Session is the context and a sequence of model interaction steps.
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
@@ -125,7 +125,10 @@ impl Action {
         &self.steps
     }
 
-    pub fn add_step(&mut self, step: Step) -> Result<()> {
+    /// Adds a new step to the action.
+    ///
+    /// Returns an error if the last step doesn't have either a model response or an error.
+    pub fn add_step(&mut self, mut step: Step) -> Result<()> {
         if let Some(last_step) = self.steps.last() {
             if last_step.model_response.is_none() && last_step.err.is_none() {
                 return Err(TenxError::Internal(
@@ -133,7 +136,8 @@ impl Action {
                 ));
             }
         }
-        // step.rollback_id = self.state.mark()?;
+        let rollback_id = self.state.mark()?;
+        step.rollback_id = rollback_id;
         self.steps.push(step);
         Ok(())
     }
@@ -199,13 +203,7 @@ impl Session {
             .ok_or_else(|| TenxError::Internal("No actions in session".into()))
     }
 
-    /// Returns a reference to the last action in the session.
-    pub fn last_action_mut(&mut self) -> Result<&mut Action> {
-        self.actions
-            .iter_mut()
-            .last()
-            .ok_or_else(|| TenxError::Internal("No actions in session".into()))
-    }
+    // Already defined above, removed duplicate
 
     /// Returns a mutable reference to the last step in the session.
     pub fn last_step_mut(&mut self) -> Option<&mut Step> {
@@ -236,18 +234,12 @@ impl Session {
         }
     }
 
-    /// Adds a new step to the last action in the session.
-    ///
-    /// Returns an error if the last step doesn't have either a patch or an error.
-    pub fn add_step(&mut self, mut step: Step) -> Result<()> {
-        if let Some(action) = self.actions.last_mut() {
-            let rollback_id = action.state.mark()?;
-            step.rollback_id = rollback_id;
-            action.add_step(step)?;
-        } else {
-            Err(TenxError::Internal("No actions in session".into()))?
-        }
-        Ok(())
+    /// Returns a mutable reference to the last action in the session or an error if there are no actions.
+    pub fn last_action_mut(&mut self) -> Result<&mut Action> {
+        self.actions
+            .iter_mut()
+            .last()
+            .ok_or_else(|| TenxError::Internal("No actions in session".into()))
     }
 
     /// Adds a new action to the session.

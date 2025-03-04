@@ -92,7 +92,7 @@ fn process_step(
         debug!("Next step, based on errors and/or patch failures");
 
         let new_step = Step::new(model, model_message);
-        session.add_step(new_step)?;
+        session.last_action_mut()?.add_step(new_step)?;
 
         return Ok(ActionState {
             completion: Completion::Incomplete,
@@ -114,7 +114,7 @@ fn process_step(
             debug!("Next step, based on operations");
 
             let new_step = Step::new(model, model_message);
-            session.add_step(new_step)?;
+            session.last_action_mut()?.add_step(new_step)?;
 
             return Ok(ActionState {
                 completion: Completion::Incomplete,
@@ -196,7 +196,7 @@ impl ActionStrategy for Code {
             if let Some(p) = prompt {
                 let model = config.models.default.clone();
                 let new_step = Step::new(model, p);
-                session.add_step(new_step)?;
+                session.last_action_mut()?.add_step(new_step)?;
 
                 Ok(ActionState {
                     completion: Completion::Incomplete,
@@ -259,7 +259,7 @@ impl ActionStrategy for Fix {
             let model = config.models.default.clone();
             let default_prompt = "Please fix the following errors.".to_string();
             let new_step = Step::new(model, prompt.unwrap_or(default_prompt));
-            session.add_step(new_step)?;
+            session.last_action_mut()?.add_step(new_step)?;
 
             Ok(ActionState {
                 completion: Completion::Incomplete,
@@ -329,7 +329,7 @@ mod test {
         assert_eq!(session_clone.last_step().unwrap().raw_prompt, "Test");
 
         // Test retry with patch error
-        session.add_step(Step::new(
+        session.last_action_mut()?.add_step(Step::new(
             test_project.config.models.default.clone(),
             "Test".into(),
         ))?;

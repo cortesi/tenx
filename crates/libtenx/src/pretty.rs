@@ -394,6 +394,7 @@ mod tests {
             strategy::Strategy::Code(strategy::Code::new()),
         )?)?;
         p.session
+            .last_action_mut()?
             .add_step(Step::new("test_model".into(), "Test prompt".to_string()))
             .unwrap();
         p.write("test_file.rs", "Test content");

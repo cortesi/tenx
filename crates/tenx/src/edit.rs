@@ -186,6 +186,8 @@ mod tests {
             ("Second prompt", "Second response"),
         ] {
             p.session
+                .last_action_mut()
+                .unwrap()
                 .add_step(Step::new("test_model".into(), prompt.to_string()))
                 .unwrap();
             if let Some(step) = p.session.last_step_mut() {
