@@ -195,6 +195,15 @@ enum Commands {
     },
     /// Clear the current session without resetting changes
     Clear,
+    /// Continue with the current session
+    Continue {
+        /// User prompt for the operation
+        #[clap(long)]
+        prompt: Option<String>,
+        /// Path to a file containing the prompt
+        #[clap(long)]
+        prompt_file: Option<PathBuf>,
+    },
     /// Make an AI-assisted change using the current session
     Code {
         /// Specifies files to edit, glob patterns accepted
@@ -766,6 +775,25 @@ async fn main() -> anyhow::Result<()> {
                             other => Err(other.into()),
                         },
                     }
+                }
+                Commands::Continue {
+                    prompt,
+                    prompt_file,
+                } => {
+                    let mut session = match tx.load_session() {
+                        Ok(sess) => sess,
+                        Err(_) => {
+                            println!("No existing session found.");
+                            return Ok(());
+                        }
+                    };
+
+                    let user_prompt =
+                        get_prompt(prompt, prompt_file, &session, false, &Some(sender.clone()))?;
+
+                    tx.continue_steps(&mut session, user_prompt, Some(sender.clone()), None)
+                        .await?;
+                    Ok(())
                 }
             }
         }
