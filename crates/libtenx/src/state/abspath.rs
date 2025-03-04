@@ -40,7 +40,7 @@ impl AbsPath {
     pub fn new(path: PathBuf) -> Result<Self> {
         if !path.is_absolute() {
             return Err(TenxError::Internal(format!(
-                "Path must be absolute: {}",
+                "Path must be absolute: '{}'",
                 path.display()
             )));
         }

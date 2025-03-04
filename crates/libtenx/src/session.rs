@@ -75,6 +75,13 @@ impl Step {
         }
     }
 
+    pub fn reset(&mut self) {
+        self.model_response = None;
+        self.response_time = None;
+        self.patch_info = None;
+        self.err = None;
+    }
+
     /// Is this step incomplete?
     pub fn is_incomplete(&self) -> bool {
         self.model_response.is_none() && self.err.is_none()
@@ -311,6 +318,33 @@ impl Session {
         Ok(())
     }
 
+    /// Reset the session to a specific action and step and prepare it for retry.
+    /// This method first resets the session to the specified step, then clears the step's
+    /// response data, and reverts to the step's rollback_id to reset the state.
+    ///
+    /// * `action_idx` - The 0-based index of the action containing the step to retry
+    /// * `step_idx` - The 0-based index of the step within the action to retry
+    pub fn retry(&mut self, action_idx: usize, step_idx: usize) -> Result<()> {
+        // First reset the session to the specified action and step
+        self.reset(action_idx, Some(step_idx))?;
+
+        // Get a mutable reference to the step and reset it
+        if action_idx < self.actions.len() {
+            let action = &mut self.actions[action_idx];
+            if step_idx < action.steps.len() {
+                let step = &mut action.steps[step_idx];
+
+                // Reset the step's response data
+                step.reset();
+
+                // Revert to the step's rollback_id to reset the state
+                action.state.revert(step.rollback_id)?;
+            }
+        }
+
+        Ok(())
+    }
+
     /// Rolls back and removes all steps in the session.
     pub fn reset_all(&mut self) -> Result<()> {
         if let Some(action) = self.actions.first_mut() {
@@ -384,6 +418,9 @@ impl Session {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::strategy::code;
+    use crate::strategy::Strategy;
+    use crate::testutils;
 
     #[test]
     fn test_add_context_ignores_duplicates() -> Result<()> {
@@ -406,6 +443,57 @@ mod tests {
         test_project.session.add_context(url1);
         test_project.session.add_context(url2);
         assert_eq!(test_project.session.contexts.len(), 2);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_retry_resets_step() -> Result<()> {
+        let tp = testutils::test_project();
+        // Use a Code strategy from the code module.
+        let strategy = Strategy::Code(code::Code::new());
+        let mut action = Action::new(&tp.config, strategy)?;
+
+        // Add the first step.
+        let mut step1 = Step::new("model1".into(), "prompt1".into());
+        step1.model_response = Some(ModelResponse {
+            comment: Some("first response".into()),
+            patch: None,
+            operations: vec![],
+            usage: None,
+            raw_response: Some("first raw".into()),
+        });
+        action.add_step(step1)?;
+
+        // Add the second step.
+        let mut step2 = Step::new("model1".into(), "prompt2".into());
+        step2.model_response = Some(ModelResponse {
+            comment: Some("second response".into()),
+            patch: None,
+            operations: vec![],
+            usage: None,
+            raw_response: Some("second raw".into()),
+        });
+        action.add_step(step2)?;
+
+        // Create a session containing this action.
+        let mut session = Session {
+            editable: vec![],
+            actions: vec![action],
+            contexts: vec![],
+        };
+
+        // Call retry on the second step (index 1) of the first action.
+        session.retry(0, 1)?;
+
+        // After retry, the targeted step should have its response data cleared.
+        let action = session.actions.first().unwrap();
+        assert_eq!(action.steps.len(), 2);
+        let retried_step = action.steps.get(1).unwrap();
+        assert!(retried_step.model_response.is_none());
+        assert!(retried_step.response_time.is_none());
+        assert!(retried_step.patch_info.is_none());
+        assert!(retried_step.err.is_none());
 
         Ok(())
     }
