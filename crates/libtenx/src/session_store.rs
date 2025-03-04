@@ -1,6 +1,10 @@
 //! Session persistence module, handling storage and retrieval of sessions.
 
-use crate::{config::Config, session::Session, Result, TenxError};
+use crate::{
+    config::Config,
+    error::{Result, TenxError},
+    session::Session,
+};
 use fs_err as fs;
 use std::path::{Path, PathBuf};
 

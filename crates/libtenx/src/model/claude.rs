@@ -9,12 +9,12 @@ use tracing::{trace, warn};
 use crate::{
     config::Config,
     dialect::{Dialect, DialectProvider},
+    error::{Result, TenxError},
     events::*,
     model::conversation::{build_conversation, Conversation},
     model::ModelProvider,
     session::ModelResponse,
     session::Session,
-    Result, TenxError,
 };
 
 const MAX_TOKENS: u32 = 8192;

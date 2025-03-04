@@ -3,8 +3,8 @@ use serde::{Deserialize, Serialize};
 
 use super::ModelProvider;
 use crate::{
-    config::Config, dialect::DialectProvider, events::EventSender, session::ModelResponse,
-    session::Session, Result,
+    config::Config, dialect::DialectProvider, error::Result, events::EventSender,
+    session::ModelResponse, session::Session,
 };
 
 use std::collections::HashMap;

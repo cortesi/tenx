@@ -7,8 +7,8 @@ mod xmlish;
 
 use crate::{
     config::Config,
+    error::Result,
     session::{ModelResponse, Session},
-    Result,
 };
 
 pub use dummy_dialect::*;

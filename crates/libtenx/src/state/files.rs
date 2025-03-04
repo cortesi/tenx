@@ -6,7 +6,7 @@ use path_clean;
 use pathdiff::diff_paths;
 
 use super::abspath::IntoAbsPath;
-use crate::TenxError;
+use crate::error::{self, TenxError};
 
 const GLOB_START: &str = "*";
 
@@ -18,7 +18,7 @@ const GLOB_START: &str = "*";
 /// - All paths are cleaned to remove redundant ".." and "." components.
 ///
 /// This function only normalizes the path - it does not check if the file exists.
-pub fn normalize_path<R, C>(root: R, cwd: C, path: &str) -> crate::Result<PathBuf>
+pub fn normalize_path<R, C>(root: R, cwd: C, path: &str) -> error::Result<PathBuf>
 where
     R: IntoAbsPath,
     C: IntoAbsPath,
@@ -58,7 +58,7 @@ where
 /// equivalent to --exclude). If no glob patterns are provided, all files are included.
 ///
 /// Files are sorted by path.
-pub fn list_files<R>(root: R, globs: Vec<String>) -> crate::Result<Vec<PathBuf>>
+pub fn list_files<R>(root: R, globs: Vec<String>) -> crate::error::Result<Vec<PathBuf>>
 where
     R: IntoAbsPath,
 {
@@ -107,12 +107,13 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::error::Result;
     use crate::state::abspath::AbsPath;
     use std::{fs, path::Path, process::Command};
     use tempfile::TempDir;
 
     #[test]
-    fn test_normalize_path() -> crate::Result<()> {
+    fn test_normalize_path() -> Result<()> {
         struct TestCase {
             name: &'static str,
             root: &'static str,
@@ -237,7 +238,7 @@ mod tests {
     }
 
     #[test]
-    fn test_list_files() -> crate::Result<()> {
+    fn test_list_files() -> Result<()> {
         let temp_dir = TempDir::new()?;
         let root = AbsPath::new(temp_dir.path().to_path_buf())?;
 

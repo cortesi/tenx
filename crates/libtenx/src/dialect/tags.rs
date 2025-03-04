@@ -7,9 +7,9 @@ use super::{xmlish, DialectProvider};
 use crate::{
     config::Config,
     context::ContextProvider,
+    error::{Result, TenxError},
     patch::{Change, Patch, Replace, WriteFile},
     session::{ModelResponse, Session},
-    Result, TenxError,
 };
 use fs_err as fs;
 

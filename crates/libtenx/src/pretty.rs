@@ -3,10 +3,10 @@ use crate::{
     config::Config,
     context,
     context::ContextProvider,
+    error::{Result, TenxError},
     model, patch,
     session::{Operation, Session, Step},
     strategy::ActionStrategy,
-    Result, TenxError,
 };
 use colored::*;
 use textwrap::{indent, wrap, Options};
@@ -384,7 +384,7 @@ mod tests {
         context::Context,
         patch::Patch,
         session::{Action, ModelResponse, Step},
-        strategy, testutils, TenxError,
+        strategy, testutils,
     };
 
     fn create_test_project() -> Result<testutils::TestProject> {

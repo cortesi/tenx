@@ -11,12 +11,12 @@ use libtenx::{
     config::{self},
     context::Context,
     dialect::DialectProvider,
-    event_consumers,
+    error, event_consumers,
     events::Event,
     model::ModelProvider,
     pretty,
     session::Session,
-    Tenx,
+    tenx::Tenx,
 };
 
 mod edit;
@@ -757,7 +757,7 @@ async fn main() -> anyhow::Result<()> {
                     match tx.check(paths, &Some(sender.clone())) {
                         Ok(_) => Ok(()),
                         Err(e) => match e {
-                            libtenx::TenxError::Check { name, user, model } => Err(anyhow!(
+                            error::TenxError::Check { name, user, model } => Err(anyhow!(
                                 "Check '{}' failed: {}\nfull output:\n{}",
                                 name,
                                 user,

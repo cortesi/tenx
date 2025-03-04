@@ -1,4 +1,7 @@
-use libtenx::{session::Session, Result, TenxError};
+use libtenx::{
+    error::{Result, TenxError},
+    session::Session,
+};
 
 /// A report about a trial execution.
 #[derive(Debug)]

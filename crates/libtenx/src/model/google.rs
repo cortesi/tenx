@@ -8,13 +8,13 @@ use tracing::{trace, warn};
 use crate::{
     config::Config,
     dialect::{Dialect, DialectProvider},
+    error::{Result, TenxError},
     events::*,
     model::conversation::{build_conversation, Conversation},
     model::ModelProvider,
     session::ModelResponse,
     session::Session,
     throttle::Throttle,
-    Result, TenxError,
 };
 
 fn map_error(e: google_genai::error::GenAiError) -> TenxError {

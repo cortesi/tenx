@@ -5,13 +5,13 @@ use crate::{
     checks::{check_paths, check_session, CheckMode},
     config::Config,
     context::{Context, ContextProvider},
+    error::{Result, TenxError},
     events::{send_event, Event, EventBlock, EventSender},
     model::ModelProvider,
     session::{Action, Session},
     session_store::{path_to_filename, SessionStore},
     strategy,
     strategy::{ActionStrategy, Completion},
-    Result, TenxError,
 };
 
 /// Tenx is an AI-driven coding assistant.

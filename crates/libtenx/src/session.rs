@@ -3,7 +3,13 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{config, context, model::Usage, patch::Patch, state, strategy, Result, TenxError};
+use crate::{
+    config, context,
+    error::{Result, TenxError},
+    model::Usage,
+    patch::Patch,
+    state, strategy,
+};
 
 /// A parsed model response
 #[derive(Debug, Deserialize, Serialize, Clone, Default, PartialEq, Eq)]

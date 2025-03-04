@@ -2,10 +2,10 @@ use std::path::PathBuf;
 
 use crate::{
     config::Config,
+    error::{Result, TenxError},
     events::{EventBlock, EventSender},
     exec::exec,
     session::Session,
-    Result, TenxError,
 };
 
 pub enum Runnable {

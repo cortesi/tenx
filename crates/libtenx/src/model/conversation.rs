@@ -1,8 +1,8 @@
 use crate::{
     config::Config,
     dialect::{Dialect, DialectProvider},
+    error::{Result, TenxError},
     session::Session,
-    Result,
 };
 
 pub const EDITABLE_LEADIN: &str = "Here are the editable files.";
@@ -17,7 +17,7 @@ fn offset_to_indices(session: &Session, step_offset: usize) -> Result<(usize, us
         if step_offset == 0 {
             return Ok((0, 0));
         }
-        return Err(crate::TenxError::Internal(format!(
+        return Err(TenxError::Internal(format!(
             "Invalid step offset: {} for empty session",
             step_offset
         )));
@@ -43,7 +43,7 @@ fn offset_to_indices(session: &Session, step_offset: usize) -> Result<(usize, us
 
     // If the action has steps but step_offset is beyond the end
     if total_steps > 0 && step_offset > total_steps {
-        return Err(crate::TenxError::Internal(format!(
+        return Err(TenxError::Internal(format!(
             "Step offset {} exceeds total steps {}",
             step_offset, total_steps
         )));
@@ -54,7 +54,7 @@ fn offset_to_indices(session: &Session, step_offset: usize) -> Result<(usize, us
         return Ok((0, 0));
     }
 
-    Err(crate::TenxError::Internal(format!(
+    Err(TenxError::Internal(format!(
         "Invalid step offset: {}",
         step_offset
     )))

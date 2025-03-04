@@ -1,6 +1,6 @@
 use crate::{
+    error::{Result, TenxError},
     events::{send_event, Event, EventSender},
-    Result, TenxError,
 };
 use serde::{Deserialize, Serialize};
 use std::time::Duration;

@@ -16,6 +16,3 @@ pub mod strategy;
 pub mod tenx;
 pub mod testutils;
 mod throttle;
-
-pub use error::{Result, TenxError};
-pub use tenx::Tenx;

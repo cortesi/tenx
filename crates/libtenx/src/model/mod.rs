@@ -19,9 +19,9 @@ pub use openai::{OpenAi, OpenAiUsage, ReasoningEffort};
 
 use crate::{
     config::Config,
+    error::Result,
     events::EventSender,
     session::{ModelResponse, Session},
-    Result,
 };
 
 use std::collections::HashMap;

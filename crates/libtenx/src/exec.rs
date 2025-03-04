@@ -3,7 +3,7 @@ use std::{
     process::{Command, ExitStatus},
 };
 
-use crate::{Result, TenxError};
+use crate::error::{Result, TenxError};
 
 /// Execute a shell command and return status, stdout and stderr, with ANSI escapes removed.
 /// The command is run in the specified root directory.

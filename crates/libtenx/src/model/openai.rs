@@ -17,6 +17,7 @@ use tracing::trace;
 use crate::{
     config::Config,
     dialect::{Dialect, DialectProvider},
+    error::{Result, TenxError},
     events::{send_event, Event, EventSender},
     model::{
         conversation::{build_conversation, Conversation},
@@ -24,7 +25,6 @@ use crate::{
     },
     session::ModelResponse,
     session::Session,
-    Result, TenxError,
 };
 
 use std::collections::HashMap;

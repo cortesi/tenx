@@ -3,7 +3,7 @@ use std::{collections::HashMap, path::PathBuf};
 use serde::{Deserialize, Serialize};
 
 use super::SubStore;
-use crate::Result;
+use crate::error::{Result, TenxError};
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Memory {
@@ -21,7 +21,7 @@ impl SubStore for Memory {
         self.memory
             .get(path)
             .cloned()
-            .ok_or_else(|| crate::TenxError::NotFound {
+            .ok_or_else(|| TenxError::NotFound {
                 msg: "Memory entry not found".to_string(),
                 path: path.display().to_string(),
             })

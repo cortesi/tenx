@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_variant::to_variant_name;
 use tokio::sync::mpsc;
 
-use crate::{Result, TenxError};
+use crate::error::{Result, TenxError};
 
 pub type EventSender = mpsc::Sender<Event>;
 pub type EventReceiver = mpsc::Receiver<Event>;

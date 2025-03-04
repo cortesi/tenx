@@ -1,5 +1,6 @@
 use crate::{
-    config::Config, dialect::DialectProvider, session::ModelResponse, session::Session, Result,
+    config::Config, dialect::DialectProvider, error::Result, session::ModelResponse,
+    session::Session,
 };
 use std::path::PathBuf;
 

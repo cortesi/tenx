@@ -16,9 +16,11 @@ use tracing::info;
 
 use libtenx::{
     config::{default_config, Config, ConfigFile},
+    error::Result,
+    error::TenxError,
     events::Event,
     session::Session,
-    Result, Tenx, TenxError,
+    tenx::Tenx,
 };
 
 #[derive(Debug, Clone, Deserialize)]

@@ -13,7 +13,13 @@ use serde::{Deserialize, Serialize};
 use ron;
 
 use super::files;
-use crate::{checks, config::default_config, dialect, model, state, TenxError};
+use crate::{
+    checks,
+    config::default_config,
+    dialect,
+    error::{self, TenxError},
+    model, state,
+};
 
 pub const HOME_CONFIG_FILE: &str = "tenx.ron";
 pub const PROJECT_CONFIG_FILE: &str = ".tenx.ron";
@@ -27,7 +33,7 @@ pub(crate) fn home_config_dir() -> PathBuf {
 }
 
 /// Deserialize a RON string into a ConfigFile.
-fn parse_config_file(ron_str: &str) -> crate::Result<ConfigFile> {
+fn parse_config_file(ron_str: &str) -> error::Result<ConfigFile> {
     let options =
         ron::Options::default().with_default_extension(ron::extensions::Extensions::IMPLICIT_SOME);
     options
@@ -41,7 +47,7 @@ fn parse_config(
     home_config: &str,
     project_config: &str,
     current_dir: &Path,
-) -> crate::Result<Config> {
+) -> error::Result<Config> {
     let default_conf = default_config(current_dir);
     let mut cnf = ConfigFile::default();
 
@@ -63,7 +69,7 @@ fn parse_config(
 
 /// Loads the Tenx configuration by merging defaults, home, and local configuration files. Returns
 /// the complete Config object.
-pub fn load_config(current_dir: &Path) -> crate::Result<Config> {
+pub fn load_config(current_dir: &Path) -> error::Result<Config> {
     let home_config_path = home_config_dir().join(HOME_CONFIG_FILE);
     let home_config = if home_config_path.exists() {
         fs::read_to_string(&home_config_path)
@@ -303,7 +309,7 @@ impl Model {
     }
 
     /// Converts ModelConfig to a Claude, OpenAi, or Google model.
-    pub fn to_model(&self, no_stream: bool) -> crate::Result<model::Model> {
+    pub fn to_model(&self, no_stream: bool) -> error::Result<model::Model> {
         match self {
             Model::Claude { api_model, key, .. } => {
                 if api_model.is_empty() {
@@ -581,7 +587,7 @@ impl Config {
         models
     }
 
-    pub fn cwd(&self) -> crate::Result<PathBuf> {
+    pub fn cwd(&self) -> error::Result<PathBuf> {
         if let Some(test_cwd) = &self.cwd {
             Ok(PathBuf::from(test_cwd))
         } else {
@@ -610,7 +616,7 @@ impl Config {
     }
 
     /// Converts a path relative to the root directory to an absolute path
-    pub fn abspath(&self, path: &Path) -> crate::Result<PathBuf> {
+    pub fn abspath(&self, path: &Path) -> error::Result<PathBuf> {
         let p = self.project_root().join(path);
         absolute(p.clone())
             .map_err(|e| TenxError::Internal(format!("could not absolute {}: {}", p.display(), e)))
@@ -625,7 +631,7 @@ impl Config {
     /// - If the path starts with "**", it will be returned as-is.
     /// - If the path is absolute, it will be returned as-is if it is outside the project root,
     ///   otherwise it will be rebased to be relative to the project root.
-    pub fn normalize_path<P: AsRef<Path>>(&self, path: P) -> crate::Result<PathBuf> {
+    pub fn normalize_path<P: AsRef<Path>>(&self, path: P) -> error::Result<PathBuf> {
         self.normalize_path_with_cwd(path, self.cwd()?)
     }
 
@@ -642,7 +648,7 @@ impl Config {
         &self,
         path: P,
         current_dir: Q,
-    ) -> crate::Result<PathBuf> {
+    ) -> error::Result<PathBuf> {
         let path = path.as_ref();
         let current_dir = current_dir.as_ref();
 
@@ -661,7 +667,7 @@ impl Config {
     }
 
     /// Traverse the included files and return a list of files that match the given glob pattern.
-    pub fn match_files_with_glob(&self, pattern: &str) -> crate::Result<Vec<PathBuf>> {
+    pub fn match_files_with_glob(&self, pattern: &str) -> error::Result<Vec<PathBuf>> {
         let project_root = &self.project_root();
         let glob = Glob::new(pattern)
             .map_err(|e| TenxError::Internal(format!("Invalid glob pattern: {}", e)))?;
@@ -708,16 +714,16 @@ impl Config {
 
     /// Construct the default state for the project, including the project root directory, and
     /// a memory overlay for files prefixed with "::".
-    pub fn state(&self) -> crate::Result<state::State> {
+    pub fn state(&self) -> error::Result<state::State> {
         state::State::default().with_directory(&self.project.root, self.project.include.clone())
     }
 
-    pub fn project_files(&self) -> crate::Result<Vec<PathBuf>> {
+    pub fn project_files(&self) -> error::Result<Vec<PathBuf>> {
         files::walk_project(&self.project)
     }
 
     /// Serialize the Config into a RON string.
-    pub fn to_ron(&self) -> crate::Result<String> {
+    pub fn to_ron(&self) -> error::Result<String> {
         let pretty_config = ron::ser::PrettyConfig::default();
         ron::ser::to_string_pretty(self, pretty_config)
             .map_err(|e| TenxError::Internal(format!("Failed to serialize to RON: {}", e)))
@@ -763,7 +769,7 @@ impl Config {
     }
 
     /// Returns the configured model.
-    pub fn active_model(&self) -> crate::Result<model::Model> {
+    pub fn active_model(&self) -> error::Result<model::Model> {
         if let Some(dummy_model) = &self.dummy_model {
             return Ok(model::Model::Dummy(dummy_model.clone()));
         }
@@ -820,7 +826,7 @@ impl Config {
     }
 
     /// Returns the configured dialect.
-    pub fn dialect(&self) -> crate::Result<dialect::Dialect> {
+    pub fn dialect(&self) -> error::Result<dialect::Dialect> {
         if let Some(dummy_dialect) = &self.dummy_dialect {
             return Ok(dialect::Dialect::Dummy(dummy_dialect.clone()));
         }
@@ -910,7 +916,7 @@ mod tests {
     use tempfile::TempDir;
 
     #[test]
-    fn test_config_merge() -> crate::Result<()> {
+    fn test_config_merge() -> error::Result<()> {
         let project = testutils::test_project();
         let parsed = parse_config(
             r#"(models: (default: "foo", no_stream: true))"#,
@@ -924,7 +930,7 @@ mod tests {
     }
 
     #[test]
-    fn test_config_roundtrip() -> crate::Result<()> {
+    fn test_config_roundtrip() -> error::Result<()> {
         let project = testutils::test_project();
         let mut config = default_config(&project.config.cwd()?);
         config.step_limit = 42;
@@ -939,7 +945,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_config_value() -> crate::Result<()> {
+    fn test_parse_config_value() -> error::Result<()> {
         // Test loading a config with a custom step_limit
         let project = testutils::test_project();
         let test_config = r#"(step_limit: 10)"#;
@@ -1002,7 +1008,7 @@ mod tests {
     }
 
     #[test]
-    fn test_included_files() -> crate::Result<()> {
+    fn test_included_files() -> error::Result<()> {
         let temp_dir = TempDir::new()?;
         let root_path = temp_dir.path();
 
@@ -1083,7 +1089,7 @@ mod tests {
     }
 
     #[test]
-    fn test_match_files_with_glob() -> crate::Result<()> {
+    fn test_match_files_with_glob() -> error::Result<()> {
         let mut project = test_project();
         project.create_file_tree(&[
             "src/file1.rs",
@@ -1148,7 +1154,7 @@ mod tests {
     }
 
     #[test]
-    fn test_normalize_path_with_cwd() -> crate::Result<()> {
+    fn test_normalize_path_with_cwd() -> error::Result<()> {
         struct TestCase {
             cwd: &'static str,
             input: &'static str,
