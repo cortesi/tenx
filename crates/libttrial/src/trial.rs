@@ -150,6 +150,18 @@ impl Trial {
 
         info!("trial setup complete: {}", self.name);
 
+        // Then execute the appropriate operation
+        let p = match &self.trial_conf.op {
+            TrialOp::Code { prompt, .. } => {
+                tenx.code(&mut session)?;
+                Some(prompt.to_string())
+            }
+            TrialOp::Fix { prompt, .. } => {
+                tenx.fix(&mut session, &sender)?;
+                prompt.clone()
+            }
+        };
+
         // First add any editable files to the session regardless of operation type
         match &self.trial_conf.op {
             TrialOp::Code { editable, .. } | TrialOp::Fix { editable, .. } => {
@@ -162,20 +174,7 @@ impl Trial {
             }
         }
 
-        // Then execute the appropriate operation
-        let result = match &self.trial_conf.op {
-            TrialOp::Code { prompt, .. } => {
-                tenx.code(&mut session)?;
-                tenx.iterate_steps(&mut session, Some(prompt.clone()), sender, None)
-                    .await
-            }
-            TrialOp::Fix { prompt, .. } => {
-                tenx.fix(&mut session, &sender)?;
-                tenx.iterate_steps(&mut session, prompt.clone(), sender, None)
-                    .await
-            }
-        };
-
+        let result = tenx.iterate_steps(&mut session, p, sender, None).await;
         match &result {
             Ok(_) => info!("trial completed successfully: {}", self.name),
             Err(e) => info!("trial failed: {}: {}", self.name, e),
