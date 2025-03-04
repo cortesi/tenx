@@ -174,7 +174,7 @@ impl Trial {
             }
         }
 
-        let result = tenx.iterate_steps(&mut session, p, sender, None).await;
+        let result = tenx.continue_steps(&mut session, p, sender, None).await;
         match &result {
             Ok(_) => info!("trial completed successfully: {}", self.name),
             Err(e) => info!("trial failed: {}: {}", self.name, e),

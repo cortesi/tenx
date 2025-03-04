@@ -255,7 +255,7 @@ impl Tenx {
     /// Iterate on steps until the action is complete.
     /// The optional prompt is passed to the first step.
     /// Returns the final state of the action.
-    pub async fn iterate_steps(
+    pub async fn continue_steps(
         &self,
         session: &mut Session,
         prompt: Option<String>,
@@ -454,7 +454,7 @@ mod tests {
             .unwrap();
 
         // Run the steps
-        tenx.iterate_steps(&mut session, Some("test".into()), None, None)
+        tenx.continue_steps(&mut session, Some("test".into()), None, None)
             .await
             .unwrap();
 

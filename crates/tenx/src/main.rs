@@ -510,7 +510,7 @@ async fn main() -> anyhow::Result<()> {
                             .state
                             .view(&config.cwd()?, files.to_vec())?;
                     }
-                    tx.iterate_steps(&mut session, Some(user_prompt), Some(sender.clone()), None)
+                    tx.continue_steps(&mut session, Some(user_prompt), Some(sender.clone()), None)
                         .await?;
                     Ok(())
                 }
@@ -549,7 +549,7 @@ async fn main() -> anyhow::Result<()> {
                         }
                     }
 
-                    tx.iterate_steps(&mut session, Some(user_prompt), Some(sender), None)
+                    tx.continue_steps(&mut session, Some(user_prompt), Some(sender), None)
                         .await?;
                     Ok(())
                 }
@@ -686,7 +686,7 @@ async fn main() -> anyhow::Result<()> {
                     };
 
                     tx.retry(&mut session)?;
-                    tx.iterate_steps(&mut session, prompt, Some(sender.clone()), None)
+                    tx.continue_steps(&mut session, prompt, Some(sender.clone()), None)
                         .await?;
                     Ok(())
                 }
@@ -732,7 +732,7 @@ async fn main() -> anyhow::Result<()> {
                         }
                     }
 
-                    tx.iterate_steps(&mut session, user_prompt, Some(sender.clone()), None)
+                    tx.continue_steps(&mut session, user_prompt, Some(sender.clone()), None)
                         .await?;
                     Ok(())
                 }

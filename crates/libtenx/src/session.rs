@@ -279,61 +279,36 @@ impl Session {
             )));
         }
 
-        match step_idx {
-            Some(step_idx) => {
-                let mut new_actions = Vec::new();
-
-                // Process actions up to action_idx
-                for (idx, action) in self.actions.iter_mut().enumerate() {
-                    match idx.cmp(&action_idx) {
-                        std::cmp::Ordering::Less => {
-                            // Keep this action entirely
-                            new_actions.push(action.clone());
-                        }
-                        std::cmp::Ordering::Equal => {
-                            // For the target action, keep steps up to step_idx
-                            if step_idx >= action.steps.len() {
-                                return Err(TenxError::Internal(format!(
-                                    "Invalid step index {} for action {}, which has {} steps",
-                                    step_idx,
-                                    action_idx,
-                                    action.steps.len()
-                                )));
-                            }
-
-                            // Rollback steps being removed (after step_idx)
-                            for step in action.steps[(step_idx + 1)..].iter_mut().rev() {
-                                action.state.revert(step.rollback_id)?;
-                            }
-
-                            // Truncate the steps and add the action
-                            let mut new_action = action.clone();
-                            new_action.steps.truncate(step_idx + 1);
-                            new_actions.push(new_action);
-
-                            // We've processed the target action, so break
-                            break;
-                        }
-                        std::cmp::Ordering::Greater => {
-                            // Any actions after action_idx will be discarded
-                            break;
-                        }
-                    }
-                }
-
-                self.actions = new_actions;
-            }
-            None => {
-                // Keep all actions up to and including action_idx
-                let mut new_actions = Vec::new();
-                for (idx, action) in self.actions.iter().enumerate() {
-                    if idx <= action_idx {
-                        new_actions.push(action.clone());
-                    }
-                }
-                self.actions = new_actions;
+        // Validate step index if provided
+        if let Some(step_idx) = step_idx {
+            let action = &self.actions[action_idx];
+            if step_idx >= action.steps.len() {
+                return Err(TenxError::Internal(format!(
+                    "Invalid step index {} for action {}, which has {} steps",
+                    step_idx,
+                    action_idx,
+                    action.steps.len()
+                )));
             }
         }
+
+        // Revert state changes after the target step
+        let action = &mut self.actions[action_idx];
+        if let Some(next_step_idx) = step_idx.map(|i| i + 1) {
+            if next_step_idx < action.steps.len() {
+                action
+                    .state
+                    .revert(action.steps[next_step_idx].rollback_id)?;
+            }
+        }
+
+        // Truncate steps in the current action
+        if let Some(step_idx) = step_idx {
+            action.steps.truncate(step_idx + 1);
+        }
+
+        // Remove all actions after the target action
+        self.actions.truncate(action_idx + 1);
 
         Ok(())
     }
