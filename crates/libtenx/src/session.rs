@@ -69,6 +69,11 @@ impl Step {
         }
     }
 
+    /// Is this step incomplete?
+    pub fn is_incomplete(&self) -> bool {
+        self.model_response.is_none() && self.err.is_none()
+    }
+
     /// Returns true if a step should continue, based on:
     /// a) there is a patch error, or
     /// b) there is a step error, and the error's should_retry() is not None.

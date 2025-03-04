@@ -217,30 +217,20 @@ impl Tenx {
             return Ok(state);
         }
 
-        // Get the next step from the strategy
-        let next_step = {
-            let action = session.last_action().unwrap();
-            let action_offset = session.actions().len() - 1;
-            action.strategy.next_step(
-                &self.config,
-                session,
-                action_offset,
-                sender.clone(),
-                prompt,
-            )?
-        };
+        // First get the strategy and action offset without holding an immutable reference
+        let action_offset = session.actions().len() - 1;
+        let strategy = session.last_action()?.strategy.clone();
 
-        // If there's no next step, just return the current state
-        match next_step {
-            Some(step) => {
-                session.add_step(step)?;
-                self.save_session(session)?;
-            }
-            None => {
-                let action = session.last_action().unwrap();
-                let action_offset = session.actions().len() - 1;
-                return Ok(action.strategy.state(&self.config, session, action_offset));
-            }
+        // Now call next_step with the mutable session reference
+        let next_step =
+            strategy.next_step(&self.config, session, action_offset, sender.clone(), prompt)?;
+
+        // Save state after the strategy generates the next step
+        self.save_session(session)?;
+
+        // If the action is done or requires user input, return early
+        if next_step.should_stop_iteration() {
+            return Ok(next_step);
         }
 
         // Execute the step

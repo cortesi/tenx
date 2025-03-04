@@ -3,12 +3,7 @@ use serde::{Deserialize, Serialize};
 pub mod code;
 mod core;
 
-use crate::{
-    config::Config,
-    error::Result,
-    events::EventSender,
-    session::{Session, Step},
-};
+use crate::{config::Config, error::Result, events::EventSender, session::Session};
 
 pub use code::*;
 pub use core::*;
@@ -31,11 +26,11 @@ impl ActionStrategy for Strategy {
     fn next_step(
         &self,
         config: &Config,
-        session: &Session,
+        session: &mut Session,
         action_offset: usize,
         sender: Option<EventSender>,
         prompt: Option<String>,
-    ) -> Result<Option<Step>> {
+    ) -> Result<ActionState> {
         match self {
             Strategy::Code(code) => code.next_step(config, session, action_offset, sender, prompt),
             Strategy::Fix(fix) => fix.next_step(config, session, action_offset, sender, prompt),

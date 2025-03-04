@@ -1,11 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    config::Config,
-    error::Result,
-    events::EventSender,
-    session::{Session, Step},
-};
+use crate::{config::Config, error::Result, events::EventSender, session::Session};
 
 /// Is the current action complete?
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -61,22 +56,20 @@ pub trait ActionStrategy {
     fn name(&self) -> &'static str;
 
     /// Given a session and action offset, calculate the next step. This may involve complex actions like executing
-    /// checks, making external requests. The returned step is ready to be sent to the upstream
-    /// model. The action's steps may currently be empty, in which case the first step is
-    /// synthesized. The strategy may choose to leave the current steps intact, or to edit the
-    /// current step history to progress.
+    /// checks, making external requests. If a new step is needed, it synthesizes and adds it to the action.
+    /// The action's steps may currently be empty, in which case the first step is synthesized.
     ///
-    /// If the action is complete, return None.
+    /// Returns the updated action state, which indicates whether more steps are needed and whether user input is required.
     ///
     /// * `action_offset` - The index of the action in the session's actions list
     fn next_step(
         &self,
         config: &Config,
-        session: &Session,
+        session: &mut Session,
         action_offset: usize,
         sender: Option<EventSender>,
         user_input: Option<String>,
-    ) -> Result<Option<Step>>;
+    ) -> Result<ActionState>;
 
     /// Returns the current state of the action, including completion status and input requirements.
     ///
