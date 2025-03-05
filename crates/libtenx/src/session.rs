@@ -75,11 +75,14 @@ impl Step {
         }
     }
 
-    pub fn reset(&mut self) {
+    /// Reset the step, clearing all response data and setting the rollback ID. The rollback ID is
+    /// required because presumably the state has been rolled back before this call.
+    pub fn reset(&mut self, rollback_id: u64) {
         self.model_response = None;
         self.response_time = None;
         self.patch_info = None;
         self.err = None;
+        self.rollback_id = rollback_id;
     }
 
     /// Is this step incomplete?
@@ -334,11 +337,11 @@ impl Session {
             if step_idx < action.steps.len() {
                 let step = &mut action.steps[step_idx];
 
-                // Reset the step's response data
-                step.reset();
-
                 // Revert to the step's rollback_id to reset the state
                 action.state.revert(step.rollback_id)?;
+
+                // Reset the step's response data with a new rollback ID
+                step.reset(action.state.mark()?);
             }
         }
 
