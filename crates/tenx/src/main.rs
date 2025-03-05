@@ -673,28 +673,23 @@ async fn main() -> anyhow::Result<()> {
                 } => {
                     let mut session = tx.load_session()?;
 
-                    // If no step offset is provided, use the last step of the last action
-                    if let Some(offset_str) = step_offset {
-                        let (action_idx, step_idx) = parse_step_offset(offset_str)?;
+                    // Parse the step offset if provided
+                    let (action_idx, step_idx) = if let Some(offset_str) = step_offset {
+                        let (a, s) = parse_step_offset(offset_str)?;
+                        (Some(a), Some(s))
+                    } else {
+                        (None, None)
+                    };
 
-                        tx.reset(&mut session, action_idx, Some(step_idx))?;
-                    } else if !session.actions().is_empty() {
-                        // Use the last step of the last action
-                        let action_idx = session.actions().len() - 1;
-                        let action = &session.actions()[action_idx];
-                        if !action.steps().is_empty() {
-                            let step_idx = action.steps().len() - 1;
-                            tx.reset(&mut session, action_idx, Some(step_idx))?;
-                        }
-                    }
-
+                    // Get prompt if needed
                     let prompt = if *edit || prompt.is_some() || prompt_file.is_some() {
                         get_prompt(prompt, prompt_file, &session, true, &Some(sender.clone()))?
                     } else {
                         None
                     };
 
-                    tx.retry(&mut session)?;
+                    // Retry the step and continue
+                    tx.retry(&mut session, action_idx, step_idx)?;
                     tx.continue_steps(&mut session, prompt, Some(sender.clone()), None)
                         .await?;
                     Ok(())

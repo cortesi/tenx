@@ -164,12 +164,38 @@ impl Tenx {
         session_store.load(name)
     }
 
-    /// Reverts the last step and prepares for retry.
-    pub fn retry(&self, session: &mut Session) -> Result<()> {
-        if let Some(_step) = session.last_step() {
-            // FIXME
-            // session.state.revert(step.rollback_id)?;
+    /// Reverts to a specific step and prepares for retry.
+    ///
+    /// * `action_idx` - Optional 0-based index of the action
+    /// * `step_idx` - Optional 0-based index of the step within the action
+    ///
+    /// If both indices are None, uses the last step of the last action.
+    pub fn retry(
+        &self,
+        session: &mut Session,
+        action_idx: Option<usize>,
+        step_idx: Option<usize>,
+    ) -> Result<()> {
+        if session.actions().is_empty() {
+            return Err(TenxError::Internal("No actions in session".to_string()));
         }
+
+        // Determine which action and step to use
+        let action_index = action_idx.unwrap_or_else(|| session.actions().len() - 1);
+
+        // If step_idx is None, use the last step of the specified action
+        let step_index = if let Some(idx) = step_idx {
+            idx
+        } else {
+            let steps = session.actions()[action_index].steps();
+            if steps.is_empty() {
+                return Err(TenxError::Internal("No steps in action".to_string()));
+            }
+            steps.len() - 1
+        };
+
+        // Reset to this step and prepare it for retry
+        session.retry(action_index, step_index)?;
         self.save_session(session)?;
         Ok(())
     }

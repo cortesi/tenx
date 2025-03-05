@@ -1,13 +1,6 @@
 STATE REFACTORING:
 
-    - Continue command
-        - If the current step is incomplete, continues with that step
-        - Otherwise, syntehsizes the next step
-
     - Diff summary line in state
-    - tenx continue
-        - Continues with the current action
-        - If the action cannot continue, raises an error
     - Refactor Conversation interface to use actions and steps
     - Shift patch module into state
     - Update pretty to output actions
