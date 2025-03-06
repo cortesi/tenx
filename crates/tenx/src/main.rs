@@ -671,11 +671,10 @@ async fn main() -> anyhow::Result<()> {
 
                         tx.reset(&mut session, action_idx, step_idx)?;
 
-                        if let Some(step) = step_idx {
-                            println!("Session reset to action {}, step {}", action_idx, step);
-                        } else {
-                            println!("Session reset to action {}", action_idx);
-                        }
+                        println!(
+                            "Session reset to step {}",
+                            pretty::render_step_offset(action_idx, step_idx)
+                        );
                     }
                     Ok(())
                 }

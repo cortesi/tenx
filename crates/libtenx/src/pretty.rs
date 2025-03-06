@@ -83,6 +83,14 @@ fn print_operations(_config: &Config, _operations: &[Operation]) -> String {
     output
 }
 
+/// Renders a step offset in the format "action" or "action:step"
+pub fn render_step_offset(action_idx: usize, step_idx: Option<usize>) -> String {
+    match step_idx {
+        Some(step) => format!("{}:{}", action_idx, step),
+        None => format!("{}", action_idx),
+    }
+}
+
 fn print_steps(config: &Config, session: &Session, full: bool, width: usize) -> Result<String> {
     if session.steps().is_empty() {
         return Ok(String::new());
@@ -108,9 +116,12 @@ fn print_steps(config: &Config, session: &Session, full: bool, width: usize) -> 
             output.push_str(&format!("\n{}\n", "-".repeat(width - 10)));
             output.push_str(&format!(
                 "{}\n",
-                format!("Step {}.{}", action_idx, local_step_idx)
-                    .blue()
-                    .bold()
+                format!(
+                    "Step {}",
+                    render_step_offset(action_idx, Some(local_step_idx))
+                )
+                .blue()
+                .bold()
             ));
             output.push_str(&format!("{}\n", "-".repeat(width - 10)));
 
@@ -408,7 +419,7 @@ mod tests {
         let config = Config::default();
         let p = create_test_project()?;
         let output = print_steps(&config, &p.session, false, 80)?;
-        assert!(output.contains("Step 0"));
+        assert!(output.contains("Step 0:0"));
         assert!(output.contains("Test prompt"));
         Ok(())
     }
@@ -429,7 +440,7 @@ mod tests {
             });
         }
         let output = print_steps(&config, &p.session, false, 80)?;
-        assert!(output.contains("Step 0"));
+        assert!(output.contains("Step 0:0"));
         assert!(output.contains("Test prompt"));
         assert!(output.contains("comment:"));
         assert!(output.contains("Test comment"));
@@ -444,7 +455,7 @@ mod tests {
             step.err = Some(TenxError::Internal("Test error".to_string()));
         }
         let output = print_steps(&config, &p.session, false, 80)?;
-        assert!(output.contains("Step 0"));
+        assert!(output.contains("Step 0:0"));
         assert!(output.contains("Test prompt"));
         assert!(output.contains("error:"));
         assert!(output.contains("Test error"));
@@ -461,5 +472,12 @@ mod tests {
         assert!(full_result.contains("Test prompt"));
         assert!(full_result.contains("with multiple"));
         assert!(full_result.contains("lines"));
+    }
+
+    #[test]
+    fn test_render_step_offset() {
+        assert_eq!(render_step_offset(0, None), "0");
+        assert_eq!(render_step_offset(1, Some(2)), "1:2");
+        assert_eq!(render_step_offset(5, Some(0)), "5:0");
     }
 }
