@@ -278,7 +278,8 @@ impl Session {
     /// Reset the session to a specific action and step, removing all subsequent steps.
     ///
     /// * `action_idx` - The 0-based index of the action to keep steps for
-    /// * `step_idx` - The 0-based index of the step within the action to keep
+    /// * `step_idx` - The 0-based index of the step within the action to keep.
+    ///   When None, keeps all steps in the action.
     pub fn reset(&mut self, action_idx: usize, step_idx: Option<usize>) -> Result<()> {
         if action_idx >= self.actions.len() {
             return Err(TenxError::Internal(format!(
@@ -287,9 +288,12 @@ impl Session {
             )));
         }
 
-        // Validate step index if provided
+        // Get a reference to the target action
+        let action = &mut self.actions[action_idx];
+
+        // If step_idx is provided, handle step-specific operations
         if let Some(step_idx) = step_idx {
-            let action = &self.actions[action_idx];
+            // Validate step index
             if step_idx >= action.steps.len() {
                 return Err(TenxError::Internal(format!(
                     "Invalid step index {} for action {}, which has {} steps",
@@ -298,20 +302,16 @@ impl Session {
                     action.steps.len()
                 )));
             }
-        }
 
-        // Revert state changes after the target step
-        let action = &mut self.actions[action_idx];
-        if let Some(next_step_idx) = step_idx.map(|i| i + 1) {
+            // Revert state changes after the target step
+            let next_step_idx = step_idx + 1;
             if next_step_idx < action.steps.len() {
                 action
                     .state
                     .revert(action.steps[next_step_idx].rollback_id)?;
             }
-        }
 
-        // Truncate steps in the current action
-        if let Some(step_idx) = step_idx {
+            // Truncate steps in the current action
             action.steps.truncate(step_idx + 1);
         }
 
