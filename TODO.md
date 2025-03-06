@@ -1,17 +1,19 @@
 STATE REFACTORING:
 
-    - Diff summary line in state
+    - pretty printing:
+        - print usable step and action offsets
+        - more compact summary output
+        - Diff summary line in state
     - Refactor Conversation interface to use actions and steps
     - Shift patch module into state
-    - Update pretty to output actions
 
 UX:
 
-    - indicate tenx version clearly in manual
     - execute pre-checks before asking the user for input
     - audio cues for model responses and completion
     - Change the name of Config::step_limit (maybe iteration_limit? auto_step_limit?)
     - We don't capture user edits in the state history. This leads to some counter-intuitive behavior.
+    - indicate tenx version clearly in manual
 
     
 Model response robustness:

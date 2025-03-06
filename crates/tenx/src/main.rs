@@ -21,22 +21,31 @@ use libtenx::{
 
 mod edit;
 
-/// Parse a step offset string in format "action:step" and return the parsed indices
-fn parse_step_offset(offset_str: &str) -> Result<(usize, usize)> {
-    // Parse the action:step format
+/// Parse a step offset string in format "action" or "action:step" and return the parsed indices
+/// If the step is not specified (format "action"), the step index will be None.
+fn parse_step_offset(offset_str: &str) -> Result<(usize, Option<usize>)> {
+    // Parse the action:step format or just action
     let parts: Vec<&str> = offset_str.split(':').collect();
-    if parts.len() != 2 {
+
+    if parts.is_empty() || parts.len() > 2 {
         return Err(anyhow!(
-            "Step offset must be in format 'action:step', e.g. '0:3'"
+            "Step offset must be in format 'action' or 'action:step', e.g. '0' or '0:3'"
         ));
     }
 
     let action_idx = parts[0]
         .parse::<usize>()
         .map_err(|_| anyhow!("Invalid action index: {}", parts[0]))?;
-    let step_idx = parts[1]
-        .parse::<usize>()
-        .map_err(|_| anyhow!("Invalid step index: {}", parts[1]))?;
+
+    let step_idx = if parts.len() == 2 {
+        Some(
+            parts[1]
+                .parse::<usize>()
+                .map_err(|_| anyhow!("Invalid step index: {}", parts[1]))?,
+        )
+    } else {
+        None
+    };
 
     Ok((action_idx, step_idx))
 }
@@ -660,8 +669,13 @@ async fn main() -> anyhow::Result<()> {
 
                         let (action_idx, step_idx) = parse_step_offset(offset_str)?;
 
-                        tx.reset(&mut session, action_idx, Some(step_idx))?;
-                        println!("Session reset to action {}, step {}", action_idx, step_idx);
+                        tx.reset(&mut session, action_idx, step_idx)?;
+
+                        if let Some(step) = step_idx {
+                            println!("Session reset to action {}, step {}", action_idx, step);
+                        } else {
+                            println!("Session reset to action {}", action_idx);
+                        }
                     }
                     Ok(())
                 }
@@ -676,7 +690,7 @@ async fn main() -> anyhow::Result<()> {
                     // Parse the step offset if provided
                     let (action_idx, step_idx) = if let Some(offset_str) = step_offset {
                         let (a, s) = parse_step_offset(offset_str)?;
-                        (Some(a), Some(s))
+                        (Some(a), s)
                     } else {
                         (None, None)
                     };
