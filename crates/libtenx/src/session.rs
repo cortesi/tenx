@@ -63,10 +63,10 @@ pub struct Step {
 
 impl Step {
     /// Creates a new Step with the given prompt and rollback ID.
-    pub fn new(model: String, prompt: String) -> Self {
+    pub fn new(model: String, raw_prompt: String) -> Self {
         Step {
             model,
-            raw_prompt: prompt,
+            raw_prompt,
             rollback_id: 0,
             model_response: None,
             response_time: None,
@@ -203,15 +203,6 @@ impl Session {
         &self.actions
     }
 
-    /// Returns a reference to the last step in the session.
-    pub fn last_step(&self) -> Option<&Step> {
-        self.actions
-            .iter()
-            .rev()
-            .flat_map(|action| action.steps.iter().rev())
-            .next()
-    }
-
     /// Returns a reference to the last action in the session.
     pub fn last_action(&self) -> Result<&Action> {
         self.actions
@@ -219,15 +210,18 @@ impl Session {
             .ok_or_else(|| TenxError::Internal("No actions in session".into()))
     }
 
-    // Already defined above, removed duplicate
+    /// Returns a reference to the last step in the session.
+    pub fn last_step(&self) -> Option<&Step> {
+        self.last_action()
+            .ok()
+            .and_then(|action| action.last_step())
+    }
 
     /// Returns a mutable reference to the last step in the session.
     pub fn last_step_mut(&mut self) -> Option<&mut Step> {
-        self.actions
-            .iter_mut()
-            .rev()
-            .flat_map(|action| action.steps.iter_mut().rev())
-            .next()
+        self.last_action_mut()
+            .ok()
+            .and_then(|action| action.steps.last_mut())
     }
 
     pub fn contexts(&self) -> &Vec<context::Context> {

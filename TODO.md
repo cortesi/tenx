@@ -1,7 +1,6 @@
 STATE REFACTORING:
 
     - pretty printing:
-        - print usable step and action offsets
         - more compact summary output
         - Diff summary line in state
     - Refactor Conversation interface to use actions and steps
