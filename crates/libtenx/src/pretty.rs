@@ -52,9 +52,9 @@ fn print_session_info(config: &Config, _: &Session) -> String {
 
 fn print_context_specs(session: &Session) -> String {
     let mut output = String::new();
-    if !session.contexts().is_empty() {
+    if !session.contexts.is_empty() {
         output.push_str(&format!("{}\n", "context:".blue().bold()));
-        for context in session.contexts() {
+        for context in &session.contexts {
             output.push_str(&format!("{}- {}\n", INDENT, context.human()));
         }
     }
@@ -366,7 +366,7 @@ pub fn print_project(config: &Config) -> String {
 /// Pretty prints all contexts in a session
 pub fn print_contexts(config: &Config, session: &Session) -> Result<String> {
     let mut output = String::new();
-    for context in session.contexts() {
+    for context in &session.contexts {
         let items = context.context_items(config, &Session::new(config)?)?;
         if let Some(item) = items.into_iter().next() {
             output.push_str(&print_context_item(&item));

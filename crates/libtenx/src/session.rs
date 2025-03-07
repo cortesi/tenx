@@ -224,10 +224,6 @@ impl Session {
             .and_then(|action| action.steps.last_mut())
     }
 
-    pub fn contexts(&self) -> &Vec<context::Context> {
-        &self.contexts
-    }
-
     /// Does this session have a pending prompt?
     pub fn should_continue(&self) -> bool {
         if let Some(step) = self.steps().last() {

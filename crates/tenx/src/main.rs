@@ -639,7 +639,7 @@ async fn main() -> anyhow::Result<()> {
                             session.add_context(Context::new_cmd(command));
                         }
                         ContextCommands::Show => {
-                            if session.contexts().is_empty() {
+                            if session.contexts.is_empty() {
                                 println!("No contexts in session");
                                 return Ok(());
                             }

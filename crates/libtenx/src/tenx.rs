@@ -433,10 +433,10 @@ mod tests {
         let tenx = Tenx::new(config);
 
         let session = tenx.new_session_from_cwd(&None, true).await.unwrap();
-        assert!(session.contexts().is_empty());
+        assert!(session.contexts.is_empty());
 
         let session = tenx.new_session_from_cwd(&None, false).await?;
-        assert!(!session.contexts().is_empty());
+        assert!(!session.contexts.is_empty());
         Ok(())
     }
 
