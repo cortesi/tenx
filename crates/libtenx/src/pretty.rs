@@ -61,18 +61,6 @@ fn print_context_specs(session: &Session) -> String {
     output
 }
 
-fn print_editables(_config: &Config, session: &Session) -> Result<String> {
-    let mut output = String::new();
-    let editables = session.editables();
-    if !editables.is_empty() {
-        output.push_str(&format!("{}\n", "edit:".blue().bold()));
-        for path in editables {
-            output.push_str(&format!("{}- {}\n", INDENT, path.display()));
-        }
-    }
-    Ok(output)
-}
-
 fn print_operations(_config: &Config, _operations: &[Operation]) -> String {
     let mut output = String::new();
     output.push_str(&format!(
@@ -340,10 +328,9 @@ pub fn print_session(config: &Config, session: &Session, full: bool) -> Result<S
     output.push_str(&format!("{}\n", "session:".blue().bold()));
     output.push_str(&indent(
         &format!(
-            "{}{}{}{}",
+            "{}{}{}",
             print_session_info(config, session),
             print_context_specs(session),
-            print_editables(config, session)?,
             print_steps(config, session, full, width - INDENT.len())?
         ),
         INDENT,

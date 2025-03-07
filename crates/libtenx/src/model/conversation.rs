@@ -94,12 +94,10 @@ where
                 if step_idx < action.steps().len() {
                     session.editables_for_step_state(action_idx, step_idx)?
                 } else {
-                    // Fallback to the session's general editables
-                    session.editables()
+                    vec![]
                 }
             } else {
-                // Fallback to the session's general editables
-                session.editables()
+                vec![]
             };
 
             if !editables.is_empty() {
@@ -114,21 +112,7 @@ where
                 conversation.add_agent_message(req, ACK)?;
             }
         }
-        Err(_) => {
-            // If we can't convert the offset, just use the general session editables
-            let editables = session.editables();
-            if !editables.is_empty() {
-                conversation.add_user_message(
-                    req,
-                    &format!(
-                        "{}\n{}",
-                        EDITABLE_LEADIN,
-                        dialect.render_editables(config, session, editables)?
-                    ),
-                )?;
-                conversation.add_agent_message(req, ACK)?;
-            }
-        }
+        Err(_) => {}
     }
 
     Ok(())

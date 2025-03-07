@@ -162,7 +162,6 @@ impl Action {
 /// A serializable session, which persists between invocations.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Session {
-    editable: Vec<PathBuf>,
     pub actions: Vec<Action>,
     pub contexts: Vec<context::Context>,
 }
@@ -174,7 +173,6 @@ impl Session {
     /// project root is used.
     pub fn new(_config: &config::Config) -> Result<Self> {
         Ok(Session {
-            editable: vec![],
             actions: vec![],
             contexts: Vec::new(),
         })
@@ -228,13 +226,6 @@ impl Session {
 
     pub fn contexts(&self) -> &Vec<context::Context> {
         &self.contexts
-    }
-
-    /// Returns the relative paths of the editables for this session in sorted order.
-    pub fn editables(&self) -> Vec<PathBuf> {
-        let mut paths = self.editable.clone();
-        paths.sort();
-        paths
     }
 
     /// Does this session have a pending prompt?
@@ -477,7 +468,6 @@ mod tests {
 
         // Create a session containing this action.
         let mut session = Session {
-            editable: vec![],
             actions: vec![action],
             contexts: vec![],
         };
