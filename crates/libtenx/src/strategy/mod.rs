@@ -3,7 +3,9 @@ use serde::{Deserialize, Serialize};
 pub mod code;
 mod core;
 
-use crate::{config::Config, error::Result, events::EventSender, session::Session};
+use crate::{
+    checks::CheckMode, config::Config, error::Result, events::EventSender, session::Session,
+};
 
 pub use code::*;
 pub use core::*;
@@ -42,6 +44,20 @@ impl ActionStrategy for Strategy {
         match self {
             Strategy::Code(code) => code.state(config, session, action_offset),
             Strategy::Fix(fix) => fix.state(config, session, action_offset),
+        }
+    }
+
+    /// Run the checks for this strategy.
+    fn check(
+        &self,
+        config: &Config,
+        session: &mut Session,
+        sender: Option<EventSender>,
+        mode: CheckMode,
+    ) -> Result<()> {
+        match self {
+            Strategy::Code(code) => code.check(config, session, sender, mode),
+            Strategy::Fix(fix) => fix.check(config, session, sender, mode),
         }
     }
 }
