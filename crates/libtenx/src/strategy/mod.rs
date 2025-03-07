@@ -3,9 +3,7 @@ use serde::{Deserialize, Serialize};
 pub mod code;
 mod core;
 
-use crate::{
-    checks::CheckMode, config::Config, error::Result, events::EventSender, session::Session,
-};
+use crate::{config::Config, error::Result, events::EventSender, session::Session};
 
 pub use code::*;
 pub use core::*;
@@ -53,11 +51,10 @@ impl ActionStrategy for Strategy {
         config: &Config,
         session: &mut Session,
         sender: Option<EventSender>,
-        mode: CheckMode,
     ) -> Result<()> {
         match self {
-            Strategy::Code(code) => code.check(config, session, sender, mode),
-            Strategy::Fix(fix) => fix.check(config, session, sender, mode),
+            Strategy::Code(code) => code.check(config, session, sender),
+            Strategy::Fix(fix) => fix.check(config, session, sender),
         }
     }
 }

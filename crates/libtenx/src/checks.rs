@@ -19,26 +19,6 @@ impl Runnable {
     }
 }
 
-/// The mode in which the check should run - pre, post or both.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CheckMode {
-    Pre,
-    Post,
-    Both,
-}
-
-impl CheckMode {
-    /// Returns true if this mode includes pre checks.
-    pub fn is_pre(&self) -> bool {
-        matches!(self, CheckMode::Pre | CheckMode::Both)
-    }
-
-    /// Returns true if this mode includes post-patch checks.
-    pub fn is_post(&self) -> bool {
-        matches!(self, CheckMode::Post | CheckMode::Both)
-    }
-}
-
 /// A validator that runs a shell command and checks its output. Relies on `sh` being available.
 ///
 /// Check commands are always run in the project root directory.
@@ -53,8 +33,6 @@ pub struct Check {
     pub default_off: bool,
     /// Whether to treat any stderr output as a failure, regardless of exit code
     pub fail_on_stderr: bool,
-    /// When this check should run
-    pub mode: CheckMode,
 }
 
 impl Check {
@@ -110,12 +88,10 @@ impl Check {
 pub fn check_paths(
     conf: &Config,
     paths: &Vec<PathBuf>,
-    mode_filter: CheckMode,
     sender: &Option<EventSender>,
 ) -> Result<()> {
     for c in conf.enabled_checks() {
-        let is_mode_match = c.mode == mode_filter || c.mode == CheckMode::Both;
-        if is_mode_match && c.is_relevant(paths)? {
+        if c.is_relevant(paths)? {
             let _check_block = EventBlock::check(sender, &c.name)?;
             c.check(conf)?;
         }
@@ -124,25 +100,14 @@ pub fn check_paths(
 }
 
 /// Run checks on a session. If the session has no editables, run checks on all project files.
-pub fn check_session(
-    conf: &Config,
-    session: &Session,
-    mode_filter: CheckMode,
-    sender: &Option<EventSender>,
-) -> Result<()> {
+pub fn check_session(conf: &Config, session: &Session, sender: &Option<EventSender>) -> Result<()> {
     let editables = session.editables().to_vec();
     let paths = if editables.is_empty() {
         conf.project_files()?
     } else {
         editables
     };
-
-    check_paths(
-        conf,
-        &paths.iter().map(PathBuf::from).collect(),
-        mode_filter,
-        sender,
-    )
+    check_paths(conf, &paths.iter().map(PathBuf::from).collect(), sender)
 }
 
 #[cfg(test)]
@@ -163,7 +128,6 @@ mod tests {
             globs: vec!["src/*.rs".to_string(), "tests/**/*.rs".to_string()],
             default_off: false,
             fail_on_stderr: true,
-            mode: CheckMode::Both,
         };
 
         let patterns = check.globs.clone();
@@ -180,7 +144,6 @@ mod tests {
             globs: vec!["*.rs".to_string()],
             default_off: false,
             fail_on_stderr: true,
-            mode: CheckMode::Both,
         };
 
         let config = test_config();
@@ -196,7 +159,6 @@ mod tests {
             globs: vec!["*.rs".to_string()],
             default_off: false,
             fail_on_stderr: true,
-            mode: super::CheckMode::Both,
         };
 
         let config = test_config();

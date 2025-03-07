@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use tracing::warn;
 
 use crate::{
-    checks::{check_paths, check_session, CheckMode},
+    checks::{check_paths, check_session},
     config::Config,
     context::{Context, ContextProvider},
     error::{Result, TenxError},
@@ -223,7 +223,7 @@ impl Tenx {
     /// Run checks on specified paths.
     pub fn check(&self, paths: Vec<PathBuf>, sender: &Option<EventSender>) -> Result<()> {
         let _block = EventBlock::start(sender)?;
-        check_paths(&self.config, &paths, CheckMode::Both, sender)
+        check_paths(&self.config, &paths, sender)
     }
 
     /// Take the next step for the current action.
@@ -378,7 +378,7 @@ impl Tenx {
     fn run_pre_checks(&self, session: &mut Session, sender: &Option<EventSender>) -> Result<()> {
         if !self.config.checks.no_pre {
             let _check_block = EventBlock::pre_check(sender)?;
-            check_session(&self.config, session, CheckMode::Pre, sender)
+            check_session(&self.config, session, sender)
         } else {
             Ok(())
         }
@@ -392,7 +392,7 @@ impl Tenx {
             .and_then(|s| s.model_response.as_ref())
             .is_some()
         {
-            check_session(&self.config, session, CheckMode::Post, sender)?
+            check_session(&self.config, session, sender)?
         }
         Ok(())
     }

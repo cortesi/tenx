@@ -480,8 +480,6 @@ async fn main() -> anyhow::Result<()> {
 
                         println!("{}{}", name.blue().bold(), status);
                         println!("    globs: {:?}", check.globs);
-                        println!("    pre: {}", check.mode.is_pre());
-                        println!("    post: {}", check.mode.is_post());
                         println!();
                     }
                     Ok(())

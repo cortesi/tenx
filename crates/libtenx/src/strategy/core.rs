@@ -1,8 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    checks::CheckMode, config::Config, error::Result, events::EventSender, session::Session,
-};
+use crate::{config::Config, error::Result, events::EventSender, session::Session};
 
 /// Is the current action complete?
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -89,7 +87,6 @@ pub trait ActionStrategy {
         _config: &Config,
         _session: &mut Session,
         _sender: Option<EventSender>,
-        _mode: CheckMode,
     ) -> Result<()> {
         Ok(())
     }

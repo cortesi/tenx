@@ -452,16 +452,6 @@ pub enum ReasoningEffort {
     High,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
-#[serde(rename_all = "snake_case")]
-/// When a check should run - before changes, after changes, or both.
-pub enum CheckMode {
-    Pre,
-    Post,
-    #[default]
-    Both,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 /// Configuration for a specific check.
 pub struct CheckConfig {
@@ -481,10 +471,6 @@ pub struct CheckConfig {
     /// Whether to treat any stderr output as a failure, regardless of exit code
     #[serde(default)]
     pub fail_on_stderr: bool,
-
-    /// When this check should run
-    #[serde(default)]
-    pub mode: CheckMode,
 }
 
 impl CheckConfig {
@@ -496,11 +482,6 @@ impl CheckConfig {
             globs: self.globs.clone(),
             default_off: self.default_off,
             fail_on_stderr: self.fail_on_stderr,
-            mode: match self.mode {
-                CheckMode::Pre => checks::CheckMode::Pre,
-                CheckMode::Post => checks::CheckMode::Post,
-                CheckMode::Both => checks::CheckMode::Both,
-            },
         }
     }
 }

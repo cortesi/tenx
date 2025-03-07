@@ -351,7 +351,6 @@ fn default_checks() -> Checks {
                 globs: vec!["*.rs".to_string()],
                 default_off: false,
                 fail_on_stderr: false,
-                mode: CheckMode::Both,
             },
             CheckConfig {
                 name: "cargo-test".to_string(),
@@ -359,7 +358,6 @@ fn default_checks() -> Checks {
                 globs: vec!["*.rs".to_string()],
                 default_off: false,
                 fail_on_stderr: false,
-                mode: CheckMode::Both,
             },
             CheckConfig {
                 name: "cargo-clippy".to_string(),
@@ -367,7 +365,6 @@ fn default_checks() -> Checks {
                 globs: vec!["*.rs".to_string()],
                 default_off: true,
                 fail_on_stderr: true,
-                mode: CheckMode::Both,
             },
             CheckConfig {
                 name: "cargo-fmt".to_string(),
@@ -375,7 +372,6 @@ fn default_checks() -> Checks {
                 globs: vec!["*.rs".to_string()],
                 default_off: false,
                 fail_on_stderr: true,
-                mode: CheckMode::Post,
             },
             CheckConfig {
                 name: "ruff-check".to_string(),
@@ -383,7 +379,6 @@ fn default_checks() -> Checks {
                 globs: vec!["*.py".to_string()],
                 default_off: false,
                 fail_on_stderr: false,
-                mode: CheckMode::Both,
             },
             CheckConfig {
                 name: "ruff-format".to_string(),
@@ -391,7 +386,6 @@ fn default_checks() -> Checks {
                 globs: vec!["*.py".to_string()],
                 default_off: false,
                 fail_on_stderr: false,
-                mode: CheckMode::Post,
             },
         ],
         ..Default::default()
