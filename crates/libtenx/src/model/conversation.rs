@@ -12,7 +12,7 @@ pub const ACK: &str = "Got it.";
 /// Convert a flat step offset into action and step indices
 fn offset_to_indices(session: &Session, step_offset: usize) -> Result<(usize, usize)> {
     // Handle empty session specially
-    if session.actions().is_empty() {
+    if session.actions.is_empty() {
         // For empty sessions, treat offset 0 as action 0, step 0 (even though they don't exist)
         if step_offset == 0 {
             return Ok((0, 0));
@@ -24,7 +24,7 @@ fn offset_to_indices(session: &Session, step_offset: usize) -> Result<(usize, us
     }
 
     let mut remaining = step_offset;
-    for (action_idx, action) in session.actions().iter().enumerate() {
+    for (action_idx, action) in session.actions.iter().enumerate() {
         if remaining < action.steps().len() {
             return Ok((action_idx, remaining));
         }
@@ -36,8 +36,8 @@ fn offset_to_indices(session: &Session, step_offset: usize) -> Result<(usize, us
 
     // If offset is exactly at the end, use the last action with a step index at its end
     if step_offset == total_steps {
-        let action_idx = session.actions().len() - 1;
-        let step_idx = session.actions()[action_idx].steps().len() - 1;
+        let action_idx = session.actions.len() - 1;
+        let step_idx = session.actions[action_idx].steps().len() - 1;
         return Ok((action_idx, step_idx));
     }
 
@@ -80,7 +80,7 @@ where
     C: Conversation<R>,
 {
     // For empty sessions or invalid offsets, skip adding editables
-    if session.actions().is_empty() {
+    if session.actions.is_empty() {
         return Ok(());
     }
 
@@ -88,8 +88,8 @@ where
     match offset_to_indices(session, step_offset) {
         Ok((action_idx, step_idx)) => {
             // Handle cases where we need to safely get editables
-            let editables = if action_idx < session.actions().len() {
-                let action = &session.actions()[action_idx];
+            let editables = if action_idx < session.actions.len() {
+                let action = &session.actions[action_idx];
                 // If this is a valid step in the action or just at the end
                 if step_idx < action.steps().len() {
                     session.editables_for_step_state(action_idx, step_idx)?

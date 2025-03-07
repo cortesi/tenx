@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use tracing::warn;
 
 use crate::{
-    checks::{check_paths, check_session},
+    checks::{check_all, check_paths},
     config::Config,
     context::{Context, ContextProvider},
     error::{Result, TenxError},
@@ -176,18 +176,18 @@ impl Tenx {
         action_idx: Option<usize>,
         step_idx: Option<usize>,
     ) -> Result<()> {
-        if session.actions().is_empty() {
+        if session.actions.is_empty() {
             return Err(TenxError::Internal("No actions in session".to_string()));
         }
 
         // Determine which action and step to use
-        let action_index = action_idx.unwrap_or_else(|| session.actions().len() - 1);
+        let action_index = action_idx.unwrap_or_else(|| session.actions.len() - 1);
 
         // If step_idx is None, use the last step of the specified action
         let step_index = if let Some(idx) = step_idx {
             idx
         } else {
-            let steps = session.actions()[action_index].steps();
+            let steps = session.actions[action_index].steps();
             if steps.is_empty() {
                 return Err(TenxError::Internal("No steps in action".to_string()));
             }
@@ -223,7 +223,11 @@ impl Tenx {
     /// Run checks on specified paths.
     pub fn check(&self, paths: Vec<PathBuf>, sender: &Option<EventSender>) -> Result<()> {
         let _block = EventBlock::start(sender)?;
-        check_paths(&self.config, &paths, sender)
+        if paths.is_empty() {
+            check_all(&self.config, sender)
+        } else {
+            check_paths(&self.config, &paths, sender)
+        }
     }
 
     /// Take the next step for the current action.
@@ -236,16 +240,19 @@ impl Tenx {
     ) -> Result<strategy::ActionState> {
         self.save_session(session)?;
 
-        let action = session.last_action()?;
-        let action_offset = session.actions().len() - 1;
+        let action = session
+            .actions
+            .last()
+            .ok_or_else(|| TenxError::Internal("No actions in session".to_string()))?;
+        let action_offset = session.actions.len() - 1;
         let state = action.strategy.state(&self.config, session, action_offset);
         if matches!(state.completion, Completion::Complete) {
             return Ok(state);
         }
 
         // First get the strategy and action offset without holding an immutable reference
-        let action_offset = session.actions().len() - 1;
-        let strategy = session.last_action()?.strategy.clone();
+        let action_offset = session.actions.len() - 1;
+        let strategy = action.strategy.clone();
 
         // Now call next_step with the mutable session reference
         let next_step =
@@ -272,10 +279,9 @@ impl Tenx {
             }
         }
 
-        // Always return the current state from the action's strategy
-        let action = session.last_action().unwrap();
-        let action_offset = session.actions().len() - 1;
-        Ok(action.strategy.state(&self.config, session, action_offset))
+        Ok(session.actions[action_offset]
+            .strategy
+            .state(&self.config, session, action_offset))
     }
 
     /// Iterate on steps until the action is complete.
@@ -378,7 +384,9 @@ impl Tenx {
     fn run_pre_checks(&self, session: &mut Session, sender: &Option<EventSender>) -> Result<()> {
         if !self.config.checks.no_pre {
             let _check_block = EventBlock::pre_check(sender)?;
-            check_session(&self.config, session, sender)
+            let action = session.last_action()?;
+            let strategy = action.strategy.clone();
+            strategy.check(&self.config, session, session.actions.len(), sender.clone())
         } else {
             Ok(())
         }
@@ -386,15 +394,9 @@ impl Tenx {
 
     fn run_post_checks(&self, session: &mut Session, sender: &Option<EventSender>) -> Result<()> {
         let _check_block = EventBlock::post_check(sender)?;
-        if session
-            .steps()
-            .last()
-            .and_then(|s| s.model_response.as_ref())
-            .is_some()
-        {
-            check_session(&self.config, session, sender)?
-        }
-        Ok(())
+        let action = session.last_action()?;
+        let strategy = action.strategy.clone();
+        strategy.check(&self.config, session, session.actions.len(), sender.clone())
     }
 }
 

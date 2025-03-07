@@ -163,7 +163,7 @@ impl Action {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Session {
     editable: Vec<PathBuf>,
-    actions: Vec<Action>,
+    pub actions: Vec<Action>,
     pub contexts: Vec<context::Context>,
 }
 
@@ -198,9 +198,11 @@ impl Session {
             .collect()
     }
 
-    /// Returns all actions in the session.
-    pub fn actions(&self) -> &Vec<Action> {
-        &self.actions
+    /// Get action and validate it exists
+    pub fn get_action(&self, action_offset: usize) -> Result<&crate::session::Action> {
+        self.actions
+            .get(action_offset)
+            .ok_or_else(|| TenxError::Internal(format!("Invalid action offset: {}", action_offset)))
     }
 
     /// Returns a reference to the last action in the session.

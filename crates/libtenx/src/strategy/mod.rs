@@ -50,11 +50,12 @@ impl ActionStrategy for Strategy {
         &self,
         config: &Config,
         session: &mut Session,
+        action_offset: usize,
         sender: Option<EventSender>,
     ) -> Result<()> {
         match self {
-            Strategy::Code(code) => code.check(config, session, sender),
-            Strategy::Fix(fix) => fix.check(config, session, sender),
+            Strategy::Code(code) => code.check(config, session, action_offset, sender),
+            Strategy::Fix(fix) => fix.check(config, session, action_offset, sender),
         }
     }
 }

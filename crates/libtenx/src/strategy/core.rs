@@ -86,6 +86,7 @@ pub trait ActionStrategy {
         &self,
         _config: &Config,
         _session: &mut Session,
+        _action_offset: usize,
         _sender: Option<EventSender>,
     ) -> Result<()> {
         Ok(())

@@ -99,7 +99,7 @@ fn print_steps(config: &Config, session: &Session, full: bool, width: usize) -> 
     let mut output = String::new();
 
     // Group steps by action
-    for (action_idx, action) in session.actions().iter().enumerate() {
+    for (action_idx, action) in session.actions.iter().enumerate() {
         // Print action header with strategy name
         output.push_str(&format!("\n{}\n", "=".repeat(width)));
         output.push_str(&format!(

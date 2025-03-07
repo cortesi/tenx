@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use tracing::debug;
 
 use crate::{
+    checks::check_paths,
     config::Config,
     error::{Result, TenxError},
     events::{send_event, Event, EventSender},
@@ -130,14 +131,6 @@ fn process_step(
     })
 }
 
-/// Get action and validate it exists
-fn get_action(session: &Session, action_offset: usize) -> Result<&crate::session::Action> {
-    session
-        .actions()
-        .get(action_offset)
-        .ok_or_else(|| TenxError::Internal(format!("Invalid action offset: {}", action_offset)))
-}
-
 /// Determines the current state of an action
 fn get_action_state(action: &crate::session::Action) -> ActionState {
     if action.steps().is_empty() {
@@ -169,6 +162,21 @@ fn get_action_state(action: &crate::session::Action) -> ActionState {
 }
 
 impl ActionStrategy for Code {
+    fn name(&self) -> &'static str {
+        "code"
+    }
+
+    fn check(
+        &self,
+        config: &Config,
+        session: &mut Session,
+        action_offset: usize,
+        events: Option<EventSender>,
+    ) -> Result<()> {
+        let paths = session.get_action(action_offset)?.state.touched()?;
+        check_paths(config, &paths, &events)
+    }
+
     fn next_step(
         &self,
         config: &Config,
@@ -177,7 +185,7 @@ impl ActionStrategy for Code {
         events: Option<EventSender>,
         prompt: Option<String>,
     ) -> Result<ActionState> {
-        let action = get_action(session, action_offset)?;
+        let action = session.get_action(action_offset)?;
 
         if let Some(step) = action.last_step() {
             // If the last step is incomplete, don't synthesize a new step
@@ -212,12 +220,8 @@ impl ActionStrategy for Code {
         }
     }
 
-    fn name(&self) -> &'static str {
-        "code"
-    }
-
     fn state(&self, _config: &Config, session: &Session, action_offset: usize) -> ActionState {
-        match session.actions().get(action_offset) {
+        match session.actions.get(action_offset) {
             Some(action) => get_action_state(action),
             None => ActionState {
                 completion: Completion::Incomplete,
@@ -232,6 +236,17 @@ impl ActionStrategy for Fix {
         "fix"
     }
 
+    fn check(
+        &self,
+        config: &Config,
+        session: &mut Session,
+        action_offset: usize,
+        events: Option<EventSender>,
+    ) -> Result<()> {
+        let paths = session.get_action(action_offset)?.state.touched()?;
+        check_paths(config, &paths, &events)
+    }
+
     fn next_step(
         &self,
         config: &Config,
@@ -240,7 +255,7 @@ impl ActionStrategy for Fix {
         events: Option<EventSender>,
         prompt: Option<String>,
     ) -> Result<ActionState> {
-        let action = get_action(session, action_offset)?;
+        let action = session.get_action(action_offset)?;
 
         if let Some(step) = action.last_step() {
             // If the last step is incomplete, don't synthesize a new step
@@ -269,7 +284,7 @@ impl ActionStrategy for Fix {
     }
 
     fn state(&self, _config: &Config, session: &Session, action_offset: usize) -> ActionState {
-        match session.actions().get(action_offset) {
+        match session.actions.get(action_offset) {
             Some(action) => {
                 if action.steps().is_empty() {
                     return ActionState {
@@ -310,7 +325,7 @@ mod test {
             &test_project.config,
             Strategy::Code(code.clone()),
         )?)?;
-        let action_idx = session.actions().len() - 1;
+        let action_idx = session.actions.len() - 1;
 
         // Without prompt should request user input
         let state = code.next_step(&test_project.config, &mut session, action_idx, None, None)?;
@@ -376,7 +391,7 @@ mod test {
             &test_project.config,
             Strategy::Fix(fix.clone()),
         )?)?;
-        let action_idx = session.actions().len() - 1;
+        let action_idx = session.actions.len() - 1;
 
         let state = fix.next_step(
             &test_project.config,
@@ -406,7 +421,7 @@ mod test {
             &test_project.config,
             Strategy::Fix(fix2.clone()),
         )?)?;
-        let action_idx2 = session2.actions().len() - 1;
+        let action_idx2 = session2.actions.len() - 1;
 
         let state = fix2.next_step(&test_project.config, &mut session2, action_idx2, None, None)?;
         assert_eq!(state.completion, Completion::Incomplete);

@@ -5,7 +5,6 @@ use crate::{
     error::{Result, TenxError},
     events::{EventBlock, EventSender},
     exec::exec,
-    session::Session,
 };
 
 pub enum Runnable {
@@ -99,15 +98,10 @@ pub fn check_paths(
     Ok(())
 }
 
-/// Run checks on a session. If the session has no editables, run checks on all project files.
-pub fn check_session(conf: &Config, session: &Session, sender: &Option<EventSender>) -> Result<()> {
-    let editables = session.editables().to_vec();
-    let paths = if editables.is_empty() {
-        conf.project_files()?
-    } else {
-        editables
-    };
-    check_paths(conf, &paths.iter().map(PathBuf::from).collect(), sender)
+/// Run checks on all configured state files.
+pub fn check_all(conf: &Config, sender: &Option<EventSender>) -> Result<()> {
+    let state = conf.state()?;
+    check_paths(conf, &state.list()?, sender)
 }
 
 #[cfg(test)]
