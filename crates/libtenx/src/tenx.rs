@@ -386,7 +386,12 @@ impl Tenx {
             let _check_block = EventBlock::pre_check(sender)?;
             let action = session.last_action()?;
             let strategy = action.strategy.clone();
-            strategy.check(&self.config, session, session.actions.len(), sender.clone())
+            strategy.check(
+                &self.config,
+                session,
+                session.actions.len() - 1,
+                sender.clone(),
+            )
         } else {
             Ok(())
         }
@@ -396,7 +401,12 @@ impl Tenx {
         let _check_block = EventBlock::post_check(sender)?;
         let action = session.last_action()?;
         let strategy = action.strategy.clone();
-        strategy.check(&self.config, session, session.actions.len(), sender.clone())
+        strategy.check(
+            &self.config,
+            session,
+            session.actions.len() - 1,
+            sender.clone(),
+        )
     }
 }
 

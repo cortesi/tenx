@@ -1,9 +1,10 @@
 GOALS:
 
-    - Use enum-dispatch library
     - Implement markdown rendering for actions
     - pretty print
-        - unify editing and pretty print, shift into Strategy
+        - unify editing and pretty print
+            - use termimad for terminal output
+            - use markdown edit for editor context
         - more compact summary output
     - large goal: get rid of Session.steps()
         - Slow process of re-asessing each piece of code that touches this
