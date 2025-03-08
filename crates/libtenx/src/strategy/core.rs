@@ -88,7 +88,15 @@ pub trait ActionStrategy {
         _session: &mut Session,
         _action_offset: usize,
         _sender: Option<EventSender>,
-    ) -> Result<()> {
-        Ok(())
+    ) -> Result<()>;
+
+    /// Render the action as markdown.
+    fn markdown(
+        &self,
+        _config: &Config,
+        _session: &mut Session,
+        _action_offset: usize,
+    ) -> Result<String> {
+        unimplemented!();
     }
 }

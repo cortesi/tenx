@@ -1,10 +1,18 @@
-STATE REFACTORING:
+GOALS:
 
-    - pretty printing:
+    - Use enum-dispatch library
+    - Implement markdown rendering for actions
+    - pretty print
+        - unify editing and pretty print, shift into Strategy
         - more compact summary output
-        - Diff summary line in state
-    - Refactor Conversation interface to use actions and steps
+    - large goal: get rid of Session.steps()
+        - Slow process of re-asessing each piece of code that touches this
+    - Strategy-related storage for steps in Strategy objects
+    - Refactor Conversation interface 
     - Shift patch module into state
+    - Chat mode
+    - Agent code editor mode
+
 
 UX:
 
@@ -13,6 +21,7 @@ UX:
     - Change the name of Config::step_limit (maybe iteration_limit? auto_step_limit?)
     - We don't capture user edits in the state history. This leads to some counter-intuitive behavior.
     - indicate tenx version clearly in manual
+    - `tenx diff` for action
 
     
 Model response robustness:

@@ -1,5 +1,6 @@
+use rinja::Template;
 use serde::{Deserialize, Serialize};
-use tracing::debug;
+use tracing::debug; // bring trait in scope
 
 use crate::{
     checks::check_paths,
@@ -10,6 +11,14 @@ use crate::{
 };
 
 use super::core::*;
+
+#[derive(Template)]
+#[template(path = "code.md")]
+
+struct CodeTemplate<'a> {
+    action_offset: usize,
+    action_name: &'a str,
+}
 
 /// The Code strategy allows the model to write and modify code based on a prompt.
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
@@ -228,6 +237,19 @@ impl ActionStrategy for Code {
                 input_required: InputRequired::No,
             },
         }
+    }
+
+    fn markdown(
+        &self,
+        _config: &Config,
+        _session: &mut Session,
+        action_offset: usize,
+    ) -> Result<String> {
+        let vars = CodeTemplate {
+            action_name: self.name(),
+            action_offset,
+        };
+        Ok(vars.render().unwrap())
     }
 }
 
