@@ -10,11 +10,10 @@ use crate::{
     session::{Session, Step},
 };
 
-use super::core::*;
+use super::*;
 
 #[derive(Template)]
 #[template(path = "code.md")]
-
 struct CodeTemplate<'a> {
     action_offset: usize,
     action_name: &'a str,

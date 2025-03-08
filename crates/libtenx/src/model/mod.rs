@@ -10,6 +10,7 @@ mod google;
 mod openai;
 
 use async_trait::async_trait;
+use enum_dispatch::enum_dispatch;
 use serde::{Deserialize, Serialize};
 
 pub use claude::{Claude, ClaudeUsage};
@@ -59,6 +60,7 @@ impl Usage {
 
 /// Implemented by types that expose a prompt operation.
 #[async_trait]
+#[enum_dispatch(Model)]
 pub trait ModelProvider {
     /// Returns user-facing name of the model.
     fn name(&self) -> String;
@@ -80,54 +82,11 @@ pub trait ModelProvider {
 }
 
 /// Available model implementations that can be used for AI interactions.
+#[enum_dispatch]
 #[derive(Debug, Clone)]
 pub enum Model {
     Claude(Claude),
     OpenAi(OpenAi),
     Dummy(DummyModel),
     Google(google::Google),
-}
-
-#[async_trait]
-impl ModelProvider for Model {
-    fn name(&self) -> String {
-        match self {
-            Model::Claude(c) => c.name(),
-            Model::OpenAi(o) => o.name(),
-            Model::Dummy(d) => d.name(),
-            Model::Google(g) => g.name(),
-        }
-    }
-
-    fn api_model(&self) -> String {
-        match self {
-            Model::Claude(c) => c.api_model(),
-            Model::OpenAi(o) => o.api_model(),
-            Model::Dummy(d) => d.api_model(),
-            Model::Google(g) => g.api_model(),
-        }
-    }
-
-    async fn send(
-        &mut self,
-        config: &Config,
-        session: &Session,
-        sender: Option<EventSender>,
-    ) -> Result<ModelResponse> {
-        match self {
-            Model::Claude(c) => c.send(config, session, sender).await,
-            Model::OpenAi(o) => o.send(config, session, sender).await,
-            Model::Dummy(d) => d.send(config, session, sender).await,
-            Model::Google(g) => g.send(config, session, sender).await,
-        }
-    }
-
-    fn render(&self, config: &Config, session: &Session) -> Result<String> {
-        match self {
-            Model::Claude(c) => c.render(config, session),
-            Model::OpenAi(o) => o.render(config, session),
-            Model::Dummy(d) => d.render(config, session),
-            Model::Google(g) => g.render(config, session),
-        }
-    }
 }
