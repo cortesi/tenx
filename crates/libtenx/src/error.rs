@@ -83,6 +83,12 @@ impl TenxError {
     }
 }
 
+impl From<rinja::Error> for TenxError {
+    fn from(error: rinja::Error) -> Self {
+        TenxError::Internal(error.to_string())
+    }
+}
+
 impl From<std::io::Error> for TenxError {
     fn from(error: std::io::Error) -> Self {
         TenxError::Io(error.to_string())

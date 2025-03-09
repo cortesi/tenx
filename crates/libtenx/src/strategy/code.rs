@@ -1,6 +1,6 @@
 use rinja::Template;
 use serde::{Deserialize, Serialize};
-use tracing::debug; // bring trait in scope
+use tracing::debug;
 
 use crate::{
     checks::check_paths,

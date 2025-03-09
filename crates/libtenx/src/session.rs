@@ -1,6 +1,7 @@
 //! Session is the context and a sequence of model interaction steps.
 use std::path::PathBuf;
 
+use rinja::Template;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -8,7 +9,8 @@ use crate::{
     error::{Result, TenxError},
     model::Usage,
     patch::Patch,
-    state, strategy,
+    state,
+    strategy::{self, ActionStrategy},
 };
 
 /// A parsed model response
@@ -112,6 +114,18 @@ impl Step {
     }
 }
 
+struct StepTemplate {
+    step_offset: usize,
+}
+
+#[derive(Template)]
+#[template(path = "action.md")]
+struct ActionTemplate<'a> {
+    action_offset: usize,
+    action_name: &'a str,
+    steps: Vec<StepTemplate>,
+}
+
 /// A user-requested action, which may contain many steps.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Action {
@@ -156,6 +170,21 @@ impl Action {
         step.rollback_id = rollback_id;
         self.steps.push(step);
         Ok(())
+    }
+
+    pub fn render(&self, action_offset: usize) -> Result<String> {
+        let steps = self
+            .steps
+            .iter()
+            .enumerate()
+            .map(|(step_offset, _step)| StepTemplate { step_offset })
+            .collect();
+        let template = ActionTemplate {
+            action_offset,
+            action_name: self.strategy.name(),
+            steps,
+        };
+        Ok(template.render()?)
     }
 }
 
@@ -398,6 +427,16 @@ impl Session {
         action
             .state
             .last_changed_between(prev_rollback_id, curr_rollback_id)
+    }
+
+    pub fn render(&self) -> Result<String> {
+        let actions = self
+            .actions
+            .iter()
+            .enumerate()
+            .map(|(action_offset, action)| action.render(action_offset))
+            .collect::<Result<Vec<String>>>()?;
+        Ok(actions.join("\n"))
     }
 }
 

@@ -20,6 +20,7 @@ use libtenx::{
 };
 
 mod edit;
+mod skin;
 
 /// Parse a step offset string in format "action" or "action:step" and return the parsed indices
 /// If the step is not specified (format "action"), the step index will be None.
@@ -332,13 +333,10 @@ enum Commands {
     Session {
         /// Path to a session file to load
         session_file: Option<PathBuf>,
-        /// Print the entire session object verbosely
-        #[clap(long)]
-        raw: bool,
-        /// Output the rendered session
-        #[clap(long)]
-        render: bool,
-        /// Show full details
+        /// Format to display the session in
+        #[clap(long, value_parser = ["pretty", "raw", "render", "markdown"], default_value = "pretty")]
+        fmt: String,
+        /// Show full details (only applies to 'pretty' format)
         #[clap(long)]
         full: bool,
     },
@@ -571,9 +569,8 @@ async fn main() -> anyhow::Result<()> {
                 }
                 Commands::Session {
                     session_file,
-                    raw,
-                    render,
-                    full,
+                    fmt,
+                    full: _,
                 } => {
                     let model = config.active_model()?;
                     let session = if let Some(path) = session_file {
@@ -581,12 +578,21 @@ async fn main() -> anyhow::Result<()> {
                     } else {
                         tx.load_session()?
                     };
-                    if *raw {
-                        println!("{:#?}", session);
-                    } else if *render {
-                        println!("{}", model.render(&config, &session)?);
-                    } else {
-                        println!("{}", pretty::print_session(&config, &session, *full)?);
+
+                    match fmt.as_str() {
+                        "raw" => {
+                            println!("{:#?}", session);
+                        }
+                        "render" => {
+                            println!("{}", model.render(&config, &session)?);
+                        }
+                        "markdown" => {
+                            println!("{}", session.render()?);
+                        }
+                        _ => {
+                            let skin = skin::make_skin();
+                            skin.print_text(&session.render()?);
+                        }
                     }
                     Ok(())
                 }
@@ -828,3 +834,4 @@ async fn main() -> anyhow::Result<()> {
 
     Ok(())
 }
+
