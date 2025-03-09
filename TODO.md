@@ -1,12 +1,12 @@
 GOALS:
 
-    - Implement markdown rendering for actions
+    - Implement markdown rendering for steps
+    - Shift action-specific state into strategy structs
     - pretty print
         - unify editing and pretty print
             - use termimad for terminal output
             - use markdown edit for editor context
         - more compact summary output
-    - Shift action-specific state into strategy structs
     - large goal: get rid of Session.steps()
         - Slow process of re-asessing each piece of code that touches this
     - Strategy-related storage for steps in Strategy objects

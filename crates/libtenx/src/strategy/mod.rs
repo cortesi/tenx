@@ -96,11 +96,12 @@ pub trait ActionStrategy {
     ) -> Result<()>;
 
     /// Render the action as markdown.
-    fn markdown(
+    fn step_markdown(
         &self,
         _config: &Config,
-        _session: &mut Session,
+        _session: &Session,
         _action_offset: usize,
+        _step_offset: usize,
     ) -> Result<String> {
         unimplemented!();
     }

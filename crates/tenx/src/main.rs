@@ -587,11 +587,11 @@ async fn main() -> anyhow::Result<()> {
                             println!("{}", model.render(&config, &session)?);
                         }
                         "markdown" => {
-                            println!("{}", session.render()?);
+                            println!("{}", session.markdown(&config)?);
                         }
                         _ => {
                             let skin = skin::make_skin();
-                            skin.print_text(&session.render()?);
+                            skin.print_text(&session.markdown(&config)?);
                         }
                     }
                     Ok(())

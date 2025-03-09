@@ -13,10 +13,9 @@ use crate::{
 use super::*;
 
 #[derive(Template)]
-#[template(path = "code.md")]
-struct CodeTemplate<'a> {
-    action_offset: usize,
-    action_name: &'a str,
+#[template(path = "code_step.md")]
+struct CodeStepTemplate<'a> {
+    comment: &'a str,
 }
 
 /// The Code strategy allows the model to write and modify code based on a prompt.
@@ -238,15 +237,16 @@ impl ActionStrategy for Code {
         }
     }
 
-    fn markdown(
+    fn step_markdown(
         &self,
         _config: &Config,
-        _session: &mut Session,
+        session: &Session,
         action_offset: usize,
+        step_offset: usize,
     ) -> Result<String> {
-        let vars = CodeTemplate {
-            action_name: self.name(),
-            action_offset,
+        let step = session.get_action(action_offset)?.steps()[step_offset].clone();
+        let vars = CodeStepTemplate {
+            comment: &step.raw_prompt,
         };
         Ok(vars.render().unwrap())
     }

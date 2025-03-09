@@ -116,6 +116,7 @@ impl Step {
 
 struct StepTemplate {
     step_offset: usize,
+    body: String,
 }
 
 #[derive(Template)]
@@ -172,12 +173,23 @@ impl Action {
         Ok(())
     }
 
-    pub fn render(&self, action_offset: usize) -> Result<String> {
+    pub fn markdown(
+        &self,
+        config: &config::Config,
+        session: &Session,
+        action_offset: usize,
+    ) -> Result<String> {
         let steps = self
             .steps
             .iter()
             .enumerate()
-            .map(|(step_offset, _step)| StepTemplate { step_offset })
+            .map(|(step_offset, _step)| {
+                let body = self
+                    .strategy
+                    .step_markdown(config, session, action_offset, step_offset)
+                    .unwrap();
+                StepTemplate { step_offset, body }
+            })
             .collect();
         let template = ActionTemplate {
             action_offset,
@@ -429,12 +441,12 @@ impl Session {
             .last_changed_between(prev_rollback_id, curr_rollback_id)
     }
 
-    pub fn render(&self) -> Result<String> {
+    pub fn markdown(&self, config: &config::Config) -> Result<String> {
         let actions = self
             .actions
             .iter()
             .enumerate()
-            .map(|(action_offset, action)| action.render(action_offset))
+            .map(|(action_offset, action)| action.markdown(config, self, action_offset))
             .collect::<Result<Vec<String>>>()?;
         Ok(actions.join("\n"))
     }
