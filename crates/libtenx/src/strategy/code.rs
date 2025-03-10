@@ -16,6 +16,22 @@ use super::*;
 #[template(path = "code_step.md")]
 struct CodeStepTemplate<'a> {
     comment: &'a str,
+    error: Option<String>,
+}
+
+fn step_markdown(
+    _config: &Config,
+    session: &Session,
+    action_offset: usize,
+    step_offset: usize,
+) -> Result<String> {
+    let step = session.get_action(action_offset)?.steps()[step_offset].clone();
+    let error = step.err.as_ref().map(|err| format!("{}", err));
+    let vars = CodeStepTemplate {
+        comment: &step.raw_prompt,
+        error,
+    };
+    Ok(vars.render().unwrap())
 }
 
 /// The Code strategy allows the model to write and modify code based on a prompt.
@@ -244,11 +260,7 @@ impl ActionStrategy for Code {
         action_offset: usize,
         step_offset: usize,
     ) -> Result<String> {
-        let step = session.get_action(action_offset)?.steps()[step_offset].clone();
-        let vars = CodeStepTemplate {
-            comment: &step.raw_prompt,
-        };
-        Ok(vars.render().unwrap())
+        step_markdown(_config, session, action_offset, step_offset)
     }
 }
 
@@ -321,6 +333,16 @@ impl ActionStrategy for Fix {
                 input_required: InputRequired::No,
             },
         }
+    }
+
+    fn step_markdown(
+        &self,
+        _config: &Config,
+        session: &Session,
+        action_offset: usize,
+        step_offset: usize,
+    ) -> Result<String> {
+        step_markdown(_config, session, action_offset, step_offset)
     }
 }
 

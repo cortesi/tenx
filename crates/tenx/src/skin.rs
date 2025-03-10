@@ -7,8 +7,9 @@ pub fn make_skin() -> MadSkin {
         .with(Attribute::Bold)
         .with(Attribute::DoubleUnderlined);
     for header in skin.headers.iter_mut().skip(1) {
-        header.left_margin = 2;
+        header.compound_style.object_style.attributes = Attributes::default().with(Attribute::Bold);
     }
     skin.headers[0].align = Alignment::Left;
+    skin.table.align = Alignment::Left;
     skin
 }
