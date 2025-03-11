@@ -168,6 +168,20 @@ impl Action {
         renderer: &mut R,
     ) -> Result<()> {
         renderer.push(&format!("{}: {}", action_offset, self.strategy.name()));
+
+        // Add list of touched files if there are any
+        if let Ok(touched_files) = self.state.touched() {
+            if !touched_files.is_empty() {
+                renderer.push("files");
+                let file_strings: Vec<String> = touched_files
+                    .iter()
+                    .map(|path| path.to_string_lossy().to_string())
+                    .collect();
+                renderer.bullets(file_strings);
+                renderer.pop();
+            }
+        }
+
         for (step_offset, _) in self.steps.iter().enumerate() {
             self.strategy
                 .render(config, session, action_offset, step_offset, renderer)?;
