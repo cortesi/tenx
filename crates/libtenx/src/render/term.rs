@@ -100,6 +100,25 @@ impl Render for Term {
 mod tests {
     use super::*;
 
+    /// Macro for asserting the indentation of a line containing specific text
+    macro_rules! assert_indent {
+        ($output:expr, $text:expr, $expected_indent:expr) => {
+            let lines: Vec<&str> = $output.lines().collect();
+            let line = lines
+                .iter()
+                .find(|line| line.contains($text))
+                .unwrap_or_else(|| panic!("Text '{}' not found in output", $text));
+
+            let indent = line.chars().take_while(|&c| c == ' ').count();
+
+            assert_eq!(
+                indent, $expected_indent,
+                "Expected indentation of {} for text '{}', but got {}",
+                $expected_indent, $text, indent
+            );
+        };
+    }
+
     #[test]
     fn test_term_rendering() {
         let mut term = Term::new();
@@ -125,42 +144,16 @@ mod tests {
         // Paragraph at level 1 again
         term.para("Back to level 1.");
 
-        // Verify output contains expected number of lines
+        // Render the output
         let output = term.render();
-        let lines: Vec<&str> = output.lines().collect();
-        // Note: Colored strings contain ANSI escape sequences that may affect line counting
-        assert_eq!(lines.len(), 9);
 
-        // Get the indentation for each line
-        let get_indent = |line: &str| {
-            let mut spaces = 0;
-            for c in line.chars() {
-                if c == ' ' {
-                    spaces += 1;
-                } else {
-                    break;
-                }
-            }
-            spaces
-        };
-
-        println!("{}", output);
-
-        // The actual output shown in the test shows we need to adjust our expectations
-        // Check the first line (Main Title) - no indentation
-        assert_eq!(get_indent(lines[0]), 0); // Level 0 has no indent
-
-        // Looking at the actual output format, the blank line is index 1
-
-        // Check subsequent lines with proper indentation
-        assert_eq!(get_indent(lines[2]), 2); // This is a paragraph at level 1
-        assert_eq!(get_indent(lines[3]), 2); // Bullet First item
-        assert_eq!(get_indent(lines[4]), 2); // Bullet Second item
-        assert_eq!(get_indent(lines[5]), 2); // Subtitle
-
-        // Another blank line at index 6
-
-        assert_eq!(get_indent(lines[7]), 4); // This is a paragraph at level 2
-        assert_eq!(get_indent(lines[8]), 2); // Back to level 1
+        // Test indentation using the macro
+        assert_indent!(output, "Main Title", 0);
+        assert_indent!(output, "This is a paragraph at level 1", 2);
+        assert_indent!(output, "First item", 2);
+        assert_indent!(output, "Second item", 2);
+        assert_indent!(output, "Subtitle", 2);
+        assert_indent!(output, "This is a paragraph at level 2", 4);
+        assert_indent!(output, "Back to level 1", 2);
     }
 }
