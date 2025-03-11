@@ -12,7 +12,6 @@ use libtenx::{
     self,
     event_consumers::{self, discard_events, output_logs, output_progress},
     events::Event,
-    pretty,
     session::Session,
     session_store::SessionStore,
 };
@@ -425,10 +424,13 @@ async fn main() -> anyhow::Result<()> {
                         if session_flag {
                             println!("\n{}", "-".repeat(80));
                             println!("Session for {} - {}:", report.model_name.blue(), trial.name);
-                            println!(
-                                "{}",
-                                pretty::print_session(&trial.tenx_conf, &session, true)?
-                            );
+
+                            // Use the Term renderer to render the session
+                            let mut renderer = libtenx::render::Term::new();
+
+                            let config = libtenx::config::Config::default();
+                            session.render(&config, &mut renderer)?;
+                            println!("{}", renderer.render());
                         }
                         reports.push(report);
                     }

@@ -258,7 +258,7 @@ impl Session {
 
     /// Does this session have a pending prompt?
     pub fn should_continue(&self) -> bool {
-        if let Some(step) = self.steps().last() {
+        if let Some(step) = self.last_step() {
             step.model_response.is_none() && step.err.is_none()
         } else {
             false
