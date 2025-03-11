@@ -19,7 +19,7 @@ const H2_FG: &str = "#268bd2";
 /// Background color for level 2 headers
 const H2_BG: &str = "";
 /// Color for level 3+ headers
-const H3_FG: &str = "#00B4B4";
+const H3_FG: &str = "#2aa198";
 /// Background color for level 3+ headers
 const H3_BG: &str = "";
 

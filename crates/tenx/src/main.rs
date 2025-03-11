@@ -14,7 +14,6 @@ use libtenx::{
     error, event_consumers,
     events::Event,
     model::ModelProvider,
-    pretty,
     session::Session,
     tenx::Tenx,
 };
@@ -118,18 +117,6 @@ struct Cli {
     #[clap(long)]
     no_color: bool,
 
-    // FIXME: Disable these for now
-    // /// Smart mode for the Tags dialect
-    // #[clap(long)]
-    // tags_smart: Option<bool>,
-    //
-    // /// Replace mode for the Tags dialect
-    // #[clap(long)]
-    // tags_replace: Option<bool>,
-    //
-    // /// Udiff mode for the Tags dialect
-    // #[clap(long)]
-    // tags_udiff: Option<bool>,
     /// Enable a specific check
     #[clap(long)]
     check: Vec<String>,
@@ -444,7 +431,8 @@ async fn main() -> anyhow::Result<()> {
                     Ok(()) as anyhow::Result<()>
                 }
                 Commands::Project => {
-                    print!("{}", pretty::print_project(&config));
+                    // FIXME: Implement this
+                    // print!("{}", pretty::print_project(&config));
                     Ok(())
                 }
                 Commands::Files { pattern } => {
@@ -647,7 +635,8 @@ async fn main() -> anyhow::Result<()> {
                                 println!("No contexts in session");
                                 return Ok(());
                             }
-                            println!("{}", pretty::print_contexts(&config, &session)?);
+                            // FIXME: Implement this
+                            //println!("{}", pretty::print_contexts(&config, &session)?);
                             return Ok(());
                         }
                     };
@@ -673,10 +662,7 @@ async fn main() -> anyhow::Result<()> {
 
                         tx.reset(&mut session, action_idx, step_idx)?;
 
-                        println!(
-                            "Session reset to step {}",
-                            pretty::render_step_offset(action_idx, step_idx)
-                        );
+                        println!("Session reset to step {}", offset_str);
                     }
                     Ok(())
                 }
@@ -715,7 +701,10 @@ async fn main() -> anyhow::Result<()> {
                         .await?;
                     tx.save_session(&session)?;
 
-                    println!("{}", pretty::print_session(&config, &session, false)?);
+                    let mut renderer = libtenx::render::Term::new();
+                    session.render(&config, &mut renderer)?;
+                    println!("{}", renderer.render());
+
                     Ok(())
                 }
                 Commands::Fix {
