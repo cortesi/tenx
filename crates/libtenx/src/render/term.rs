@@ -10,15 +10,28 @@ const INDENT_SPACES: usize = 2;
 /// Bullet character used in lists
 const BULLET_CHAR: &str = "•";
 
-/// Color for level 1 headers
-const H1: &str = "#00D2D2";
+/// Foreground color for level 1 headers
+const H1_FG: &str = "#b58900";
+/// Background color for level 1 headers
+const H1_BG: &str = "#073642";
 /// Color for level 2 headers
-const H2: &str = "#00B4B4";
+const H2_FG: &str = "#268bd2";
+/// Background color for level 2 headers
+const H2_BG: &str = "";
 /// Color for level 3+ headers
-const H3: &str = "#FFCC00";
+const H3_FG: &str = "#00B4B4";
+/// Background color for level 3+ headers
+const H3_BG: &str = "";
 
 /// Default width when not in a terminal
 const DEFAULT_WIDTH: usize = 100;
+
+fn right_pad(s: &str, width: usize) -> String {
+    let mut padded = s.to_string();
+    let padding = width.saturating_sub(s.len());
+    padded.push_str(&" ".repeat(padding));
+    padded
+}
 
 /// Convert a hex color string (#RRGGBB) to a CustomColor
 fn hex_to_custom_color(hex: &str) -> CustomColor {
@@ -71,22 +84,46 @@ impl Default for Term {
 }
 
 impl Render for Term {
+    #[allow(clippy::const_is_empty)]
     fn push(&mut self, text: &str) {
-        let header = match self.level {
-            0 => text
-                .bold()
-                .custom_color(hex_to_custom_color(H1))
-                .underline()
-                .to_string(),
-            1 => text.custom_color(hex_to_custom_color(H2)).to_string(),
-            _ => text
-                .bold()
-                .custom_color(hex_to_custom_color(H3))
-                .to_string(),
+        // Calculate the available width for wrapping text
+        let indent_width = self.level * INDENT_SPACES;
+        let available_width = if self.width > indent_width {
+            self.width - indent_width
+        } else {
+            self.width
         };
-        let header = format!("{}\n", header);
+        let text = right_pad(text, available_width - indent_width);
 
-        self.add_indented(&header);
+        let styled_text = match self.level {
+            0 => {
+                let mut styled = text.bold().custom_color(hex_to_custom_color(H1_FG));
+                let has_bg = !H1_BG.is_empty();
+                if has_bg {
+                    styled = styled.on_custom_color(hex_to_custom_color(H1_BG));
+                }
+                styled.to_string()
+            }
+            1 => {
+                let mut styled = text.custom_color(hex_to_custom_color(H2_FG));
+                let has_bg = !H2_BG.is_empty();
+                if has_bg {
+                    styled = styled.on_custom_color(hex_to_custom_color(H2_BG));
+                }
+                styled.to_string()
+            }
+            _ => {
+                let mut styled = text.bold().custom_color(hex_to_custom_color(H3_FG));
+                let has_bg = !H3_BG.is_empty();
+                if has_bg {
+                    styled = styled.on_custom_color(hex_to_custom_color(H3_BG));
+                }
+                styled.to_string()
+            }
+        };
+
+        // Wrap the header text
+        self.add_indented(&styled_text);
         self.level += 1;
     }
 

@@ -239,21 +239,25 @@ impl ActionStrategy for Code {
         renderer: &mut R,
     ) -> Result<()> {
         let step = session.get_action(action_offset)?.steps()[step_offset].clone();
+        renderer.push(&format!("step {}:{}", action_offset, step_offset));
 
-        renderer.push(&format!("Step {}", step_offset));
-
-        // Add prompt
-        renderer.para(&format!("Prompt: {}", step.raw_prompt));
+        renderer.push("prompt");
+        renderer.para(&step.raw_prompt);
+        renderer.pop();
 
         // Add error if present
         if let Some(err) = &step.err {
-            renderer.para(&format!("Error: {}", err));
+            renderer.push("error");
+            renderer.para(&err.to_string());
+            renderer.pop();
         }
 
         // Add comment from model response if present
         if let Some(model_response) = &step.model_response {
             if let Some(comment) = &model_response.comment {
-                renderer.para(&format!("Comment: {}", comment));
+                renderer.push("model comment");
+                renderer.para(comment);
+                renderer.pop();
             }
         }
 
@@ -266,13 +270,9 @@ impl ActionStrategy for Code {
                     .map(|(change, err)| format!("Failed to apply {:?}: {}", change, err))
                     .collect();
 
-                renderer.para("Patch failures:");
+                renderer.push("Patch failures:");
                 renderer.bullets(failure_messages);
-            } else {
-                renderer.para(&format!(
-                    "Successfully applied {} changes",
-                    patch_info.succeeded
-                ));
+                renderer.pop();
             }
         }
 

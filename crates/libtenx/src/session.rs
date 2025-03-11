@@ -167,17 +167,11 @@ impl Action {
         action_offset: usize,
         renderer: &mut R,
     ) -> Result<()> {
-        renderer.push(&format!(
-            "Action {}: {}",
-            action_offset,
-            self.strategy.name()
-        ));
-
+        renderer.push(&format!("{}: {}", action_offset, self.strategy.name()));
         for (step_offset, _) in self.steps.iter().enumerate() {
             self.strategy
                 .render(config, session, action_offset, step_offset, renderer)?;
         }
-
         renderer.pop();
         Ok(())
     }
