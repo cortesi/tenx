@@ -114,4 +114,3 @@ pub enum Strategy {
     Code(Code),
     Fix(Fix),
 }
-
