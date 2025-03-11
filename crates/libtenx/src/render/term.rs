@@ -1,5 +1,7 @@
 use colored::CustomColor;
 use colored::*;
+use terminal_size::{terminal_size, Height, Width};
+use textwrap;
 
 use super::*;
 
@@ -14,6 +16,9 @@ const H1: &str = "#00D2D2";
 const H2: &str = "#00B4B4";
 /// Color for level 3+ headers
 const H3: &str = "#FFCC00";
+
+/// Default width when not in a terminal
+const DEFAULT_WIDTH: usize = 100;
 
 /// Convert a hex color string (#RRGGBB) to a CustomColor
 fn hex_to_custom_color(hex: &str) -> CustomColor {
@@ -31,13 +36,20 @@ fn hex_to_custom_color(hex: &str) -> CustomColor {
 pub struct Term {
     level: usize,
     parts: Vec<String>,
+    width: usize,
 }
 
 impl Term {
     pub fn new() -> Self {
+        // Get terminal width using terminal_size crate
+        let width = terminal_size()
+            .map(|(Width(w), Height(_))| w as usize)
+            .unwrap_or(DEFAULT_WIDTH);
+
         Self {
             level: 0,
             parts: Vec::new(),
+            width,
         }
     }
 
@@ -85,14 +97,58 @@ impl Render for Term {
     }
 
     fn para(&mut self, text: &str) {
-        self.add_indented(text);
+        // Calculate the available width for wrapping text
+        // Account for indentation to prevent text from wrapping incorrectly
+        let indent_width = self.level * INDENT_SPACES;
+        let available_width = if self.width > indent_width {
+            self.width - indent_width
+        } else {
+            self.width
+        };
+
+        // Wrap the text to the available width
+        let wrapped_text = textwrap::fill(text, available_width);
+
+        // Add each wrapped line with proper indentation
+        for line in wrapped_text.lines() {
+            self.add_indented(line);
+        }
+
+        // Add an extra newline
+        self.parts.push("".to_string());
     }
 
     fn bullets(&mut self, items: Vec<String>) {
+        // Calculate the available width for wrapping text, accounting for indentation
+        let indent_width = self.level * INDENT_SPACES;
+        let bullet_prefix_width = 2; // BULLET_CHAR plus space
+        let available_width = if self.width > (indent_width + bullet_prefix_width) {
+            self.width - indent_width - bullet_prefix_width
+        } else {
+            self.width
+        };
+
         for item in items {
-            let bullet_line = format!("{} {}", BULLET_CHAR, item);
-            self.add_indented(&bullet_line);
+            // Wrap the bullet item text
+            let wrapped_text = textwrap::fill(&item, available_width);
+            let wrapped_lines: Vec<&str> = wrapped_text.lines().collect();
+
+            // First line with bullet
+            if !wrapped_lines.is_empty() {
+                let first_line = format!("{} {}", BULLET_CHAR, wrapped_lines[0]);
+                self.add_indented(&first_line);
+
+                // Subsequent lines with indent aligned with text after bullet
+                let continuation_indent = " ".repeat(bullet_prefix_width);
+                for line in wrapped_lines.iter().skip(1) {
+                    let indented_line = format!("{}{}", continuation_indent, line);
+                    self.add_indented(&indented_line);
+                }
+            }
         }
+
+        // Add an extra newline after all bullets
+        self.parts.push("".to_string());
     }
 }
 
