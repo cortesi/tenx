@@ -1,7 +1,6 @@
 //! Session is the context and a sequence of model interaction steps.
 use std::path::PathBuf;
 
-use rinja::Template;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -114,19 +113,6 @@ impl Step {
     }
 }
 
-struct StepTemplate {
-    step_offset: usize,
-    body: String,
-}
-
-#[derive(Template)]
-#[template(path = "action.md")]
-struct ActionTemplate<'a> {
-    action_offset: usize,
-    action_name: &'a str,
-    steps: Vec<StepTemplate>,
-}
-
 /// A user-requested action, which may contain many steps.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Action {
@@ -173,32 +159,6 @@ impl Action {
         Ok(())
     }
 
-    pub fn markdown(
-        &self,
-        config: &config::Config,
-        session: &Session,
-        action_offset: usize,
-    ) -> Result<String> {
-        let steps = self
-            .steps
-            .iter()
-            .enumerate()
-            .map(|(step_offset, _step)| {
-                let body = self
-                    .strategy
-                    .step_markdown(config, session, action_offset, step_offset)
-                    .unwrap();
-                StepTemplate { step_offset, body }
-            })
-            .collect();
-        let template = ActionTemplate {
-            action_offset,
-            action_name: self.strategy.name(),
-            steps,
-        };
-        Ok(template.render()?)
-    }
-
     /// Render the action using the provided renderer
     pub fn render<R: crate::render::Render>(
         &self,
@@ -207,12 +167,17 @@ impl Action {
         action_offset: usize,
         renderer: &mut R,
     ) -> Result<()> {
-        renderer.push(&format!("Action {}: {}", action_offset, self.strategy.name()));
-        
+        renderer.push(&format!(
+            "Action {}: {}",
+            action_offset,
+            self.strategy.name()
+        ));
+
         for (step_offset, _) in self.steps.iter().enumerate() {
-            self.strategy.render(config, session, action_offset, step_offset, renderer)?;
+            self.strategy
+                .render(config, session, action_offset, step_offset, renderer)?;
         }
-        
+
         renderer.pop();
         Ok(())
     }
@@ -459,18 +424,12 @@ impl Session {
             .last_changed_between(prev_rollback_id, curr_rollback_id)
     }
 
-    pub fn markdown(&self, config: &config::Config) -> Result<String> {
-        let actions = self
-            .actions
-            .iter()
-            .enumerate()
-            .map(|(action_offset, action)| action.markdown(config, self, action_offset))
-            .collect::<Result<Vec<String>>>()?;
-        Ok(actions.join("\n"))
-    }
-
     /// Render the session using the provided renderer
-    pub fn render<R: crate::render::Render>(&self, config: &config::Config, renderer: &mut R) -> Result<()> {
+    pub fn render<R: crate::render::Render>(
+        &self,
+        config: &config::Config,
+        renderer: &mut R,
+    ) -> Result<()> {
         for (action_offset, action) in self.actions.iter().enumerate() {
             action.render(config, self, action_offset, renderer)?;
         }
@@ -560,3 +519,4 @@ mod tests {
         Ok(())
     }
 }
+

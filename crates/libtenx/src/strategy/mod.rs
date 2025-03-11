@@ -95,17 +95,6 @@ pub trait ActionStrategy {
         _sender: Option<EventSender>,
     ) -> Result<()>;
 
-    /// Render the action as markdown.
-    fn step_markdown(
-        &self,
-        _config: &Config,
-        _session: &Session,
-        _action_offset: usize,
-        _step_offset: usize,
-    ) -> Result<String> {
-        unimplemented!();
-    }
-
     /// Render a step using the provided renderer
     fn render<R: crate::render::Render>(
         &self,
@@ -125,3 +114,4 @@ pub enum Strategy {
     Code(Code),
     Fix(Fix),
 }
+

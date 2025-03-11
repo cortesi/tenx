@@ -333,7 +333,7 @@ enum Commands {
         /// Path to a session file to load
         session_file: Option<PathBuf>,
         /// Format to display the session in
-        #[clap(long, value_parser = ["pretty", "raw", "render", "markdown"], default_value = "pretty")]
+        #[clap(long, value_parser = ["pretty", "raw", "render"], default_value = "pretty")]
         fmt: String,
         /// Show full details (only applies to 'pretty' format)
         #[clap(long)]
@@ -584,9 +584,6 @@ async fn main() -> anyhow::Result<()> {
                         }
                         "render" => {
                             println!("{}", model.render(&config, &session)?);
-                        }
-                        "markdown" => {
-                            println!("{}", session.markdown(&config)?);
                         }
                         _ => {
                             // Use the Term renderer to render the session

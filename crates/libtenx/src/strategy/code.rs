@@ -1,4 +1,3 @@
-use rinja::Template;
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 
@@ -11,28 +10,6 @@ use crate::{
 };
 
 use super::*;
-
-#[derive(Template)]
-#[template(path = "code_step.md")]
-struct CodeStepTemplate<'a> {
-    comment: &'a str,
-    error: Option<String>,
-}
-
-fn step_markdown(
-    _config: &Config,
-    session: &Session,
-    action_offset: usize,
-    step_offset: usize,
-) -> Result<String> {
-    let step = session.get_action(action_offset)?.steps()[step_offset].clone();
-    let error = step.err.as_ref().map(|err| format!("{}", err));
-    let vars = CodeStepTemplate {
-        comment: &step.raw_prompt,
-        error,
-    };
-    Ok(vars.render().unwrap())
-}
 
 /// The Code strategy allows the model to write and modify code based on a prompt.
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
@@ -253,16 +230,6 @@ impl ActionStrategy for Code {
         }
     }
 
-    fn step_markdown(
-        &self,
-        _config: &Config,
-        session: &Session,
-        action_offset: usize,
-        step_offset: usize,
-    ) -> Result<String> {
-        step_markdown(_config, session, action_offset, step_offset)
-    }
-
     fn render<R: crate::render::Render>(
         &self,
         _config: &Config,
@@ -272,24 +239,24 @@ impl ActionStrategy for Code {
         renderer: &mut R,
     ) -> Result<()> {
         let step = session.get_action(action_offset)?.steps()[step_offset].clone();
-        
+
         renderer.push(&format!("Step {}", step_offset));
-        
+
         // Add prompt
         renderer.para(&format!("Prompt: {}", step.raw_prompt));
-        
+
         // Add error if present
         if let Some(err) = &step.err {
             renderer.para(&format!("Error: {}", err));
         }
-        
+
         // Add comment from model response if present
         if let Some(model_response) = &step.model_response {
             if let Some(comment) = &model_response.comment {
                 renderer.para(&format!("Comment: {}", comment));
             }
         }
-        
+
         // Add patch information if present
         if let Some(patch_info) = &step.patch_info {
             if !patch_info.failures.is_empty() {
@@ -298,14 +265,17 @@ impl ActionStrategy for Code {
                     .iter()
                     .map(|(change, err)| format!("Failed to apply {:?}: {}", change, err))
                     .collect();
-                
+
                 renderer.para("Patch failures:");
                 renderer.bullets(failure_messages);
             } else {
-                renderer.para(&format!("Successfully applied {} changes", patch_info.succeeded));
+                renderer.para(&format!(
+                    "Successfully applied {} changes",
+                    patch_info.succeeded
+                ));
             }
         }
-        
+
         renderer.pop();
         Ok(())
     }
@@ -382,16 +352,6 @@ impl ActionStrategy for Fix {
         }
     }
 
-    fn step_markdown(
-        &self,
-        _config: &Config,
-        session: &Session,
-        action_offset: usize,
-        step_offset: usize,
-    ) -> Result<String> {
-        step_markdown(_config, session, action_offset, step_offset)
-    }
-    
     fn render<R: crate::render::Render>(
         &self,
         _config: &Config,
@@ -401,29 +361,29 @@ impl ActionStrategy for Fix {
         renderer: &mut R,
     ) -> Result<()> {
         let step = session.get_action(action_offset)?.steps()[step_offset].clone();
-        
+
         renderer.push(&format!("Step {}", step_offset));
-        
+
         // If it's the first step, show the error we're fixing
         if step_offset == 0 {
             renderer.para(&format!("Fixing error: {}", self.error));
         }
-        
+
         // Add prompt
         renderer.para(&format!("Prompt: {}", step.raw_prompt));
-        
+
         // Add error if present
         if let Some(err) = &step.err {
             renderer.para(&format!("Error: {}", err));
         }
-        
+
         // Add comment from model response if present
         if let Some(model_response) = &step.model_response {
             if let Some(comment) = &model_response.comment {
                 renderer.para(&format!("Comment: {}", comment));
             }
         }
-        
+
         // Add patch information if present
         if let Some(patch_info) = &step.patch_info {
             if !patch_info.failures.is_empty() {
@@ -432,14 +392,17 @@ impl ActionStrategy for Fix {
                     .iter()
                     .map(|(change, err)| format!("Failed to apply {:?}: {}", change, err))
                     .collect();
-                
+
                 renderer.para("Patch failures:");
                 renderer.bullets(failure_messages);
             } else {
-                renderer.para(&format!("Successfully applied {} changes", patch_info.succeeded));
+                renderer.para(&format!(
+                    "Successfully applied {} changes",
+                    patch_info.succeeded
+                ));
             }
         }
-        
+
         renderer.pop();
         Ok(())
     }
@@ -575,3 +538,4 @@ mod test {
         Ok(())
     }
 }
+
