@@ -20,7 +20,6 @@ use libtenx::{
 };
 
 mod edit;
-mod skin;
 
 /// Parse a step offset string in format "action" or "action:step" and return the parsed indices
 /// If the step is not specified (format "action"), the step index will be None.
@@ -590,8 +589,10 @@ async fn main() -> anyhow::Result<()> {
                             println!("{}", session.markdown(&config)?);
                         }
                         _ => {
-                            let skin = skin::make_skin();
-                            skin.print_text(&session.markdown(&config)?);
+                            // Use the Term renderer to render the session
+                            let mut renderer = libtenx::render::Term::new();
+                            session.render(&config, &mut renderer)?;
+                            println!("{}", renderer.render());
                         }
                     }
                     Ok(())
@@ -834,3 +835,4 @@ async fn main() -> anyhow::Result<()> {
 
     Ok(())
 }
+

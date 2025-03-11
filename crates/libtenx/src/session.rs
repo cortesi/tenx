@@ -198,6 +198,24 @@ impl Action {
         };
         Ok(template.render()?)
     }
+
+    /// Render the action using the provided renderer
+    pub fn render<R: crate::render::Render>(
+        &self,
+        config: &config::Config,
+        session: &Session,
+        action_offset: usize,
+        renderer: &mut R,
+    ) -> Result<()> {
+        renderer.push(&format!("Action {}: {}", action_offset, self.strategy.name()));
+        
+        for (step_offset, _) in self.steps.iter().enumerate() {
+            self.strategy.render(config, session, action_offset, step_offset, renderer)?;
+        }
+        
+        renderer.pop();
+        Ok(())
+    }
 }
 
 /// A serializable session, which persists between invocations.
@@ -449,6 +467,14 @@ impl Session {
             .map(|(action_offset, action)| action.markdown(config, self, action_offset))
             .collect::<Result<Vec<String>>>()?;
         Ok(actions.join("\n"))
+    }
+
+    /// Render the session using the provided renderer
+    pub fn render<R: crate::render::Render>(&self, config: &config::Config, renderer: &mut R) -> Result<()> {
+        for (action_offset, action) in self.actions.iter().enumerate() {
+            action.render(config, self, action_offset, renderer)?;
+        }
+        Ok(())
     }
 }
 

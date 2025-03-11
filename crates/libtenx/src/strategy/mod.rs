@@ -105,6 +105,18 @@ pub trait ActionStrategy {
     ) -> Result<String> {
         unimplemented!();
     }
+
+    /// Render a step using the provided renderer
+    fn render<R: crate::render::Render>(
+        &self,
+        _config: &Config,
+        _session: &Session,
+        _action_offset: usize,
+        _step_offset: usize,
+        _renderer: &mut R,
+    ) -> Result<()> {
+        unimplemented!();
+    }
 }
 
 #[enum_dispatch]
