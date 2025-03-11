@@ -1,9 +1,11 @@
 GOALS:
 
     - Shift action-specific state into strategy structs
+        - Create action-specific state enum
     - pretty print
         - unify editing and pretty print
         - more compact summary output
+        - verbose output
     - large goal: get rid of Session.steps()
         - Slow process of re-asessing each piece of code that touches this
     - Refactor Conversation interface 
@@ -14,6 +16,7 @@ GOALS:
 
 UX:
 
+    - filter logs for output to only tenx
     - execute pre-checks before asking the user for input
     - audio cues for model responses and completion
     - Change the name of Config::step_limit (maybe iteration_limit? auto_step_limit?)

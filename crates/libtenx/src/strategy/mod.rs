@@ -61,7 +61,7 @@ pub trait ActionStrategy {
     fn name(&self) -> &'static str;
 
     /// Given a session and action offset, calculate the next step. This may involve complex actions like executing
-    /// checks, making external requests. If a new step is needed, it synthesizes and adds it to the action.
+    /// checks, making external requests. If a new step is needed, the strategy creates it and adds it to the action.
     /// The action's steps may currently be empty, in which case the first step is synthesized.
     ///
     /// Returns the updated action state, which indicates whether more steps are needed and whether user input is required.
@@ -113,4 +113,9 @@ pub trait ActionStrategy {
 pub enum Strategy {
     Code(Code),
     Fix(Fix),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum StrategyStep {
+    Code(CodeStep),
 }

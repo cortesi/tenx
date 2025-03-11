@@ -4,12 +4,23 @@ use tracing::debug;
 use crate::{
     checks::check_paths,
     config::Config,
-    error::{Result, TenxError},
+    error::Result,
     events::{send_event, Event, EventSender},
     session::{Session, Step},
 };
 
 use super::*;
+
+/// Shared step data for Code and Fix strategies.
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+pub struct CodeStep {}
+
+impl CodeStep {
+    /// Creates a new CodeStep instance.
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
 
 /// The Code strategy allows the model to write and modify code based on a prompt.
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
@@ -25,13 +36,15 @@ impl Code {
 /// The Fix strategy is used to resolve errors in code by providing the model with error details.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Fix {
-    error: TenxError,
+    error: String,
 }
 
 impl Fix {
     /// Creates a new Fix strategy with the specified error.
-    pub fn new(error: TenxError) -> Self {
-        Self { error }
+    pub fn new(error: &str) -> Self {
+        Self {
+            error: String::from(error),
+        }
     }
 }
 
@@ -92,7 +105,7 @@ fn process_step(
         )?;
         debug!("Next step, based on errors and/or patch failures");
 
-        let new_step = Step::new(model, model_message);
+        let new_step = Step::new(model, model_message, StrategyStep::Code(CodeStep::new()));
         session.last_action_mut()?.add_step(new_step)?;
 
         return Ok(ActionState {
@@ -114,7 +127,7 @@ fn process_step(
             )?;
             debug!("Next step, based on operations");
 
-            let new_step = Step::new(model, model_message);
+            let new_step = Step::new(model, model_message, StrategyStep::Code(CodeStep::new()));
             session.last_action_mut()?.add_step(new_step)?;
 
             return Ok(ActionState {
@@ -203,7 +216,7 @@ impl ActionStrategy for Code {
             // First step in the action
             if let Some(p) = prompt {
                 let model = config.models.default.clone();
-                let new_step = Step::new(model, p);
+                let new_step = Step::new(model, p, StrategyStep::Code(CodeStep::new()));
                 session.last_action_mut()?.add_step(new_step)?;
 
                 Ok(ActionState {
@@ -322,8 +335,12 @@ impl ActionStrategy for Fix {
         } else {
             // First step in the action
             let model = config.models.default.clone();
-            let default_prompt = "Please fix the following errors.".to_string();
-            let new_step = Step::new(model, prompt.unwrap_or(default_prompt));
+            let default_prompt = format! {"Please fix the following errors: {}\n", self.error};
+            let new_step = Step::new(
+                model,
+                prompt.unwrap_or(default_prompt),
+                StrategyStep::Code(CodeStep::new()),
+            );
             session.last_action_mut()?.add_step(new_step)?;
 
             Ok(ActionState {
@@ -411,6 +428,7 @@ impl ActionStrategy for Fix {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::error::TenxError;
     use crate::session::Action;
     use crate::strategy::Strategy;
     use crate::testutils::test_project;
@@ -452,6 +470,7 @@ mod test {
         session.last_action_mut()?.add_step(Step::new(
             test_project.config.models.default.clone(),
             "Test".into(),
+            StrategyStep::Code(CodeStep::new()),
         ))?;
         let patch_err = TenxError::Patch {
             user: "Error".into(),
@@ -486,7 +505,7 @@ mod test {
         let mut session = Session::new(&test_project.config)?;
 
         // Empty session should return an error now
-        let fix = Fix::new(TenxError::Config("Error".into()));
+        let fix = Fix::new("error");
         let result = fix.next_step(&test_project.config, &mut session, 0, None, None);
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), TenxError::Internal(_)));
@@ -520,7 +539,7 @@ mod test {
         assert_eq!(session.last_step().unwrap().raw_prompt, "Retry");
 
         // Test default prompt in a new action
-        let fix2 = Fix::new(TenxError::Config("Error".into()));
+        let fix2 = Fix::new("error");
         let mut session2 = Session::new(&test_project.config)?;
         session2.add_action(Action::new(
             &test_project.config,
@@ -530,11 +549,13 @@ mod test {
 
         let state = fix2.next_step(&test_project.config, &mut session2, action_idx2, None, None)?;
         assert_eq!(state.completion, Completion::Incomplete);
-        assert_eq!(
-            session2.last_step().unwrap().raw_prompt,
-            "Please fix the following errors."
-        );
+        assert!(session2
+            .last_step()
+            .unwrap()
+            .raw_prompt
+            .starts_with("Please fix the following errors"),);
 
         Ok(())
     }
 }
+

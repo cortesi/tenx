@@ -9,7 +9,7 @@ use crate::{
     model::Usage,
     patch::Patch,
     state,
-    strategy::{self, ActionStrategy},
+    strategy::{self, ActionStrategy, StrategyStep},
 };
 
 /// A parsed model response
@@ -60,11 +60,12 @@ pub struct Step {
     /// The rollback identifier for this step. Rolling back to this identifier will revert all
     /// changes.
     pub rollback_id: u64,
+    pub strategy_step: StrategyStep,
 }
 
 impl Step {
     /// Creates a new Step with the given prompt and rollback ID.
-    pub fn new(model: String, raw_prompt: String) -> Self {
+    pub fn new(model: String, raw_prompt: String, strategy_step: StrategyStep) -> Self {
         Step {
             model,
             raw_prompt,
@@ -73,6 +74,7 @@ impl Step {
             response_time: None,
             patch_info: None,
             err: None,
+            strategy_step,
         }
     }
 
@@ -485,7 +487,7 @@ mod tests {
         let mut action = Action::new(&tp.config, strategy)?;
 
         // Add the first step.
-        let mut step1 = Step::new("model1".into(), "prompt1".into());
+        let mut step1 = Step::new("model1".into(), "prompt1".into(), strategy::StrategyStep::Code(strategy::CodeStep::new()));
         step1.model_response = Some(ModelResponse {
             comment: Some("first response".into()),
             patch: None,
@@ -496,7 +498,7 @@ mod tests {
         action.add_step(step1)?;
 
         // Add the second step.
-        let mut step2 = Step::new("model1".into(), "prompt2".into());
+        let mut step2 = Step::new("model1".into(), "prompt2".into(), strategy::StrategyStep::Code(strategy::CodeStep::new()));
         step2.model_response = Some(ModelResponse {
             comment: Some("second response".into()),
             patch: None,

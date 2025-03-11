@@ -134,11 +134,18 @@ impl Tenx {
     /// Adds a fix action to the session.
     /// Files must be already added to the session with session.state.view() before calling this.
     pub fn fix(&self, session: &mut Session, sender: &Option<EventSender>) -> Result<()> {
-        let pre_result = self.run_pre_checks(session, sender);
+        let pre_result = check_all(&self.config, sender);
         if let Err(e) = pre_result {
-            let action = Action::new(&self.config, strategy::Strategy::Fix(strategy::Fix::new(e)))?;
-            session.add_action(action)?;
-            self.save_session(session)?;
+            if let TenxError::Check { model, .. } = e {
+                let action = Action::new(
+                    &self.config,
+                    strategy::Strategy::Fix(strategy::Fix::new(&model)),
+                )?;
+                session.add_action(action)?;
+                self.save_session(session)?;
+            } else {
+                return Err(e);
+            }
             Ok(())
         } else {
             Err(TenxError::Internal("No errors found".to_string()))
@@ -378,22 +385,6 @@ impl Tenx {
                 }
                 Err(e) => return Err(e),
             }
-        }
-    }
-
-    fn run_pre_checks(&self, session: &mut Session, sender: &Option<EventSender>) -> Result<()> {
-        if !self.config.checks.no_pre {
-            let _check_block = EventBlock::pre_check(sender)?;
-            let action = session.last_action()?;
-            let strategy = action.strategy.clone();
-            strategy.check(
-                &self.config,
-                session,
-                session.actions.len() - 1,
-                sender.clone(),
-            )
-        } else {
-            Ok(())
         }
     }
 
