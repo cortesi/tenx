@@ -9,6 +9,7 @@ pub mod exec;
 pub mod model;
 pub mod patch;
 pub mod pretty;
+pub mod render;
 pub mod session;
 pub mod session_store;
 pub mod state;

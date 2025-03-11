@@ -85,34 +85,31 @@ where
     }
 
     // Try to convert the offset to indices
-    match offset_to_indices(session, step_offset) {
-        Ok((action_idx, step_idx)) => {
-            // Handle cases where we need to safely get editables
-            let editables = if action_idx < session.actions.len() {
-                let action = &session.actions[action_idx];
-                // If this is a valid step in the action or just at the end
-                if step_idx < action.steps().len() {
-                    session.editables_for_step_state(action_idx, step_idx)?
-                } else {
-                    vec![]
-                }
+    if let Ok((action_idx, step_idx)) = offset_to_indices(session, step_offset) {
+        // Handle cases where we need to safely get editables
+        let editables = if action_idx < session.actions.len() {
+            let action = &session.actions[action_idx];
+            // If this is a valid step in the action or just at the end
+            if step_idx < action.steps().len() {
+                session.editables_for_step_state(action_idx, step_idx)?
             } else {
                 vec![]
-            };
-
-            if !editables.is_empty() {
-                conversation.add_user_message(
-                    req,
-                    &format!(
-                        "{}\n{}",
-                        EDITABLE_LEADIN,
-                        dialect.render_editables(config, session, editables)?
-                    ),
-                )?;
-                conversation.add_agent_message(req, ACK)?;
             }
+        } else {
+            vec![]
+        };
+
+        if !editables.is_empty() {
+            conversation.add_user_message(
+                req,
+                &format!(
+                    "{}\n{}",
+                    EDITABLE_LEADIN,
+                    dialect.render_editables(config, session, editables)?
+                ),
+            )?;
+            conversation.add_agent_message(req, ACK)?;
         }
-        Err(_) => {}
     }
 
     Ok(())
