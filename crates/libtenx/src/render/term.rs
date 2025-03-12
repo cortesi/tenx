@@ -4,7 +4,9 @@ use colored::*;
 use terminal_size::{terminal_size, Height, Width};
 use textwrap;
 
-use super::*;
+// Import our Style enum explicitly to avoid ambiguity with colored::Style
+use super::Render;
+use super::Style as RenderStyle;
 
 /// Number of spaces to indent per level
 const INDENT_SPACES: usize = 2;
@@ -41,6 +43,16 @@ const H2_BG: &str = "";
 const H3_FG: &str = CYAN;
 /// Background color for level 3+ headers
 const H3_BG: &str = "";
+
+// Style-specific colors
+const WARN_FG: &str = ORANGE;
+const WARN_BG: &str = "";
+const ERROR_FG: &str = RED;
+const ERROR_BG: &str = "";
+const SUCCESS_FG: &str = GREEN;
+const SUCCESS_BG: &str = "";
+const DEFAULT_FG: &str = BASE1;
+const DEFAULT_BG: &str = "";
 
 /// Default width when not in a terminal
 const DEFAULT_WIDTH: usize = 100;
@@ -102,9 +114,43 @@ impl Default for Term {
     }
 }
 
+/// Apply styling to text based on a RenderStyle enum
+fn apply_style(text: &str, style: &RenderStyle) -> String {
+    let (fg_color, bg_color, make_bold) = match style {
+        RenderStyle::H1 => (H1_FG, H1_BG, true),
+        RenderStyle::H2 => (H2_FG, H2_BG, false),
+        RenderStyle::H3 | RenderStyle::H4 => (H3_FG, H3_BG, false),
+        RenderStyle::Warn => (WARN_FG, WARN_BG, true),
+        RenderStyle::Error => (ERROR_FG, ERROR_BG, true),
+        RenderStyle::Success => (SUCCESS_FG, SUCCESS_BG, true),
+        RenderStyle::Plain => (DEFAULT_FG, DEFAULT_BG, false),
+    };
+
+    let mut styled = text.custom_color(hex_to_custom_color(fg_color));
+
+    if make_bold {
+        styled = styled.bold();
+    }
+
+    if !bg_color.is_empty() {
+        styled = styled.on_custom_color(hex_to_custom_color(bg_color));
+    }
+
+    styled.to_string()
+}
+
 impl Render for Term {
     #[allow(clippy::const_is_empty)]
     fn push(&mut self, text: &str) {
+        let style = match self.level {
+            0 => RenderStyle::H1,
+            1 => RenderStyle::H2,
+            _ => RenderStyle::H3,
+        };
+        self.push_style(text, style);
+    }
+
+    fn push_style(&mut self, text: &str, style: RenderStyle) {
         // Calculate the available width for wrapping text
         let indent_width = self.level * INDENT_SPACES;
         let available_width = if self.width > indent_width {
@@ -114,32 +160,8 @@ impl Render for Term {
         };
         let text = right_pad(text, available_width - indent_width);
 
-        let styled_text = match self.level {
-            0 => {
-                let mut styled = text.bold().custom_color(hex_to_custom_color(H1_FG));
-                let has_bg = !H1_BG.is_empty();
-                if has_bg {
-                    styled = styled.on_custom_color(hex_to_custom_color(H1_BG));
-                }
-                styled.to_string()
-            }
-            1 => {
-                let mut styled = text.custom_color(hex_to_custom_color(H2_FG));
-                let has_bg = !H2_BG.is_empty();
-                if has_bg {
-                    styled = styled.on_custom_color(hex_to_custom_color(H2_BG));
-                }
-                styled.to_string()
-            }
-            _ => {
-                let mut styled = text.bold().custom_color(hex_to_custom_color(H3_FG));
-                let has_bg = !H3_BG.is_empty();
-                if has_bg {
-                    styled = styled.on_custom_color(hex_to_custom_color(H3_BG));
-                }
-                styled.to_string()
-            }
-        };
+        // Apply styling based on the provided style
+        let styled_text = apply_style(&text, &style);
 
         // Wrap the header text
         self.add_indented(&styled_text);
@@ -269,4 +291,3 @@ mod tests {
         assert_indent!(output, "Back to level 1", 2);
     }
 }
-

@@ -6,6 +6,7 @@ use crate::{
     config::Config,
     error::Result,
     events::{send_event, Event, EventSender},
+    render::Style,
     session::{Session, Step},
 };
 
@@ -199,7 +200,11 @@ fn render_step<R: crate::render::Render>(
 
     // Add error if present
     if let Some(err) = &step.err {
-        renderer.push("error");
+        if err.should_retry().is_some() {
+            renderer.push_style("error: retryable", Style::Warn);
+        } else {
+            renderer.push_style("error: fatal", Style::Error);
+        }
         renderer.para(&err.to_string());
         renderer.pop();
     }

@@ -2,10 +2,24 @@ mod term;
 
 pub use term::*;
 
+pub enum Style {
+    H1,
+    H2,
+    H3,
+    H4,
+    Warn,
+    Error,
+    Success,
+    Plain,
+}
+
 /// A generic trait for rendering output
 pub trait Render {
-    /// Push a new section onto the stack, with the specified heading
+    /// Push a new section onto the stack, with the default heading style
     fn push(&mut self, text: &str);
+
+    /// Push a new section onto the stack, with the specified heading and style
+    fn push_style(&mut self, text: &str, style: Style);
 
     /// Pop the current section off the stack
     fn pop(&mut self);
