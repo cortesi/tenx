@@ -14,12 +14,14 @@ use super::*;
 
 /// Shared step data for Code and Fix strategies.
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
-pub struct CodeStep {}
+pub struct CodeStep {
+    pub user_input: Option<String>,
+}
 
 impl CodeStep {
     /// Creates a new CodeStep instance.
-    pub fn new() -> Self {
-        Self::default()
+    pub fn new(user_input: Option<String>) -> Self {
+        Self { user_input }
     }
 }
 
@@ -106,7 +108,11 @@ fn process_step(
         )?;
         debug!("Next step, based on errors and/or patch failures");
 
-        let new_step = Step::new(model, model_message, StrategyStep::Code(CodeStep::new()));
+        let new_step = Step::new(
+            model,
+            model_message,
+            StrategyStep::Code(CodeStep::default()),
+        );
         session.last_action_mut()?.add_step(new_step)?;
 
         return Ok(ActionState {
@@ -128,7 +134,11 @@ fn process_step(
             )?;
             debug!("Next step, based on operations");
 
-            let new_step = Step::new(model, model_message, StrategyStep::Code(CodeStep::new()));
+            let new_step = Step::new(
+                model,
+                model_message,
+                StrategyStep::Code(CodeStep::default()),
+            );
             session.last_action_mut()?.add_step(new_step)?;
 
             return Ok(ActionState {
@@ -275,7 +285,12 @@ impl ActionStrategy for Code {
             // First step in the action
             if let Some(p) = prompt {
                 let model = config.models.default.clone();
-                let new_step = Step::new(model, p, StrategyStep::Code(CodeStep::new()));
+                let raw_prompt = p.clone();
+                let new_step = Step::new(
+                    model,
+                    raw_prompt,
+                    StrategyStep::Code(CodeStep::new(Some(p))),
+                );
                 session.last_action_mut()?.add_step(new_step)?;
 
                 Ok(ActionState {
@@ -357,12 +372,13 @@ impl ActionStrategy for Fix {
         } else {
             // First step in the action
             let model = config.models.default.clone();
-            let default_prompt = format! {"Please fix the following errors: {}\n", self.error};
-            let new_step = Step::new(
-                model,
-                prompt.unwrap_or(default_prompt),
-                StrategyStep::Code(CodeStep::new()),
-            );
+            let preamble = match prompt {
+                Some(ref s) => format!("{}\n", s),
+                None => "".to_string(),
+            };
+            let raw_prompt =
+                format! {"{}Please fix the following errors: {}\n", preamble, self.error};
+            let new_step = Step::new(model, raw_prompt, StrategyStep::Code(CodeStep::new(prompt)));
             session.last_action_mut()?.add_step(new_step)?;
 
             Ok(ActionState {
@@ -460,7 +476,7 @@ mod test {
         session.last_action_mut()?.add_step(Step::new(
             test_project.config.models.default.clone(),
             "Test".into(),
-            StrategyStep::Code(CodeStep::new()),
+            StrategyStep::Code(CodeStep::default()),
         ))?;
         let patch_err = TenxError::Patch {
             user: "Error".into(),
@@ -516,7 +532,11 @@ mod test {
         )?;
 
         assert_eq!(state.completion, Completion::Incomplete);
-        assert_eq!(session.last_step().unwrap().raw_prompt, "Fix prompt");
+        assert!(session
+            .last_step()
+            .unwrap()
+            .raw_prompt
+            .starts_with("Fix prompt"));
 
         // Test retryable error
         session.last_step_mut().unwrap().err = Some(TenxError::Patch {

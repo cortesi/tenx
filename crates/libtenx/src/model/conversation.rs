@@ -238,7 +238,7 @@ mod tests {
         p.session.last_action_mut()?.add_step(Step::new(
             "test_model".into(),
             "test prompt".to_string(),
-            strategy::StrategyStep::Code(strategy::CodeStep::new()),
+            strategy::StrategyStep::Code(strategy::CodeStep::default()),
         ))?;
 
         build_conversation(&conversation, &mut req, &p.config, &p.session, &dialect)?;

@@ -3,6 +3,7 @@ GOALS:
     - Shift action-specific state into strategy structs
         - Create action-specific state enum
     - pretty print
+        - verbosity for rendering
         - unify editing and pretty print
         - more compact summary output
         - verbose output
@@ -16,7 +17,7 @@ GOALS:
 
 UX:
 
-    - filter logs for output to only tenx
+    - filter --logs for output to only tenx
     - execute pre-checks before asking the user for input
     - audio cues for model responses and completion
     - Change the name of Config::step_limit (maybe iteration_limit? auto_step_limit?)

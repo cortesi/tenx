@@ -361,7 +361,7 @@ mod tests {
         p.session.last_action_mut()?.add_step(Step::new(
             "test_model".into(),
             "test".into(),
-            strategy::StrategyStep::Code(strategy::CodeStep::new()),
+            strategy::StrategyStep::Code(strategy::CodeStep::default()),
         ))?;
         if let Some(step) = p.session.last_step_mut() {
             step.model_response = Some(response);

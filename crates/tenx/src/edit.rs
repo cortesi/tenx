@@ -191,7 +191,7 @@ mod tests {
                 .add_step(Step::new(
                     "test_model".into(),
                     prompt.to_string(),
-                    libtenx::strategy::StrategyStep::Code(libtenx::strategy::CodeStep::new()),
+                    libtenx::strategy::StrategyStep::Code(libtenx::strategy::CodeStep::default()),
                 ))
                 .unwrap();
             if let Some(step) = p.session.last_step_mut() {

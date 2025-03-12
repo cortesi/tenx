@@ -490,7 +490,7 @@ mod tests {
         let mut step1 = Step::new(
             "model1".into(),
             "prompt1".into(),
-            strategy::StrategyStep::Code(strategy::CodeStep::new()),
+            strategy::StrategyStep::Code(strategy::CodeStep::default()),
         );
         step1.model_response = Some(ModelResponse {
             comment: Some("first response".into()),
@@ -505,7 +505,7 @@ mod tests {
         let mut step2 = Step::new(
             "model1".into(),
             "prompt2".into(),
-            strategy::StrategyStep::Code(strategy::CodeStep::new()),
+            strategy::StrategyStep::Code(strategy::CodeStep::default()),
         );
         step2.model_response = Some(ModelResponse {
             comment: Some("second response".into()),
