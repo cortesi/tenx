@@ -174,6 +174,60 @@ fn get_action_state(action: &crate::session::Action) -> ActionState {
     }
 }
 
+/// Renders a step with common rendering logic for both Code and Fix strategies
+fn render_step<R: crate::render::Render>(
+    step: &Step,
+    renderer: &mut R,
+    step_header: &str,
+    show_success: bool,
+) -> Result<()> {
+    renderer.push(step_header);
+
+    // Add prompt
+    renderer.push("prompt");
+    renderer.para(&step.raw_prompt);
+    renderer.pop();
+
+    // Add comment from model response if present
+    if let Some(model_response) = &step.model_response {
+        if let Some(comment) = &model_response.comment {
+            renderer.push("model comment");
+            renderer.para(comment);
+            renderer.pop();
+        }
+    }
+
+    // Add error if present
+    if let Some(err) = &step.err {
+        renderer.push("error");
+        renderer.para(&err.to_string());
+        renderer.pop();
+    }
+
+    // Add patch information if present
+    if let Some(patch_info) = &step.patch_info {
+        if !patch_info.failures.is_empty() {
+            let failure_messages: Vec<String> = patch_info
+                .failures
+                .iter()
+                .map(|(change, err)| format!("Failed to apply {:?}: {}", change, err))
+                .collect();
+
+            renderer.push("Patch failures:");
+            renderer.bullets(failure_messages);
+            renderer.pop();
+        } else if show_success && patch_info.succeeded > 0 {
+            renderer.para(&format!(
+                "Successfully applied {} changes",
+                patch_info.succeeded
+            ));
+        }
+    }
+
+    renderer.pop();
+    Ok(())
+}
+
 impl ActionStrategy for Code {
     fn name(&self) -> &'static str {
         "code"
@@ -252,45 +306,8 @@ impl ActionStrategy for Code {
         renderer: &mut R,
     ) -> Result<()> {
         let step = session.get_action(action_offset)?.steps()[step_offset].clone();
-        renderer.push(&format!("step {}:{}", action_offset, step_offset));
-
-        renderer.push("prompt");
-        renderer.para(&step.raw_prompt);
-        renderer.pop();
-
-        // Add error if present
-        if let Some(err) = &step.err {
-            renderer.push("error");
-            renderer.para(&err.to_string());
-            renderer.pop();
-        }
-
-        // Add comment from model response if present
-        if let Some(model_response) = &step.model_response {
-            if let Some(comment) = &model_response.comment {
-                renderer.push("model comment");
-                renderer.para(comment);
-                renderer.pop();
-            }
-        }
-
-        // Add patch information if present
-        if let Some(patch_info) = &step.patch_info {
-            if !patch_info.failures.is_empty() {
-                let failure_messages: Vec<String> = patch_info
-                    .failures
-                    .iter()
-                    .map(|(change, err)| format!("Failed to apply {:?}: {}", change, err))
-                    .collect();
-
-                renderer.push("Patch failures:");
-                renderer.bullets(failure_messages);
-                renderer.pop();
-            }
-        }
-
-        renderer.pop();
-        Ok(())
+        let header = format!("step {}:{}", action_offset, step_offset);
+        render_step(&step, renderer, &header, false)
     }
 }
 
@@ -379,49 +396,17 @@ impl ActionStrategy for Fix {
     ) -> Result<()> {
         let step = session.get_action(action_offset)?.steps()[step_offset].clone();
 
-        renderer.push(&format!("Step {}", step_offset));
+        // Create the header
+        let header = format!("Step {}", step_offset);
 
-        // If it's the first step, show the error we're fixing
+        // If it's the first step, show the error we're fixing before rendering the common parts
         if step_offset == 0 {
+            renderer.push(&header);
             renderer.para(&format!("Fixing error: {}", self.error));
+            renderer.pop();
         }
 
-        // Add prompt
-        renderer.para(&format!("Prompt: {}", step.raw_prompt));
-
-        // Add error if present
-        if let Some(err) = &step.err {
-            renderer.para(&format!("Error: {}", err));
-        }
-
-        // Add comment from model response if present
-        if let Some(model_response) = &step.model_response {
-            if let Some(comment) = &model_response.comment {
-                renderer.para(&format!("Comment: {}", comment));
-            }
-        }
-
-        // Add patch information if present
-        if let Some(patch_info) = &step.patch_info {
-            if !patch_info.failures.is_empty() {
-                let failure_messages: Vec<String> = patch_info
-                    .failures
-                    .iter()
-                    .map(|(change, err)| format!("Failed to apply {:?}: {}", change, err))
-                    .collect();
-
-                renderer.para("Patch failures:");
-                renderer.bullets(failure_messages);
-            } else {
-                renderer.para(&format!(
-                    "Successfully applied {} changes",
-                    patch_info.succeeded
-                ));
-            }
-        }
-
-        renderer.pop();
-        Ok(())
+        render_step(&step, renderer, &header, true)
     }
 }
 
@@ -558,4 +543,3 @@ mod test {
         Ok(())
     }
 }
-

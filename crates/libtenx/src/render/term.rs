@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use colored::CustomColor;
 use colored::*;
 use terminal_size::{terminal_size, Height, Width};
@@ -10,16 +11,34 @@ const INDENT_SPACES: usize = 2;
 /// Bullet character used in lists
 const BULLET_CHAR: &str = "•";
 
+// Solarized color scheme
+const BASE03: &str = "#002b36";
+const BASE02: &str = "#073642";
+const BASE01: &str = "#586e75";
+const BASE00: &str = "#657b83";
+const BASE0: &str = "#839496";
+const BASE1: &str = "#93a1a1";
+const BASE2: &str = "#eee8d5";
+const BASE3: &str = "#fdf6e3";
+const YELLOW: &str = "#b58900";
+const ORANGE: &str = "#cb4b16";
+const RED: &str = "#dc322f";
+const MAGENTA: &str = "#d33682";
+const VIOLET: &str = "#6c71c4";
+const BLUE: &str = "#268bd2";
+const CYAN: &str = "#2aa198";
+const GREEN: &str = "#859900";
+
 /// Foreground color for level 1 headers
-const H1_FG: &str = "#b58900";
+const H1_FG: &str = YELLOW;
 /// Background color for level 1 headers
-const H1_BG: &str = "#073642";
+const H1_BG: &str = BASE02;
 /// Color for level 2 headers
-const H2_FG: &str = "#268bd2";
+const H2_FG: &str = BLUE;
 /// Background color for level 2 headers
 const H2_BG: &str = "";
 /// Color for level 3+ headers
-const H3_FG: &str = "#2aa198";
+const H3_FG: &str = CYAN;
 /// Background color for level 3+ headers
 const H3_BG: &str = "";
 
@@ -250,3 +269,4 @@ mod tests {
         assert_indent!(output, "Back to level 1", 2);
     }
 }
+
