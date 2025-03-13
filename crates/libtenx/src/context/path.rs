@@ -1,0 +1,184 @@
+use super::ContextItem;
+use super::ContextProvider;
+use crate::config::Config;
+use crate::error::Result;
+use crate::session::Session;
+use async_trait::async_trait;
+use fs_err as fs;
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum PathType {
+    SinglePath(String),
+    Pattern(String),
+}
+
+/// A context provider that handles file paths, either single files or glob patterns.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Path {
+    pub(crate) path_type: PathType,
+}
+
+impl Path {
+    pub(crate) fn new(config: &Config, pattern: String) -> Result<Self> {
+        let pattern = config.normalize_path(pattern)?.display().to_string();
+        let path_type = if pattern.contains('*') {
+            PathType::Pattern(pattern)
+        } else {
+            PathType::SinglePath(pattern)
+        };
+        Ok(Self { path_type })
+    }
+}
+
+#[async_trait]
+impl ContextProvider for Path {
+    fn context_items(&self, config: &Config, _session: &Session) -> Result<Vec<ContextItem>> {
+        let matched_files = match &self.path_type {
+            PathType::SinglePath(path) => vec![std::path::PathBuf::from(path)],
+            PathType::Pattern(pattern) => config.match_files_with_glob(pattern)?,
+        };
+        let mut contexts = Vec::new();
+        for file in matched_files {
+            let abs_path = config.abspath(&file)?;
+            let body = fs::read_to_string(&abs_path)?;
+            contexts.push(ContextItem {
+                ty: "file".to_string(),
+                source: file.to_string_lossy().into_owned(),
+                body,
+            });
+        }
+        Ok(contexts)
+    }
+
+    fn human(&self) -> String {
+        match &self.path_type {
+            PathType::SinglePath(path) => path.to_string(),
+            PathType::Pattern(pattern) => pattern.to_string(),
+        }
+    }
+
+    async fn refresh(&mut self, _config: &Config) -> Result<()> {
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        context::{Context, ContextProvider},
+        model::{DummyModel, Model, ModelProvider},
+        session::Session,
+        testutils::test_project,
+    };
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_glob_context_initialization() {
+        let test_project = test_project();
+        test_project.create_file_tree(&[
+            "src/main.rs",
+            "src/lib.rs",
+            "tests/test1.rs",
+            "README.md",
+            "Cargo.toml",
+        ]);
+
+        let mut config = test_project.config.clone();
+        config.project.include = vec!["**/*.rs".to_string()];
+
+        let context_spec = Context::new_path(&config, "**/*.rs").unwrap();
+        assert!(matches!(context_spec, Context::Path(_)));
+
+        if let Context::Path(path) = context_spec {
+            let contexts = path.context_items(&config, &test_project.session).unwrap();
+
+            let mut expected_files = vec!["src/main.rs", "src/lib.rs", "tests/test1.rs"];
+            expected_files.sort();
+
+            let mut actual_files: Vec<_> = contexts.iter().map(|c| c.source.as_str()).collect();
+            actual_files.sort();
+
+            assert_eq!(actual_files, expected_files);
+
+            for context in contexts {
+                assert_eq!(context.ty, "file");
+                assert_eq!(test_project.read(&context.source), context.body);
+            }
+        } else {
+            panic!("Expected ContextSpec::Path");
+        }
+    }
+
+    #[test]
+    fn test_single_file_context_initialization() {
+        let test_project = test_project();
+        test_project.create_file_tree(&[
+            "src/main.rs",
+            "src/lib.rs",
+            "tests/test1.rs",
+            "README.md",
+            "Cargo.toml",
+        ]);
+
+        let config = test_project.config.clone();
+        let context_spec = Context::new_path(&config, "src/main.rs").unwrap();
+        assert!(matches!(context_spec, Context::Path(_)));
+
+        if let Context::Path(path) = context_spec {
+            let contexts = path.context_items(&config, &test_project.session).unwrap();
+
+            assert_eq!(contexts.len(), 1);
+            let context = &contexts[0];
+            assert_eq!(context.source, "src/main.rs");
+            assert_eq!(context.ty, "file");
+            assert_eq!(test_project.read(&context.source), context.body);
+        } else {
+            panic!("Expected ContextSpec::Path");
+        }
+
+        let mut config_in_src = test_project.config.clone();
+        config_in_src = config_in_src.with_cwd(test_project.tempdir.path().join("src"));
+        let context_spec = Context::new_path(&config_in_src, "./lib.rs").unwrap();
+        assert!(matches!(context_spec, Context::Path(_)));
+
+        if let Context::Path(path) = context_spec {
+            let contexts = path
+                .context_items(&config_in_src, &test_project.session)
+                .unwrap();
+
+            assert_eq!(contexts.len(), 1);
+            let context = &contexts[0];
+            assert_eq!(context.source, "src/lib.rs");
+            assert_eq!(context.ty, "file");
+            assert_eq!(test_project.read(&context.source), context.body);
+        } else {
+            panic!("Expected ContextSpec::Path");
+        }
+    }
+
+    #[test]
+    fn test_file_context_outside_project_root() {
+        let test_project = test_project();
+        let outside_dir = tempdir().unwrap();
+        let outside_file_path = outside_dir.path().join("outside.txt");
+        std::fs::write(&outside_file_path, "Outside content").unwrap();
+
+        // Use config with CWD set to project root
+        let mut config = test_project.config.clone();
+        config = config.with_cwd(test_project.tempdir.path().to_path_buf());
+
+        // Create context and verify rendering when referencing file outside project root
+        let mut session = Session::new(&config).unwrap();
+        session.contexts.push(Context::Path(
+            Path::new(&config, outside_file_path.to_str().unwrap().to_string()).unwrap(),
+        ));
+
+        let model = Model::Dummy(DummyModel::default());
+        if let Model::Dummy(dummy) = model {
+            let rendered = dummy.render(&config, &session).unwrap();
+            assert!(rendered.contains("Outside content"));
+        }
+    }
+}

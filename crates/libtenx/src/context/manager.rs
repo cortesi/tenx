@@ -49,3 +49,36 @@ impl ContextManager {
         self.contexts.is_empty()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::context::{Context, ContextProvider};
+
+    #[test]
+    fn test_context_manager() {
+        let mut manager = ContextManager::new();
+        assert!(manager.is_empty());
+
+        // Add a context
+        let context1 = Context::new_text("test1", "content1");
+        manager.add(context1.clone());
+        assert_eq!(manager.len(), 1);
+        assert_eq!(manager.list()[0].human(), "text: test1 (1 lines, 8 chars)");
+
+        // Add another context
+        let context2 = Context::new_text("test2", "content2");
+        manager.add(context2);
+        assert_eq!(manager.len(), 2);
+
+        // Add a duplicate context (should replace the first one)
+        let context3 = Context::new_text("test1", "updated content");
+        manager.add(context3);
+        assert_eq!(manager.len(), 2);
+        assert_eq!(manager.list()[0].human(), "text: test1 (1 lines, 15 chars)");
+
+        // Clear all contexts
+        manager.clear();
+        assert!(manager.is_empty());
+    }
+}
