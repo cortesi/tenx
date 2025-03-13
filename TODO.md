@@ -1,6 +1,5 @@
 
 NOW:
-    - verbosity for rendering
 
 
 GOALS:
@@ -20,6 +19,7 @@ GOALS:
     - Shift patch module into state
     - Chat mode
     - Agent code editor mode
+    - Context manager rewrite
 
 
 UX:
