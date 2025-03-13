@@ -6,21 +6,26 @@ which are included in prompts.
 
 use enum_dispatch::enum_dispatch;
 
+mod cmd;
 mod manager;
+mod path;
+mod project_map;
+mod ruskel;
+mod text;
+mod url;
 
+pub use cmd::*;
 pub use manager::*;
+pub use path::*;
+pub use project_map::*;
+pub use ruskel::*;
+pub use text::*;
+pub use url::*;
 
 use async_trait::async_trait;
-use fs_err as fs;
-use libruskel::Ruskel as LibRuskel;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    config::Config,
-    error::{Result, TenxError},
-    exec::exec,
-    session::Session,
-};
+use crate::{config::Config, error::Result, session::Session};
 
 /// An individual context item.
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -58,11 +63,7 @@ impl Context {
 #[enum_dispatch(Context)]
 pub trait ContextProvider {
     /// Retrieves the context items for this provider.
-    fn context_items(
-        &self,
-        config: &crate::config::Config,
-        session: &Session,
-    ) -> Result<Vec<ContextItem>>;
+    fn context_items(&self, config: &Config, session: &Session) -> Result<Vec<ContextItem>>;
 
     /// Returns a human-readable representation of the context provider.
     fn human(&self) -> String;
@@ -72,211 +73,6 @@ pub trait ContextProvider {
 
     async fn needs_refresh(&self, _config: &Config) -> bool {
         false
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-/// A context provider that generates Rust API documentation using Ruskel.
-pub struct Ruskel {
-    name: String,
-    content: String,
-}
-
-impl Ruskel {
-    pub(crate) fn new(name: String) -> Self {
-        Self {
-            name,
-            content: String::new(),
-        }
-    }
-}
-
-#[async_trait]
-impl ContextProvider for Ruskel {
-    fn context_items(
-        &self,
-        _config: &crate::config::Config,
-        _session: &Session,
-    ) -> Result<Vec<ContextItem>> {
-        Ok(vec![ContextItem {
-            ty: "ruskel".to_string(),
-            source: self.name.clone(),
-            body: self.content.clone(),
-        }])
-    }
-
-    fn human(&self) -> String {
-        format!("ruskel: {}", self.name)
-    }
-
-    async fn refresh(&mut self, _config: &Config) -> Result<()> {
-        let ruskel = LibRuskel::new(&self.name);
-        self.content = ruskel
-            .render(false, false, true)
-            .map_err(|e| TenxError::Resolve(e.to_string()))?;
-        Ok(())
-    }
-
-    async fn needs_refresh(&self, _config: &Config) -> bool {
-        self.content.is_empty()
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-/// A context provider that represents the project's file structure.
-pub struct ProjectMap;
-
-impl ProjectMap {
-    pub(crate) fn new() -> Self {
-        Self
-    }
-}
-
-#[async_trait]
-impl ContextProvider for ProjectMap {
-    fn context_items(&self, config: &Config, _: &Session) -> Result<Vec<ContextItem>> {
-        let files = config.project_files()?;
-        let body = files
-            .iter()
-            .map(|p| p.to_string_lossy().to_string())
-            .collect::<Vec<_>>()
-            .join("\n");
-
-        Ok(vec![ContextItem {
-            ty: "project_map".to_string(),
-            source: "project_map".to_string(),
-            body,
-        }])
-    }
-
-    fn human(&self) -> String {
-        "project_map".to_string()
-    }
-
-    async fn refresh(&mut self, _config: &Config) -> Result<()> {
-        Ok(())
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-enum PathType {
-    SinglePath(String),
-    Pattern(String),
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-/// A context provider that handles file paths, either single files or glob patterns.
-pub struct Path {
-    path_type: PathType,
-}
-
-impl Path {
-    pub(crate) fn new(config: &Config, pattern: String) -> Result<Self> {
-        let pattern = config.normalize_path(pattern)?.display().to_string();
-        let path_type = if pattern.contains('*') {
-            PathType::Pattern(pattern)
-        } else {
-            PathType::SinglePath(pattern)
-        };
-        Ok(Self { path_type })
-    }
-}
-
-#[async_trait]
-impl ContextProvider for Path {
-    fn context_items(
-        &self,
-        config: &crate::config::Config,
-        _session: &Session,
-    ) -> Result<Vec<ContextItem>> {
-        let matched_files = match &self.path_type {
-            PathType::SinglePath(path) => vec![std::path::PathBuf::from(path)],
-            PathType::Pattern(pattern) => config.match_files_with_glob(pattern)?,
-        };
-        let mut contexts = Vec::new();
-        for file in matched_files {
-            let abs_path = config.abspath(&file)?;
-            let body = fs::read_to_string(&abs_path)?;
-            contexts.push(ContextItem {
-                ty: "file".to_string(),
-                source: file.to_string_lossy().into_owned(),
-                body,
-            });
-        }
-        Ok(contexts)
-    }
-
-    fn human(&self) -> String {
-        match &self.path_type {
-            PathType::SinglePath(path) => path.to_string(),
-            PathType::Pattern(pattern) => pattern.to_string(),
-        }
-    }
-
-    async fn refresh(&mut self, _config: &Config) -> Result<()> {
-        Ok(())
-    }
-}
-
-/// A specification for reference material included in the prompt. This may be turned into actual
-/// Context objects with the ContextProvider::contexts() method.
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
-/// A context provider that fetches content from a remote URL.
-pub struct Url {
-    name: String,
-    url: String,
-    content: String,
-}
-
-impl Url {
-    pub(crate) fn new(url: String) -> Self {
-        let name = if url.len() > 40 {
-            format!("{}...", &url[..37])
-        } else {
-            url.clone()
-        };
-
-        Self {
-            name,
-            url,
-            content: String::new(),
-        }
-    }
-}
-
-#[async_trait]
-impl ContextProvider for Url {
-    fn context_items(
-        &self,
-        _config: &crate::config::Config,
-        _session: &Session,
-    ) -> Result<Vec<ContextItem>> {
-        Ok(vec![ContextItem {
-            ty: "url".to_string(),
-            source: self.url.clone(),
-            body: self.content.clone(),
-        }])
-    }
-
-    fn human(&self) -> String {
-        format!("url: {}", self.name)
-    }
-
-    async fn refresh(&mut self, _config: &Config) -> Result<()> {
-        let client = reqwest::Client::new();
-        self.content = client
-            .get(&self.url)
-            .send()
-            .await
-            .map_err(|e| TenxError::Resolve(e.to_string()))?
-            .text()
-            .await
-            .map_err(|e| TenxError::Resolve(e.to_string()))?;
-        Ok(())
-    }
-
-    async fn needs_refresh(&self, _config: &Config) -> bool {
-        self.content.is_empty()
     }
 }
 
@@ -296,102 +92,6 @@ pub enum Context {
     Text(Text),
     /// Output from executing a command
     Cmd(Cmd),
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
-/// A context provider for raw text content.
-pub struct Text {
-    name: String,
-    content: String,
-}
-
-impl Text {
-    pub(crate) fn new(name: String, content: String) -> Self {
-        Self { name, content }
-    }
-}
-
-#[async_trait]
-impl ContextProvider for Text {
-    fn context_items(
-        &self,
-        _config: &crate::config::Config,
-        _session: &Session,
-    ) -> Result<Vec<ContextItem>> {
-        Ok(vec![ContextItem {
-            ty: "text".to_string(),
-            source: self.name.clone(),
-            body: self.content.clone(),
-        }])
-    }
-
-    fn human(&self) -> String {
-        let lines = self.content.lines().count();
-        let chars = self.content.chars().count();
-        format!("text: {} ({} lines, {} chars)", self.name, lines, chars)
-    }
-
-    async fn refresh(&mut self, _config: &Config) -> Result<()> {
-        Ok(())
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
-/// A context provider that captures command output
-pub struct Cmd {
-    command: String,
-    content: String,
-}
-
-impl Cmd {
-    pub(crate) fn new(command: String) -> Self {
-        Self {
-            command,
-            content: String::new(),
-        }
-    }
-}
-
-#[async_trait]
-impl ContextProvider for Cmd {
-    fn context_items(
-        &self,
-        _config: &crate::config::Config,
-        _session: &Session,
-    ) -> Result<Vec<ContextItem>> {
-        Ok(vec![ContextItem {
-            ty: "cmd".to_string(),
-            source: self.command.clone(),
-            body: self.content.clone(),
-        }])
-    }
-
-    fn human(&self) -> String {
-        format!("cmd: {}", self.command)
-    }
-
-    async fn refresh(&mut self, config: &Config) -> Result<()> {
-        let (_, stdout, stderr) = exec(config.project_root(), &self.command)?;
-
-        let mut content = String::new();
-        let stdout = stdout.trim_end();
-        if !stdout.is_empty() {
-            content.push_str(stdout);
-        }
-        let stderr = stderr.trim_end();
-        if !stderr.is_empty() {
-            if !content.is_empty() {
-                content.push('\n');
-            }
-            content.push_str(stderr);
-        }
-        self.content = content;
-        Ok(())
-    }
-
-    async fn needs_refresh(&self, _config: &Config) -> bool {
-        self.content.is_empty()
-    }
 }
 
 impl Context {
