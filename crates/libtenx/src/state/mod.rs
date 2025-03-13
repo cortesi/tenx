@@ -38,7 +38,7 @@ trait SubStore: Debug {
 /// Information about a patch operation, including success/failure counts and any errors.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PatchInfo {
-    pub id: u64,
+    pub rollback_id: u64,
     pub succeeded: usize,
     /// All errors here are of type TenxError::Patch
     pub failures: Vec<(Change, TenxError)>,
@@ -279,7 +279,7 @@ impl State {
     pub fn patch(&mut self, patch: &Patch) -> Result<PatchInfo> {
         let id = self.snapshot(&patch.affected_files())?;
         let mut pinfo = PatchInfo {
-            id,
+            rollback_id: id,
             succeeded: 0,
             failures: Vec::new(),
         };
@@ -489,7 +489,7 @@ impl State {
         let patch_info = self.patch(&patch)?;
         // Failures for view changes should always be empty.
         debug_assert!(patch_info.failures.is_empty());
-        Ok((patch_info.id, file_count))
+        Ok((patch_info.rollback_id, file_count))
     }
 
     /// Add an empty patch to the snapshot sequence and return a snapshot ID. Useful as a markder.
@@ -498,7 +498,7 @@ impl State {
         let patch_info = self.patch(&patch)?;
         // Failures for view changes should always be empty.
         debug_assert!(patch_info.failures.is_empty());
-        Ok(patch_info.id)
+        Ok(patch_info.rollback_id)
     }
 }
 

@@ -5,9 +5,10 @@ use crate::{
     checks::check_paths,
     config::Config,
     error::Result,
+    error::TenxError,
     events::{send_event, Event, EventSender},
-    render::Style,
-    session::{Session, Step},
+    render::{Detail, Style},
+    session::Step,
 };
 
 use super::*;
@@ -191,29 +192,47 @@ fn render_step<R: crate::render::Render>(
     renderer: &mut R,
     step_header: &str,
     show_success: bool,
+    detail: Detail,
 ) -> Result<()> {
     renderer.push(step_header);
+    #[allow(unreachable_patterns)]
+    let astep = match &step.strategy_step {
+        StrategyStep::Code(astep) => astep,
+        _ => return Err(TenxError::Internal("Invalid strategy step".into())),
+    };
 
-    // Add prompt
-    renderer.push("prompt");
-    renderer.para(&step.raw_prompt);
-    renderer.pop();
-
-    // Add comment from model response if present
-    if let Some(model_response) = &step.model_response {
-        if let Some(comment) = &model_response.comment {
-            renderer.push("model comment");
-            renderer.para(comment);
+    if detail == Detail::Full {
+        renderer.push("raw prompt");
+        renderer.para(&step.raw_prompt);
+        renderer.pop();
+        if let Some(model_response) = &step.model_response {
+            if let Some(raw_response) = &model_response.raw_response {
+                renderer.push("raw response");
+                renderer.para(raw_response);
+                renderer.pop();
+            }
+        }
+    } else {
+        if let Some(user_input) = &astep.user_input {
+            renderer.push("prompt");
+            renderer.para(user_input);
             renderer.pop();
+        }
+        if let Some(model_response) = &step.model_response {
+            if let Some(comment) = &model_response.comment {
+                renderer.push("model comment");
+                renderer.para(comment);
+                renderer.pop();
+            }
         }
     }
 
     // Add error if present
     if let Some(err) = &step.err {
         if err.should_retry().is_some() {
-            renderer.push_style("error: retryable", Style::Warn);
+            renderer.push_style("retryable error", Style::Warn);
         } else {
-            renderer.push_style("error: fatal", Style::Error);
+            renderer.push_style("fatal error", Style::Error);
         }
         renderer.para(&err.to_string());
         renderer.pop();
@@ -324,10 +343,11 @@ impl ActionStrategy for Code {
         action_offset: usize,
         step_offset: usize,
         renderer: &mut R,
+        detail: Detail,
     ) -> Result<()> {
         let step = session.get_action(action_offset)?.steps()[step_offset].clone();
         let header = format!("step {}:{}", action_offset, step_offset);
-        render_step(&step, renderer, &header, false)
+        render_step(&step, renderer, &header, false, detail)
     }
 }
 
@@ -414,6 +434,7 @@ impl ActionStrategy for Fix {
         action_offset: usize,
         step_offset: usize,
         renderer: &mut R,
+        detail: Detail,
     ) -> Result<()> {
         let step = session.get_action(action_offset)?.steps()[step_offset].clone();
 
@@ -427,7 +448,7 @@ impl ActionStrategy for Fix {
             renderer.pop();
         }
 
-        render_step(&step, renderer, &header, true)
+        render_step(&step, renderer, &header, true, detail)
     }
 }
 

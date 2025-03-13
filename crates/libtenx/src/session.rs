@@ -8,6 +8,7 @@ use crate::{
     error::{Result, TenxError},
     model::Usage,
     patch::Patch,
+    render::Detail,
     state,
     strategy::{self, ActionStrategy, StrategyStep},
 };
@@ -35,7 +36,8 @@ pub struct ModelResponse {
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
 pub enum Operation {}
 
-/// A single step in the session - basically a prompt and a patch.
+/// A single step in the session - single prompt and model response. Steps also store
+/// processed information from the active strategy in `strategy_step`.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Step {
     /// The name of the model used for this step
@@ -51,11 +53,11 @@ pub struct Step {
     /// retryable, in which case a new step will be synthesized to go back to the model.
     pub err: Option<TenxError>,
 
-    /// Information about the patch applied in this step, including any failures.
-    pub patch_info: Option<state::PatchInfo>,
-
     /// The response from the model
     pub model_response: Option<ModelResponse>,
+
+    /// Information about the patch applied in this step, including any failures.
+    pub patch_info: Option<state::PatchInfo>,
 
     /// The rollback identifier for this step. Rolling back to this identifier will revert all
     /// changes.
@@ -168,6 +170,7 @@ impl Action {
         session: &Session,
         action_offset: usize,
         renderer: &mut R,
+        detail: Detail,
     ) -> Result<()> {
         renderer.push(&format!("{}: {}", action_offset, self.strategy.name()));
 
@@ -185,8 +188,14 @@ impl Action {
         }
 
         for (step_offset, _) in self.steps.iter().enumerate() {
-            self.strategy
-                .render(config, session, action_offset, step_offset, renderer)?;
+            self.strategy.render(
+                config,
+                session,
+                action_offset,
+                step_offset,
+                renderer,
+                detail,
+            )?;
         }
         renderer.pop();
         Ok(())
@@ -439,9 +448,10 @@ impl Session {
         &self,
         config: &config::Config,
         renderer: &mut R,
+        detail: Detail,
     ) -> Result<()> {
         for (action_offset, action) in self.actions.iter().enumerate() {
-            action.render(config, self, action_offset, renderer)?;
+            action.render(config, self, action_offset, renderer, detail)?;
         }
         Ok(())
     }

@@ -1,7 +1,7 @@
 use enum_dispatch::enum_dispatch;
 use serde::{Deserialize, Serialize};
 
-use crate::{config::Config, error::Result, events::EventSender, session::Session};
+use crate::{config::Config, error::Result, events::EventSender, render::Detail, session::Session};
 
 pub mod code;
 pub use code::*;
@@ -103,6 +103,7 @@ pub trait ActionStrategy {
         _action_offset: usize,
         _step_offset: usize,
         _renderer: &mut R,
+        _detail: Detail,
     ) -> Result<()> {
         unimplemented!();
     }

@@ -1,11 +1,18 @@
+
+NOW:
+    - verbosity for rendering
+
+
 GOALS:
 
     - Shift action-specific state into strategy structs
-        - Create action-specific state enum
+        - Shift parsing and parse products out of ModelResponse into strategies
     - pretty print
+        - add context to pretty print
         - verbosity for rendering
+            - more compact summary output
+        - use render for logs as well
         - unify editing and pretty print
-        - more compact summary output
         - verbose output
     - large goal: get rid of Session.steps()
         - Slow process of re-asessing each piece of code that touches this

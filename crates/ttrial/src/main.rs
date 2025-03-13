@@ -429,7 +429,11 @@ async fn main() -> anyhow::Result<()> {
                             let mut renderer = libtenx::render::Term::new();
 
                             let config = libtenx::config::Config::default();
-                            session.render(&config, &mut renderer)?;
+                            session.render(
+                                &config,
+                                &mut renderer,
+                                libtenx::render::Detail::Default,
+                            )?;
                             println!("{}", renderer.render());
                         }
                         reports.push(report);

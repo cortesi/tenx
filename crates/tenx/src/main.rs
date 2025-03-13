@@ -14,6 +14,7 @@ use libtenx::{
     error, event_consumers,
     events::Event,
     model::ModelProvider,
+    render::Detail,
     session::Session,
     tenx::Tenx,
 };
@@ -322,9 +323,12 @@ enum Commands {
         /// Format to display the session in
         #[clap(long, value_parser = ["pretty", "raw", "render"], default_value = "pretty")]
         fmt: String,
-        /// Show full details (only applies to 'pretty' format)
-        #[clap(long)]
-        full: bool,
+        /// Increase detail level (can be used multiple times)
+        #[clap(short = 'd', action = clap::ArgAction::Count, default_value = "0")]
+        detail: u8,
+        /// Show short output (less detail)
+        #[clap(short, long, conflicts_with = "detail")]
+        short: bool,
     },
 }
 
@@ -557,7 +561,8 @@ async fn main() -> anyhow::Result<()> {
                 Commands::Session {
                     session_file,
                     fmt,
-                    full: _,
+                    detail,
+                    short,
                 } => {
                     let model = config.active_model()?;
                     let session = if let Some(path) = session_file {
@@ -574,9 +579,20 @@ async fn main() -> anyhow::Result<()> {
                             println!("{}", model.render(&config, &session)?);
                         }
                         _ => {
+                            // Determine detail level
+                            let detail_level = if *short {
+                                Detail::Short
+                            } else {
+                                match detail {
+                                    0 => Detail::Default,
+                                    1 => Detail::Detailed,
+                                    _ => Detail::Full,
+                                }
+                            };
+
                             // Use the Term renderer to render the session
                             let mut renderer = libtenx::render::Term::new();
-                            session.render(&config, &mut renderer)?;
+                            session.render(&config, &mut renderer, detail_level)?;
                             println!("{}", renderer.render());
                         }
                     }
@@ -702,7 +718,7 @@ async fn main() -> anyhow::Result<()> {
                     tx.save_session(&session)?;
 
                     let mut renderer = libtenx::render::Term::new();
-                    session.render(&config, &mut renderer)?;
+                    session.render(&config, &mut renderer, Detail::Default)?;
                     println!("{}", renderer.render());
 
                     Ok(())
