@@ -4,6 +4,8 @@ context provider implements the `ContextProvider` trait and can generate one or 
 which are included in prompts.
 */
 
+use enum_dispatch::enum_dispatch;
+
 mod manager;
 
 pub use manager::*;
@@ -53,6 +55,7 @@ impl Context {
 
 /// A trait for context providers that can be used to generate context items for a prompt.
 #[async_trait]
+#[enum_dispatch(Context)]
 pub trait ContextProvider {
     /// Retrieves the context items for this provider.
     fn context_items(
@@ -278,6 +281,7 @@ impl ContextProvider for Url {
 }
 
 /// A context provider that produces reference material for model interactions.
+#[enum_dispatch]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum Context {
     /// API documentation generated using Ruskel
@@ -419,57 +423,6 @@ impl Context {
     /// Creates a new Context for a command.
     pub fn new_cmd(command: &str) -> Self {
         Context::Cmd(Cmd::new(command.to_string()))
-    }
-}
-
-#[async_trait]
-impl ContextProvider for Context {
-    fn context_items(
-        &self,
-        config: &crate::config::Config,
-        session: &Session,
-    ) -> Result<Vec<ContextItem>> {
-        match self {
-            Context::Ruskel(r) => r.context_items(config, session),
-            Context::Path(g) => g.context_items(config, session),
-            Context::ProjectMap(p) => p.context_items(config, session),
-            Context::Url(u) => u.context_items(config, session),
-            Context::Text(t) => t.context_items(config, session),
-            Context::Cmd(c) => c.context_items(config, session),
-        }
-    }
-
-    fn human(&self) -> String {
-        match self {
-            Context::Ruskel(r) => r.human(),
-            Context::Path(g) => g.human(),
-            Context::ProjectMap(p) => p.human(),
-            Context::Url(u) => u.human(),
-            Context::Text(t) => t.human(),
-            Context::Cmd(c) => c.human(),
-        }
-    }
-
-    async fn refresh(&mut self, config: &Config) -> Result<()> {
-        match self {
-            Context::Ruskel(r) => r.refresh(config).await,
-            Context::Path(g) => g.refresh(config).await,
-            Context::ProjectMap(p) => p.refresh(config).await,
-            Context::Url(u) => u.refresh(config).await,
-            Context::Text(t) => t.refresh(config).await,
-            Context::Cmd(c) => c.refresh(config).await,
-        }
-    }
-
-    async fn needs_refresh(&self, config: &Config) -> bool {
-        match self {
-            Context::Ruskel(r) => r.needs_refresh(config).await,
-            Context::Path(g) => g.needs_refresh(config).await,
-            Context::ProjectMap(p) => p.needs_refresh(config).await,
-            Context::Url(u) => u.needs_refresh(config).await,
-            Context::Text(t) => t.needs_refresh(config).await,
-            Context::Cmd(c) => c.needs_refresh(config).await,
-        }
     }
 }
 
