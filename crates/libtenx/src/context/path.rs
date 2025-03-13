@@ -7,14 +7,14 @@ use async_trait::async_trait;
 use fs_err as fs;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub enum PathType {
     SinglePath(String),
     Pattern(String),
 }
 
 /// A context provider that handles file paths, either single files or glob patterns.
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct Path {
     pub(crate) path_type: PathType,
 }
@@ -55,6 +55,13 @@ impl ContextProvider for Path {
         match &self.path_type {
             PathType::SinglePath(path) => path.to_string(),
             PathType::Pattern(pattern) => pattern.to_string(),
+        }
+    }
+
+    fn id(&self) -> String {
+        match &self.path_type {
+            PathType::SinglePath(path) => format!("single:{}", path),
+            PathType::Pattern(pattern) => format!("pattern:{}", pattern),
         }
     }
 

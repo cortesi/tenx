@@ -44,6 +44,10 @@ impl ContextProvider for Url {
         format!("url: {}", self.name)
     }
 
+    fn id(&self) -> String {
+        self.url.clone()
+    }
+
     async fn refresh(&mut self, _config: &Config) -> Result<()> {
         let client = reqwest::Client::new();
         self.content = client

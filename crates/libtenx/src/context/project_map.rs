@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 /// A context provider that represents the project's file structure.
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct ProjectMap;
 
 impl ProjectMap {
@@ -37,6 +37,10 @@ impl ContextProvider for ProjectMap {
         "project_map".to_string()
     }
 
+    fn id(&self) -> String {
+        "project_map".to_string()
+    }
+
     async fn refresh(&mut self, _config: &Config) -> Result<()> {
         Ok(())
     }
@@ -44,8 +48,10 @@ impl ContextProvider for ProjectMap {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::{context::{Context, ContextProvider}, testutils::test_project};
+    use crate::{
+        context::{Context, ContextProvider},
+        testutils::test_project,
+    };
 
     #[test]
     fn test_project_map_context() {

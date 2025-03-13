@@ -40,21 +40,17 @@ pub struct ContextItem {
     pub body: String,
 }
 
+// Custom implementation of PartialEq to match the semantics of is_dupe
+impl PartialEq for Context {
+    fn eq(&self, other: &Self) -> bool {
+        self.id() == other.id()
+    }
+}
+
 impl Context {
     /// Returns true if both contexts have the same name and type.
     pub fn is_dupe(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Context::Ruskel(a), Context::Ruskel(b)) => a.name == b.name,
-            (Context::Path(a), Context::Path(b)) => match (&a.path_type, &b.path_type) {
-                (PathType::SinglePath(a), PathType::SinglePath(b)) => a == b,
-                (PathType::Pattern(a), PathType::Pattern(b)) => a == b,
-                _ => false,
-            },
-            (Context::ProjectMap(_), Context::ProjectMap(_)) => true,
-            (Context::Url(a), Context::Url(b)) => a.url == b.url,
-            (Context::Text(a), Context::Text(b)) => a.name == b.name,
-            _ => false,
-        }
+        self.id() == other.id()
     }
 }
 
@@ -68,6 +64,10 @@ pub trait ContextProvider {
     /// Returns a human-readable representation of the context provider.
     fn human(&self) -> String;
 
+    /// Returns a unique identifier for this context provider.
+    /// This ID is used for equality comparison between contexts.
+    fn id(&self) -> String;
+
     /// Refreshes the content of the context provider.
     async fn refresh(&mut self, config: &Config) -> Result<()>;
 
@@ -78,7 +78,7 @@ pub trait ContextProvider {
 
 /// A context provider that produces reference material for model interactions.
 #[enum_dispatch]
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Eq)]
 pub enum Context {
     /// API documentation generated using Ruskel
     Ruskel(Ruskel),

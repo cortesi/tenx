@@ -37,6 +37,10 @@ impl ContextProvider for Cmd {
         format!("cmd: {}", self.command)
     }
 
+    fn id(&self) -> String {
+        self.command.clone()
+    }
+
     async fn refresh(&mut self, config: &Config) -> Result<()> {
         let (_, stdout, stderr) = exec(config.project_root(), &self.command)?;
 
@@ -64,7 +68,10 @@ impl ContextProvider for Cmd {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{context::{Context, ContextProvider}, testutils::test_project};
+    use crate::{
+        context::{Context, ContextProvider},
+        testutils::test_project,
+    };
     use tokio::runtime::Runtime;
 
     #[test]

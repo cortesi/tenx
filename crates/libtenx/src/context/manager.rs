@@ -1,37 +1,32 @@
-use super::Context;
+use super::{Context, ContextProvider};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// A manager for a collection of context items.
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct ContextManager {
-    /// An ordered list of context items.
-    contexts: Vec<Context>,
+    /// A map of context items with their IDs as keys.
+    contexts: HashMap<String, Context>,
 }
 
 impl ContextManager {
     /// Creates a new empty ContextManager.
     pub fn new() -> Self {
         Self {
-            contexts: Vec::new(),
+            contexts: HashMap::new(),
         }
     }
 
     /// Adds a context item to the manager.
     /// If a duplicate context already exists, it will be replaced.
     pub fn add(&mut self, context: Context) {
-        // Find any existing duplicates
-        if let Some(index) = self.contexts.iter().position(|c| c.is_dupe(&context)) {
-            // Replace the duplicate with the new context
-            self.contexts[index] = context;
-        } else {
-            // Add the new context
-            self.contexts.push(context);
-        }
+        let id = context.id();
+        self.contexts.insert(id, context);
     }
 
     /// Returns a list of all contexts.
-    pub fn list(&self) -> &[Context] {
-        &self.contexts
+    pub fn list(&self) -> Vec<&Context> {
+        self.contexts.values().collect()
     }
 
     /// Clears all contexts.
@@ -64,7 +59,9 @@ mod tests {
         let context1 = Context::new_text("test1", "content1");
         manager.add(context1.clone());
         assert_eq!(manager.len(), 1);
-        assert_eq!(manager.list()[0].human(), "text: test1 (1 lines, 8 chars)");
+
+        let human_strings: Vec<String> = manager.list().iter().map(|c| c.human()).collect();
+        assert!(human_strings.contains(&"text: test1 (1 lines, 8 chars)".to_string()));
 
         // Add another context
         let context2 = Context::new_text("test2", "content2");
@@ -75,7 +72,9 @@ mod tests {
         let context3 = Context::new_text("test1", "updated content");
         manager.add(context3);
         assert_eq!(manager.len(), 2);
-        assert_eq!(manager.list()[0].human(), "text: test1 (1 lines, 15 chars)");
+
+        let human_strings: Vec<String> = manager.list().iter().map(|c| c.human()).collect();
+        assert!(human_strings.contains(&"text: test1 (1 lines, 15 chars)".to_string()));
 
         // Clear all contexts
         manager.clear();

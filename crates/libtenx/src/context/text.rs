@@ -35,6 +35,10 @@ impl ContextProvider for Text {
         format!("text: {} ({} lines, {} chars)", self.name, lines, chars)
     }
 
+    fn id(&self) -> String {
+        self.name.clone()
+    }
+
     async fn refresh(&mut self, _config: &Config) -> Result<()> {
         Ok(())
     }

@@ -8,7 +8,7 @@ use libruskel::Ruskel as LibRuskel;
 use serde::{Deserialize, Serialize};
 
 /// A context provider that generates Rust API documentation using Ruskel.
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct Ruskel {
     pub(crate) name: String,
     pub(crate) content: String,
@@ -35,6 +35,10 @@ impl ContextProvider for Ruskel {
 
     fn human(&self) -> String {
         format!("ruskel: {}", self.name)
+    }
+
+    fn id(&self) -> String {
+        self.name.clone()
     }
 
     async fn refresh(&mut self, _config: &Config) -> Result<()> {
