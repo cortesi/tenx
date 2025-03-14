@@ -9,6 +9,7 @@ repository.workspace = true
 keywords.workspace = true
 
 [dependencies]
+unirend = { path = "../unirend" }
 libtenx = { path = "../libtenx" }
 libttrial = { path = "../libttrial" }
 anyhow = "1.0"

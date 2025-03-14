@@ -16,6 +16,7 @@ use libtenx::{
     session_store::SessionStore,
 };
 use libttrial::*;
+use unirend;
 
 #[derive(ValueEnum, Clone, Debug)]
 enum OutputMode {
@@ -426,14 +427,10 @@ async fn main() -> anyhow::Result<()> {
                             println!("Session for {} - {}:", report.model_name.blue(), trial.name);
 
                             // Use the Term renderer to render the session
-                            let mut renderer = libtenx::render::Term::new();
+                            let mut renderer = unirend::Term::new();
 
                             let config = libtenx::config::Config::default();
-                            session.render(
-                                &config,
-                                &mut renderer,
-                                libtenx::render::Detail::Default,
-                            )?;
+                            session.render(&config, &mut renderer, unirend::Detail::Default)?;
                             println!("{}", renderer.render());
                         }
                         reports.push(report);
@@ -510,3 +507,4 @@ async fn main() -> anyhow::Result<()> {
 
     result
 }
+

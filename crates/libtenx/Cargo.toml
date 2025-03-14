@@ -12,6 +12,8 @@ readme.workspace = true
 
 [dependencies]
 
+unirend = { path = "../unirend" }
+
 # google-genai = { path = "../../../google-genai" }
 google-genai = "0.0.2"
 

@@ -15,6 +15,7 @@ use crate::{
     model::ModelProvider,
     session::ModelResponse,
     session::Session,
+    throttle::Throttle,
 };
 
 const MAX_TOKENS: u32 = 8192;
@@ -122,6 +123,10 @@ impl Claude {
     ) -> Result<ModelResponse> {
         if let Some(message) = &req.messages.last() {
             if message.role == Role::Assistant {
+                if message.content.is_empty() {
+                    // We are seeing this happen fairly frequently with the Anthropic API.
+                    return Err(TenxError::Throttle(Throttle::Backoff));
+                }
                 for content in &message.content {
                     if let Content::Text(text) = content {
                         return dialect.parse(&text.text);
@@ -227,6 +232,7 @@ impl ModelProvider for Claude {
         };
 
         trace!("Got response: {}", serde_json::to_string_pretty(&resp)?);
+
         req.merge_response(&resp);
         let mut modresp = self.extract_changes(&dialect, &req)?;
         modresp.usage = Some(super::Usage::Claude(ClaudeUsage {

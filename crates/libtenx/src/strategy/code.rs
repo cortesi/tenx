@@ -7,9 +7,9 @@ use crate::{
     error::Result,
     error::TenxError,
     events::{send_event, Event, EventSender},
-    render::{Detail, Render, Style},
     session::Step,
 };
+use unirend::{Detail, Render, Style};
 
 use super::*;
 
@@ -326,7 +326,7 @@ impl ActionStrategy for Code {
         }
     }
 
-    fn render<R: crate::render::Render>(
+    fn render<R: unirend::Render>(
         &self,
         _config: &Config,
         session: &Session,
@@ -417,7 +417,7 @@ impl ActionStrategy for Fix {
         }
     }
 
-    fn render<R: crate::render::Render>(
+    fn render<R: unirend::Render>(
         &self,
         _config: &Config,
         session: &Session,

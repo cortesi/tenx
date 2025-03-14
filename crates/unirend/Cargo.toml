@@ -1,9 +1,11 @@
+
 [package]
 name = "unirend"
+description ="A simple unified rendering interface with output to terminal and markdown."
+
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
-description.workspace = true
 license.workspace = true
 repository.workspace = true
 keywords.workspace = true

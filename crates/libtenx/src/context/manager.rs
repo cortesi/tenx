@@ -4,8 +4,8 @@ use std::iter::IntoIterator;
 
 use crate::{
     error::Result,
-    render::{Detail, Render},
 };
+use unirend::{Detail, Render};
 
 use super::{Context, ContextProvider};
 

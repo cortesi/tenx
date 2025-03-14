@@ -3017,6 +3017,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "unirend",
 ]
 
 [[package]]
@@ -4570,6 +4571,7 @@ dependencies = [
  "textwrap",
  "tokio",
  "tracing-subscriber",
+ "unirend",
 ]
 
 [[package]]
@@ -4937,6 +4939,7 @@ dependencies = [
  "textwrap",
  "tokio",
  "tracing-subscriber",
+ "unirend",
 ]
 
 [[package]]

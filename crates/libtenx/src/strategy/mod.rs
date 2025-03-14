@@ -1,7 +1,8 @@
 use enum_dispatch::enum_dispatch;
 use serde::{Deserialize, Serialize};
 
-use crate::{config::Config, error::Result, events::EventSender, render::Detail, session::Session};
+use crate::{config::Config, error::Result, events::EventSender, session::Session};
+use unirend::Detail;
 
 pub mod code;
 pub use code::*;
@@ -96,7 +97,7 @@ pub trait ActionStrategy {
     ) -> Result<()>;
 
     /// Render a step using the provided renderer
-    fn render<R: crate::render::Render>(
+    fn render<R: unirend::Render>(
         &self,
         _config: &Config,
         _session: &Session,

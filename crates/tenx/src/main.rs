@@ -14,10 +14,10 @@ use libtenx::{
     error, event_consumers,
     events::Event,
     model::ModelProvider,
-    render::Detail,
     session::Session,
     tenx::Tenx,
 };
+use unirend::Detail;
 
 mod edit;
 
@@ -591,7 +591,7 @@ async fn main() -> anyhow::Result<()> {
                             };
 
                             // Use the Term renderer to render the session
-                            let mut renderer = libtenx::render::Term::new();
+                            let mut renderer = unirend::Term::new();
                             session.render(&config, &mut renderer, detail_level)?;
                             println!("{}", renderer.render());
                         }
@@ -650,7 +650,7 @@ async fn main() -> anyhow::Result<()> {
                             if session.contexts.is_empty() {
                                 println!("No contexts in session");
                             } else {
-                                let mut render = libtenx::render::Term::new();
+                                let mut render = unirend::Term::new();
                                 session.contexts.render(&mut render, Detail::Default)?;
                                 println!("{}", render.render());
                             }
@@ -718,7 +718,7 @@ async fn main() -> anyhow::Result<()> {
                         .await?;
                     tx.save_session(&session)?;
 
-                    let mut renderer = libtenx::render::Term::new();
+                    let mut renderer = unirend::Term::new();
                     session.render(&config, &mut renderer, Detail::Default)?;
                     println!("{}", renderer.render());
 
@@ -838,3 +838,4 @@ async fn main() -> anyhow::Result<()> {
 
     Ok(())
 }
+

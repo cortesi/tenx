@@ -8,10 +8,10 @@ use crate::{
     error::{Result, TenxError},
     model::Usage,
     patch::Patch,
-    render::Detail,
     state,
     strategy::{self, ActionStrategy, StrategyStep},
 };
+use unirend::Detail;
 
 /// A parsed model response
 #[derive(Debug, Deserialize, Serialize, Clone, Default, PartialEq, Eq)]
@@ -164,7 +164,7 @@ impl Action {
     }
 
     /// Render the action using the provided renderer
-    pub fn render<R: crate::render::Render>(
+    pub fn render<R: unirend::Render>(
         &self,
         config: &config::Config,
         session: &Session,
@@ -440,7 +440,7 @@ impl Session {
     }
 
     /// Render the session using the provided renderer
-    pub fn render<R: crate::render::Render>(
+    pub fn render<R: unirend::Render>(
         &self,
         config: &config::Config,
         renderer: &mut R,
