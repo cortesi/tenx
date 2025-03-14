@@ -1,0 +1,15 @@
+[package]
+name = "unirend"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+description.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+readme.workspace = true
+
+[dependencies]
+colored = "3.0.0"
+terminal_size = "0.4.2"
+textwrap = "0.16.2"
