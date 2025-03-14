@@ -206,7 +206,7 @@ impl Action {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Session {
     pub actions: Vec<Action>,
-    pub contexts: Vec<context::Context>,
+    pub contexts: context::ContextManager,
 }
 
 impl Session {
@@ -217,7 +217,7 @@ impl Session {
     pub fn new(_config: &config::Config) -> Result<Self> {
         Ok(Session {
             actions: vec![],
-            contexts: Vec::new(),
+            contexts: context::ContextManager::new(),
         })
     }
 
@@ -294,11 +294,7 @@ impl Session {
     ///
     /// If a context with the same name and type already exists, it will be replaced.
     pub fn add_context(&mut self, new_context: context::Context) {
-        if let Some(pos) = self.contexts.iter().position(|x| x.is_dupe(&new_context)) {
-            self.contexts[pos] = new_context;
-        } else {
-            self.contexts.push(new_context);
-        }
+        self.contexts.add(new_context);
     }
 
     /// Reset the session to a specific action and step, removing all subsequent steps.
@@ -529,7 +525,7 @@ mod tests {
         // Create a session containing this action.
         let mut session = Session {
             actions: vec![action],
-            contexts: vec![],
+            contexts: context::ContextManager::new(),
         };
 
         // Call retry on the second step (index 1) of the first action.
