@@ -1,7 +1,13 @@
-use super::{Context, ContextProvider};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::iter::IntoIterator;
+
+use crate::{
+    error::Result,
+    render::{Detail, Render},
+};
+
+use super::{Context, ContextProvider};
 
 /// A manager for a collection of context items.
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
@@ -48,6 +54,15 @@ impl ContextManager {
     /// Returns a mutable iterator over the contexts.
     pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut Context> {
         self.contexts.values_mut()
+    }
+
+    pub fn render<R: Render>(&self, renderer: &mut R, _detail: Detail) -> Result<()> {
+        let mut bullets = vec![];
+        for context in self.list() {
+            bullets.push(context.human());
+        }
+        renderer.bullets(bullets);
+        Ok(())
     }
 }
 

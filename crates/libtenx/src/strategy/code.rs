@@ -7,7 +7,7 @@ use crate::{
     error::Result,
     error::TenxError,
     events::{send_event, Event, EventSender},
-    render::{Detail, Style},
+    render::{Detail, Render, Style},
     session::Step,
 };
 
@@ -177,7 +177,7 @@ fn get_action_state(action: &crate::session::Action) -> ActionState {
 }
 
 /// Renders a step with common rendering logic for both Code and Fix strategies
-fn render_step<R: crate::render::Render>(
+fn render_step<R: Render>(
     step: &Step,
     renderer: &mut R,
     step_header: &str,

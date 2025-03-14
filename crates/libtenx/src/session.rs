@@ -446,6 +446,12 @@ impl Session {
         renderer: &mut R,
         detail: Detail,
     ) -> Result<()> {
+        renderer.push("session");
+        if !self.contexts.is_empty() {
+            renderer.push("context");
+            self.contexts.render(renderer, detail)?;
+            renderer.pop();
+        }
         for (action_offset, action) in self.actions.iter().enumerate() {
             action.render(config, self, action_offset, renderer, detail)?;
         }

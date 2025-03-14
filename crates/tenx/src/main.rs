@@ -649,10 +649,11 @@ async fn main() -> anyhow::Result<()> {
                         ContextCommands::Show => {
                             if session.contexts.is_empty() {
                                 println!("No contexts in session");
-                                return Ok(());
+                            } else {
+                                let mut render = libtenx::render::Term::new();
+                                session.contexts.render(&mut render, Detail::Default)?;
+                                println!("{}", render.render());
                             }
-                            // FIXME: Implement this
-                            //println!("{}", pretty::print_contexts(&config, &session)?);
                             return Ok(());
                         }
                     };
