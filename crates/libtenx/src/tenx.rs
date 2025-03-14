@@ -487,10 +487,13 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(session.steps().len(), 1);
-        assert!(session.steps()[0].model_response.is_some());
+        let last_action = session.last_action().unwrap();
+        let steps = last_action.steps();
+
+        assert_eq!(steps.len(), 1);
+        assert!(steps[0].model_response.is_some());
         assert_eq!(
-            session.steps()[0].model_response.as_ref().unwrap().comment,
+            steps[0].model_response.as_ref().unwrap().comment,
             Some("Test comment".to_string())
         );
 
@@ -554,8 +557,11 @@ mod tests {
         assert!(matches!(state.input_required, InputRequired::No));
 
         // Also verify the step was executed properly
-        assert_eq!(session.steps().len(), 1);
-        assert!(session.steps()[0].model_response.is_some());
+        let last_action = session.last_action().unwrap();
+        let steps = last_action.steps();
+
+        assert_eq!(steps.len(), 1);
+        assert!(steps[0].model_response.is_some());
         let file_content = fs::read_to_string(&test_file_path).unwrap();
         assert_eq!(file_content, "Updated content");
 

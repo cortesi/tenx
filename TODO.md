@@ -4,20 +4,25 @@ NOW:
 
 GOALS:
 
-    - Shift action-specific state into strategy structs
-        - Shift parsing and parse products out of ModelResponse into strategies
-    - pretty print
-        - use render for logs as well
+    - render
         - unify editing and pretty print
-        - verbose output
+        - use render for logs as well?
+    - Get back to 100% functionality
+        - retry
+        - fix
+        - continue
     - large goal: get rid of Session.steps()
+        - Rewrite tests that use steps()
         - Slow process of re-asessing each piece of code that touches this
-    - Refactor Conversation interface 
+    - Refactor Conversation interface?
     - Shift patch module into state
+
+    - Claude text editor tool
     - Chat mode
     - Agent code editor mode
     - Context manager rewrite
-
+        - Context store with persistent rendered assets
+        - Menu of context items that can be requested by models
 
 UX:
 
@@ -36,7 +41,6 @@ Model response robustness:
       more robust patch mode for this.
     - Allow write_file to create files
         - Ensure that newly created files are rolled back in rollback
-    - Partial application of patches
     - A <continue> operation, which lets models break operations into batches
     - An <abort> operation, which lets a model signal when it can't continue
     - Ignore <edit> requests for files that are already being edited
