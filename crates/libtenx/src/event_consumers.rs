@@ -25,12 +25,23 @@ pub async fn discard_events(mut receiver: EventReceiver, mut kill_signal: mpsc::
 
 /// Creates a subscriber that sends all tracing events to an mpsc channel for processing.
 pub fn create_tracing_subscriber(verbosity: u8, sender: EventSender) -> impl Subscriber {
-    let filter = match verbosity {
-        0 => EnvFilter::new("warn"),
-        1 => EnvFilter::new("info"),
-        2 => EnvFilter::new("debug"),
-        3 => EnvFilter::new("trace"),
-        _ => EnvFilter::new("trace"),
+    let log_level = match verbosity {
+        0 => "warn",
+        1 => "info",
+        2 => "debug",
+        3 => "trace",
+        _ => "trace",
+    };
+
+    // At verbosity level 4 and above, include all logs
+    // Otherwise only include logs from libtenx and related packages
+    let filter = if verbosity >= 4 {
+        EnvFilter::new("trace")
+    } else {
+        EnvFilter::new(format!(
+            "libtenx={},tenx={},ttrial={}",
+            log_level, log_level, log_level
+        ))
     };
 
     struct Writer {

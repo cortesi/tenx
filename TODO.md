@@ -7,9 +7,6 @@ GOALS:
     - Shift action-specific state into strategy structs
         - Shift parsing and parse products out of ModelResponse into strategies
     - pretty print
-        - add context to pretty print
-        - verbosity for rendering
-            - more compact summary output
         - use render for logs as well
         - unify editing and pretty print
         - verbose output
@@ -24,7 +21,6 @@ GOALS:
 
 UX:
 
-    - filter --logs for output to only tenx
     - execute pre-checks before asking the user for input
     - audio cues for model responses and completion
     - Change the name of Config::step_limit (maybe iteration_limit? auto_step_limit?)
