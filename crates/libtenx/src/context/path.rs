@@ -178,7 +178,7 @@ mod tests {
 
         // Create context and verify rendering when referencing file outside project root
         let mut session = Session::new(&config).unwrap();
-        session.contexts.push(Context::Path(
+        session.contexts.add(Context::Path(
             Path::new(&config, outside_file_path.to_str().unwrap().to_string()).unwrap(),
         ));
 
