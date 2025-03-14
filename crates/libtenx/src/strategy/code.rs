@@ -66,6 +66,7 @@ fn process_step(
     events: Option<EventSender>,
 ) -> Result<ActionState> {
     let model = config.models.default.clone();
+    // If any messages are pushed onto here for the model, the step is incomplete.
     let mut messages = Vec::new();
     let mut user_message = Vec::new();
 
@@ -93,39 +94,17 @@ fn process_step(
             ));
             user_message.push("patch failures".into());
         }
-    }
-
-    // If we have errors or patch failures, create a new step
-    if !messages.is_empty() {
-        let model_message = messages.join("\n\n");
-        let user = user_message.join(", ");
-
-        send_event(
-            &events,
-            Event::NextStep {
-                user,
-                model: model_message.clone(),
-            },
-        )?;
-        debug!("Next step, based on errors and/or patch failures");
-
-        let new_step = Step::new(
-            model,
-            model_message,
-            StrategyStep::Code(CodeStep::default()),
-        );
-        session.last_action_mut()?.add_step(new_step)?;
-
-        return Ok(ActionState {
-            completion: Completion::Incomplete,
-            input_required: InputRequired::No,
-        });
+        if patch_info.should_continue {
+            messages.push("Operations applied".to_string());
+            user_message.push("operations applied".into());
+        }
     }
 
     // Check for operations in model response that need further action
     if let Some(model_response) = &step.model_response {
         if !model_response.operations.is_empty() {
-            let model_message = "OK".to_string();
+            let model_message = "Operations applied".to_string();
+            messages.push(model_message.clone());
             send_event(
                 &events,
                 Event::NextStep {
@@ -133,27 +112,38 @@ fn process_step(
                     model: model_message.clone(),
                 },
             )?;
-            debug!("Next step, based on operations");
-
-            let new_step = Step::new(
-                model,
-                model_message,
-                StrategyStep::Code(CodeStep::default()),
-            );
-            session.last_action_mut()?.add_step(new_step)?;
-
-            return Ok(ActionState {
-                completion: Completion::Incomplete,
-                input_required: InputRequired::No,
-            });
         }
     }
 
-    // No issues found, action is complete
-    Ok(ActionState {
-        completion: Completion::Complete,
-        input_required: InputRequired::No,
-    })
+    if !messages.is_empty() {
+        let model_message = messages.join("\n\n");
+        let user = user_message.join(", ");
+        send_event(
+            &events,
+            Event::NextStep {
+                user,
+                model: model_message.clone(),
+            },
+        )?;
+        let new_step = Step::new(
+            model,
+            model_message,
+            StrategyStep::Code(CodeStep::default()),
+        );
+        session.last_action_mut()?.add_step(new_step)?;
+
+        debug!("Action incomplete: creating next step");
+        Ok(ActionState {
+            completion: Completion::Incomplete,
+            input_required: InputRequired::No,
+        })
+    } else {
+        debug!("Action complete");
+        Ok(ActionState {
+            completion: Completion::Complete,
+            input_required: InputRequired::No,
+        })
+    }
 }
 
 /// Determines the current state of an action
