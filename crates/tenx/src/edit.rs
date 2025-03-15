@@ -33,15 +33,20 @@ fn render_session_summary(session: &Session, _retry: bool) -> String {
 /// summary.
 fn render_edit_text(session: &Session, retry: bool) -> Result<String> {
     let mut text = String::new();
-    let steps = session.steps();
-
-    if retry {
-        if steps.is_empty() {
-            anyhow::bail!("Cannot retry without at least one step");
+    match session.last_step() {
+        Some(step) => {
+            if retry {
+                text.push_str(&step.raw_prompt);
+            }
         }
-        let last = steps.last().unwrap();
-        text.push_str(&last.raw_prompt);
+        None => {
+            if retry {
+                anyhow::bail!("Cannot retry without at least one step");
+            }
+            text.push_str("Enter your prompt here...");
+        }
     }
+
     text.push('\n');
     text.push_str(SESSION_INFO_MARKER);
     text.push_str(SESSION_HEADER);

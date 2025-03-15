@@ -4,10 +4,7 @@ NOW:
 
 GOALS:
 
-    - print
-        - print patch info
     - Get back to 100% functionality
-        - retry
         - fix
         - continue
     - large goal: get rid of Session.steps()
