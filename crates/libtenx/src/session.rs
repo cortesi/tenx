@@ -359,9 +359,6 @@ impl Session {
             if step_idx < action.steps.len() {
                 let step = &mut action.steps[step_idx];
 
-                // Revert to the step's rollback_id to reset the state
-                action.state.revert(step.rollback_id)?;
-
                 // Reset the step's response data with a new rollback ID
                 step.reset(action.state.mark()?);
             }
