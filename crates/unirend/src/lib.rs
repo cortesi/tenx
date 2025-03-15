@@ -6,7 +6,7 @@ pub use term::*;
 
 /// The amount of detail to include in a render. The the `Render` implementations themselves
 /// don't use this - it's here as a common convention for callers.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Detail {
     Short,
     Default,

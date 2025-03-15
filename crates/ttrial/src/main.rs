@@ -16,7 +16,6 @@ use libtenx::{
     session_store::SessionStore,
 };
 use libttrial::*;
-use unirend;
 
 #[derive(ValueEnum, Clone, Debug)]
 enum OutputMode {
@@ -507,4 +506,3 @@ async fn main() -> anyhow::Result<()> {
 
     result
 }
-

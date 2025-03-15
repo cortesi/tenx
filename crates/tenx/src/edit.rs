@@ -4,8 +4,6 @@ use anyhow::{Context as AnyhowContext, Result};
 use tempfile::NamedTempFile;
 use tokio::sync::mpsc;
 
-use unirend;
-
 use libtenx::{config::Config, events::Event, session::Session};
 
 const SESSION_INFO_MARKER: &str = "\n** Only edit prompt text ABOVE this marker. **\n";

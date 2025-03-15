@@ -4,9 +4,8 @@ NOW:
 
 GOALS:
 
-    - render
-        - unify editing and pretty print
-        - use render for logs as well?
+    - print
+        - print patch info
     - Get back to 100% functionality
         - retry
         - fix
@@ -18,11 +17,14 @@ GOALS:
     - Shift patch module into state
 
     - Claude text editor tool
+        - Support all operations in State
     - Chat mode
     - Agent code editor mode
     - Context manager rewrite
         - Context store with persistent rendered assets
         - Menu of context items that can be requested by models
+    - render
+        - use render for logs as well?
 
 UX:
 

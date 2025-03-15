@@ -2,9 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::iter::IntoIterator;
 
-use crate::{
-    error::Result,
-};
+use crate::error::Result;
 use unirend::{Detail, Render};
 
 use super::{Context, ContextProvider};

@@ -431,13 +431,6 @@ impl ActionStrategy for Fix {
         // Create the header
         let header = format!("Step {}", step_offset);
 
-        // If it's the first step, show the error we're fixing before rendering the common parts
-        if step_offset == 0 {
-            renderer.push(&header);
-            renderer.para(&format!("Fixing error: {}", self.error));
-            renderer.pop();
-        }
-
         render_step(&step, renderer, &header, true, detail)
     }
 }
