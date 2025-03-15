@@ -35,7 +35,8 @@ pub trait DialectProvider {
         &self,
         config: &Config,
         session: &Session,
-        offset: usize,
+        action_offset: usize,
+        step_offset: usize,
     ) -> Result<String>;
 
     /// Render the response portion of a step.
@@ -43,7 +44,8 @@ pub trait DialectProvider {
         &self,
         config: &Config,
         session: &Session,
-        offset: usize,
+        action_offset: usize,
+        step_offset: usize,
     ) -> Result<String>;
 
     /// Render the editable context section

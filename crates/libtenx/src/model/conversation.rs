@@ -136,19 +136,27 @@ where
         ),
     )?;
     conversation.add_agent_message(req, ACK)?;
-    for (i, step) in session.steps().iter().enumerate() {
-        add_editables(conversation, req, config, session, dialect, i)?;
-        conversation.add_user_message(req, &dialect.render_step_request(config, session, i)?)?;
-        if step.model_response.is_some() {
-            conversation
-                .add_agent_message(req, &dialect.render_step_response(config, session, i)?)?;
-        } else if i != session.steps().len() - 1 {
-            // We have no model response, but we're not the last step, so this isn't a user request
-            // step just about to be sent to the model. This is presumably an error - the best we
-            // can do to preserve sequencing is either omit the step entirely or add an omission
-            // message from the agent. Since omitting the step will lose the user's prompt, we opt
-            // for the latter.
-            conversation.add_agent_message(req, "omitted due to error")?;
+    if !session.actions.is_empty() {
+        let last_action = session.actions.len() - 1;
+        for (i, step) in session.get_action(last_action)?.steps().iter().enumerate() {
+            add_editables(conversation, req, config, session, dialect, i)?;
+            conversation.add_user_message(
+                req,
+                &dialect.render_step_request(config, session, last_action, i)?,
+            )?;
+            if step.model_response.is_some() {
+                conversation.add_agent_message(
+                    req,
+                    &dialect.render_step_response(config, session, last_action, i)?,
+                )?;
+            } else if i != session.steps().len() - 1 {
+                // We have no model response, but we're not the last step, so this isn't a user request
+                // step just about to be sent to the model. This is presumably an error - the best we
+                // can do to preserve sequencing is either omit the step entirely or add an omission
+                // message from the agent. Since omitting the step will lose the user's prompt, we opt
+                // for the latter.
+                conversation.add_agent_message(req, "omitted due to error")?;
+            }
         }
     }
     add_editables(

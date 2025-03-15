@@ -76,7 +76,8 @@ mod tests {
     use crate::{
         context::{Context, ContextProvider},
         model::{DummyModel, Model, ModelProvider},
-        session::Session,
+        session::{Action, Session, Step},
+        strategy,
         testutils::test_project,
     };
     use tempfile::tempdir;
@@ -181,6 +182,20 @@ mod tests {
         session.contexts.add(Context::Path(
             Path::new(&config, outside_file_path.to_str().unwrap().to_string()).unwrap(),
         ));
+        session
+            .add_action(
+                Action::new(&config, strategy::Strategy::Code(strategy::Code::new())).unwrap(),
+            )
+            .unwrap();
+        session
+            .last_action_mut()
+            .unwrap()
+            .add_step(Step::new(
+                "test_model".into(),
+                "test prompt".to_string(),
+                strategy::StrategyStep::Code(strategy::CodeStep::default()),
+            ))
+            .unwrap();
 
         let model = Model::Dummy(DummyModel::default());
         if let Model::Dummy(dummy) = model {

@@ -80,16 +80,16 @@ impl ModelProvider for DummyModel {
         out.push_str(&dialect.render_context(config, session)?);
         out.push('\n');
 
+        let last_action = session.actions.len() - 1;
+
         // Add request context
-        if let Ok(act) = session.last_action() {
-            for (i, step) in act.steps().iter().enumerate() {
-                out.push_str(&format!("=== Step {} ===\n", i));
-                out.push_str(&dialect.render_step_request(config, session, i)?);
-                if let Some(_response) = &step.model_response {
-                    out.push_str(&dialect.render_step_response(config, session, i)?);
-                }
-                out.push('\n');
+        for (i, step) in session.actions[last_action].steps().iter().enumerate() {
+            out.push_str(&format!("=== Step {} ===\n", i));
+            out.push_str(&dialect.render_step_request(config, session, last_action, i)?);
+            if let Some(_response) = &step.model_response {
+                out.push_str(&dialect.render_step_response(config, session, last_action, i)?);
             }
+            out.push('\n');
         }
 
         Ok(out)

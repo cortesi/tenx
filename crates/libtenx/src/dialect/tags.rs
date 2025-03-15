@@ -88,17 +88,12 @@ impl DialectProvider for Tags {
         &self,
         _config: &Config,
         session: &Session,
-        offset: usize,
+        step_offset: usize,
+        action_offset: usize,
     ) -> Result<String> {
-        let steps = session.steps();
-        let prompt = steps
-            .get(offset)
-            .ok_or_else(|| TenxError::Internal("Invalid prompt offset".into()))?;
+        let step = session.get_step(action_offset, step_offset)?;
         let mut rendered = String::new();
-        rendered.push_str(&format!(
-            "\n<prompt>\n{}\n</prompt>\n\n",
-            &prompt.raw_prompt
-        ));
+        rendered.push_str(&format!("\n<prompt>\n{}\n</prompt>\n\n", &step.raw_prompt));
         Ok(rendered)
     }
 
@@ -207,12 +202,10 @@ impl DialectProvider for Tags {
         &self,
         _config: &Config,
         session: &Session,
-        offset: usize,
+        step_offset: usize,
+        action_offset: usize,
     ) -> Result<String> {
-        let steps = session.steps();
-        let step = steps
-            .get(offset)
-            .ok_or_else(|| TenxError::Internal("Invalid step offset".into()))?;
+        let step = session.get_step(action_offset, step_offset)?;
         if let Some(resp) = &step.model_response {
             let mut rendered = String::new();
             if let Some(comment) = &resp.comment {
@@ -368,7 +361,7 @@ mod tests {
         }
 
         let result = d
-            .render_step_response(&Config::default(), &p.session, 0)
+            .render_step_response(&Config::default(), &p.session, 0, 0)
             .unwrap();
         assert_eq!(
             result,

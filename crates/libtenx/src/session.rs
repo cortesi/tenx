@@ -246,6 +246,18 @@ impl Session {
             .ok_or_else(|| TenxError::Internal(format!("Invalid action offset: {}", action_offset)))
     }
 
+    pub fn get_step(
+        &self,
+        action_offset: usize,
+        step_offset: usize,
+    ) -> Result<&crate::session::Step> {
+        let action = self.get_action(action_offset)?;
+        action
+            .steps
+            .get(step_offset)
+            .ok_or_else(|| TenxError::Internal(format!("Invalid step offset: {}", step_offset)))
+    }
+
     /// Returns a reference to the last action in the session.
     pub fn last_action(&self) -> Result<&Action> {
         self.actions

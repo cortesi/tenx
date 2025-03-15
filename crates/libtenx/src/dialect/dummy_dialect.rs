@@ -43,7 +43,8 @@ impl DialectProvider for DummyDialect {
         &self,
         _config: &Config,
         _session: &Session,
-        _offset: usize,
+        _action_offset: usize,
+        _step_offset: usize,
     ) -> Result<String> {
         Ok(String::new())
     }
@@ -65,7 +66,8 @@ impl DialectProvider for DummyDialect {
         &self,
         _config: &Config,
         _session: &Session,
-        _offset: usize,
+        _action_offset: usize,
+        _step_offset: usize,
     ) -> Result<String> {
         Ok(String::new())
     }
