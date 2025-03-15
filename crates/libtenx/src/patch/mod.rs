@@ -10,6 +10,7 @@ use std::path::PathBuf;
 
 use fs_err;
 use serde::{Deserialize, Serialize};
+use unirend::{Detail, Render};
 
 use crate::{config::Config, error::Result};
 
@@ -26,6 +27,14 @@ pub enum Change {
 }
 
 impl Change {
+    pub fn name(&self) -> &str {
+        match self {
+            Change::Write(_) => "write",
+            Change::Replace(_) => "replace",
+            Change::View(_) => "view",
+        }
+    }
+
     pub fn path(&self) -> &PathBuf {
         match self {
             Change::Write(write_file) => &write_file.path,
@@ -40,6 +49,37 @@ impl Change {
             Change::Replace(replace) => replace.apply(input),
             Change::View(_) => Ok(input.to_string()),
         }
+    }
+
+    /// Renders this change with the specified level of detail
+    pub fn render<R: Render>(&self, renderer: &mut R, _detail: Detail) -> Result<()> {
+        match self {
+            Change::Write(write_file) => {
+                let path_str = write_file.path.to_string_lossy();
+                renderer.push("write");
+                renderer.push(&format!("write: {}", path_str));
+                renderer.para(&write_file.content);
+                renderer.pop();
+                renderer.pop();
+            }
+            Change::Replace(replace) => {
+                let path_str = replace.path.to_string_lossy();
+                renderer.push("replace");
+                renderer.push(&format!("replace in file: {}", path_str));
+                renderer.push("old:");
+                renderer.para(&replace.old);
+                renderer.pop();
+                renderer.push("new:");
+                renderer.para(&replace.new);
+                renderer.pop();
+                renderer.pop();
+                renderer.pop();
+            }
+            Change::View(_) => {
+                renderer.para("view");
+            }
+        }
+        Ok(())
     }
 }
 
@@ -69,6 +109,56 @@ impl Patch {
             snapshot.insert(path, content);
         }
         Ok(snapshot)
+    }
+
+    /// Groups changes by file path
+    fn changes_by_file(&self) -> HashMap<&PathBuf, Vec<&Change>> {
+        let mut file_changes = HashMap::new();
+        for change in &self.changes {
+            file_changes
+                .entry(change.path())
+                .or_insert_with(Vec::new)
+                .push(change);
+        }
+        file_changes
+    }
+
+    /// Renders the patch with the specified level of detail
+    pub fn render<R: Render>(&self, renderer: &mut R, detail: Detail) -> Result<()> {
+        let affected_files = self.affected_files();
+
+        // Simplest summary for minimal detail
+        if detail < Detail::Default {
+            renderer.para(&format!(
+                "{} changes made to {} files",
+                self.changes.len(),
+                affected_files.len()
+            ));
+        } else {
+            let file_changes = self.changes_by_file();
+            for (file, changes) in file_changes {
+                renderer.push(&file.to_string_lossy());
+                if detail >= Detail::Detailed {
+                    for change in changes {
+                        change.render(renderer, detail)?;
+                    }
+                } else {
+                    let mut counts: HashMap<String, usize> = HashMap::new();
+                    for c in changes {
+                        let count = counts.entry(c.name().to_string()).or_insert(0);
+                        *count += 1;
+                    }
+                    let counts: Vec<String> = counts
+                        .iter()
+                        .map(|(name, count)| format!("{} ({})", name, count))
+                        .collect();
+                    renderer.para(&counts.join(", "));
+                }
+
+                renderer.pop();
+            }
+        }
+        Ok(())
     }
 }
 

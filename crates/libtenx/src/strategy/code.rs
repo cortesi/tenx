@@ -217,6 +217,14 @@ fn render_step<R: Render>(
         }
     }
 
+    if let Some(model_response) = &step.model_response {
+        if let Some(patch) = &model_response.patch {
+            renderer.push("patch");
+            patch.render(renderer, detail)?;
+            renderer.pop();
+        }
+    }
+
     // Add error if present
     if let Some(err) = &step.err {
         if err.should_retry().is_some() {
