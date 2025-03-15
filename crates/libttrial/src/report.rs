@@ -122,8 +122,7 @@ impl TrialReport {
         n: usize,
         config: &libtenx::config::Config,
     ) -> Result<Self> {
-        let steps = session.steps();
-        let model = steps.first().ok_or_else(|| {
+        let model = session.last_step().ok_or_else(|| {
             TenxError::Internal("Cannot create trial report from empty session".to_string())
         })?;
 
@@ -143,26 +142,30 @@ impl TrialReport {
         let mut error_other = 0;
 
         let failed = session.last_step().and_then(|s| s.err.as_ref()).is_some();
-        for step in session.steps() {
-            if let Some(err) = &step.err {
-                match err {
-                    TenxError::Patch { .. } => error_patch += 1,
-                    TenxError::Check { .. } => error_check += 1,
-                    TenxError::ResponseParse { .. } => error_response_parse += 1,
-                    _ => error_other += 1,
+        let mut total_response_time = 0.0;
+        let mut words_received = 0;
+        let mut steps = 0;
+
+        for act in &session.actions {
+            for step in act.steps() {
+                if let Some(err) = &step.err {
+                    match err {
+                        TenxError::Patch { .. } => error_patch += 1,
+                        TenxError::Check { .. } => error_check += 1,
+                        TenxError::ResponseParse { .. } => error_response_parse += 1,
+                        _ => error_other += 1,
+                    }
                 }
+                total_response_time += step.response_time.unwrap_or(0.0);
+                words_received += step
+                    .model_response
+                    .as_ref()
+                    .and_then(|r| r.raw_response.as_ref())
+                    .map(|s| s.split_whitespace().count())
+                    .unwrap_or(0);
+                steps += 1;
             }
         }
-
-        let total_response_time = session.steps().iter().filter_map(|s| s.response_time).sum();
-
-        let words_received = session
-            .steps()
-            .iter()
-            .filter_map(|s| s.model_response.as_ref())
-            .filter_map(|r| r.raw_response.as_ref())
-            .map(|s| s.split_whitespace().count())
-            .sum();
 
         Ok(TrialReport {
             trial_name: trial_name.to_string(),
@@ -170,7 +173,7 @@ impl TrialReport {
             api_model,
             n,
             failed,
-            steps: session.steps().len(),
+            steps,
             error_patch,
             error_check,
             error_response_parse,
