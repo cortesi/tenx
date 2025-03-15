@@ -4,12 +4,12 @@ NOW:
 
 GOALS:
 
-    - Get back to 100% functionality
-        - fix
-        - continue
     - large goal: get rid of Session.steps()
         - Rewrite tests that use steps()
         - Slow process of re-asessing each piece of code that touches this
+    - Get back to 100% functionality
+        - fix
+        - continue
     - Refactor Conversation interface?
     - Shift patch module into state
 
