@@ -4,7 +4,9 @@ use anyhow::{Context as AnyhowContext, Result};
 use tempfile::NamedTempFile;
 use tokio::sync::mpsc;
 
-use libtenx::{events::Event, session::Session};
+use unirend;
+
+use libtenx::{config::Config, events::Event, session::Session};
 
 const SESSION_INFO_MARKER: &str = "\n** Only edit prompt text ABOVE this marker. **\n";
 
@@ -20,49 +22,13 @@ fn get_editor() -> (String, Vec<String>) {
     (command, args)
 }
 
-/// Renders a step as a comment.
-fn render_step(session: &Session, step_offset: usize) -> String {
-    let mut text = String::new();
-    let steps = session.steps();
-    let step = &steps[step_offset];
-
-    text.push_str(&format!("## Step {}\n\n", step_offset));
-    text.push_str("### Prompt");
-    text.push_str("\n```\n");
-    for line in step.raw_prompt.lines() {
-        text.push_str(&format!("    {}\n", line));
-    }
-    text.push_str("```\n");
-    if let Some(response) = &step.model_response {
-        if let Some(comment) = &response.comment {
-            text.push_str("\n### Response");
-            text.push_str("\n```\n");
-            for line in comment.lines() {
-                text.push_str(&format!("    {}\n", line));
-            }
-            text.push_str("```\n");
-        }
-    }
-    text.push('\n');
-    text
-}
-
 /// Renders the session summary
-fn render_session_summary(session: &Session, retry: bool) -> String {
-    let mut text = String::new();
-    let steps = session.steps();
-    let start_idx = if retry && !steps.is_empty() {
-        steps.len() - 1
-    } else {
-        steps.len()
-    };
-    for i in (0..start_idx).rev() {
-        text.push_str(&render_step(session, i));
-        if i > 0 {
-            text.push('\n');
-        }
-    }
-    text
+fn render_session_summary(session: &Session, _retry: bool) -> String {
+    let mut md = unirend::Markdown::new();
+    session
+        .render(&Config::default(), &mut md, unirend::Detail::Default)
+        .unwrap();
+    md.render()
 }
 
 /// Renders the text for the user to edit. This includes space for the user's prompt, and a
