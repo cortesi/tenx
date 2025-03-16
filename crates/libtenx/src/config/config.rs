@@ -18,8 +18,9 @@ use crate::{
     config::default_config,
     dialect,
     error::{self, TenxError},
-    model, state,
+    model,
 };
+use state;
 
 pub const HOME_CONFIG_FILE: &str = "tenx.ron";
 pub const PROJECT_CONFIG_FILE: &str = ".tenx.ron";
@@ -696,7 +697,9 @@ impl Config {
     /// Construct the default state for the project, including the project root directory, and
     /// a memory overlay for files prefixed with "::".
     pub fn state(&self) -> error::Result<state::State> {
-        state::State::default().with_directory(&self.project.root, self.project.include.clone())
+        let s = state::State::default()
+            .with_directory(&self.project.root, self.project.include.clone())?;
+        Ok(s)
     }
 
     pub fn project_files(&self) -> error::Result<Vec<PathBuf>> {

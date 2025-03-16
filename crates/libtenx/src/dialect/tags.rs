@@ -9,9 +9,9 @@ use crate::{
     context::ContextProvider,
     error::{Result, TenxError},
     session::{ModelResponse, Session},
-    state::patch::{Change, Patch, Replace, WriteFile},
 };
 use fs_err as fs;
+use state::patch::{Change, Patch, Replace, WriteFile};
 
 const SYSTEM: &str = include_str!("./tags-system.txt");
 const REPLACE: &str = include_str!("./tags-replace.txt");

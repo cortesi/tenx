@@ -8,7 +8,6 @@ pub mod events;
 pub mod model;
 pub mod session;
 pub mod session_store;
-pub mod state;
 pub mod strategy;
 mod tenx;
 pub mod testutils;

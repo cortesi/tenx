@@ -6,8 +6,8 @@ use std::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    error::{Result, TenxError},
-    state::abspath::AbsPath,
+    abspath::AbsPath,
+    error::{Error, Result},
 };
 
 use super::files;
@@ -29,7 +29,7 @@ impl Directory {
     fn abspath(&self, path: &Path) -> Result<PathBuf> {
         let p = PathBuf::from(&*self.root).join(path);
         absolute(p.clone())
-            .map_err(|e| TenxError::Internal(format!("could not absolute {}: {}", p.display(), e)))
+            .map_err(|e| Error::Internal(format!("could not absolute {}: {}", p.display(), e)))
     }
 
     /// List files in the directory using ignore rules, returning all included files relative to
@@ -47,13 +47,13 @@ impl Directory {
     pub fn read(&self, path: &Path) -> Result<String> {
         let abs_path = self.abspath(path)?;
         if !abs_path.exists() {
-            return Err(TenxError::NotFound {
+            return Err(Error::NotFound {
                 msg: "File not found".to_string(),
                 path: path.display().to_string(),
             });
         }
         fs::read_to_string(&abs_path).map_err(|e| {
-            TenxError::Internal(format!("Could not read file {}: {}", abs_path.display(), e))
+            Error::Internal(format!("Could not read file {}: {}", abs_path.display(), e))
         })
     }
 
@@ -62,29 +62,28 @@ impl Directory {
         let abs_path = self.abspath(path)?;
         if let Some(parent) = abs_path.parent() {
             fs::create_dir_all(parent).map_err(|e| {
-                TenxError::Internal(format!(
+                Error::Internal(format!(
                     "Could not create directory {}: {}",
                     parent.display(),
                     e
                 ))
             })?;
         }
-        fs::write(&abs_path, content).map_err(|e| {
-            TenxError::Internal(format!("Could not write file {}: {}", path.display(), e))
-        })
+        fs::write(&abs_path, content)
+            .map_err(|e| Error::Internal(format!("Could not write file {}: {}", path.display(), e)))
     }
 
     /// Removes a file by joining the given path with the root directory.
     pub fn remove(&mut self, path: &Path) -> Result<()> {
         let abs_path = self.root.join(path);
         if !abs_path.exists() {
-            return Err(TenxError::NotFound {
+            return Err(Error::NotFound {
                 msg: "File not found".to_string(),
                 path: path.display().to_string(),
             });
         }
         fs::remove_file(&abs_path).map_err(|e| {
-            TenxError::Internal(format!(
+            Error::Internal(format!(
                 "Could not remove file {}: {}",
                 abs_path.display(),
                 e

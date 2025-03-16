@@ -5,10 +5,12 @@
 //!
 //! The actual state consists of a filesystem directory and an in-memory store. Files in the
 //! in-memory store are prefixed with `::`.
-pub mod abspath;
 mod directory;
-pub mod files;
 mod memory;
+
+pub mod abspath;
+pub mod error;
+pub mod files;
 pub mod patch;
 
 use patch::{Change, Patch, WriteFile};
@@ -19,11 +21,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use diffy;
 use globset::Glob;
 use serde::{Deserialize, Serialize};
 
-use crate::error::{Result, TenxError};
+use crate::error::{Error, Result};
 
 /// Prefix for in-memory files
 pub const MEM_PREFIX: &str = "::";
@@ -43,15 +44,14 @@ pub struct PatchInfo {
     /// Some operations, like View, mean the dialogue with the model should continue
     pub should_continue: bool,
     /// All errors here are of type TenxError::Patch
-    pub failures: Vec<(Change, TenxError)>,
+    pub failures: Vec<(Change, Error)>,
 }
 
 impl PatchInfo {
-    pub fn add_failure(&mut self, change: Change, error: TenxError) -> Result<()> {
+    pub fn add_failure(&mut self, change: Change, error: Error) -> Result<()> {
         match error {
-            TenxError::Patch { user, model } => {
-                self.failures
-                    .push((change, TenxError::Patch { user, model }));
+            Error::Patch { user, model } => {
+                self.failures.push((change, Error::Patch { user, model }));
                 Ok(())
             }
             _ => Err(error),
@@ -198,7 +198,7 @@ impl State {
         } else if let Some(ref fs) = self.directory {
             f(fs)
         } else {
-            Err(TenxError::NotFound {
+            Err(Error::NotFound {
                 msg: "No matching store".to_string(),
                 path: path.display().to_string(),
             })
@@ -215,7 +215,7 @@ impl State {
         } else if let Some(ref mut fs) = self.directory {
             f(fs)
         } else {
-            Err(TenxError::NotFound {
+            Err(Error::NotFound {
                 msg: "No matching store".to_string(),
                 path: path.display().to_string(),
             })
@@ -244,7 +244,7 @@ impl State {
         for p in paths {
             match self.read(p) {
                 Ok(content) => snap.insert(p.clone(), content),
-                Err(TenxError::NotFound { .. }) => snap.create(p.clone()),
+                Err(Error::NotFound { .. }) => snap.create(p.clone()),
                 Err(e) => return Err(e),
             }
         }
@@ -327,7 +327,7 @@ impl State {
             }
         }
         if to_revert.is_empty() {
-            return Err(TenxError::Internal(format!("Snapshot id {} not found", id)));
+            return Err(Error::Internal(format!("Snapshot id {} not found", id)));
         }
         for (_id, snap) in to_revert.into_iter().rev() {
             self.revert_snapshot(snap)?;
@@ -443,9 +443,9 @@ impl State {
         for pattern in &patterns {
             let cleaned = path_clean::clean(pattern);
             let pattern_str = cleaned.to_str().ok_or_else(|| {
-                TenxError::Internal("Failed to convert cleaned path to string".to_string())
+                Error::Internal("Failed to convert cleaned path to string".to_string())
             })?;
-            let glob = Glob::new(pattern_str).map_err(|e| TenxError::Path(e.to_string()))?;
+            let glob = Glob::new(pattern_str).map_err(|e| Error::Path(e.to_string()))?;
             let matcher = glob.compile_matcher();
             for file in &mem_files {
                 if matcher.is_match(file) {
@@ -463,9 +463,9 @@ impl State {
                 }
                 let normalized = files::normalize_path(dir.root.clone(), cwd.clone(), pattern)?;
                 let pattern_str = normalized.to_str().ok_or_else(|| {
-                    TenxError::Internal("Failed to convert normalized path to string".to_string())
+                    Error::Internal("Failed to convert normalized path to string".to_string())
                 })?;
-                let glob = Glob::new(pattern_str).map_err(|e| TenxError::Path(e.to_string()))?;
+                let glob = Glob::new(pattern_str).map_err(|e| Error::Path(e.to_string()))?;
                 let matcher = glob.compile_matcher();
                 for file in &dir_files {
                     if matcher.is_match(file) {
@@ -594,7 +594,7 @@ mod tests {
                 fs_content: None,
                 memory_content: None,
                 path: "test.txt",
-                expected: Err(TenxError::NotFound {
+                expected: Err(Error::NotFound {
                     msg: "No matching store".to_string(),
                     path: "test.txt".to_string(),
                 }),
@@ -604,7 +604,7 @@ mod tests {
                 fs_content: Some("file content"),
                 memory_content: None,
                 path: "nonexistent.txt",
-                expected: Err(TenxError::NotFound {
+                expected: Err(Error::NotFound {
                     msg: "File not found".to_string(),
                     path: "nonexistent.txt".to_string(),
                 }),
@@ -652,9 +652,9 @@ mod tests {
                         result
                     );
                     let err = result.unwrap_err();
-                    if let TenxError::NotFound { msg, path } = err {
+                    if let Error::NotFound { msg, path } = err {
                         assert_eq!(
-                            TenxError::NotFound { msg, path },
+                            Error::NotFound { msg, path },
                             match &case.expected {
                                 Err(expected) => expected.clone(),
                                 _ => panic!("Expected error variant"),
@@ -879,7 +879,7 @@ mod tests {
                     let got: Vec<&str> = got.iter().map(|p| p.to_str().unwrap()).collect();
                     assert_eq!(got, expected, "{}: got wrong paths", case.name);
                 }
-                (Err(TenxError::Internal(got)), Err(TenxError::Internal(expected))) => {
+                (Err(Error::Internal(got)), Err(Error::Internal(expected))) => {
                     assert_eq!(got, expected, "{}: got wrong error message", case.name);
                 }
                 (got, expected) => {
@@ -1352,7 +1352,7 @@ mod tests {
                     let got: Vec<&str> = got.iter().map(|p| p.to_str().unwrap()).collect();
                     assert_eq!(got, expected, "{}: got wrong paths", case.name);
                 }
-                (Err(TenxError::Internal(got)), Err(TenxError::Internal(expected))) => {
+                (Err(Error::Internal(got)), Err(Error::Internal(expected))) => {
                     assert_eq!(got, expected, "{}: got wrong error message", case.name);
                 }
                 (got, expected) => {

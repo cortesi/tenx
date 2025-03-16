@@ -11,6 +11,7 @@ readme.workspace = true
 
 [dependencies]
 unirend = { path = "../unirend" }
+state = { path = "../state" }
 
 anyhow = "1.0.86"
 clap = { version = "4.5.13", features = ["derive", "env", "wrap_help"] }

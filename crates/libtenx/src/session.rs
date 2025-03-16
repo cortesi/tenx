@@ -7,9 +7,9 @@ use crate::{
     config, context,
     error::{Result, TenxError},
     model::Usage,
-    state::{self, patch::Patch},
     strategy::{self, ActionStrategy, StrategyStep},
 };
+use state::{self, patch::Patch};
 use unirend::Detail;
 
 /// A parsed model response
@@ -410,9 +410,10 @@ impl Session {
             None
         };
 
-        action
+        let ret = action
             .state
-            .last_changed_between(prev_rollback_id, curr_rollback_id)
+            .last_changed_between(prev_rollback_id, curr_rollback_id)?;
+        Ok(ret)
     }
 
     /// Render the session using the provided renderer

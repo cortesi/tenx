@@ -408,9 +408,9 @@ mod tests {
 
     use crate::{
         session::ModelResponse,
-        state::patch::{Change, Patch, WriteFile},
         strategy::{Completion, InputRequired},
     };
+    use state::patch::{Change, Patch, WriteFile};
 
     use fs_err as fs;
     use tempfile::tempdir;

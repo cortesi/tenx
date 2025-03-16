@@ -7,7 +7,7 @@ use pathdiff::diff_paths;
 
 use super::abspath::IntoAbsPath;
 
-use crate::error::{Result, TenxError};
+use crate::error::{Error, Result};
 
 const GLOB_START: &str = "*";
 
@@ -38,13 +38,13 @@ where
     };
 
     let rel_path = diff_paths(&abs_path, &root).ok_or_else(|| {
-        TenxError::Path(format!(
+        Error::Path(format!(
             "Path not under current directory: {}",
             path.display()
         ))
     })?;
     if rel_path.starts_with("..") {
-        return Err(TenxError::Path(format!(
+        return Err(Error::Path(format!(
             "Path not under current directory: {}",
             path.display()
         )));
@@ -71,15 +71,15 @@ where
     for pattern in &globs {
         builder
             .add(pattern)
-            .map_err(|e| TenxError::Path(format!("Invalid glob pattern: {}", e)))?;
+            .map_err(|e| Error::Path(format!("Invalid glob pattern: {}", e)))?;
     }
     builder
         .add("!/.git")
-        .map_err(|e| TenxError::Path(format!("Invalid glob pattern: {}", e)))?; // Don't include the .git directory
+        .map_err(|e| Error::Path(format!("Invalid glob pattern: {}", e)))?; // Don't include the .git directory
 
     let overrides = builder
         .build()
-        .map_err(|e| TenxError::Path(format!("Failed to build override rules: {}", e)))?;
+        .map_err(|e| Error::Path(format!("Failed to build override rules: {}", e)))?;
 
     // Build and configure the walker
     let mut walker = WalkBuilder::new(&root);
@@ -94,7 +94,7 @@ where
     // Collect all files, converting to relative paths
     let mut files = Vec::new();
     for result in walker.build() {
-        let entry = result.map_err(|e| TenxError::Path(format!("Walk error: {}", e)))?;
+        let entry = result.map_err(|e| Error::Path(format!("Walk error: {}", e)))?;
         if entry.file_type().is_some_and(|ft| ft.is_file()) {
             if let Ok(path) = entry.path().strip_prefix(&root) {
                 files.push(path.to_path_buf());
@@ -108,7 +108,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::state::abspath::AbsPath;
+    use crate::abspath::AbsPath;
     use std::{fs, path::Path, process::Command};
     use tempfile::TempDir;
 

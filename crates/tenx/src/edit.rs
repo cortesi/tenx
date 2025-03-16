@@ -103,9 +103,9 @@ mod tests {
 
     use libtenx::{
         session::{Action, ModelResponse, Step},
-        state::patch::Patch,
         strategy, testutils,
     };
+    use state::patch::Patch;
 
     use pretty_assertions::assert_eq;
 

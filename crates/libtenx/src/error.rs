@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use state;
 use thiserror::Error;
 
 use crate::throttle::Throttle;
@@ -95,6 +96,18 @@ impl From<misanthropy::Error> for TenxError {
             misanthropy::Error::RateLimitExceeded(_msg) => TenxError::Throttle(Throttle::Backoff),
             misanthropy::Error::ApiOverloaded(_msg) => TenxError::Throttle(Throttle::Backoff),
             _ => TenxError::Model(error.to_string()),
+        }
+    }
+}
+
+impl From<state::error::Error> for TenxError {
+    fn from(e: state::error::Error) -> Self {
+        match e {
+            state::error::Error::Path(e) => TenxError::Path(e),
+            state::error::Error::Io(e) => TenxError::Io(e),
+            state::error::Error::NotFound { msg, path } => TenxError::NotFound { msg, path },
+            state::error::Error::Internal(e) => TenxError::Internal(e),
+            state::error::Error::Patch { user, model } => TenxError::Patch { user, model },
         }
     }
 }

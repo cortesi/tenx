@@ -5,7 +5,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::error::{Result, TenxError};
+use crate::error::{Error, Result};
 use serde::{Deserialize, Serialize};
 
 /// A helper trait to convert a type into an AbsPath.
@@ -39,7 +39,7 @@ impl AbsPath {
     /// Creates a new AbsPath, ensuring the path is absolute.
     pub fn new(path: PathBuf) -> Result<Self> {
         if !path.is_absolute() {
-            return Err(TenxError::Internal(format!(
+            return Err(Error::Internal(format!(
                 "Path must be absolute: '{}'",
                 path.display()
             )));
@@ -49,7 +49,7 @@ impl AbsPath {
 }
 
 impl TryFrom<&PathBuf> for AbsPath {
-    type Error = TenxError;
+    type Error = Error;
 
     fn try_from(path: &PathBuf) -> std::result::Result<Self, Self::Error> {
         Self::new(path.to_path_buf())
@@ -57,7 +57,7 @@ impl TryFrom<&PathBuf> for AbsPath {
 }
 
 impl TryFrom<PathBuf> for AbsPath {
-    type Error = TenxError;
+    type Error = Error;
 
     fn try_from(path: PathBuf) -> std::result::Result<Self, Self::Error> {
         Self::new(path)

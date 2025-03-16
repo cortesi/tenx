@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-use crate::error::{Result, TenxError};
+use crate::error::{Error, Result};
 
 /// An operation that replaces once occurrence of a string with another.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -41,7 +41,7 @@ impl Replace {
             }
         }
 
-        Err(TenxError::Patch {
+        Err(Error::Patch {
             user: "Could not find the text to replace".to_string(),
             model: format!(
                 "Invalid replace specification - could not find the following text in the source file:\n{}",
