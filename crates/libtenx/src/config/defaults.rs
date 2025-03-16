@@ -347,7 +347,7 @@ fn default_checks() -> Checks {
         builtin: vec![
             CheckConfig {
                 name: "cargo-check".to_string(),
-                command: "cargo check --tests".to_string(),
+                command: "cargo check --tests --examples".to_string(),
                 globs: vec!["*.rs".to_string()],
                 default_off: false,
                 fail_on_stderr: false,
