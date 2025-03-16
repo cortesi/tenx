@@ -105,7 +105,7 @@ mod tests {
         session::{Action, ModelResponse, Step},
         strategy, testutils,
     };
-    use state::patch::Patch;
+    use state::Patch;
 
     use pretty_assertions::assert_eq;
 

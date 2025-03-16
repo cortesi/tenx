@@ -410,7 +410,7 @@ mod tests {
         session::ModelResponse,
         strategy::{Completion, InputRequired},
     };
-    use state::patch::{Change, Patch, WriteFile};
+    use state::{Change, Patch, WriteFile};
 
     use fs_err as fs;
     use tempfile::tempdir;

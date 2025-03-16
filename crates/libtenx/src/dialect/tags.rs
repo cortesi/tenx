@@ -11,7 +11,7 @@ use crate::{
     session::{ModelResponse, Session},
 };
 use fs_err as fs;
-use state::patch::{Change, Patch, Replace, WriteFile};
+use state::{Change, Patch, Replace, WriteFile};
 
 const SYSTEM: &str = include_str!("./tags-system.txt");
 const REPLACE: &str = include_str!("./tags-replace.txt");

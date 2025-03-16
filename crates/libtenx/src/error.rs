@@ -100,14 +100,14 @@ impl From<misanthropy::Error> for TenxError {
     }
 }
 
-impl From<state::error::Error> for TenxError {
-    fn from(e: state::error::Error) -> Self {
+impl From<state::Error> for TenxError {
+    fn from(e: state::Error) -> Self {
         match e {
-            state::error::Error::Path(e) => TenxError::Path(e),
-            state::error::Error::Io(e) => TenxError::Io(e),
-            state::error::Error::NotFound { msg, path } => TenxError::NotFound { msg, path },
-            state::error::Error::Internal(e) => TenxError::Internal(e),
-            state::error::Error::Patch { user, model } => TenxError::Patch { user, model },
+            state::Error::Path(e) => TenxError::Path(e),
+            state::Error::Io(e) => TenxError::Io(e),
+            state::Error::NotFound { msg, path } => TenxError::NotFound { msg, path },
+            state::Error::Internal(e) => TenxError::Internal(e),
+            state::Error::Patch { user, model } => TenxError::Patch { user, model },
         }
     }
 }

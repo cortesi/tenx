@@ -9,7 +9,7 @@ use crate::{
     model::Usage,
     strategy::{self, ActionStrategy, StrategyStep},
 };
-use state::{self, patch::Patch};
+use state::{self, Patch};
 use unirend::Detail;
 
 /// A parsed model response

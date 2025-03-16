@@ -12,7 +12,6 @@ use serde::{Deserialize, Serialize};
 
 use ron;
 
-use super::files;
 use crate::{
     checks,
     config::default_config,
@@ -703,7 +702,9 @@ impl Config {
     }
 
     pub fn project_files(&self) -> error::Result<Vec<PathBuf>> {
-        files::walk_project(&self.project)
+        let root = state::abspath::AbsPath::new(self.project.root.clone())?;
+        let ret = state::files::list_files(root, self.project.include.clone())?;
+        Ok(ret)
     }
 
     /// Serialize the Config into a RON string.

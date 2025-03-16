@@ -3,7 +3,6 @@
 #[allow(clippy::module_inception)]
 mod config;
 mod defaults;
-mod files;
 
 pub use config::*;
 pub use defaults::*;

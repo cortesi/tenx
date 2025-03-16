@@ -6,14 +6,15 @@
 //! The actual state consists of a filesystem directory and an in-memory store. Files in the
 //! in-memory store are prefixed with `::`.
 mod directory;
+mod error;
 mod memory;
 
 pub mod abspath;
-pub mod error;
 pub mod files;
-pub mod patch;
+mod patch;
 
-use patch::{Change, Patch, WriteFile};
+pub use crate::error::*;
+pub use crate::patch::*;
 
 use std::{
     collections::{BTreeSet, HashMap, HashSet},
@@ -23,8 +24,6 @@ use std::{
 
 use globset::Glob;
 use serde::{Deserialize, Serialize};
-
-use crate::error::{Error, Result};
 
 /// Prefix for in-memory files
 pub const MEM_PREFIX: &str = "::";
