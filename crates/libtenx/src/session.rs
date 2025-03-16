@@ -231,14 +231,6 @@ impl Session {
         self.actions.clear();
     }
 
-    /// Returns all steps across all actions in the session.
-    pub fn steps(&self) -> Vec<&Step> {
-        self.actions
-            .iter()
-            .flat_map(|action| &action.steps)
-            .collect()
-    }
-
     /// Get action and validate it exists
     pub fn get_action(&self, action_offset: usize) -> Result<&crate::session::Action> {
         self.actions

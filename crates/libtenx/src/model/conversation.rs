@@ -1,64 +1,13 @@
 use crate::{
     config::Config,
     dialect::{Dialect, DialectProvider},
-    error::{Result, TenxError},
+    error::Result,
     session::Session,
 };
 
 pub const EDITABLE_LEADIN: &str = "Here are the editable files.";
 pub const CONTEXT_LEADIN: &str = "Here is some immutable context that you may not edit.";
 pub const ACK: &str = "Got it.";
-
-/// Convert a flat step offset into action and step indices
-fn offset_to_indices(session: &Session, step_offset: usize) -> Result<(usize, usize)> {
-    // Handle empty session specially
-    if session.actions.is_empty() {
-        // For empty sessions, treat offset 0 as action 0, step 0 (even though they don't exist)
-        if step_offset == 0 {
-            return Ok((0, 0));
-        }
-        return Err(TenxError::Internal(format!(
-            "Invalid step offset: {} for empty session",
-            step_offset
-        )));
-    }
-
-    let mut remaining = step_offset;
-    for (action_idx, action) in session.actions.iter().enumerate() {
-        if remaining < action.steps().len() {
-            return Ok((action_idx, remaining));
-        }
-        remaining -= action.steps().len();
-    }
-
-    // If we reach here, the offset is equal to or greater than the total number of steps
-    let total_steps = session.steps().len();
-
-    // If offset is exactly at the end, use the last action with a step index at its end
-    if step_offset == total_steps {
-        let action_idx = session.actions.len() - 1;
-        let step_idx = session.actions[action_idx].steps().len() - 1;
-        return Ok((action_idx, step_idx));
-    }
-
-    // If the action has steps but step_offset is beyond the end
-    if total_steps > 0 && step_offset > total_steps {
-        return Err(TenxError::Internal(format!(
-            "Step offset {} exceeds total steps {}",
-            step_offset, total_steps
-        )));
-    }
-
-    // Default for testing - if actions exist but have no steps, use first action, step 0
-    if total_steps == 0 {
-        return Ok((0, 0));
-    }
-
-    Err(TenxError::Internal(format!(
-        "Invalid step offset: {}",
-        step_offset
-    )))
-}
 
 /// Conversation lets us extact a generic strategy for dealing with conversational
 /// models, where there is a User/Assistant request/response cycle.
@@ -74,7 +23,8 @@ fn add_editables<C, R>(
     config: &Config,
     session: &Session,
     dialect: &Dialect,
-    step_offset: usize,
+    action_idx: usize,
+    step_idx: usize,
 ) -> Result<()>
 where
     C: Conversation<R>,
@@ -84,32 +34,29 @@ where
         return Ok(());
     }
 
-    // Try to convert the offset to indices
-    if let Ok((action_idx, step_idx)) = offset_to_indices(session, step_offset) {
-        // Handle cases where we need to safely get editables
-        let editables = if action_idx < session.actions.len() {
-            let action = &session.actions[action_idx];
-            // If this is a valid step in the action or just at the end
-            if step_idx < action.steps().len() {
-                session.editables_for_step_state(action_idx, step_idx)?
-            } else {
-                vec![]
-            }
+    // Handle cases where we need to safely get editables
+    let editables = if action_idx < session.actions.len() {
+        let action = &session.actions[action_idx];
+        // If this is a valid step in the action or just at the end
+        if step_idx < action.steps().len() {
+            session.editables_for_step_state(action_idx, step_idx)?
         } else {
             vec![]
-        };
-
-        if !editables.is_empty() {
-            conversation.add_user_message(
-                req,
-                &format!(
-                    "{}\n{}",
-                    EDITABLE_LEADIN,
-                    dialect.render_editables(config, session, editables)?
-                ),
-            )?;
-            conversation.add_agent_message(req, ACK)?;
         }
+    } else {
+        vec![]
+    };
+
+    if !editables.is_empty() {
+        conversation.add_user_message(
+            req,
+            &format!(
+                "{}\n{}",
+                EDITABLE_LEADIN,
+                dialect.render_editables(config, session, editables)?
+            ),
+        )?;
+        conversation.add_agent_message(req, ACK)?;
     }
 
     Ok(())
@@ -139,7 +86,7 @@ where
     if !session.actions.is_empty() {
         let last_action = session.actions.len() - 1;
         for (i, step) in session.get_action(last_action)?.steps().iter().enumerate() {
-            add_editables(conversation, req, config, session, dialect, i)?;
+            add_editables(conversation, req, config, session, dialect, last_action, i)?;
             conversation.add_user_message(
                 req,
                 &dialect.render_step_request(config, session, last_action, i)?,
@@ -149,7 +96,7 @@ where
                     req,
                     &dialect.render_step_response(config, session, last_action, i)?,
                 )?;
-            } else if i != session.steps().len() - 1 {
+            } else if i != session.actions[last_action].steps().len() - 1 {
                 // We have no model response, but we're not the last step, so this isn't a user request
                 // step just about to be sent to the model. This is presumably an error - the best we
                 // can do to preserve sequencing is either omit the step entirely or add an omission
@@ -158,15 +105,16 @@ where
                 conversation.add_agent_message(req, "omitted due to error")?;
             }
         }
+        add_editables(
+            conversation,
+            req,
+            config,
+            session,
+            dialect,
+            last_action,
+            session.actions[last_action].steps().len(),
+        )?;
     }
-    add_editables(
-        conversation,
-        req,
-        config,
-        session,
-        dialect,
-        session.steps().len(),
-    )?;
     Ok(())
 }
 
