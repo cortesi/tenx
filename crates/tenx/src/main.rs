@@ -512,7 +512,7 @@ async fn main() -> anyhow::Result<()> {
                         session
                             .last_action_mut()?
                             .state
-                            .view(&config.cwd()?, files.to_vec())?;
+                            .touch(&config.cwd()?, files.to_vec())?;
                     }
                     tx.continue_steps(&mut session, Some(user_prompt), Some(sender.clone()), None)
                         .await?;
@@ -549,7 +549,7 @@ async fn main() -> anyhow::Result<()> {
                             session
                                 .last_action_mut()?
                                 .state
-                                .view(&config.cwd()?, file_list.to_vec())?;
+                                .touch(&config.cwd()?, file_list.to_vec())?;
                         }
                     }
 
@@ -752,7 +752,7 @@ async fn main() -> anyhow::Result<()> {
                             session
                                 .last_action_mut()?
                                 .state
-                                .view(&config.cwd()?, file_list.to_vec())?;
+                                .touch(&config.cwd()?, file_list.to_vec())?;
                         }
                     }
 

@@ -272,7 +272,7 @@ impl ActionStrategy for Code {
         action_offset: usize,
         events: Option<EventSender>,
     ) -> Result<()> {
-        let paths = session.actions[action_offset].state.touched()?;
+        let paths = session.actions[action_offset].state.changed()?;
         check_paths(config, &paths, &events)
     }
 
@@ -361,7 +361,7 @@ impl ActionStrategy for Fix {
         action_offset: usize,
         events: Option<EventSender>,
     ) -> Result<()> {
-        let paths = &session.actions[action_offset].state.touched()?;
+        let paths = &session.actions[action_offset].state.changed()?;
         check_paths(config, paths, &events)
     }
 

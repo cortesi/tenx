@@ -169,7 +169,7 @@ impl Action {
         renderer.push(&format!("{}: {}", action_offset, self.strategy.name()));
 
         // Add list of touched files if there are any
-        if let Ok(touched_files) = self.state.touched() {
+        if let Ok(touched_files) = self.state.changed() {
             if !touched_files.is_empty() {
                 renderer.push("files");
                 let file_strings: Vec<String> = touched_files

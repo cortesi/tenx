@@ -171,7 +171,7 @@ impl Trial {
                     session
                         .last_action_mut()?
                         .state
-                        .view(tenx.config.cwd()?, vec![path.to_string_lossy().to_string()])?;
+                        .touch(tenx.config.cwd()?, vec![path.to_string_lossy().to_string()])?;
                 }
             }
         }
@@ -197,7 +197,7 @@ impl Trial {
             ".pytest/**".to_string(),
             "__pycache__/**".to_string(),
         ];
-        config.step_limit = 1;
+        config.step_limit = 3;
         // We disable streaming for trials by default, because streaming messes up token counts
         config.models.no_stream = true;
         Ok(config)

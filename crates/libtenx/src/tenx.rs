@@ -114,7 +114,7 @@ impl Tenx {
         let (_, count) = session
             .last_action_mut()?
             .state
-            .view(&self.config.cwd()?, files.to_vec())?;
+            .touch(&self.config.cwd()?, files.to_vec())?;
         self.save_session(session)?;
         Ok(count)
     }
@@ -480,7 +480,7 @@ mod tests {
             .last_action_mut()
             .unwrap()
             .state
-            .view(temp_dir.path().to_path_buf(), vec!["**".to_string()])
+            .touch(temp_dir.path().to_path_buf(), vec!["**".to_string()])
             .unwrap();
 
         // Run the steps
@@ -549,7 +549,7 @@ mod tests {
             .last_action_mut()
             .unwrap()
             .state
-            .view(temp_dir.path().to_path_buf(), vec!["**".to_string()])
+            .touch(temp_dir.path().to_path_buf(), vec!["**".to_string()])
             .unwrap();
 
         let state = tenx
