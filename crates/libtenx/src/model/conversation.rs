@@ -85,7 +85,7 @@ where
     conversation.add_agent_message(req, ACK)?;
     if !session.actions.is_empty() {
         let last_action = session.actions.len() - 1;
-        for (i, step) in session.get_action(last_action)?.steps.iter().enumerate() {
+        for (i, step) in session.actions[last_action].steps.iter().enumerate() {
             add_editables(conversation, req, config, session, dialect, last_action, i)?;
             conversation.add_user_message(
                 req,

@@ -91,7 +91,7 @@ impl DialectProvider for Tags {
         action_offset: usize,
         step_offset: usize,
     ) -> Result<String> {
-        let step = session.get_step(action_offset, step_offset)?;
+        let step = &session.actions[action_offset].steps[step_offset];
         let mut rendered = String::new();
         rendered.push_str(&format!("\n<prompt>\n{}\n</prompt>\n\n", &step.raw_prompt));
         Ok(rendered)
@@ -205,7 +205,7 @@ impl DialectProvider for Tags {
         action_offset: usize,
         step_offset: usize,
     ) -> Result<String> {
-        let step = session.get_step(action_offset, step_offset)?;
+        let step = &session.actions[action_offset].steps[step_offset];
         if let Some(resp) = &step.model_response {
             let mut rendered = String::new();
             if let Some(comment) = &resp.comment {

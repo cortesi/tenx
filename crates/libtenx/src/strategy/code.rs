@@ -272,7 +272,7 @@ impl ActionStrategy for Code {
         action_offset: usize,
         events: Option<EventSender>,
     ) -> Result<()> {
-        let paths = session.get_action(action_offset)?.state.touched()?;
+        let paths = session.actions[action_offset].state.touched()?;
         check_paths(config, &paths, &events)
     }
 
@@ -284,7 +284,7 @@ impl ActionStrategy for Code {
         events: Option<EventSender>,
         prompt: Option<String>,
     ) -> Result<ActionState> {
-        let action = session.get_action(action_offset)?;
+        let action = &session.actions[action_offset];
 
         if let Some(step) = action.last_step() {
             // If the last step is incomplete, don't synthesize a new step
@@ -343,9 +343,9 @@ impl ActionStrategy for Code {
         renderer: &mut R,
         detail: Detail,
     ) -> Result<()> {
-        let step = session.get_action(action_offset)?.steps[step_offset].clone();
+        let step = &session.actions[action_offset].steps[step_offset].clone();
         let header = format!("step {}:{}", action_offset, step_offset);
-        render_step(&step, renderer, &header, false, detail)
+        render_step(step, renderer, &header, false, detail)
     }
 }
 
@@ -361,8 +361,8 @@ impl ActionStrategy for Fix {
         action_offset: usize,
         events: Option<EventSender>,
     ) -> Result<()> {
-        let paths = session.get_action(action_offset)?.state.touched()?;
-        check_paths(config, &paths, &events)
+        let paths = &session.actions[action_offset].state.touched()?;
+        check_paths(config, paths, &events)
     }
 
     fn next_step(
@@ -373,7 +373,7 @@ impl ActionStrategy for Fix {
         events: Option<EventSender>,
         prompt: Option<String>,
     ) -> Result<ActionState> {
-        let action = session.get_action(action_offset)?;
+        let action = &session.actions[action_offset];
 
         if let Some(step) = action.last_step() {
             // If the last step is incomplete, don't synthesize a new step
@@ -434,12 +434,12 @@ impl ActionStrategy for Fix {
         renderer: &mut R,
         detail: Detail,
     ) -> Result<()> {
-        let step = session.get_action(action_offset)?.steps[step_offset].clone();
+        let step = &session.actions[action_offset].steps[step_offset].clone();
 
         // Create the header
         let header = format!("Step {}", step_offset);
 
-        render_step(&step, renderer, &header, true, detail)
+        render_step(step, renderer, &header, true, detail)
     }
 }
 
