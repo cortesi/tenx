@@ -16,13 +16,14 @@ use crate::error::Result;
 /// A change to be applied to the state.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum Change {
-    /// Write a complete file.
+    /// Write or create a complete file.
     Write(write::WriteFile),
+
     /// Replace one piece of text with another.
     Replace(replace::Replace),
-    /// View is basically a NoOp, it just enters the path as an affected file, which in turn
-    /// causes it to be output by the dialect at the appropriate point.
-    View(PathBuf),
+
+    /// Touch is a NoOp, it just enters the path as an affected file without modifying it.
+    Touch(PathBuf),
 }
 
 impl Change {
@@ -31,7 +32,7 @@ impl Change {
         match self {
             Change::Write(_) => "write",
             Change::Replace(_) => "replace",
-            Change::View(_) => "view",
+            Change::Touch(_) => "view",
         }
     }
 
@@ -40,7 +41,7 @@ impl Change {
         match self {
             Change::Write(write_file) => &write_file.path,
             Change::Replace(replace) => &replace.path,
-            Change::View(path) => path,
+            Change::Touch(path) => path,
         }
     }
 
@@ -49,7 +50,7 @@ impl Change {
         match self {
             Change::Write(write_file) => Ok(write_file.content.clone()),
             Change::Replace(replace) => replace.apply(input),
-            Change::View(_) => Ok(input.to_string()),
+            Change::Touch(_) => Ok(input.to_string()),
         }
     }
 
@@ -77,7 +78,7 @@ impl Change {
                 renderer.pop();
                 renderer.pop();
             }
-            Change::View(_) => {
+            Change::Touch(_) => {
                 renderer.para("view");
             }
         }
@@ -85,7 +86,7 @@ impl Change {
     }
 }
 
-/// A unified patch operation requested by the model, as a collection of Change operations.
+/// A unified collection of Change operations, to be applied as a single patch.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct Patch {
     pub changes: Vec<Change>,

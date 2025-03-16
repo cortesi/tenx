@@ -56,3 +56,5 @@ Features:
 Internals:
 
     - Elicit user input with a UserInput event, shift logic into libtenx::Tenx
+    - Extract a fileutils crate from State
+    - Get rid of path normalization in config, only used in path contexts now

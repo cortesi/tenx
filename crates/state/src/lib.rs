@@ -305,7 +305,7 @@ impl State {
                         pinfo.succeeded += 1;
                     }
                 }
-                Change::View(_) => {
+                Change::Touch(_) => {
                     pinfo.should_continue = true;
                     pinfo.succeeded += 1;
                 }
@@ -488,7 +488,7 @@ impl State {
     {
         let paths = self.find(cwd, patterns)?;
         let file_count = paths.len();
-        let changes: Vec<Change> = paths.into_iter().map(patch::Change::View).collect();
+        let changes: Vec<Change> = paths.into_iter().map(patch::Change::Touch).collect();
         let patch = Patch { changes };
         let patch_info = self.patch(&patch)?;
         // Failures for view changes should always be empty.
@@ -1134,7 +1134,7 @@ mod tests {
                 name: "file created in first snapshot",
                 initial_files: HashMap::new(),
                 patches: vec![Patch {
-                    changes: vec![Change::View(PathBuf::from("::created.txt"))],
+                    changes: vec![Change::Touch(PathBuf::from("::created.txt"))],
                 }],
                 path: "::created.txt",
                 expected: Some(""),
@@ -1314,11 +1314,11 @@ mod tests {
                 name: "view changes included",
                 patches: vec![
                     Patch {
-                        changes: vec![Change::View(PathBuf::from("::view1.txt"))],
+                        changes: vec![Change::Touch(PathBuf::from("::view1.txt"))],
                     },
                     Patch {
                         changes: vec![
-                            Change::View(PathBuf::from("::view2.txt")),
+                            Change::Touch(PathBuf::from("::view2.txt")),
                             Change::Write(WriteFile {
                                 path: PathBuf::from("::a.txt"),
                                 content: "A0".to_string(),
