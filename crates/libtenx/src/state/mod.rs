@@ -9,9 +9,12 @@ pub mod abspath;
 mod directory;
 pub mod files;
 mod memory;
+pub mod patch;
+
+use patch::{Change, Patch, WriteFile};
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeSet, HashMap, HashSet},
     fmt::Debug,
     path::{Path, PathBuf},
 };
@@ -20,10 +23,7 @@ use diffy;
 use globset::Glob;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    error::{Result, TenxError},
-    patch::{Change, Patch},
-};
+use crate::error::{Result, TenxError};
 
 /// Prefix for in-memory files
 pub const MEM_PREFIX: &str = "::";
@@ -77,7 +77,6 @@ impl Snapshot {
 
     /// Returns a unique list of all files touched in the snapshot.
     pub fn touched(&self) -> Vec<PathBuf> {
-        use std::collections::BTreeSet;
         let mut touched = BTreeSet::new();
         for path in self.content.keys() {
             touched.insert(path.clone());
@@ -142,7 +141,7 @@ impl State {
 
             total_replaced_lines += hunk_replaced_lines;
 
-            changes.push(Change::Replace(crate::patch::Replace {
+            changes.push(Change::Replace(patch::Replace {
                 path: path.clone(),
                 old: old_content,
                 new: new_content,
@@ -156,7 +155,7 @@ impl State {
             || current_content.is_empty()
             || (total_lines > 0 && (total_replaced_lines as f64) / (total_lines as f64) > 0.5)
         {
-            changes = vec![Change::Write(crate::patch::WriteFile {
+            changes = vec![Change::Write(WriteFile {
                 path,
                 content: current_content,
             })];
@@ -490,7 +489,7 @@ impl State {
     {
         let paths = self.find(cwd, patterns)?;
         let file_count = paths.len();
-        let changes: Vec<Change> = paths.into_iter().map(Change::View).collect();
+        let changes: Vec<Change> = paths.into_iter().map(patch::Change::View).collect();
         let patch = Patch { changes };
         let patch_info = self.patch(&patch)?;
         // Failures for view changes should always be empty.
@@ -682,8 +681,6 @@ mod tests {
 
     #[test]
     fn test_last_changed_between() -> Result<()> {
-        use crate::patch::{Change, Patch, WriteFile};
-
         struct TestCase {
             name: &'static str,
             patches: Vec<Patch>,
@@ -708,7 +705,7 @@ mod tests {
                             path: PathBuf::from("::a.txt"),
                             content: "A0".to_string(),
                         }),
-                        Change::Write(WriteFile {
+                        Change::Write(patch::WriteFile {
                             path: PathBuf::from("::b.txt"),
                             content: "B0".to_string(),
                         }),
@@ -723,18 +720,18 @@ mod tests {
                 patches: vec![
                     Patch {
                         changes: vec![
-                            Change::Write(WriteFile {
+                            Change::Write(patch::WriteFile {
                                 path: PathBuf::from("::a.txt"),
                                 content: "A0".to_string(),
                             }),
-                            Change::Write(WriteFile {
+                            Change::Write(patch::WriteFile {
                                 path: PathBuf::from("::b.txt"),
                                 content: "B0".to_string(),
                             }),
                         ],
                     },
                     Patch {
-                        changes: vec![Change::Write(WriteFile {
+                        changes: vec![Change::Write(patch::WriteFile {
                             path: PathBuf::from("::b.txt"),
                             content: "B1".to_string(),
                         })],
@@ -748,19 +745,19 @@ mod tests {
                 name: "full range with implicit boundaries",
                 patches: vec![
                     Patch {
-                        changes: vec![Change::Write(WriteFile {
+                        changes: vec![Change::Write(patch::WriteFile {
                             path: PathBuf::from("::a.txt"),
                             content: "A0".to_string(),
                         })],
                     },
                     Patch {
-                        changes: vec![Change::Write(WriteFile {
+                        changes: vec![Change::Write(patch::WriteFile {
                             path: PathBuf::from("::b.txt"),
                             content: "B0".to_string(),
                         })],
                     },
                     Patch {
-                        changes: vec![Change::Write(WriteFile {
+                        changes: vec![Change::Write(patch::WriteFile {
                             path: PathBuf::from("::c.txt"),
                             content: "C0".to_string(),
                         })],
@@ -774,19 +771,19 @@ mod tests {
                 name: "middle range",
                 patches: vec![
                     Patch {
-                        changes: vec![Change::Write(WriteFile {
+                        changes: vec![Change::Write(patch::WriteFile {
                             path: PathBuf::from("::a.txt"),
                             content: "A0".to_string(),
                         })],
                     },
                     Patch {
-                        changes: vec![Change::Write(WriteFile {
+                        changes: vec![Change::Write(patch::WriteFile {
                             path: PathBuf::from("::b.txt"),
                             content: "B0".to_string(),
                         })],
                     },
                     Patch {
-                        changes: vec![Change::Write(WriteFile {
+                        changes: vec![Change::Write(patch::WriteFile {
                             path: PathBuf::from("::c.txt"),
                             content: "C0".to_string(),
                         })],
@@ -800,19 +797,19 @@ mod tests {
                 name: "changes outside range excluded",
                 patches: vec![
                     Patch {
-                        changes: vec![Change::Write(WriteFile {
+                        changes: vec![Change::Write(patch::WriteFile {
                             path: PathBuf::from("::a.txt"),
                             content: "A0".to_string(),
                         })],
                     },
                     Patch {
-                        changes: vec![Change::Write(WriteFile {
+                        changes: vec![Change::Write(patch::WriteFile {
                             path: PathBuf::from("::b.txt"),
                             content: "B0".to_string(),
                         })],
                     },
                     Patch {
-                        changes: vec![Change::Write(WriteFile {
+                        changes: vec![Change::Write(patch::WriteFile {
                             path: PathBuf::from("::a.txt"),
                             content: "A1".to_string(),
                         })],
@@ -827,11 +824,11 @@ mod tests {
                 patches: vec![
                     Patch {
                         changes: vec![
-                            Change::Write(WriteFile {
+                            Change::Write(patch::WriteFile {
                                 path: PathBuf::from("::a.txt"),
                                 content: "A0".to_string(),
                             }),
-                            Change::Write(WriteFile {
+                            Change::Write(patch::WriteFile {
                                 path: PathBuf::from("::b.txt"),
                                 content: "B0".to_string(),
                             }),
@@ -839,11 +836,11 @@ mod tests {
                     },
                     Patch {
                         changes: vec![
-                            Change::Write(WriteFile {
+                            Change::Write(patch::WriteFile {
                                 path: PathBuf::from("::c.txt"),
                                 content: "C0".to_string(),
                             }),
-                            Change::Write(WriteFile {
+                            Change::Write(patch::WriteFile {
                                 path: PathBuf::from("::d.txt"),
                                 content: "D0".to_string(),
                             }),
@@ -851,11 +848,11 @@ mod tests {
                     },
                     Patch {
                         changes: vec![
-                            Change::Write(WriteFile {
+                            Change::Write(patch::WriteFile {
                                 path: PathBuf::from("::b.txt"),
                                 content: "B1".to_string(),
                             }),
-                            Change::Write(WriteFile {
+                            Change::Write(patch::WriteFile {
                                 path: PathBuf::from("::d.txt"),
                                 content: "D1".to_string(),
                             }),
@@ -1061,8 +1058,6 @@ mod tests {
 
     #[test]
     fn test_original() -> Result<()> {
-        use crate::patch::{Change, Patch, WriteFile};
-
         struct TestCase {
             name: &'static str,
             initial_files: HashMap<PathBuf, String>,
@@ -1205,8 +1200,6 @@ mod tests {
 
     #[test]
     fn test_touched() -> Result<()> {
-        use crate::patch::{Change, Patch, WriteFile};
-
         struct TestCase {
             name: &'static str,
             patches: Vec<Patch>,
@@ -1380,8 +1373,6 @@ mod tests {
 
     #[test]
     fn test_diff_path() -> Result<()> {
-        use crate::patch::Change;
-
         struct TestCase {
             name: &'static str,
             orig_content: &'static str,

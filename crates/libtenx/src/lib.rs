@@ -7,7 +7,6 @@ pub mod event_consumers;
 pub mod events;
 pub mod exec;
 pub mod model;
-pub mod patch;
 pub mod session;
 pub mod session_store;
 pub mod state;

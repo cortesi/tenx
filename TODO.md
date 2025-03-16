@@ -4,10 +4,6 @@ NOW:
 
 GOALS:
 
-    - Get back to 100% functionality
-        - fix
-        - continue
-    - Refactor Conversation interface?
     - Shift patch module into state
 
     - Claude text editor tool

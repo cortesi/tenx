@@ -407,9 +407,11 @@ mod tests {
 
     use std::path::PathBuf;
 
-    use crate::patch::{Change, Patch, WriteFile};
-    use crate::session::ModelResponse;
-    use crate::strategy::{Completion, InputRequired};
+    use crate::{
+        session::ModelResponse,
+        state::patch::{Change, Patch, WriteFile},
+        strategy::{Completion, InputRequired},
+    };
 
     use fs_err as fs;
     use tempfile::tempdir;

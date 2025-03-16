@@ -7,8 +7,7 @@ use crate::{
     config, context,
     error::{Result, TenxError},
     model::Usage,
-    patch::Patch,
-    state,
+    state::{self, patch::Patch},
     strategy::{self, ActionStrategy, StrategyStep},
 };
 use unirend::Detail;

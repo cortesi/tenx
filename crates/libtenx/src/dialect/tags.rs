@@ -8,8 +8,8 @@ use crate::{
     config::Config,
     context::ContextProvider,
     error::{Result, TenxError},
-    patch::{Change, Patch, Replace, WriteFile},
     session::{ModelResponse, Session},
+    state::patch::{Change, Patch, Replace, WriteFile},
 };
 use fs_err as fs;
 

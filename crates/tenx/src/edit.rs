@@ -102,8 +102,8 @@ mod tests {
     use super::*;
 
     use libtenx::{
-        patch::Patch,
         session::{Action, ModelResponse, Step},
+        state::patch::Patch,
         strategy, testutils,
     };
 
