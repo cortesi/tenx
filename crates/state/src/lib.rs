@@ -74,16 +74,16 @@ impl Snapshot {
         self.created.push(path);
     }
 
-    /// Returns a unique list of all files touched in the snapshot.
-    pub fn touched(&self) -> Vec<PathBuf> {
-        let mut touched = BTreeSet::new();
+    /// Returns a unique list of all files affected (touched or changed) by the snapshot.
+    pub fn affected(&self) -> Vec<PathBuf> {
+        let mut affected = BTreeSet::new();
         for path in self.content.keys() {
-            touched.insert(path.clone());
+            affected.insert(path.clone());
         }
         for path in &self.created {
-            touched.insert(path.clone());
+            affected.insert(path.clone());
         }
-        touched.into_iter().collect()
+        affected.into_iter().collect()
     }
 }
 
@@ -358,7 +358,7 @@ impl State {
         let max_id = end.unwrap_or_else(|| self.snapshots.last().unwrap().0);
         let mut latest: HashMap<PathBuf, u64> = HashMap::new();
         for (snap_id, snap) in &self.snapshots {
-            for path in snap.touched() {
+            for path in snap.affected() {
                 latest
                     .entry(path)
                     .and_modify(|e| {
@@ -383,9 +383,9 @@ impl State {
         Ok(result)
     }
 
-    /// Returns a unique, sorted list of all files touched in the current session.
-    /// This includes all files that have been modified in any snapshot.
-    pub fn touched(&self) -> Result<Vec<PathBuf>> {
+    /// Returns a unique, sorted list of all files touched, changed or created in the current
+    /// session. This includes all files that have been modified in any snapshot.
+    pub fn changed(&self) -> Result<Vec<PathBuf>> {
         if self.snapshots.is_empty() {
             return Ok(vec![]);
         }
@@ -393,7 +393,7 @@ impl State {
         let mut files = std::collections::BTreeSet::new();
 
         for (_, snap) in &self.snapshots {
-            for path in snap.touched() {
+            for path in snap.affected() {
                 files.insert(path);
             }
         }
@@ -479,10 +479,11 @@ impl State {
         Ok(result_vec)
     }
 
-    /// Creates and dispatches a view patch for files matching the provided patterns. Expands the
-    /// patterns using the current working directory, creates a Change::View for each matched path,
-    /// and applies the patch. Returns a tuple of (snapshot ID, file count) from applying the patch.
-    pub fn view<P>(&mut self, cwd: P, patterns: Vec<String>) -> Result<(u64, usize)>
+    /// Creates and dispatches a touch patch for files matching the provided patterns. Expands the
+    /// patterns using the current working directory, creates a `Change::Touch` for each matched
+    /// path, and applies the patch. Returns a tuple of (snapshot ID, file count) from applying the
+    /// patch.
+    pub fn touch<P>(&mut self, cwd: P, patterns: Vec<String>) -> Result<(u64, usize)>
     where
         P: abspath::IntoAbsPath,
     {
@@ -491,7 +492,7 @@ impl State {
         let changes: Vec<Change> = paths.into_iter().map(patch::Change::Touch).collect();
         let patch = Patch { changes };
         let patch_info = self.patch(&patch)?;
-        // Failures for view changes should always be empty.
+        // Failures for touch changes should always be empty.
         debug_assert!(patch_info.failures.is_empty());
         Ok((patch_info.rollback_id, file_count))
     }
@@ -500,7 +501,7 @@ impl State {
     pub fn mark(&mut self) -> Result<u64> {
         let patch = Patch { changes: vec![] };
         let patch_info = self.patch(&patch)?;
-        // Failures for view changes should always be empty.
+        // Failures for mark changes should always be empty.
         debug_assert!(patch_info.failures.is_empty());
         Ok(patch_info.rollback_id)
     }
@@ -1191,7 +1192,7 @@ mod tests {
     }
 
     #[test]
-    fn test_touched() -> Result<()> {
+    fn test_changed() -> Result<()> {
         struct TestCase {
             name: &'static str,
             patches: Vec<Patch>,
@@ -1344,7 +1345,7 @@ mod tests {
             }
 
             // Test touched
-            let result = state.touched();
+            let result = state.changed();
 
             match (result, case.expected) {
                 (Ok(got), Ok(expected)) => {

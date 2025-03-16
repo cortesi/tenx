@@ -1,0 +1,9 @@
+(
+    retry_limit: 50,
+    context: (
+        ruskel: ["state"]
+    ),
+    checks: (
+        enable: ["cargo-clippy"]
+    )
+)
