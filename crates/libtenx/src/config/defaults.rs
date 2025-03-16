@@ -29,10 +29,8 @@ const XAI_API_BASE: &str = "https://api.x.ai/v1";
 const XAI_DEFAULT_GROK: &str = "grok-beta";
 
 const GOOGLEAI_API_KEY: &str = "GOOGLEAI_API_KEY";
-const GOOGLEAI_GEMINI_15_PRO: &str = "gemini-1.5-pro";
-const GOOGLEAI_GEMINI_15_FLASH: &str = "gemini-1.5-flash";
-const GOOGLEAI_GEMINI_15_FLASH_8B: &str = "gemini-1.5-flash-8b";
-const GOOGLEAI_GEMINI_FLASH_EXP: &str = "gemini-2.0-flash-exp";
+const GOOGLEAI_GEMINI_FLASH: &str = "gemini-2.0-flash";
+const GOOGLEAI_GEMINI_FLASH_LITE: &str = "gemini-2.0-flash-lite";
 const GOOGLEAI_GEMINI_EXP: &str = "gemini-exp-1206";
 const GOOGLEAI_GEMINI_THINKING_EXP: &str = "gemini-2.0-flash-thinking-exp-01-21";
 
@@ -301,8 +299,15 @@ fn default_models() -> Vec<Model> {
                 can_stream: false,
             },
             Model::Google {
-                name: "gemini-flash-exp".to_string(),
-                api_model: GOOGLEAI_GEMINI_FLASH_EXP.to_string(),
+                name: "gemini-flash".to_string(),
+                api_model: GOOGLEAI_GEMINI_FLASH.to_string(),
+                key: "".to_string(),
+                key_env: GOOGLEAI_API_KEY.to_string(),
+                can_stream: false,
+            },
+            Model::Google {
+                name: "gemini-flash-lite".to_string(),
+                api_model: GOOGLEAI_GEMINI_FLASH_LITE.to_string(),
                 key: "".to_string(),
                 key_env: GOOGLEAI_API_KEY.to_string(),
                 can_stream: false,
@@ -310,27 +315,6 @@ fn default_models() -> Vec<Model> {
             Model::Google {
                 name: "gemini-flash-thinking-exp".to_string(),
                 api_model: GOOGLEAI_GEMINI_THINKING_EXP.to_string(),
-                key: "".to_string(),
-                key_env: GOOGLEAI_API_KEY.to_string(),
-                can_stream: false,
-            },
-            Model::Google {
-                name: "gemini-15pro".to_string(),
-                api_model: GOOGLEAI_GEMINI_15_PRO.to_string(),
-                key: "".to_string(),
-                key_env: GOOGLEAI_API_KEY.to_string(),
-                can_stream: false,
-            },
-            Model::Google {
-                name: "gemini-15flash".to_string(),
-                api_model: GOOGLEAI_GEMINI_15_FLASH.to_string(),
-                key: "".to_string(),
-                key_env: GOOGLEAI_API_KEY.to_string(),
-                can_stream: false,
-            },
-            Model::Google {
-                name: "gemini-15flash8b".to_string(),
-                api_model: GOOGLEAI_GEMINI_15_FLASH_8B.to_string(),
                 key: "".to_string(),
                 key_env: GOOGLEAI_API_KEY.to_string(),
                 can_stream: false,
