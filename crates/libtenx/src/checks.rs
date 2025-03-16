@@ -1,3 +1,4 @@
+//! Check module for running code conformance checks.
 use std::path::PathBuf;
 
 use crate::{

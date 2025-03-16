@@ -462,7 +462,7 @@ impl Session {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::strategy::code;
+    use crate::strategy;
     use crate::strategy::Strategy;
     use crate::testutils;
 
@@ -495,7 +495,7 @@ mod tests {
     fn test_retry_resets_step() -> Result<()> {
         let tp = testutils::test_project();
         // Use a Code strategy from the code module.
-        let strategy = Strategy::Code(code::Code::new());
+        let strategy = Strategy::Code(strategy::Code::new());
         let mut action = Action::new(&tp.config, strategy)?;
 
         // Add the first step.

@@ -20,7 +20,7 @@ use libtenx::{
     error::TenxError,
     events::Event,
     session::Session,
-    tenx::Tenx,
+    Tenx,
 };
 
 #[derive(Debug, Clone, Deserialize)]

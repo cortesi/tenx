@@ -1,3 +1,4 @@
+//! Execute shell commands and return status, stdout and stderr.
 use std::{
     path::Path,
     process::{Command, ExitStatus},

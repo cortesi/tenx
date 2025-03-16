@@ -7,7 +7,7 @@ use crate::{
     error::Result,
     error::TenxError,
     events::{send_event, Event, EventSender},
-    session::Step,
+    session::{Action, Step},
 };
 use unirend::{Detail, Render, Style};
 
@@ -147,7 +147,7 @@ fn process_step(
 }
 
 /// Determines the current state of an action
-fn get_action_state(action: &crate::session::Action) -> ActionState {
+fn get_action_state(action: &Action) -> ActionState {
     if action.steps().is_empty() {
         return ActionState {
             completion: Completion::Incomplete,
@@ -446,10 +446,7 @@ impl ActionStrategy for Fix {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::error::TenxError;
-    use crate::session::Action;
-    use crate::strategy::Strategy;
-    use crate::testutils::test_project;
+    use crate::{error::TenxError, strategy::Strategy, testutils::test_project};
 
     #[test]
     fn test_code_next_step() -> Result<()> {

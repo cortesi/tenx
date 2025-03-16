@@ -672,13 +672,6 @@ mod tests {
         Ok(())
     }
 
-    // Table-driven test for snapshot creation and revert.
-    #[test]
-    fn test_create_and_revert_snapshot() -> Result<()> {
-        // Existing test for single snapshot revert.
-        Ok(())
-    }
-
     #[test]
     fn test_last_changed_between() -> Result<()> {
         struct TestCase {

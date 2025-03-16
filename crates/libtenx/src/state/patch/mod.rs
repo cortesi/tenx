@@ -1,4 +1,4 @@
-//! Patch operations that modify files in the project.
+//! Patch operations that modify state.
 mod replace;
 mod write;
 
@@ -8,16 +8,15 @@ pub use write::*;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use fs_err;
 use serde::{Deserialize, Serialize};
 use unirend::{Detail, Render};
 
-use crate::{config::Config, error::Result};
+use crate::error::Result;
 
 /// A change to be applied to the state.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum Change {
-    /// Wrhite a complete file.
+    /// Write a complete file.
     Write(write::WriteFile),
     /// Replace one piece of text with another.
     Replace(replace::Replace),
@@ -27,6 +26,7 @@ pub enum Change {
 }
 
 impl Change {
+    /// Returns the name of the change type.
     pub fn name(&self) -> &str {
         match self {
             Change::Write(_) => "write",
@@ -35,6 +35,7 @@ impl Change {
         }
     }
 
+    /// Returns the path of the file affected by this change.
     pub fn path(&self) -> &PathBuf {
         match self {
             Change::Write(write_file) => &write_file.path,
@@ -43,6 +44,7 @@ impl Change {
         }
     }
 
+    /// Applies this change to the input string, returning the modified string.
     pub fn apply(&self, input: &str) -> Result<String> {
         match self {
             Change::Write(write_file) => Ok(write_file.content.clone()),
@@ -83,8 +85,7 @@ impl Change {
     }
 }
 
-/// A unified patch operation requested by the model. This contains all changes, as well as a cache
-/// of file state before the patch is applied, so we can roll back.
+/// A unified patch operation requested by the model, as a collection of Change operations.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct Patch {
     pub changes: Vec<Change>,
@@ -98,17 +99,6 @@ impl Patch {
             paths.insert(change.path().clone(), ());
         }
         paths.into_keys().collect()
-    }
-
-    /// Takes a snapshot of the current state of all files that would be modified by this patch.
-    pub fn snapshot(&self, config: &Config) -> Result<HashMap<PathBuf, String>> {
-        let mut snapshot = HashMap::new();
-        for path in self.affected_files() {
-            let abs_path = config.abspath(&path)?;
-            let content = fs_err::read_to_string(&abs_path)?;
-            snapshot.insert(path, content);
-        }
-        Ok(snapshot)
     }
 
     /// Groups changes by file path

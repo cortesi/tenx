@@ -7,7 +7,6 @@ use tokio::sync::mpsc;
 use tracing_subscriber::util::SubscriberInitExt;
 
 use libtenx::{
-    self,
     config::{self},
     context::Context,
     dialect::DialectProvider,
@@ -15,7 +14,7 @@ use libtenx::{
     events::Event,
     model::ModelProvider,
     session::Session,
-    tenx::Tenx,
+    Tenx,
 };
 use unirend::Detail;
 

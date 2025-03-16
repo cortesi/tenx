@@ -4,10 +4,9 @@ NOW:
 
 GOALS:
 
-    - Shift patch module into state
-
     - Claude text editor tool
         - Support all operations in State
+
     - Chat mode
     - Agent code editor mode
     - Context manager rewrite

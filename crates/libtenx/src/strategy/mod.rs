@@ -1,10 +1,12 @@
+//! Strategies that drive Actions
 use enum_dispatch::enum_dispatch;
 use serde::{Deserialize, Serialize};
 
 use crate::{config::Config, error::Result, events::EventSender, session::Session};
 use unirend::Detail;
 
-pub mod code;
+mod code;
+
 pub use code::*;
 
 /// Is the current action complete?
@@ -56,6 +58,7 @@ impl ActionState {
     }
 }
 
+/// A strategy for performing an Action.
 #[enum_dispatch(Strategy)]
 pub trait ActionStrategy {
     /// Returns the name of the strategy.
@@ -110,6 +113,7 @@ pub trait ActionStrategy {
     }
 }
 
+/// A strategy for performing an Action.
 #[enum_dispatch]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Strategy {
@@ -117,6 +121,7 @@ pub enum Strategy {
     Fix(Fix),
 }
 
+/// Strategy-specific state for a step.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum StrategyStep {
     Code(CodeStep),
