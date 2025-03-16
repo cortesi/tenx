@@ -305,6 +305,18 @@ impl State {
                         pinfo.succeeded += 1;
                     }
                 }
+                Change::Replace(replace) => {
+                    let res = (|| {
+                        let original = self.read(replace.path.as_path())?;
+                        let new_content = replace.apply(&original)?;
+                        self.write(replace.path.as_path(), &new_content)
+                    })();
+                    if let Err(e) = res {
+                        pinfo.add_failure(change.clone(), e)?;
+                    } else {
+                        pinfo.succeeded += 1;
+                    }
+                }
                 Change::Touch(_) => {
                     pinfo.should_continue = true;
                     pinfo.succeeded += 1;

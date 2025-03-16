@@ -4,141 +4,74 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, Result};
 
-/// An replace operation that replaces once occurrence of a string with another. This operation is
-/// fuzzy - meaning it tries really hard to make the replacement by ignoring leading and trailing
-/// whitespace.
+/// An exact replace operation that replaces one occurrence of a string with another.
+/// The match must be exact and appear exactly once in the file.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct ReplaceFuzzy {
+pub struct Replace {
     pub path: PathBuf,
     pub old: String,
     pub new: String,
 }
 
-impl ReplaceFuzzy {
+impl Replace {
     /// Applies the replacement operation to the given input string.
     ///
-    /// Replaces only the first occurrence of the old content with the new content.
-    /// Returns the modified string if the replacement was successful, or an error if no changes were made.
+    /// Replaces exactly one occurrence of the old content with the new content.
+    /// Returns an error if the old content is not found exactly once.
     pub fn apply(&self, input: &str) -> Result<String> {
-        let old_lines: Vec<&str> = self.old.lines().map(str::trim).collect();
-        let new_lines: Vec<&str> = self.new.lines().collect();
-        let input_lines: Vec<&str> = input.lines().collect();
-
-        let mut result = Vec::new();
-        let mut i = 0;
-
-        while i < input_lines.len() {
-            if input_lines[i..]
-                .iter()
-                .map(|s| s.trim())
-                .collect::<Vec<_>>()
-                .starts_with(&old_lines)
-            {
-                result.extend(new_lines.iter().cloned());
-                result.extend(input_lines[i + old_lines.len()..].iter().cloned());
-                return Ok(result.join("\n"));
-            } else {
-                result.push(input_lines[i]);
-                i += 1;
-            }
+        match input.matches(&self.old).count() {
+            0 => Err(Error::Patch {
+                user: "Text to replace not found".to_string(),
+                model: format!(
+                    "Could not find the specified text in the source file:\n{}",
+                    self.old
+                ),
+            }),
+            1 => Ok(input.replace(&self.old, &self.new)),
+            _ => Err(Error::Patch {
+                user: "Multiple occurrences of text to replace found".to_string(),
+                model: format!(
+                    "Found multiple occurrences of the specified text in the source file:\n{}",
+                    self.old
+                ),
+            }),
         }
-
-        Err(Error::Patch {
-            user: "Could not find the text to replace".to_string(),
-            model: format!(
-                "Invalid replace specification - could not find the following text in the source file:\n{}",
-                self.old
-            )
-        })
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use indoc::indoc;
     use pretty_assertions::assert_eq;
 
     #[test]
     fn test_replace_apply() {
-        let test_cases = vec![
-            (
-                "Basic replace",
-                "/path/to/file.txt",
-                indoc! {"
-                    This is
-                    old content
-                    to be replaced
-                "},
-                indoc! {"
-                    This is
-                    new content
-                    that replaces the old
-                "},
-                indoc! {"
-                    Some initial text
-                    This is
-                    old content
-                    to be replaced
-                    Some final text
-                    This is
-                    old content
-                    to be replaced
-                    More text
-                "},
-                indoc! {"
-                    Some initial text
-                    This is
-                    new content
-                    that replaces the old
-                    Some final text
-                    This is
-                    old content
-                    to be replaced
-                    More text
-                "},
-            ),
-            (
-                "Whitespace insensitive replace",
-                "/path/to/file.txt",
-                indoc! {"
-                      This is
-                      old content  
-                    to be replaced
-                "},
-                indoc! {"
-                    This is
-                    new content
-                    that replaces the old
-                "},
-                indoc! {"
-                    Some initial text
-                     This is 
-                       old content
-                      to be replaced 
-                    Some final text
-                "},
-                indoc! {"
-                    Some initial text
-                    This is
-                    new content
-                    that replaces the old
-                    Some final text
-                "},
-            ),
-        ];
+        // Successful replace
+        let replace = Replace {
+            path: PathBuf::from("/path/to/file.txt"),
+            old: "old content".to_string(),
+            new: "new content".to_string(),
+        };
 
-        for (name, path, old, new, input, expected_output) in test_cases {
-            let replace = ReplaceFuzzy {
-                path: path.into(),
-                old: old.trim().to_string(),
-                new: new.trim().to_string(),
-            };
+        let input = "before old content after";
+        let result = replace.apply(input).unwrap();
+        assert_eq!(result, "before new content after");
 
-            let result = replace
-                .apply(input)
-                .unwrap_or_else(|_| panic!("Failed to apply replace: {}", name));
-            assert_eq!(result, expected_output.trim_end(), "Test case: {}", name);
-        }
+        // Not found
+        let replace = Replace {
+            path: PathBuf::from("/path/to/file.txt"),
+            old: "nonexistent".to_string(),
+            new: "new".to_string(),
+        };
+        assert!(replace.apply(input).is_err());
+
+        // Multiple occurrences
+        let replace = Replace {
+            path: PathBuf::from("/path/to/file.txt"),
+            old: "o".to_string(),
+            new: "x".to_string(),
+        };
+        assert!(replace.apply(input).is_err());
     }
 }
+

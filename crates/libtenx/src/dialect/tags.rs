@@ -232,6 +232,9 @@ impl DialectProvider for Tags {
                         Change::Touch(v) => {
                             rendered.push_str(&format!("<edit>\n{}\n</edit>\n", v.display()));
                         }
+                        v => {
+                            panic!("unsupported change type: {:?}", v);
+                        }
                     }
                 }
             }

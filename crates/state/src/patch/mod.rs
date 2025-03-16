@@ -1,8 +1,10 @@
 //! Patch operations that modify state.
 mod replace;
+mod replace_fuzzy;
 mod write;
 
 pub use replace::*;
+pub use replace_fuzzy::*;
 pub use write::*;
 
 use std::collections::HashMap;
@@ -19,8 +21,11 @@ pub enum Change {
     /// Write or create a complete file.
     Write(write::WriteFile),
 
-    /// Replace one piece of text with another.
-    ReplaceFuzzy(replace::ReplaceFuzzy),
+    /// Replace one piece of text with another, with fuzzy matching.
+    ReplaceFuzzy(replace_fuzzy::ReplaceFuzzy),
+
+    /// Replace one piece of text with another, requiring an exact match.
+    Replace(replace::Replace),
 
     /// Touch is a NoOp, it just enters the path as an affected file without modifying it.
     Touch(PathBuf),
@@ -31,7 +36,8 @@ impl Change {
     pub fn name(&self) -> &str {
         match self {
             Change::Write(_) => "write",
-            Change::ReplaceFuzzy(_) => "replace",
+            Change::ReplaceFuzzy(_) => "replace_fuzzy",
+            Change::Replace(_) => "replace",
             Change::Touch(_) => "view",
         }
     }
@@ -41,6 +47,7 @@ impl Change {
         match self {
             Change::Write(write_file) => &write_file.path,
             Change::ReplaceFuzzy(replace) => &replace.path,
+            Change::Replace(replace) => &replace.path,
             Change::Touch(path) => path,
         }
     }
@@ -50,6 +57,7 @@ impl Change {
         match self {
             Change::Write(write_file) => Ok(write_file.content.clone()),
             Change::ReplaceFuzzy(replace) => replace.apply(input),
+            Change::Replace(replace) => replace.apply(input),
             Change::Touch(_) => Ok(input.to_string()),
         }
     }
@@ -67,8 +75,21 @@ impl Change {
             }
             Change::ReplaceFuzzy(replace) => {
                 let path_str = replace.path.to_string_lossy();
+                renderer.push("replace_fuzzy");
+                renderer.push(&format!("replace (fuzzy) in file: {}", path_str));
+                renderer.push("old:");
+                renderer.para(&replace.old);
+                renderer.pop();
+                renderer.push("new:");
+                renderer.para(&replace.new);
+                renderer.pop();
+                renderer.pop();
+                renderer.pop();
+            }
+            Change::Replace(replace) => {
+                let path_str = replace.path.to_string_lossy();
                 renderer.push("replace");
-                renderer.push(&format!("replace in file: {}", path_str));
+                renderer.push(&format!("replace (exact) in file: {}", path_str));
                 renderer.push("old:");
                 renderer.para(&replace.old);
                 renderer.pop();
@@ -167,7 +188,7 @@ mod tests {
         }));
         patch
             .changes
-            .push(Change::ReplaceFuzzy(replace::ReplaceFuzzy {
+            .push(Change::ReplaceFuzzy(replace_fuzzy::ReplaceFuzzy {
                 path: PathBuf::from("file2.txt"),
                 old: "old".to_string(),
                 new: "new".to_string(),
@@ -179,3 +200,4 @@ mod tests {
         assert!(changed_files.contains(&PathBuf::from("file2.txt")));
     }
 }
+
