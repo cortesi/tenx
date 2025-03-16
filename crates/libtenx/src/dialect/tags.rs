@@ -88,8 +88,8 @@ impl DialectProvider for Tags {
         &self,
         _config: &Config,
         session: &Session,
-        step_offset: usize,
         action_offset: usize,
+        step_offset: usize,
     ) -> Result<String> {
         let step = session.get_step(action_offset, step_offset)?;
         let mut rendered = String::new();
@@ -202,8 +202,8 @@ impl DialectProvider for Tags {
         &self,
         _config: &Config,
         session: &Session,
-        step_offset: usize,
         action_offset: usize,
+        step_offset: usize,
     ) -> Result<String> {
         let step = session.get_step(action_offset, step_offset)?;
         if let Some(resp) = &step.model_response {

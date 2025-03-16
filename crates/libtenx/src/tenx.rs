@@ -194,11 +194,10 @@ impl Tenx {
         let step_index = if let Some(idx) = step_idx {
             idx
         } else {
-            let steps = session.actions[action_index].steps();
-            if steps.is_empty() {
+            if session.actions[action_index].steps.is_empty() {
                 return Err(TenxError::Internal("No steps in action".to_string()));
             }
-            steps.len() - 1
+            session.actions[action_index].steps.len() - 1
         };
 
         // Reset to this step and prepare it for retry
@@ -490,12 +489,15 @@ mod tests {
             .unwrap();
 
         let last_action = session.last_action().unwrap();
-        let steps = last_action.steps();
 
-        assert_eq!(steps.len(), 1);
-        assert!(steps[0].model_response.is_some());
+        assert_eq!(last_action.steps.len(), 1);
+        assert!(last_action.steps[0].model_response.is_some());
         assert_eq!(
-            steps[0].model_response.as_ref().unwrap().comment,
+            last_action.steps[0]
+                .model_response
+                .as_ref()
+                .unwrap()
+                .comment,
             Some("Test comment".to_string())
         );
 
@@ -560,10 +562,9 @@ mod tests {
 
         // Also verify the step was executed properly
         let last_action = session.last_action().unwrap();
-        let steps = last_action.steps();
 
-        assert_eq!(steps.len(), 1);
-        assert!(steps[0].model_response.is_some());
+        assert_eq!(last_action.steps.len(), 1);
+        assert!(last_action.steps[0].model_response.is_some());
         let file_content = fs::read_to_string(&test_file_path).unwrap();
         assert_eq!(file_content, "Updated content");
 

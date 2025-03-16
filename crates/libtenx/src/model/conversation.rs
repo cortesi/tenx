@@ -38,7 +38,7 @@ where
     let editables = if action_idx < session.actions.len() {
         let action = &session.actions[action_idx];
         // If this is a valid step in the action or just at the end
-        if step_idx < action.steps().len() {
+        if step_idx < action.steps.len() {
             session.editables_for_step_state(action_idx, step_idx)?
         } else {
             vec![]
@@ -85,7 +85,7 @@ where
     conversation.add_agent_message(req, ACK)?;
     if !session.actions.is_empty() {
         let last_action = session.actions.len() - 1;
-        for (i, step) in session.get_action(last_action)?.steps().iter().enumerate() {
+        for (i, step) in session.get_action(last_action)?.steps.iter().enumerate() {
             add_editables(conversation, req, config, session, dialect, last_action, i)?;
             conversation.add_user_message(
                 req,
@@ -96,7 +96,7 @@ where
                     req,
                     &dialect.render_step_response(config, session, last_action, i)?,
                 )?;
-            } else if i != session.actions[last_action].steps().len() - 1 {
+            } else if i != session.actions[last_action].steps.len() - 1 {
                 // We have no model response, but we're not the last step, so this isn't a user request
                 // step just about to be sent to the model. This is presumably an error - the best we
                 // can do to preserve sequencing is either omit the step entirely or add an omission
@@ -112,7 +112,7 @@ where
             session,
             dialect,
             last_action,
-            session.actions[last_action].steps().len(),
+            session.actions[last_action].steps.len(),
         )?;
     }
     Ok(())

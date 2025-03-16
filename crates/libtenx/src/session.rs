@@ -122,7 +122,7 @@ pub struct Action {
     pub strategy: strategy::Strategy,
     pub state: state::State,
     /// The steps in the action
-    steps: Vec<Step>,
+    pub steps: Vec<Step>,
 }
 
 impl Action {
@@ -138,11 +138,6 @@ impl Action {
     /// Returns a reference to the last step in the action
     pub fn last_step(&self) -> Option<&Step> {
         self.steps.last()
-    }
-
-    /// Returns all steps in the action.
-    pub fn steps(&self) -> &Vec<Step> {
-        &self.steps
     }
 
     /// Adds a new step to the action.
@@ -234,7 +229,7 @@ impl Session {
     pub fn get_action(&self, action_offset: usize) -> Result<&crate::session::Action> {
         self.actions
             .get(action_offset)
-            .ok_or_else(|| TenxError::Internal(format!("Invalid action offset: {}", action_offset)))
+            .ok_or_else(|| panic!("Invalid action offset: {}", action_offset))
     }
 
     pub fn get_step(

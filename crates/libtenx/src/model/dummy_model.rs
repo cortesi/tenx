@@ -83,7 +83,7 @@ impl ModelProvider for DummyModel {
         let last_action = session.actions.len() - 1;
 
         // Add request context
-        for (i, step) in session.actions[last_action].steps().iter().enumerate() {
+        for (i, step) in session.actions[last_action].steps.iter().enumerate() {
             out.push_str(&format!("=== Step {} ===\n", i));
             out.push_str(&dialect.render_step_request(config, session, last_action, i)?);
             if let Some(_response) = &step.model_response {

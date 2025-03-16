@@ -147,7 +147,7 @@ impl TrialReport {
         let mut steps = 0;
 
         for act in &session.actions {
-            for step in act.steps() {
+            for step in &act.steps {
                 if let Some(err) = &step.err {
                     match err {
                         TenxError::Patch { .. } => error_patch += 1,

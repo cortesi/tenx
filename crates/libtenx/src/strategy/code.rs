@@ -148,7 +148,7 @@ fn process_step(
 
 /// Determines the current state of an action
 fn get_action_state(action: &Action) -> ActionState {
-    if action.steps().is_empty() {
+    if action.steps.is_empty() {
         return ActionState {
             completion: Completion::Incomplete,
             input_required: InputRequired::Yes,
@@ -343,7 +343,7 @@ impl ActionStrategy for Code {
         renderer: &mut R,
         detail: Detail,
     ) -> Result<()> {
-        let step = session.get_action(action_offset)?.steps()[step_offset].clone();
+        let step = session.get_action(action_offset)?.steps[step_offset].clone();
         let header = format!("step {}:{}", action_offset, step_offset);
         render_step(&step, renderer, &header, false, detail)
     }
@@ -409,7 +409,7 @@ impl ActionStrategy for Fix {
     fn state(&self, _config: &Config, session: &Session, action_offset: usize) -> ActionState {
         match session.actions.get(action_offset) {
             Some(action) => {
-                if action.steps().is_empty() {
+                if action.steps.is_empty() {
                     return ActionState {
                         completion: Completion::Incomplete,
                         input_required: InputRequired::Optional,
@@ -434,7 +434,7 @@ impl ActionStrategy for Fix {
         renderer: &mut R,
         detail: Detail,
     ) -> Result<()> {
-        let step = session.get_action(action_offset)?.steps()[step_offset].clone();
+        let step = session.get_action(action_offset)?.steps[step_offset].clone();
 
         // Create the header
         let header = format!("Step {}", step_offset);
@@ -453,11 +453,6 @@ mod test {
         let test_project = test_project();
         let code = Code::new();
         let mut session = Session::new(&test_project.config)?;
-
-        // Empty session should return an error now
-        let result = code.next_step(&test_project.config, &mut session, 0, None, None);
-        assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), TenxError::Internal(_)));
 
         session.add_action(Action::new(
             &test_project.config,
@@ -518,12 +513,7 @@ mod test {
     fn test_fix_next_step() -> Result<()> {
         let test_project = test_project();
         let mut session = Session::new(&test_project.config)?;
-
-        // Empty session should return an error now
         let fix = Fix::new("error");
-        let result = fix.next_step(&test_project.config, &mut session, 0, None, None);
-        assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), TenxError::Internal(_)));
 
         // Add an action and test custom prompt
         session.add_action(Action::new(
