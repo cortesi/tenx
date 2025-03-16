@@ -140,7 +140,7 @@ impl State {
 
             total_replaced_lines += hunk_replaced_lines;
 
-            changes.push(Change::Replace(patch::Replace {
+            changes.push(Change::ReplaceFuzzy(patch::ReplaceFuzzy {
                 path: path.clone(),
                 old: old_content,
                 new: new_content,
@@ -293,7 +293,7 @@ impl State {
                         pinfo.succeeded += 1;
                     }
                 }
-                Change::Replace(replace) => {
+                Change::ReplaceFuzzy(replace) => {
                     let res = (|| {
                         let original = self.read(replace.path.as_path())?;
                         let new_content = replace.apply(&original)?;
@@ -1480,7 +1480,7 @@ mod tests {
 
                     for change in &patch.changes {
                         match change {
-                            Change::Replace(_) => {} // This is expected
+                            Change::ReplaceFuzzy(_) => {} // This is expected
                             _ => panic!("{}: expected Replace change, got {:?}", case.name, change),
                         }
                     }

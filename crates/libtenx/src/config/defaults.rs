@@ -12,6 +12,7 @@ const ANTHROPIC_CLAUDE_HAIKU: &str = "claude-3-5-haiku-latest";
 
 const OPENAI_API_BASE: &str = "https://api.openai.com/v1";
 const OPENAI_API_KEY: &str = "OPENAI_API_KEY";
+
 const OPENAI_GPT_O1_MINI: &str = "o1-mini";
 const OPENAI_GPT_O1: &str = "o1";
 const OPENAI_GPT_O3_MINI: &str = "o3-mini";

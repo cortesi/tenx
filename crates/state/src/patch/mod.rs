@@ -20,7 +20,7 @@ pub enum Change {
     Write(write::WriteFile),
 
     /// Replace one piece of text with another.
-    Replace(replace::Replace),
+    ReplaceFuzzy(replace::ReplaceFuzzy),
 
     /// Touch is a NoOp, it just enters the path as an affected file without modifying it.
     Touch(PathBuf),
@@ -31,7 +31,7 @@ impl Change {
     pub fn name(&self) -> &str {
         match self {
             Change::Write(_) => "write",
-            Change::Replace(_) => "replace",
+            Change::ReplaceFuzzy(_) => "replace",
             Change::Touch(_) => "view",
         }
     }
@@ -40,7 +40,7 @@ impl Change {
     pub fn path(&self) -> &PathBuf {
         match self {
             Change::Write(write_file) => &write_file.path,
-            Change::Replace(replace) => &replace.path,
+            Change::ReplaceFuzzy(replace) => &replace.path,
             Change::Touch(path) => path,
         }
     }
@@ -49,7 +49,7 @@ impl Change {
     pub fn apply(&self, input: &str) -> Result<String> {
         match self {
             Change::Write(write_file) => Ok(write_file.content.clone()),
-            Change::Replace(replace) => replace.apply(input),
+            Change::ReplaceFuzzy(replace) => replace.apply(input),
             Change::Touch(_) => Ok(input.to_string()),
         }
     }
@@ -65,7 +65,7 @@ impl Change {
                 renderer.pop();
                 renderer.pop();
             }
-            Change::Replace(replace) => {
+            Change::ReplaceFuzzy(replace) => {
                 let path_str = replace.path.to_string_lossy();
                 renderer.push("replace");
                 renderer.push(&format!("replace in file: {}", path_str));
@@ -165,11 +165,13 @@ mod tests {
             path: PathBuf::from("file1.txt"),
             content: "content".to_string(),
         }));
-        patch.changes.push(Change::Replace(replace::Replace {
-            path: PathBuf::from("file2.txt"),
-            old: "old".to_string(),
-            new: "new".to_string(),
-        }));
+        patch
+            .changes
+            .push(Change::ReplaceFuzzy(replace::ReplaceFuzzy {
+                path: PathBuf::from("file2.txt"),
+                old: "old".to_string(),
+                new: "new".to_string(),
+            }));
 
         let changed_files = patch.affected_files();
         assert_eq!(changed_files.len(), 2);

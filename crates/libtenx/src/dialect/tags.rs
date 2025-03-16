@@ -11,7 +11,7 @@ use crate::{
     session::{ModelResponse, Session},
 };
 use fs_err as fs;
-use state::{Change, Patch, Replace, WriteFile};
+use state::{Change, Patch, ReplaceFuzzy, WriteFile};
 
 const SYSTEM: &str = include_str!("./tags-system.txt");
 const REPLACE: &str = include_str!("./tags-replace.txt");
@@ -162,7 +162,7 @@ impl DialectProvider for Tags {
                         let mut replace_lines = replace_content.into_iter().peekable();
                         let (_, old) = xmlish::parse_block("old", &mut replace_lines)?;
                         let (_, new) = xmlish::parse_block("new", &mut replace_lines)?;
-                        patch.changes.push(Change::Replace(Replace {
+                        patch.changes.push(Change::ReplaceFuzzy(ReplaceFuzzy {
                             path: path.into(),
                             old: old.join("\n"),
                             new: new.join("\n"),
@@ -221,7 +221,7 @@ impl DialectProvider for Tags {
                                 write_file.content
                             ));
                         }
-                        Change::Replace(replace) => {
+                        Change::ReplaceFuzzy(replace) => {
                             rendered.push_str(&format!(
                             "<replace path=\"{}\">\n<old>\n{}\n</old>\n<new>\n{}\n</new>\n</replace>\n\n",
                             replace.path.display(),
@@ -285,7 +285,7 @@ mod tests {
                         path: PathBuf::from("/path/to/file2.txt"),
                         content: "This is the content of the file.".to_string(),
                     }),
-                    Change::Replace(Replace {
+                    Change::ReplaceFuzzy(ReplaceFuzzy {
                         path: PathBuf::from("/path/to/file.txt"),
                         old: "Old content".to_string(),
                         new: "New content".to_string(),

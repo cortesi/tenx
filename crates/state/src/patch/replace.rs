@@ -4,15 +4,17 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, Result};
 
-/// An operation that replaces once occurrence of a string with another.
+/// An replace operation that replaces once occurrence of a string with another. This operation is
+/// fuzzy - meaning it tries really hard to make the replacement by ignoring leading and trailing
+/// whitespace.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct Replace {
+pub struct ReplaceFuzzy {
     pub path: PathBuf,
     pub old: String,
     pub new: String,
 }
 
-impl Replace {
+impl ReplaceFuzzy {
     /// Applies the replacement operation to the given input string.
     ///
     /// Replaces only the first occurrence of the old content with the new content.
@@ -127,7 +129,7 @@ mod tests {
         ];
 
         for (name, path, old, new, input, expected_output) in test_cases {
-            let replace = Replace {
+            let replace = ReplaceFuzzy {
                 path: path.into(),
                 old: old.trim().to_string(),
                 new: new.trim().to_string(),
