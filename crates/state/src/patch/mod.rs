@@ -1,8 +1,10 @@
 //! Patch operations that modify state.
+mod insert;
 mod replace;
 mod replace_fuzzy;
 mod write;
 
+pub use insert::*;
 pub use replace::*;
 pub use replace_fuzzy::*;
 pub use write::*;
@@ -27,6 +29,9 @@ pub enum Change {
     /// Replace one piece of text with another, requiring an exact match.
     Replace(replace::Replace),
 
+    /// Insert text at a specific line in a file.
+    Insert(insert::Insert),
+
     /// Touch is a NoOp, it just enters the path as an affected file without modifying it.
     Touch(PathBuf),
 
@@ -42,6 +47,7 @@ impl Change {
             Change::Write(_) => "write",
             Change::ReplaceFuzzy(_) => "replace_fuzzy",
             Change::Replace(_) => "replace",
+            Change::Insert(_) => "insert",
             Change::Touch(_) => "view",
             Change::Undo(_) => "undo",
         }
@@ -53,6 +59,7 @@ impl Change {
             Change::Write(write_file) => &write_file.path,
             Change::ReplaceFuzzy(replace) => &replace.path,
             Change::Replace(replace) => &replace.path,
+            Change::Insert(insert) => &insert.path,
             Change::Touch(path) => path,
             Change::Undo(path) => path,
         }
@@ -91,6 +98,19 @@ impl Change {
                 renderer.pop();
                 renderer.push("new:");
                 renderer.para(&replace.new);
+                renderer.pop();
+                renderer.pop();
+                renderer.pop();
+            }
+            Change::Insert(insert) => {
+                let path_str = insert.path.to_string_lossy();
+                renderer.push("insert");
+                renderer.push(&format!(
+                    "insert at line {} in file: {}",
+                    insert.line, path_str
+                ));
+                renderer.push("content:");
+                renderer.para(&insert.new);
                 renderer.pop();
                 renderer.pop();
                 renderer.pop();
@@ -155,6 +175,20 @@ impl Patch {
             path: path.as_ref().to_path_buf(),
             old: old.as_ref().to_string(),
             new: new.as_ref().to_string(),
+        }));
+        self
+    }
+
+    /// Adds an Insert change to the patch
+    pub fn with_insert<P, S>(mut self, path: P, line: usize, content: S) -> Self
+    where
+        P: AsRef<std::path::Path>,
+        S: AsRef<str>,
+    {
+        self.changes.push(Change::Insert(Insert {
+            path: path.as_ref().to_path_buf(),
+            line,
+            new: content.as_ref().to_string(),
         }));
         self
     }
@@ -255,17 +289,19 @@ mod tests {
             .with_write("file1.txt", "content")
             .with_replace_fuzzy("file2.txt", "old", "new")
             .with_replace("file3.txt", "old", "new")
+            .with_insert("file6.txt", 3, "inserted content")
             .with_touch("file4.txt")
             .with_undo("file5.txt");
 
-        assert_eq!(patch.changes.len(), 5);
+        assert_eq!(patch.changes.len(), 6);
 
         let changed_files = patch.affected_files();
-        assert_eq!(changed_files.len(), 5);
+        assert_eq!(changed_files.len(), 6);
         assert!(changed_files.contains(&PathBuf::from("file1.txt")));
         assert!(changed_files.contains(&PathBuf::from("file2.txt")));
         assert!(changed_files.contains(&PathBuf::from("file3.txt")));
         assert!(changed_files.contains(&PathBuf::from("file4.txt")));
         assert!(changed_files.contains(&PathBuf::from("file5.txt")));
+        assert!(changed_files.contains(&PathBuf::from("file6.txt")));
     }
 }
