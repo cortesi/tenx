@@ -52,16 +52,6 @@ impl Change {
         }
     }
 
-    /// Applies this change to the input string, returning the modified string.
-    pub fn apply(&self, input: &str) -> Result<String> {
-        match self {
-            Change::Write(write_file) => Ok(write_file.content.clone()),
-            Change::ReplaceFuzzy(replace) => replace.apply(input),
-            Change::Replace(replace) => replace.apply(input),
-            Change::Touch(_) => Ok(input.to_string()),
-        }
-    }
-
     /// Renders this change with the specified level of detail
     pub fn render<R: Render>(&self, renderer: &mut R, _detail: Detail) -> Result<()> {
         match self {
