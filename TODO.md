@@ -40,6 +40,8 @@ Model response robustness:
 
 Bugs:
     
+    - No error is output if the user selects a non-existent model
+    - If we issue a code command, and all the mode does is a view, we exit immediately
     - retry doesn't work with fix
     - retry doesn't work if the previous step had an error
 

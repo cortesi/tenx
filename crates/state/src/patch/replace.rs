@@ -74,4 +74,3 @@ mod tests {
         assert!(replace.apply(input).is_err());
     }
 }
-

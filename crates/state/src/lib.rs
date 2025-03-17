@@ -395,6 +395,29 @@ impl State {
         Ok(result)
     }
 
+    /// Returns the content of the file in the most recent snapshot prior to the current revision.
+    /// This is used to support Undo operations.
+    pub fn last_original(&self, path: &Path) -> Option<String> {
+        if self.snapshots.is_empty() {
+            return None;
+        }
+        let snaps = self
+            .snapshots
+            .iter()
+            .rev()
+            .filter(|(_, s)| s.content.contains_key(path));
+
+        for (_, snap) in snaps.rev().skip(1) {
+            if let Some(content) = snap.content.get(path) {
+                return Some(content.clone());
+            }
+            if snap.created.contains(&path.to_path_buf()) {
+                return None;
+            }
+        }
+        None
+    }
+
     /// Returns a unique, sorted list of all files touched, changed or created in the current
     /// session. This includes all files that have been modified in any snapshot.
     pub fn changed(&self) -> Result<Vec<PathBuf>> {
@@ -1377,6 +1400,166 @@ mod tests {
     }
 
     #[test]
+    fn test_last_original() -> Result<()> {
+        struct TestCase {
+            name: &'static str,
+            initial_files: HashMap<PathBuf, String>,
+            patches: Vec<Patch>,
+            path: &'static str,
+            expected: Option<&'static str>,
+        }
+
+        let cases = vec![
+            TestCase {
+                name: "empty snapshots list",
+                initial_files: HashMap::new(),
+                patches: vec![],
+                path: "::test.txt",
+                expected: None,
+            },
+            TestCase {
+                name: "single snapshot with file",
+                initial_files: {
+                    let mut files = HashMap::new();
+                    files.insert(PathBuf::from("::test.txt"), "Original".to_string());
+                    files
+                },
+                patches: vec![Patch {
+                    changes: vec![Change::Write(WriteFile {
+                        path: PathBuf::from("::test.txt"),
+                        content: "Modified".to_string(),
+                    })],
+                }],
+                path: "::test.txt",
+                expected: None, // No previous snapshot to compare with
+            },
+            TestCase {
+                name: "multiple snapshots with file modifications",
+                initial_files: {
+                    let mut files = HashMap::new();
+                    files.insert(PathBuf::from("::test.txt"), "Original".to_string());
+                    files
+                },
+                patches: vec![
+                    Patch {
+                        changes: vec![Change::Write(WriteFile {
+                            path: PathBuf::from("::test.txt"),
+                            content: "Version 1".to_string(),
+                        })],
+                    },
+                    Patch {
+                        changes: vec![Change::Write(WriteFile {
+                            path: PathBuf::from("::test.txt"),
+                            content: "Version 2".to_string(),
+                        })],
+                    },
+                ],
+                path: "::test.txt",
+                expected: Some("Version 1"), // The content from the previous snapshot
+            },
+            TestCase {
+                name: "file not modified in second snapshot",
+                initial_files: {
+                    let mut files = HashMap::new();
+                    files.insert(PathBuf::from("::a.txt"), "A-Original".to_string());
+                    files.insert(PathBuf::from("::b.txt"), "B-Original".to_string());
+                    files
+                },
+                patches: vec![
+                    Patch {
+                        changes: vec![
+                            Change::Write(WriteFile {
+                                path: PathBuf::from("::a.txt"),
+                                content: "A-Version 1".to_string(),
+                            }),
+                            Change::Write(WriteFile {
+                                path: PathBuf::from("::b.txt"),
+                                content: "B-Version 1".to_string(),
+                            }),
+                        ],
+                    },
+                    Patch {
+                        changes: vec![Change::Write(WriteFile {
+                            path: PathBuf::from("::a.txt"),
+                            content: "A-Version 2".to_string(),
+                        })], // b.txt not modified
+                    },
+                ],
+                path: "::b.txt",
+                expected: None,
+            },
+            TestCase {
+                name: "file created in second snapshot",
+                initial_files: HashMap::new(),
+                patches: vec![
+                    Patch {
+                        changes: vec![Change::Write(WriteFile {
+                            path: PathBuf::from("::a.txt"),
+                            content: "A-Version 1".to_string(),
+                        })],
+                    },
+                    Patch {
+                        changes: vec![Change::Write(WriteFile {
+                            path: PathBuf::from("::b.txt"), // New file
+                            content: "B-Version 1".to_string(),
+                        })],
+                    },
+                ],
+                path: "::b.txt",
+                expected: None, // No previous snapshot for this file
+            },
+            TestCase {
+                name: "file not in any snapshot",
+                initial_files: {
+                    let mut files = HashMap::new();
+                    files.insert(PathBuf::from("::a.txt"), "A-Original".to_string());
+                    files
+                },
+                patches: vec![Patch {
+                    changes: vec![Change::Write(WriteFile {
+                        path: PathBuf::from("::a.txt"),
+                        content: "A-Version 1".to_string(),
+                    })],
+                }],
+                path: "::nonexistent.txt",
+                expected: None, // File doesn't exist in any snapshot
+            },
+        ];
+
+        for case in cases {
+            // Initialize state with pre-populated memory content
+            let mut state = State::default().with_memory(case.initial_files)?;
+
+            // Apply each patch to build up the snapshot history
+            for patch in case.patches {
+                let patch_info = state.patch(&patch)?;
+                assert!(
+                    patch_info.failures.is_empty(),
+                    "{}: patch application failed",
+                    case.name
+                );
+            }
+
+            // Test last_original method
+            let result = state.last_original(Path::new(case.path));
+
+            match (result, case.expected) {
+                (Some(got), Some(expected)) => {
+                    assert_eq!(got, expected, "{}: got wrong content", case.name);
+                }
+                (None, None) => {
+                    // Both are None, that's correct
+                }
+                (got, expected) => {
+                    panic!("{}: got {:?}, expected {:?}", case.name, got, expected);
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    #[test]
     fn test_diff_path() -> Result<()> {
         struct TestCase {
             name: &'static str,
@@ -1524,3 +1707,4 @@ mod tests {
         Ok(())
     }
 }
+

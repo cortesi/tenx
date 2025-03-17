@@ -200,4 +200,3 @@ mod tests {
         assert!(changed_files.contains(&PathBuf::from("file2.txt")));
     }
 }
-
