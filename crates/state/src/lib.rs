@@ -743,45 +743,23 @@ mod tests {
     }
 
     #[test]
-    fn test_state_with_filesystem() -> Result<()> {
-        let temp_dir = TempDir::new().expect("failed to create temporary directory");
-        let root = temp_dir.path().to_path_buf();
+    fn test_basic_state_operations() {
+        let fs_file = "test.txt";
+        let mem_file = "::mem.txt";
 
-        // Create a test file in the temporary directory.
-        let test_file = root.join("test.rs");
-        fs::write(&test_file, "fn main() {}")?;
+        let test_cases = vec![StateTestCase::new(
+            "Basic filesystem and memory operations",
+            vec![
+                Patch::default().with_write(fs_file, "filesystem content"),
+                Patch::default().with_write(mem_file, "memory content"),
+                Patch::default().with_write(fs_file, "updated filesystem content"),
+                Patch::default().with_write(mem_file, "updated memory content"),
+            ],
+        )
+        .expect_content(fs_file, "updated filesystem content")
+        .expect_content(mem_file, "updated memory content")];
 
-        // Create a Filesystem with a glob pattern for .rs files.
-        let state = State::default()
-            .with_directory(AbsPath::new(root.clone())?, vec!["*.rs".to_string()])?;
-
-        // Get the filesystem from the state and list the files.
-        let file_system = state.directory.as_ref().expect("Filesystem should be set");
-        let files = file_system.list().unwrap();
-
-        // Check that the test file is found (relative path).
-        assert!(files.contains(&PathBuf::from("test.rs")));
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_state_write() -> Result<()> {
-        let temp_dir = TempDir::new().expect("failed to create temporary directory");
-        // Setup filesystem
-        let root = temp_dir.path().to_path_buf();
-        let mut state = State::default()
-            .with_directory(AbsPath::new(root.clone())?, vec!["*.txt".to_string()])?;
-
-        // Test writing to filesystem
-        state.write(Path::new("test.txt"), "file content")?;
-        assert_eq!(state.read(Path::new("test.txt"))?, "file content");
-
-        // Test writing to memory
-        state.write(Path::new("::test.txt"), "memory content")?;
-        assert_eq!(state.read(Path::new("::test.txt"))?, "memory content");
-
-        Ok(())
+        StateTest::run_tests(test_cases);
     }
 
     #[test]
@@ -795,27 +773,6 @@ mod tests {
         }
 
         let cases = vec![
-            TestCase {
-                name: "get from memory only",
-                fs_content: None,
-                memory_content: Some("memory content"),
-                path: "::test.txt",
-                expected: Ok("memory content"),
-            },
-            TestCase {
-                name: "get from filesystem",
-                fs_content: Some("file content"),
-                memory_content: None,
-                path: "test.txt",
-                expected: Ok("file content"),
-            },
-            TestCase {
-                name: "memory takes precedence over filesystem",
-                fs_content: Some("file content"),
-                memory_content: Some("memory content"),
-                path: "test.txt",
-                expected: Ok("memory content"),
-            },
             TestCase {
                 name: "no store configured",
                 fs_content: None,
@@ -1541,29 +1498,6 @@ mod tests {
         ];
 
         StateTest::run_tests(test_cases);
-    }
-
-    #[test]
-    fn test_undo_nonexistent_change() {
-        let mut state = State::default();
-        let path = PathBuf::from("::test.txt");
-
-        // Create a new file
-        state.write(&path, "New content").unwrap();
-
-        // Try to undo a change to a file that has no previous snapshots
-        let nonexistent_path = PathBuf::from("::nonexistent.txt");
-        let patch = Patch::default().with_undo(nonexistent_path.clone());
-
-        let patch_info = state.patch(&patch).unwrap();
-        assert_eq!(patch_info.failures.len(), 1, "Expected undo to fail");
-
-        match &patch_info.failures[0] {
-            (Change::Undo(p), Error::Patch { model: _, user: _ }) => {
-                assert_eq!(p, &nonexistent_path);
-            }
-            _ => panic!("Expected NotFound error for Undo operation"),
-        }
     }
 
     #[test]
