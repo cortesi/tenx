@@ -32,18 +32,26 @@ impl Insert {
             });
         }
 
-        let mut result = Vec::new();
+        // Find the offset at the target line
+        let mut offset = 0;
+        for line in lines.iter().take(self.line) {
+            offset += line.len() + 1; // +1 for the newline
+        }
 
-        // Add lines before insertion point
-        result.extend(lines[..self.line].iter().cloned());
+        // Handle the case where we're inserting at the end of the file
+        if self.line == lines.len() && !input.is_empty() && !input.ends_with('\n') {
+            // If the file doesn't end with a newline, add one before inserting
+            let mut result = input.to_string();
+            result.push('\n');
+            result.insert_str(result.len(), &self.new);
+            return Ok(result);
+        }
 
-        // Add the new content
-        result.extend(self.new.lines());
+        // Insert the new content at the offset
+        let mut result = input.to_string();
+        result.insert_str(offset, &self.new);
 
-        // Add lines after insertion point
-        result.extend(lines[self.line..].iter().cloned());
-
-        Ok(result.join("\n"))
+        Ok(result)
     }
 }
 
@@ -58,7 +66,7 @@ mod tests {
         let insert = Insert {
             path: PathBuf::from("/path/to/file.txt"),
             line: 0,
-            new: "inserted content".to_string(),
+            new: "inserted content\n".to_string(),
         };
 
         let input = "line 1\nline 2\nline 3";
@@ -69,7 +77,7 @@ mod tests {
         let insert = Insert {
             path: PathBuf::from("/path/to/file.txt"),
             line: 1,
-            new: "inserted content".to_string(),
+            new: "inserted content\n".to_string(),
         };
 
         let result = insert.apply(input).unwrap();
@@ -89,7 +97,7 @@ mod tests {
         let insert = Insert {
             path: PathBuf::from("/path/to/file.txt"),
             line: 1,
-            new: "inserted line 1\ninserted line 2".to_string(),
+            new: "inserted line 1\ninserted line 2\n".to_string(),
         };
 
         let result = insert.apply(input).unwrap();
@@ -97,6 +105,16 @@ mod tests {
             result,
             "line 1\ninserted line 1\ninserted line 2\nline 2\nline 3"
         );
+
+        // Insert with trailing newlines preserved
+        let insert = Insert {
+            path: PathBuf::from("/path/to/file.txt"),
+            line: 1,
+            new: "inserted content\n\n".to_string(),
+        };
+
+        let result = insert.apply(input).unwrap();
+        assert_eq!(result, "line 1\ninserted content\n\nline 2\nline 3");
 
         // Line out of bounds
         let insert = Insert {

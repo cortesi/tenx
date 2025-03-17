@@ -1252,6 +1252,61 @@ mod tests {
     }
 
     #[test]
+    fn test_insert() {
+        let p = "::test.txt";
+
+        let test_cases = vec![
+            StateTestCase::new(
+                "Insert at beginning",
+                vec![Patch::default().with_insert(p, 0, "Inserted line\n")],
+            )
+            .with_content(p, "Line 1\nLine 2\nLine 3")
+            .expect_content(p, "Inserted line\nLine 1\nLine 2\nLine 3"),
+            StateTestCase::new(
+                "Insert in middle",
+                vec![Patch::default().with_insert(p, 1, "Inserted line\n")],
+            )
+            .with_content(p, "Line 1\nLine 2\nLine 3")
+            .expect_content(p, "Line 1\nInserted line\nLine 2\nLine 3"),
+            StateTestCase::new(
+                "Insert at end",
+                vec![Patch::default().with_insert(p, 3, "Inserted line\n")],
+            )
+            .with_content(p, "Line 1\nLine 2\nLine 3")
+            .expect_content(p, "Line 1\nLine 2\nLine 3\nInserted line\n"),
+            StateTestCase::new(
+                "Insert into empty file",
+                vec![Patch::default().with_insert(p, 0, "First line\n")],
+            )
+            .with_content(p, "")
+            .expect_content(p, "First line\n"),
+            StateTestCase::new(
+                "Insert past end of file",
+                vec![Patch::default().with_insert(p, 10, "New line\n")],
+            )
+            .with_content(p, "Line 1\nLine 2")
+            .expect_patch_failure("out of bounds"),
+            StateTestCase::new(
+                "Multiple inserts",
+                vec![
+                    Patch::default().with_insert(p, 0, "First insert\n"),
+                    Patch::default().with_insert(p, 1, "Second insert\n"),
+                ],
+            )
+            .with_content(p, "Original line")
+            .expect_content(p, "First insert\nSecond insert\nOriginal line"),
+            StateTestCase::new(
+                "Insert with no newline",
+                vec![Patch::default().with_insert(p, 1, "Inserted")],
+            )
+            .with_content(p, "Line 1\nLine 2")
+            .expect_content(p, "Line 1\nInsertedLine 2"),
+        ];
+
+        StateTest::run_tests(test_cases);
+    }
+
+    #[test]
     fn test_diff_path() {
         // Test diff_path directly without relying on the StateTest framework
         let mut state = State::default();
