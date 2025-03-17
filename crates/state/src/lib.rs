@@ -573,12 +573,16 @@ mod tests {
     use std::{collections::HashMap, fs, path::PathBuf};
     use tempfile::TempDir;
 
+    /// Function type used for making assertions on the state
+    type StateAssertionFn = Box<dyn Fn(&State)>;
+
     struct StateTestCase {
         name: &'static str,
         patches: Vec<Patch>,
         initial_content: HashMap<PathBuf, String>,
         expected_final_content: Vec<(PathBuf, String)>,
         expect_patch_failure: Option<String>,
+        state_assertion: Option<StateAssertionFn>,
     }
 
     impl StateTestCase {
@@ -593,6 +597,7 @@ mod tests {
                 initial_content: HashMap::new(),
                 expected_final_content: Vec::new(),
                 expect_patch_failure: None,
+                state_assertion: None,
             }
         }
 
@@ -623,6 +628,15 @@ mod tests {
         {
             self.expected_final_content
                 .push((path.as_ref().to_path_buf(), content.into()));
+            self
+        }
+
+        /// Add a closure to perform custom assertions on the final state
+        pub fn expect_state<F>(mut self, f: F) -> Self
+        where
+            F: Fn(&State) + 'static,
+        {
+            self.state_assertion = Some(Box::new(f));
             self
         }
     }
@@ -728,6 +742,11 @@ mod tests {
                     msg,
                     info.failures[0].1
                 }
+            }
+
+            // Run custom state assertions if provided
+            if let Some(assertion) = &test_case.state_assertion {
+                assertion(&self.state);
             }
 
             Ok(())
@@ -857,80 +876,79 @@ mod tests {
     }
 
     #[test]
-    fn test_last_changed_between() -> Result<()> {
-        struct TestCase {
-            name: &'static str,
-            patches: Vec<Patch>,
-            start: Option<u64>,
-            end: Option<u64>,
-            expected: Result<Vec<&'static str>>,
-        }
-
-        let cases = vec![
-            TestCase {
-                name: "empty snapshots list",
-                patches: vec![],
-                start: None,
-                end: None,
-                expected: Ok(vec![]),
-            },
-            TestCase {
-                name: "single snapshot",
-                patches: vec![Patch::default()
+    fn test_last_changed_between() {
+        let test_cases = vec![
+            StateTestCase::new("empty snapshots list", vec![]).expect_state(|state| {
+                let result = state.last_changed_between(None, None).unwrap();
+                assert_eq!(result, Vec::<PathBuf>::new(),);
+            }),
+            StateTestCase::new(
+                "single snapshot",
+                vec![Patch::default()
                     .with_write("::a.txt", "A0")
                     .with_write("::b.txt", "B0")],
-                start: Some(0),
-                end: Some(0),
-                expected: Ok(vec!["::a.txt", "::b.txt"]),
-            },
-            TestCase {
-                name: "overlapping changes in range",
-                patches: vec![
+            )
+            .expect_state(|state| {
+                let result = state.last_changed_between(Some(0), Some(0)).unwrap();
+                let paths: Vec<&str> = result.iter().map(|p| p.to_str().unwrap()).collect();
+                assert_eq!(paths, vec!["::a.txt", "::b.txt"],);
+            }),
+            StateTestCase::new(
+                "overlapping changes in range",
+                vec![
                     Patch::default()
                         .with_write("::a.txt", "A0")
                         .with_write("::b.txt", "B0"),
                     Patch::default().with_write("::b.txt", "B1"),
                 ],
-                start: Some(0),
-                end: Some(0),
-                expected: Ok(vec!["::a.txt"]),
-            },
-            TestCase {
-                name: "full range with implicit boundaries",
-                patches: vec![
+            )
+            .expect_state(|state| {
+                let result = state.last_changed_between(Some(0), Some(0)).unwrap();
+                let paths: Vec<&str> = result.iter().map(|p| p.to_str().unwrap()).collect();
+                assert_eq!(paths, vec!["::a.txt"]);
+            }),
+            StateTestCase::new(
+                "full range with implicit boundaries",
+                vec![
                     Patch::default().with_write("::a.txt", "A0"),
                     Patch::default().with_write("::b.txt", "B0"),
                     Patch::default().with_write("::c.txt", "C0"),
                 ],
-                start: None,
-                end: None,
-                expected: Ok(vec!["::a.txt", "::b.txt", "::c.txt"]),
-            },
-            TestCase {
-                name: "middle range",
-                patches: vec![
+            )
+            .expect_state(|state| {
+                let result = state.last_changed_between(None, None).unwrap();
+                let paths: Vec<&str> = result.iter().map(|p| p.to_str().unwrap()).collect();
+                assert_eq!(paths, vec!["::a.txt", "::b.txt", "::c.txt"],);
+            }),
+            StateTestCase::new(
+                "middle range",
+                vec![
                     Patch::default().with_write("::a.txt", "A0"),
                     Patch::default().with_write("::b.txt", "B0"),
                     Patch::default().with_write("::c.txt", "C0"),
                 ],
-                start: Some(1),
-                end: Some(1),
-                expected: Ok(vec!["::b.txt"]),
-            },
-            TestCase {
-                name: "changes outside range excluded",
-                patches: vec![
+            )
+            .expect_state(|state| {
+                let result = state.last_changed_between(Some(1), Some(1)).unwrap();
+                let paths: Vec<&str> = result.iter().map(|p| p.to_str().unwrap()).collect();
+                assert_eq!(paths, vec!["::b.txt"]);
+            }),
+            StateTestCase::new(
+                "changes outside range excluded",
+                vec![
                     Patch::default().with_write("::a.txt", "A0"),
                     Patch::default().with_write("::b.txt", "B0"),
                     Patch::default().with_write("::a.txt", "A1"),
                 ],
-                start: Some(1),
-                end: Some(1),
-                expected: Ok(vec!["::b.txt"]),
-            },
-            TestCase {
-                name: "multiple files in multiple snapshots",
-                patches: vec![
+            )
+            .expect_state(|state| {
+                let result = state.last_changed_between(Some(1), Some(1)).unwrap();
+                let paths: Vec<&str> = result.iter().map(|p| p.to_str().unwrap()).collect();
+                assert_eq!(paths, vec!["::b.txt"]);
+            }),
+            StateTestCase::new(
+                "multiple files in multiple snapshots",
+                vec![
                     Patch::default()
                         .with_write("::a.txt", "A0")
                         .with_write("::b.txt", "B0"),
@@ -941,43 +959,15 @@ mod tests {
                         .with_write("::b.txt", "B1")
                         .with_write("::d.txt", "D1"),
                 ],
-                start: Some(0),
-                end: Some(1),
-                expected: Ok(vec!["::a.txt", "::c.txt"]),
-            },
+            )
+            .expect_state(|state| {
+                let result = state.last_changed_between(Some(0), Some(1)).unwrap();
+                let paths: Vec<&str> = result.iter().map(|p| p.to_str().unwrap()).collect();
+                assert_eq!(paths, vec!["::a.txt", "::c.txt"],);
+            }),
         ];
 
-        for case in cases {
-            let mut state = State::default();
-
-            // Apply each patch to build up the snapshot history
-            for patch in case.patches {
-                let patch_info = state.patch(&patch)?;
-                assert!(
-                    patch_info.failures.is_empty(),
-                    "{}: patch application failed",
-                    case.name
-                );
-            }
-
-            // Test last_changed_between
-            let result = state.last_changed_between(case.start, case.end);
-
-            match (result, case.expected) {
-                (Ok(got), Ok(expected)) => {
-                    let got: Vec<&str> = got.iter().map(|p| p.to_str().unwrap()).collect();
-                    assert_eq!(got, expected, "{}: got wrong paths", case.name);
-                }
-                (Err(Error::Internal(got)), Err(Error::Internal(expected))) => {
-                    assert_eq!(got, expected, "{}: got wrong error message", case.name);
-                }
-                (got, expected) => {
-                    panic!("{}: got {:?}, expected {:?}", case.name, got, expected);
-                }
-            }
-        }
-
-        Ok(())
+        StateTest::run_tests(test_cases);
     }
 
     /// Unit test for multiple snapshot layers.
