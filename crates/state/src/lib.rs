@@ -578,6 +578,7 @@ mod tests {
         patches: Vec<Patch>,
         initial_content: HashMap<PathBuf, String>,
         expected_final_content: Vec<(PathBuf, String)>,
+        expect_patch_failure: Option<String>,
     }
 
     impl StateTestCase {
@@ -591,7 +592,16 @@ mod tests {
                 patches,
                 initial_content: HashMap::new(),
                 expected_final_content: Vec::new(),
+                expect_patch_failure: None,
             }
+        }
+
+        pub fn expect_patch_failure<S>(mut self, msg: S) -> Self
+        where
+            S: Into<String>,
+        {
+            self.expect_patch_failure = Some(msg.into());
+            self
         }
 
         /// Add initial content for a file
@@ -654,18 +664,6 @@ mod tests {
             self.state.read(path.as_ref())
         }
 
-        /// Apply a patch and assert no failures
-        fn apply_patch(&mut self, patch: &Patch, test_name: &str) -> Result<PatchInfo> {
-            let info = self.state.patch(patch)?;
-            assert!(
-                info.failures.is_empty(),
-                "[{}] Patch application had failures: {:?}",
-                test_name,
-                info.failures
-            );
-            Ok(info)
-        }
-
         /// Assert that a file contains the expected content
         fn assert_content<P, E>(&self, path: P, expected: E, test_name: &str) -> Result<()>
         where
@@ -691,8 +689,22 @@ mod tests {
             }
 
             // Apply all patches
+            let mut patchinfos = vec![];
             for patch in test_case.patches {
-                self.apply_patch(&patch, test_case.name)?;
+                patchinfos.push(self.state.patch(&patch)?);
+            }
+
+            if test_case.expect_patch_failure.is_none() {
+                // Verify that all patches succeeded
+                for info in &patchinfos {
+                    assert_eq!(
+                        info.failures.len(),
+                        0,
+                        "[{}] Patch application had failures: {:?}",
+                        test_case.name,
+                        info.failures
+                    );
+                }
             }
 
             // Verify expected content
@@ -700,7 +712,33 @@ mod tests {
                 self.assert_content(&path, &expected_content, test_case.name)?;
             }
 
+            if let Some(msg) = test_case.expect_patch_failure {
+                let info = patchinfos.last().expect("No patch info found");
+                assert_eq!(
+                    info.failures.len(),
+                    1,
+                    "[{}] Expected 1 patch failure but got {}",
+                    test_case.name,
+                    info.failures.len()
+                );
+                assert! {
+                    info.failures[0].1.to_string().to_lowercase().contains(&msg.to_lowercase()),
+                    "[{}] Expected patch failure message to contain '{}', got: {}",
+                    test_case.name,
+                    msg,
+                    info.failures[0].1
+                }
+            }
+
             Ok(())
+        }
+
+        /// Run multiple test cases in sequence
+        fn run_tests(test_cases: Vec<StateTestCase>) {
+            for test_case in test_cases {
+                let mut test = Self::new().unwrap();
+                test.run_test(test_case).unwrap()
+            }
         }
     }
 
@@ -1464,10 +1502,12 @@ mod tests {
     }
 
     #[test]
-    fn test_undo_change() -> Result<()> {
+    fn test_undo() {
         let p = "::test.txt";
 
         let test_cases = vec![
+            StateTestCase::new("Nonexistent", vec![Patch::default().with_undo(p)])
+                .expect_patch_failure("No previous version"),
             StateTestCase::new(
                 "Undo a single change",
                 vec![
@@ -1500,12 +1540,7 @@ mod tests {
             .expect_content(p, "Second modification"),
         ];
 
-        for case in test_cases {
-            let mut test = StateTest::new().unwrap();
-            test.run_test(case)?;
-        }
-
-        Ok(())
+        StateTest::run_tests(test_cases);
     }
 
     #[test]
@@ -1679,4 +1714,3 @@ mod tests {
         Ok(())
     }
 }
-
