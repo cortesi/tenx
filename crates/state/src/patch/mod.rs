@@ -29,6 +29,9 @@ pub enum Change {
 
     /// Touch is a NoOp, it just enters the path as an affected file without modifying it.
     Touch(PathBuf),
+    
+    /// Undo reverts a single file to its previous state.
+    Undo(PathBuf),
 }
 
 impl Change {
@@ -39,6 +42,7 @@ impl Change {
             Change::ReplaceFuzzy(_) => "replace_fuzzy",
             Change::Replace(_) => "replace",
             Change::Touch(_) => "view",
+            Change::Undo(_) => "undo",
         }
     }
 
@@ -49,6 +53,7 @@ impl Change {
             Change::ReplaceFuzzy(replace) => &replace.path,
             Change::Replace(replace) => &replace.path,
             Change::Touch(path) => path,
+            Change::Undo(path) => path,
         }
     }
 
@@ -91,6 +96,12 @@ impl Change {
             }
             Change::Touch(_) => {
                 renderer.para("view");
+            }
+            Change::Undo(path) => {
+                let path_str = path.to_string_lossy();
+                renderer.push("undo");
+                renderer.para(&format!("undo changes to: {}", path_str));
+                renderer.pop();
             }
         }
         Ok(())

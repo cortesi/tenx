@@ -321,6 +321,26 @@ impl State {
                     pinfo.should_continue = true;
                     pinfo.succeeded += 1;
                 }
+                Change::Undo(path) => {
+                    let res = (|| {
+                        if let Some(previous_content) = self.last_original(path) {
+                            self.write(path, &previous_content)?;
+                            Ok(())
+                        } else {
+                            let msg =
+                                format!("No previous version found for undo: {}", path.display());
+                            Err(Error::Patch {
+                                user: msg.clone(),
+                                model: msg,
+                            })
+                        }
+                    })();
+                    if let Err(e) = res {
+                        pinfo.add_failure(change.clone(), e)?;
+                    } else {
+                        pinfo.succeeded += 1;
+                    }
+                }
             }
         }
         Ok(pinfo)
@@ -406,13 +426,9 @@ impl State {
             .iter()
             .rev()
             .filter(|(_, s)| s.content.contains_key(path));
-
         for (_, snap) in snaps.rev().skip(1) {
             if let Some(content) = snap.content.get(path) {
                 return Some(content.clone());
-            }
-            if snap.created.contains(&path.to_path_buf()) {
-                return None;
             }
         }
         None
@@ -547,6 +563,7 @@ mod tests {
     use super::abspath::AbsPath;
     use super::*;
     // test imports are used below
+    use crate::patch::Change;
     use std::{collections::HashMap, fs, path::PathBuf};
     use tempfile::TempDir;
 
@@ -1557,6 +1574,63 @@ mod tests {
         }
 
         Ok(())
+    }
+
+    #[test]
+    fn test_undo_change() -> Result<()> {
+        let mut state = State::default();
+        let path = PathBuf::from("::test.txt");
+
+        // Setup initial content
+        state.write(&path, "Original content")?;
+        let _snap_id = state.snapshot(&[path.clone()])?;
+
+        // Create a second snapshot
+        state.snapshot(&[path.clone()])?;
+
+        // Make a change
+        state.write(&path, "Modified content")?;
+
+        // Verify the change
+        assert_eq!(state.read(&path)?, "Modified content");
+
+        // Create and apply an Undo patch
+        let patch = Patch {
+            changes: vec![Change::Undo(path.clone())],
+        };
+
+        let patch_info = state.patch(&patch)?;
+        assert!(patch_info.failures.is_empty(), "Undo operation failed");
+
+        // Verify file was restored to original content
+        assert_eq!(state.read(&path)?, "Original content");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_undo_nonexistent_change() {
+        let mut state = State::default();
+        let path = PathBuf::from("::test.txt");
+
+        // Create a new file
+        state.write(&path, "New content").unwrap();
+
+        // Try to undo a change to a file that has no previous snapshots
+        let nonexistent_path = PathBuf::from("::nonexistent.txt");
+        let patch = Patch {
+            changes: vec![Change::Undo(nonexistent_path.clone())],
+        };
+
+        let patch_info = state.patch(&patch).unwrap();
+        assert_eq!(patch_info.failures.len(), 1, "Expected undo to fail");
+
+        match &patch_info.failures[0] {
+            (Change::Undo(p), Error::Patch { model: _, user: _ }) => {
+                assert_eq!(p, &nonexistent_path);
+            }
+            _ => panic!("Expected NotFound error for Undo operation"),
+        }
     }
 
     #[test]
