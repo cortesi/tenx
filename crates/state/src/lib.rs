@@ -567,6 +567,86 @@ mod tests {
     use std::{collections::HashMap, fs, path::PathBuf};
     use tempfile::TempDir;
 
+    struct StateTestCase {
+        name: &'static str,
+        initial_content: &'static str,
+        patches: Vec<Patch>,
+        expected_final_content: Vec<(&'static str, &'static str)>,
+    }
+
+    /// A testing framework for state operations
+    struct StateTest {
+        state: State,
+        _temp_dir: Option<TempDir>,
+    }
+
+    impl StateTest {
+        /// Create a new state test framework backed by a temporary directory
+        fn new() -> Result<Self> {
+            let temp_dir = TempDir::new().expect("failed to create temporary directory");
+            let root = temp_dir.path().to_path_buf();
+            let state =
+                State::default().with_directory(AbsPath::new(root)?, vec!["*".to_string()])?;
+
+            Ok(Self {
+                state,
+                _temp_dir: Some(temp_dir),
+            })
+        }
+
+        /// Write directly to a file in the state to initialize test data
+        fn write(&mut self, path: &str, content: &str) -> Result<()> {
+            self.state.write(Path::new(path), content)
+        }
+
+        /// Read content from a file in the state
+        fn read(&self, path: &str) -> Result<String> {
+            self.state.read(Path::new(path))
+        }
+
+        /// Take a snapshot of the specified paths
+        fn snapshot(&mut self, paths: &[&str]) -> Result<u64> {
+            let paths: Vec<PathBuf> = paths.iter().map(|p| PathBuf::from(*p)).collect();
+            self.state.snapshot(&paths)
+        }
+
+        /// Apply a patch and assert no failures
+        fn apply_patch(&mut self, patch: &Patch, test_name: &str) -> Result<PatchInfo> {
+            let info = self.state.patch(patch)?;
+            assert!(
+                info.failures.is_empty(),
+                "[{}] Patch application had failures: {:?}",
+                test_name,
+                info.failures
+            );
+            Ok(info)
+        }
+
+        /// Assert that a file contains the expected content
+        fn assert_content(&self, path: &str, expected: &str, test_name: &str) -> Result<()> {
+            let content = self.read(path)?;
+            assert_eq!(
+                content, expected,
+                "[{}] Content mismatch for {}",
+                test_name, path
+            );
+            Ok(())
+        }
+
+        /// Run a table test with a StateTestCase containing patches and expected file states
+        fn run_test(&mut self, test_case: StateTestCase) -> Result<()> {
+            for patch in test_case.patches {
+                self.apply_patch(&patch, test_case.name)?;
+            }
+
+            for (path, expected_content) in test_case.expected_final_content {
+                self.assert_content(path, expected_content, test_case.name)?;
+            }
+
+            Ok(())
+        }
+    }
+
     #[test]
     fn test_state_with_filesystem() -> Result<()> {
         let temp_dir = TempDir::new().expect("failed to create temporary directory");
@@ -744,18 +824,9 @@ mod tests {
             },
             TestCase {
                 name: "single snapshot",
-                patches: vec![Patch {
-                    changes: vec![
-                        Change::Write(WriteFile {
-                            path: PathBuf::from("::a.txt"),
-                            content: "A0".to_string(),
-                        }),
-                        Change::Write(patch::WriteFile {
-                            path: PathBuf::from("::b.txt"),
-                            content: "B0".to_string(),
-                        }),
-                    ],
-                }],
+                patches: vec![Patch::default()
+                    .with_write("::a.txt", "A0")
+                    .with_write("::b.txt", "B0")],
                 start: Some(0),
                 end: Some(0),
                 expected: Ok(vec!["::a.txt", "::b.txt"]),
@@ -763,24 +834,10 @@ mod tests {
             TestCase {
                 name: "overlapping changes in range",
                 patches: vec![
-                    Patch {
-                        changes: vec![
-                            Change::Write(patch::WriteFile {
-                                path: PathBuf::from("::a.txt"),
-                                content: "A0".to_string(),
-                            }),
-                            Change::Write(patch::WriteFile {
-                                path: PathBuf::from("::b.txt"),
-                                content: "B0".to_string(),
-                            }),
-                        ],
-                    },
-                    Patch {
-                        changes: vec![Change::Write(patch::WriteFile {
-                            path: PathBuf::from("::b.txt"),
-                            content: "B1".to_string(),
-                        })],
-                    },
+                    Patch::default()
+                        .with_write("::a.txt", "A0")
+                        .with_write("::b.txt", "B0"),
+                    Patch::default().with_write("::b.txt", "B1"),
                 ],
                 start: Some(0),
                 end: Some(0),
@@ -789,24 +846,9 @@ mod tests {
             TestCase {
                 name: "full range with implicit boundaries",
                 patches: vec![
-                    Patch {
-                        changes: vec![Change::Write(patch::WriteFile {
-                            path: PathBuf::from("::a.txt"),
-                            content: "A0".to_string(),
-                        })],
-                    },
-                    Patch {
-                        changes: vec![Change::Write(patch::WriteFile {
-                            path: PathBuf::from("::b.txt"),
-                            content: "B0".to_string(),
-                        })],
-                    },
-                    Patch {
-                        changes: vec![Change::Write(patch::WriteFile {
-                            path: PathBuf::from("::c.txt"),
-                            content: "C0".to_string(),
-                        })],
-                    },
+                    Patch::default().with_write("::a.txt", "A0"),
+                    Patch::default().with_write("::b.txt", "B0"),
+                    Patch::default().with_write("::c.txt", "C0"),
                 ],
                 start: None,
                 end: None,
@@ -815,24 +857,9 @@ mod tests {
             TestCase {
                 name: "middle range",
                 patches: vec![
-                    Patch {
-                        changes: vec![Change::Write(patch::WriteFile {
-                            path: PathBuf::from("::a.txt"),
-                            content: "A0".to_string(),
-                        })],
-                    },
-                    Patch {
-                        changes: vec![Change::Write(patch::WriteFile {
-                            path: PathBuf::from("::b.txt"),
-                            content: "B0".to_string(),
-                        })],
-                    },
-                    Patch {
-                        changes: vec![Change::Write(patch::WriteFile {
-                            path: PathBuf::from("::c.txt"),
-                            content: "C0".to_string(),
-                        })],
-                    },
+                    Patch::default().with_write("::a.txt", "A0"),
+                    Patch::default().with_write("::b.txt", "B0"),
+                    Patch::default().with_write("::c.txt", "C0"),
                 ],
                 start: Some(1),
                 end: Some(1),
@@ -841,24 +868,9 @@ mod tests {
             TestCase {
                 name: "changes outside range excluded",
                 patches: vec![
-                    Patch {
-                        changes: vec![Change::Write(patch::WriteFile {
-                            path: PathBuf::from("::a.txt"),
-                            content: "A0".to_string(),
-                        })],
-                    },
-                    Patch {
-                        changes: vec![Change::Write(patch::WriteFile {
-                            path: PathBuf::from("::b.txt"),
-                            content: "B0".to_string(),
-                        })],
-                    },
-                    Patch {
-                        changes: vec![Change::Write(patch::WriteFile {
-                            path: PathBuf::from("::a.txt"),
-                            content: "A1".to_string(),
-                        })],
-                    },
+                    Patch::default().with_write("::a.txt", "A0"),
+                    Patch::default().with_write("::b.txt", "B0"),
+                    Patch::default().with_write("::a.txt", "A1"),
                 ],
                 start: Some(1),
                 end: Some(1),
@@ -867,42 +879,15 @@ mod tests {
             TestCase {
                 name: "multiple files in multiple snapshots",
                 patches: vec![
-                    Patch {
-                        changes: vec![
-                            Change::Write(patch::WriteFile {
-                                path: PathBuf::from("::a.txt"),
-                                content: "A0".to_string(),
-                            }),
-                            Change::Write(patch::WriteFile {
-                                path: PathBuf::from("::b.txt"),
-                                content: "B0".to_string(),
-                            }),
-                        ],
-                    },
-                    Patch {
-                        changes: vec![
-                            Change::Write(patch::WriteFile {
-                                path: PathBuf::from("::c.txt"),
-                                content: "C0".to_string(),
-                            }),
-                            Change::Write(patch::WriteFile {
-                                path: PathBuf::from("::d.txt"),
-                                content: "D0".to_string(),
-                            }),
-                        ],
-                    },
-                    Patch {
-                        changes: vec![
-                            Change::Write(patch::WriteFile {
-                                path: PathBuf::from("::b.txt"),
-                                content: "B1".to_string(),
-                            }),
-                            Change::Write(patch::WriteFile {
-                                path: PathBuf::from("::d.txt"),
-                                content: "D1".to_string(),
-                            }),
-                        ],
-                    },
+                    Patch::default()
+                        .with_write("::a.txt", "A0")
+                        .with_write("::b.txt", "B0"),
+                    Patch::default()
+                        .with_write("::c.txt", "C0")
+                        .with_write("::d.txt", "D0"),
+                    Patch::default()
+                        .with_write("::b.txt", "B1")
+                        .with_write("::d.txt", "D1"),
                 ],
                 start: Some(0),
                 end: Some(1),
@@ -1123,18 +1108,8 @@ mod tests {
                 name: "newly created file in patch",
                 initial_files: HashMap::new(),
                 patches: vec![
-                    Patch {
-                        changes: vec![Change::Write(WriteFile {
-                            path: PathBuf::from("::a.txt"),
-                            content: "A0".to_string(),
-                        })],
-                    },
-                    Patch {
-                        changes: vec![Change::Write(WriteFile {
-                            path: PathBuf::from("::a.txt"),
-                            content: "A1".to_string(),
-                        })],
-                    },
+                    Patch::default().with_write("::a.txt", "A0"),
+                    Patch::default().with_write("::a.txt", "A1"),
                 ],
                 path: "::a.txt",
                 expected: Some(""),
@@ -1147,18 +1122,8 @@ mod tests {
                     files
                 },
                 patches: vec![
-                    Patch {
-                        changes: vec![Change::Write(WriteFile {
-                            path: PathBuf::from("::a.txt"),
-                            content: "A0".to_string(),
-                        })],
-                    },
-                    Patch {
-                        changes: vec![Change::Write(WriteFile {
-                            path: PathBuf::from("::a.txt"),
-                            content: "A1".to_string(),
-                        })],
-                    },
+                    Patch::default().with_write("::a.txt", "A0"),
+                    Patch::default().with_write("::a.txt", "A1"),
                 ],
                 path: "::a.txt",
                 expected: Some("Original"),
@@ -1167,18 +1132,8 @@ mod tests {
                 name: "file in second snapshot only",
                 initial_files: HashMap::new(),
                 patches: vec![
-                    Patch {
-                        changes: vec![Change::Write(WriteFile {
-                            path: PathBuf::from("::a.txt"),
-                            content: "A0".to_string(),
-                        })],
-                    },
-                    Patch {
-                        changes: vec![Change::Write(WriteFile {
-                            path: PathBuf::from("::b.txt"),
-                            content: "B0".to_string(),
-                        })],
-                    },
+                    Patch::default().with_write("::a.txt", "A0"),
+                    Patch::default().with_write("::b.txt", "B0"),
                 ],
                 path: "::b.txt",
                 expected: Some(""),
@@ -1186,9 +1141,7 @@ mod tests {
             TestCase {
                 name: "file created in first snapshot",
                 initial_files: HashMap::new(),
-                patches: vec![Patch {
-                    changes: vec![Change::Touch(PathBuf::from("::created.txt"))],
-                }],
+                patches: vec![Patch::default().with_touch("::created.txt")],
                 path: "::created.txt",
                 expected: Some(""),
             },
@@ -1199,12 +1152,7 @@ mod tests {
                     files.insert(PathBuf::from("::a.txt"), "A0".to_string());
                     files
                 },
-                patches: vec![Patch {
-                    changes: vec![Change::Write(WriteFile {
-                        path: PathBuf::from("::a.txt"),
-                        content: "A1".to_string(),
-                    })],
-                }],
+                patches: vec![Patch::default().with_write("::a.txt", "A1")],
                 path: "::nonexistent.txt",
                 expected: None,
             },
@@ -1259,125 +1207,51 @@ mod tests {
             },
             TestCase {
                 name: "single snapshot with multiple files",
-                patches: vec![Patch {
-                    changes: vec![
-                        Change::Write(WriteFile {
-                            path: PathBuf::from("::a.txt"),
-                            content: "A0".to_string(),
-                        }),
-                        Change::Write(WriteFile {
-                            path: PathBuf::from("::b.txt"),
-                            content: "B0".to_string(),
-                        }),
-                    ],
-                }],
+                patches: vec![Patch::default()
+                    .with_write("::a.txt", "A0")
+                    .with_write("::b.txt", "B0")],
                 expected: Ok(vec!["::a.txt", "::b.txt"]),
             },
             TestCase {
                 name: "multiple snapshots with unique files",
                 patches: vec![
-                    Patch {
-                        changes: vec![Change::Write(WriteFile {
-                            path: PathBuf::from("::a.txt"),
-                            content: "A0".to_string(),
-                        })],
-                    },
-                    Patch {
-                        changes: vec![Change::Write(WriteFile {
-                            path: PathBuf::from("::b.txt"),
-                            content: "B0".to_string(),
-                        })],
-                    },
-                    Patch {
-                        changes: vec![Change::Write(WriteFile {
-                            path: PathBuf::from("::c.txt"),
-                            content: "C0".to_string(),
-                        })],
-                    },
+                    Patch::default().with_write("::a.txt", "A0"),
+                    Patch::default().with_write("::b.txt", "B0"),
+                    Patch::default().with_write("::c.txt", "C0"),
                 ],
                 expected: Ok(vec!["::a.txt", "::b.txt", "::c.txt"]),
             },
             TestCase {
                 name: "multiple snapshots with overlapping files",
                 patches: vec![
-                    Patch {
-                        changes: vec![Change::Write(WriteFile {
-                            path: PathBuf::from("::a.txt"),
-                            content: "A0".to_string(),
-                        })],
-                    },
-                    Patch {
-                        changes: vec![Change::Write(WriteFile {
-                            path: PathBuf::from("::b.txt"),
-                            content: "B0".to_string(),
-                        })],
-                    },
-                    Patch {
-                        changes: vec![Change::Write(WriteFile {
-                            path: PathBuf::from("::a.txt"),
-                            content: "A1".to_string(),
-                        })],
-                    },
+                    Patch::default().with_write("::a.txt", "A0"),
+                    Patch::default().with_write("::b.txt", "B0"),
+                    Patch::default().with_write("::a.txt", "A1"),
                 ],
                 expected: Ok(vec!["::a.txt", "::b.txt"]),
             },
             TestCase {
                 name: "multiple snapshots with multiple files per snapshot",
                 patches: vec![
-                    Patch {
-                        changes: vec![
-                            Change::Write(WriteFile {
-                                path: PathBuf::from("::a.txt"),
-                                content: "A0".to_string(),
-                            }),
-                            Change::Write(WriteFile {
-                                path: PathBuf::from("::b.txt"),
-                                content: "B0".to_string(),
-                            }),
-                        ],
-                    },
-                    Patch {
-                        changes: vec![
-                            Change::Write(WriteFile {
-                                path: PathBuf::from("::c.txt"),
-                                content: "C0".to_string(),
-                            }),
-                            Change::Write(WriteFile {
-                                path: PathBuf::from("::d.txt"),
-                                content: "D0".to_string(),
-                            }),
-                        ],
-                    },
-                    Patch {
-                        changes: vec![
-                            Change::Write(WriteFile {
-                                path: PathBuf::from("::b.txt"),
-                                content: "B1".to_string(),
-                            }),
-                            Change::Write(WriteFile {
-                                path: PathBuf::from("::d.txt"),
-                                content: "D1".to_string(),
-                            }),
-                        ],
-                    },
+                    Patch::default()
+                        .with_write("::a.txt", "A0")
+                        .with_write("::b.txt", "B0"),
+                    Patch::default()
+                        .with_write("::c.txt", "C0")
+                        .with_write("::d.txt", "D0"),
+                    Patch::default()
+                        .with_write("::b.txt", "B1")
+                        .with_write("::d.txt", "D1"),
                 ],
                 expected: Ok(vec!["::a.txt", "::b.txt", "::c.txt", "::d.txt"]),
             },
             TestCase {
                 name: "view changes included",
                 patches: vec![
-                    Patch {
-                        changes: vec![Change::Touch(PathBuf::from("::view1.txt"))],
-                    },
-                    Patch {
-                        changes: vec![
-                            Change::Touch(PathBuf::from("::view2.txt")),
-                            Change::Write(WriteFile {
-                                path: PathBuf::from("::a.txt"),
-                                content: "A0".to_string(),
-                            }),
-                        ],
-                    },
+                    Patch::default().with_touch("::view1.txt"),
+                    Patch::default()
+                        .with_touch("::view2.txt")
+                        .with_write("::a.txt", "A0"),
                 ],
                 expected: Ok(vec!["::a.txt", "::view1.txt", "::view2.txt"]),
             },
@@ -1441,12 +1315,7 @@ mod tests {
                     files.insert(PathBuf::from("::test.txt"), "Original".to_string());
                     files
                 },
-                patches: vec![Patch {
-                    changes: vec![Change::Write(WriteFile {
-                        path: PathBuf::from("::test.txt"),
-                        content: "Modified".to_string(),
-                    })],
-                }],
+                patches: vec![Patch::default().with_write("::test.txt", "Modified")],
                 path: "::test.txt",
                 expected: None, // No previous snapshot to compare with
             },
@@ -1458,18 +1327,8 @@ mod tests {
                     files
                 },
                 patches: vec![
-                    Patch {
-                        changes: vec![Change::Write(WriteFile {
-                            path: PathBuf::from("::test.txt"),
-                            content: "Version 1".to_string(),
-                        })],
-                    },
-                    Patch {
-                        changes: vec![Change::Write(WriteFile {
-                            path: PathBuf::from("::test.txt"),
-                            content: "Version 2".to_string(),
-                        })],
-                    },
+                    Patch::default().with_write("::test.txt", "Version 1"),
+                    Patch::default().with_write("::test.txt", "Version 2"),
                 ],
                 path: "::test.txt",
                 expected: Some("Version 1"), // The content from the previous snapshot
@@ -1483,24 +1342,10 @@ mod tests {
                     files
                 },
                 patches: vec![
-                    Patch {
-                        changes: vec![
-                            Change::Write(WriteFile {
-                                path: PathBuf::from("::a.txt"),
-                                content: "A-Version 1".to_string(),
-                            }),
-                            Change::Write(WriteFile {
-                                path: PathBuf::from("::b.txt"),
-                                content: "B-Version 1".to_string(),
-                            }),
-                        ],
-                    },
-                    Patch {
-                        changes: vec![Change::Write(WriteFile {
-                            path: PathBuf::from("::a.txt"),
-                            content: "A-Version 2".to_string(),
-                        })], // b.txt not modified
-                    },
+                    Patch::default()
+                        .with_write("::a.txt", "A-Version 1")
+                        .with_write("::b.txt", "B-Version 1"),
+                    Patch::default().with_write("::a.txt", "A-Version 2"), // b.txt not modified
                 ],
                 path: "::b.txt",
                 expected: None,
@@ -1509,18 +1354,8 @@ mod tests {
                 name: "file created in second snapshot",
                 initial_files: HashMap::new(),
                 patches: vec![
-                    Patch {
-                        changes: vec![Change::Write(WriteFile {
-                            path: PathBuf::from("::a.txt"),
-                            content: "A-Version 1".to_string(),
-                        })],
-                    },
-                    Patch {
-                        changes: vec![Change::Write(WriteFile {
-                            path: PathBuf::from("::b.txt"), // New file
-                            content: "B-Version 1".to_string(),
-                        })],
-                    },
+                    Patch::default().with_write("::a.txt", "A-Version 1"),
+                    Patch::default().with_write("::b.txt", "B-Version 1"), // New file
                 ],
                 path: "::b.txt",
                 expected: None, // No previous snapshot for this file
@@ -1532,12 +1367,7 @@ mod tests {
                     files.insert(PathBuf::from("::a.txt"), "A-Original".to_string());
                     files
                 },
-                patches: vec![Patch {
-                    changes: vec![Change::Write(WriteFile {
-                        path: PathBuf::from("::a.txt"),
-                        content: "A-Version 1".to_string(),
-                    })],
-                }],
+                patches: vec![Patch::default().with_write("::a.txt", "A-Version 1")],
                 path: "::nonexistent.txt",
                 expected: None, // File doesn't exist in any snapshot
             },
@@ -1578,32 +1408,78 @@ mod tests {
 
     #[test]
     fn test_undo_change() -> Result<()> {
-        let mut state = State::default();
-        let path = PathBuf::from("::test.txt");
+        let path = "::test.txt";
+        let path_buf = PathBuf::from(path);
 
-        // Setup initial content
-        state.write(&path, "Original content")?;
-        let _snap_id = state.snapshot(&[path.clone()])?;
+        let test_cases = vec![
+            StateTestCase {
+                name: "Undo a single change",
+                initial_content: "Original content",
+                patches: vec![
+                    Patch::default().with_write(path_buf.clone(), "Modified content"),
+                    Patch::default().with_undo(path_buf.clone()),
+                ],
+                expected_final_content: vec![(path, "Original content")],
+            },
+            // TestCase {
+            //     name: "Multiple changes and undo",
+            //     initial_content: "Original content",
+            //     patches: vec![
+            //         Patch {
+            //             changes: vec![Change::Write(WriteFile {
+            //                 path: path_buf.clone(),
+            //                 content: "First modification".to_string(),
+            //             })],
+            //         },
+            //         Patch {
+            //             changes: vec![Change::Write(WriteFile {
+            //                 path: path_buf.clone(),
+            //                 content: "Second modification".to_string(),
+            //             })],
+            //         },
+            //         Patch {
+            //             changes: vec![Change::Undo(path_buf.clone())],
+            //         },
+            //     ],
+            //     expected_final_content: "First modification",
+            // },
+            // TestCase {
+            //     name: "Double undo to return to original",
+            //     initial_content: "Original content",
+            //     patches: vec![
+            //         Patch {
+            //             changes: vec![Change::Write(WriteFile {
+            //                 path: path_buf.clone(),
+            //                 content: "First modification".to_string(),
+            //             })],
+            //         },
+            //         Patch {
+            //             changes: vec![Change::Write(WriteFile {
+            //                 path: path_buf.clone(),
+            //                 content: "Second modification".to_string(),
+            //             })],
+            //         },
+            //         Patch {
+            //             changes: vec![Change::Undo(path_buf.clone())],
+            //         },
+            //         Patch {
+            //             changes: vec![Change::Undo(path_buf.clone())],
+            //         },
+            //     ],
+            //     expected_final_content: "Original content",
+            // },
+        ];
 
-        // Create a second snapshot
-        state.snapshot(&[path.clone()])?;
+        for case in test_cases {
+            let mut test = StateTest::new().unwrap();
 
-        // Make a change
-        state.write(&path, "Modified content")?;
+            // Initialize with the original content
+            test.write(path, case.initial_content)?;
+            test.snapshot(&[path])?;
 
-        // Verify the change
-        assert_eq!(state.read(&path)?, "Modified content");
-
-        // Create and apply an Undo patch
-        let patch = Patch {
-            changes: vec![Change::Undo(path.clone())],
-        };
-
-        let patch_info = state.patch(&patch)?;
-        assert!(patch_info.failures.is_empty(), "Undo operation failed");
-
-        // Verify file was restored to original content
-        assert_eq!(state.read(&path)?, "Original content");
+            // Run the test with the test case
+            test.run_test(case)?;
+        }
 
         Ok(())
     }
@@ -1618,9 +1494,7 @@ mod tests {
 
         // Try to undo a change to a file that has no previous snapshots
         let nonexistent_path = PathBuf::from("::nonexistent.txt");
-        let patch = Patch {
-            changes: vec![Change::Undo(nonexistent_path.clone())],
-        };
+        let patch = Patch::default().with_undo(nonexistent_path.clone());
 
         let patch_info = state.patch(&patch).unwrap();
         assert_eq!(patch_info.failures.len(), 1, "Expected undo to fail");
@@ -1781,4 +1655,3 @@ mod tests {
         Ok(())
     }
 }
-

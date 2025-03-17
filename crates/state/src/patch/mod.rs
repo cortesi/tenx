@@ -29,8 +29,9 @@ pub enum Change {
 
     /// Touch is a NoOp, it just enters the path as an affected file without modifying it.
     Touch(PathBuf),
-    
-    /// Undo reverts a single file to its previous state.
+
+    /// Undo reverts a single file to its previous state. Note that this adds a new snapshot entry,
+    /// so undoing twice gets you back to the original state.       
     Undo(PathBuf),
 }
 
@@ -115,6 +116,62 @@ pub struct Patch {
 }
 
 impl Patch {
+    /// Adds a WriteFile change to the patch
+    pub fn with_write<P, S>(mut self, path: P, content: S) -> Self
+    where
+        P: AsRef<std::path::Path>,
+        S: AsRef<str>,
+    {
+        self.changes.push(Change::Write(WriteFile {
+            path: path.as_ref().to_path_buf(),
+            content: content.as_ref().to_string(),
+        }));
+        self
+    }
+
+    /// Adds a ReplaceFuzzy change to the patch
+    pub fn with_replace_fuzzy<P, S1, S2>(mut self, path: P, old: S1, new: S2) -> Self
+    where
+        P: AsRef<std::path::Path>,
+        S1: AsRef<str>,
+        S2: AsRef<str>,
+    {
+        self.changes.push(Change::ReplaceFuzzy(ReplaceFuzzy {
+            path: path.as_ref().to_path_buf(),
+            old: old.as_ref().to_string(),
+            new: new.as_ref().to_string(),
+        }));
+        self
+    }
+
+    /// Adds a Replace change to the patch
+    pub fn with_replace<P, S1, S2>(mut self, path: P, old: S1, new: S2) -> Self
+    where
+        P: AsRef<std::path::Path>,
+        S1: AsRef<str>,
+        S2: AsRef<str>,
+    {
+        self.changes.push(Change::Replace(Replace {
+            path: path.as_ref().to_path_buf(),
+            old: old.as_ref().to_string(),
+            new: new.as_ref().to_string(),
+        }));
+        self
+    }
+
+    /// Adds a Touch change to the patch
+    pub fn with_touch<P: AsRef<std::path::Path>>(mut self, path: P) -> Self {
+        self.changes
+            .push(Change::Touch(path.as_ref().to_path_buf()));
+        self
+    }
+
+    /// Adds an Undo change to the patch
+    pub fn with_undo<P: AsRef<std::path::Path>>(mut self, path: P) -> Self {
+        self.changes.push(Change::Undo(path.as_ref().to_path_buf()));
+        self
+    }
+
     /// Returns a vector of unique PathBufs for all files changed in the patch.
     pub fn affected_files(&self) -> Vec<PathBuf> {
         let mut paths = HashMap::new();
@@ -182,22 +239,33 @@ mod tests {
 
     #[test]
     fn test_changed_files() {
-        let mut patch = Patch::default();
-        patch.changes.push(Change::Write(write::WriteFile {
-            path: PathBuf::from("file1.txt"),
-            content: "content".to_string(),
-        }));
-        patch
-            .changes
-            .push(Change::ReplaceFuzzy(replace_fuzzy::ReplaceFuzzy {
-                path: PathBuf::from("file2.txt"),
-                old: "old".to_string(),
-                new: "new".to_string(),
-            }));
+        let patch = Patch::default()
+            .with_write("file1.txt", "content")
+            .with_replace_fuzzy("file2.txt", "old", "new");
 
         let changed_files = patch.affected_files();
         assert_eq!(changed_files.len(), 2);
         assert!(changed_files.contains(&PathBuf::from("file1.txt")));
         assert!(changed_files.contains(&PathBuf::from("file2.txt")));
+    }
+
+    #[test]
+    fn test_convenience_constructors() {
+        let patch = Patch::default()
+            .with_write("file1.txt", "content")
+            .with_replace_fuzzy("file2.txt", "old", "new")
+            .with_replace("file3.txt", "old", "new")
+            .with_touch("file4.txt")
+            .with_undo("file5.txt");
+
+        assert_eq!(patch.changes.len(), 5);
+
+        let changed_files = patch.affected_files();
+        assert_eq!(changed_files.len(), 5);
+        assert!(changed_files.contains(&PathBuf::from("file1.txt")));
+        assert!(changed_files.contains(&PathBuf::from("file2.txt")));
+        assert!(changed_files.contains(&PathBuf::from("file3.txt")));
+        assert!(changed_files.contains(&PathBuf::from("file4.txt")));
+        assert!(changed_files.contains(&PathBuf::from("file5.txt")));
     }
 }
