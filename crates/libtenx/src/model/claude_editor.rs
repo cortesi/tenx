@@ -1,4 +1,4 @@
-//! This module implements the Claude model provider for the tenx system.
+//! This module implements the Claude model provider with text editor capabilities for the tenx system.
 use misanthropy::{tools, Anthropic, Content, ContentBlockDelta, Role, StreamEvent};
 use serde_json;
 use tracing::{trace, warn};
@@ -15,6 +15,7 @@ use crate::{
     session::Session,
     throttle::Throttle,
 };
+use state::{Insert, Replace, WriteFile};
 
 const MAX_TOKENS: u32 = 8192;
 
@@ -67,24 +68,84 @@ impl ClaudeEditor {
     }
 
     fn extract_changes(&self, req: &misanthropy::MessagesRequest) -> Result<ModelResponse> {
-        let mr = ModelResponse {
-            patch: None,
+        let mut mr = ModelResponse {
+            patch: Some(state::Patch::default()),
             operations: vec![],
             comment: None,
             usage: None,
             raw_response: None,
         };
+
         if let Some(message) = &req.messages.last() {
             if message.role == Role::Assistant {
                 if message.content.is_empty() {
                     // We are seeing this happen fairly frequently with the Anthropic API.
                     return Err(TenxError::Throttle(Throttle::Backoff));
                 }
+
+                // First, look for a comment in text content
+                for content in &message.content {
+                    if let Content::Text(text) = content {
+                        mr.comment = Some(text.text.clone());
+                        break;
+                    }
+                }
+
+                // Then process tool uses
+                let mut has_changes = false;
                 for content in &message.content {
                     if let Content::ToolUse(tool_use) = content {
                         match serde_json::from_value::<tools::TextEditor>(tool_use.input.clone()) {
-                            Ok(_ed) => {
-                                // Extract operations here
+                            Ok(edit) => {
+                                match edit {
+                                    tools::TextEditor::Create { path, file_text } => {
+                                        if let Some(patch) = &mut mr.patch {
+                                            patch.changes.push(state::Change::Write(WriteFile {
+                                                path: std::path::PathBuf::from(path),
+                                                content: file_text,
+                                            }));
+                                            has_changes = true;
+                                        }
+                                    }
+                                    tools::TextEditor::StrReplace {
+                                        path,
+                                        old_str,
+                                        new_str,
+                                    } => {
+                                        if let Some(patch) = &mut mr.patch {
+                                            patch.changes.push(state::Change::Replace(Replace {
+                                                path: std::path::PathBuf::from(path),
+                                                old: old_str,
+                                                new: new_str,
+                                            }));
+                                            has_changes = true;
+                                        }
+                                    }
+                                    tools::TextEditor::Insert {
+                                        path,
+                                        insert_line,
+                                        new_str,
+                                    } => {
+                                        if let Some(patch) = &mut mr.patch {
+                                            patch.changes.push(state::Change::Insert(Insert {
+                                                path: std::path::PathBuf::from(path),
+                                                line: insert_line,
+                                                new: new_str,
+                                            }));
+                                            has_changes = true;
+                                        }
+                                    }
+                                    tools::TextEditor::View { .. } => {
+                                        // View operation doesn't modify files, so no patch needed
+                                    }
+                                    tools::TextEditor::UndoEdit { .. } => {
+                                        // UndoEdit might need special handling depending on your implementation
+                                        // For now, we'll just log it
+                                        trace!(
+                                            "UndoEdit operation encountered but not implemented"
+                                        );
+                                    }
+                                }
                             }
                             Err(e) => {
                                 return Err(TenxError::Internal(format!(
@@ -95,10 +156,21 @@ impl ClaudeEditor {
                         }
                     }
                 }
+
+                // If no actual changes were found, return None for the patch
+                if !has_changes {
+                    mr.patch = None;
+                }
             }
         }
-        // TODO: Error if we don't have a patch
-        // Err(TenxError::Internal("No patch to parse.".into()))
+
+        // Convert the entire message content to raw_response for debugging
+        if let Some(message) = &req.messages.last() {
+            if message.role == Role::Assistant {
+                mr.raw_response = Some(message.format_content());
+            }
+        }
+
         Ok(mr)
     }
 
