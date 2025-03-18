@@ -94,33 +94,39 @@ impl ClaudeEditor {
         for content in &last_message.content {
             if let Content::ToolUse(tool_use) = content {
                 match serde_json::from_value::<tools::TextEditor>(tool_use.input.clone()) {
-                    Ok(edit) => {
-                        match edit {
-                            tools::TextEditor::Create { path, file_text } => {
-                                patch = patch.with_write(path, file_text);
-                            }
-                            tools::TextEditor::StrReplace {
-                                path,
-                                old_str,
-                                new_str,
-                            } => {
-                                patch = patch.with_replace(path, old_str, new_str);
-                            }
-                            tools::TextEditor::Insert {
-                                path,
-                                insert_line,
-                                new_str,
-                            } => {
-                                patch = patch.with_insert(path, insert_line, new_str);
-                            }
-                            tools::TextEditor::View { .. } => {
-                                // View operation doesn't modify files, so no patch needed
-                            }
-                            tools::TextEditor::UndoEdit { path } => {
-                                patch = patch.with_undo(path);
+                    Ok(edit) => match edit {
+                        tools::TextEditor::Create { path, file_text } => {
+                            patch = patch.with_write(path, file_text);
+                        }
+                        tools::TextEditor::StrReplace {
+                            path,
+                            old_str,
+                            new_str,
+                        } => {
+                            patch = patch.with_replace(path, old_str, new_str);
+                        }
+                        tools::TextEditor::Insert {
+                            path,
+                            insert_line,
+                            new_str,
+                        } => {
+                            patch = patch.with_insert(path, insert_line, new_str);
+                        }
+                        tools::TextEditor::View { path, view_range } => {
+                            if let Some(range) = view_range {
+                                patch = patch.with_view_range_onebased(
+                                    path,
+                                    range[0] as isize,
+                                    range[1] as isize,
+                                );
+                            } else {
+                                patch = patch.with_view(path);
                             }
                         }
-                    }
+                        tools::TextEditor::UndoEdit { path } => {
+                            patch = patch.with_undo(path);
+                        }
+                    },
                     Err(e) => {
                         return Err(TenxError::Internal(format!(
                             "Failed to parse tool use: {}",

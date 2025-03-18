@@ -223,6 +223,40 @@ impl Patch {
         self
     }
 
+    /// Adds a ViewRange change to the patch
+    pub fn with_view_range<P: AsRef<std::path::Path>>(
+        mut self,
+        path: P,
+        start: usize,
+        end: Option<usize>,
+    ) -> Self {
+        self.changes
+            .push(Change::ViewRange(path.as_ref().to_path_buf(), start, end));
+        self
+    }
+
+    /// Adds a ViewRange change to the patch with one-based indexing
+    ///
+    /// Takes start and end line numbers in one-based form.
+    /// If end is -1, it's considered to be the end of the file.
+    pub fn with_view_range_onebased<P: AsRef<std::path::Path>>(
+        self,
+        path: P,
+        start: isize,
+        end: isize,
+    ) -> Self {
+        let start_zero_based = if start > 0 { start - 1 } else { 0 };
+        let end_opt = if end == -1 {
+            None
+        } else if end > 0 {
+            Some(end as usize)
+        } else {
+            Some(0)
+        };
+
+        self.with_view_range(path, start_zero_based as usize, end_opt)
+    }
+
     /// Adds an Undo change to the patch
     pub fn with_undo<P: AsRef<std::path::Path>>(mut self, path: P) -> Self {
         self.changes.push(Change::Undo(path.as_ref().to_path_buf()));
