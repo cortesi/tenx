@@ -177,7 +177,7 @@ impl DialectProvider for Tags {
                         for line in content {
                             let path = line.trim().to_string();
                             if !path.is_empty() {
-                                patch.changes.push(Change::Touch(path.clone().into()));
+                                patch.changes.push(Change::View(path.clone().into()));
                             }
                         }
                     }
@@ -229,7 +229,7 @@ impl DialectProvider for Tags {
                             replace.new
                         ));
                         }
-                        Change::Touch(v) => {
+                        Change::View(v) => {
                             rendered.push_str(&format!("<edit>\n{}\n</edit>\n", v.display()));
                         }
                         v => {
@@ -325,8 +325,8 @@ mod tests {
         assert_eq!(
             result.patch.unwrap().changes,
             vec![
-                Change::Touch(PathBuf::from("src/main.rs")),
-                Change::Touch(PathBuf::from("with/leading/spaces.rs")),
+                Change::View(PathBuf::from("src/main.rs")),
+                Change::View(PathBuf::from("with/leading/spaces.rs")),
             ]
         );
     }
@@ -341,8 +341,8 @@ mod tests {
             comment: Some("A comment".into()),
             patch: Some(Patch {
                 changes: vec![
-                    Change::Touch(PathBuf::from("src/main.rs")),
-                    Change::Touch(PathBuf::from("src/lib.rs")),
+                    Change::View(PathBuf::from("src/main.rs")),
+                    Change::View(PathBuf::from("src/lib.rs")),
                 ],
             }),
             operations: vec![],
@@ -399,8 +399,8 @@ mod tests {
         assert_eq!(
             result.patch.unwrap().changes,
             vec![
-                Change::Touch(PathBuf::from("/path/to/first")),
-                Change::Touch(PathBuf::from("/path/to/second")),
+                Change::View(PathBuf::from("/path/to/first")),
+                Change::View(PathBuf::from("/path/to/second")),
             ]
         );
     }

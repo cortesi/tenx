@@ -15,7 +15,7 @@ use unirend::Detail;
 /// A parsed model response
 #[derive(Debug, Deserialize, Serialize, Clone, Default, PartialEq, Eq)]
 pub struct ModelResponse {
-    /// Model's comment on changes
+    /// Model's comment - the user-visible part of the response
     pub comment: Option<String>,
 
     /// The unified patch in the response

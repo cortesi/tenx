@@ -298,29 +298,27 @@ impl ActionStrategy for Code {
             // Clone to avoid borrow issues when calling process_step
             let step_clone = step.clone();
             process_step(config, session, action_offset, &step_clone, events)
-        } else {
+        } else if let Some(p) = prompt {
             // First step in the action
-            if let Some(p) = prompt {
-                let model = config.models.default.clone();
-                let raw_prompt = p.clone();
-                let new_step = Step::new(
-                    model,
-                    raw_prompt,
-                    StrategyStep::Code(CodeStep::new(Some(p))),
-                );
-                session.last_action_mut()?.add_step(new_step)?;
+            let model = config.models.default.clone();
+            let raw_prompt = p.clone();
+            let new_step = Step::new(
+                model,
+                raw_prompt,
+                StrategyStep::Code(CodeStep::new(Some(p))),
+            );
+            session.last_action_mut()?.add_step(new_step)?;
 
-                Ok(ActionState {
-                    completion: Completion::Incomplete,
-                    input_required: InputRequired::No,
-                })
-            } else {
-                // Need user input for first step
-                Ok(ActionState {
-                    completion: Completion::Incomplete,
-                    input_required: InputRequired::Yes,
-                })
-            }
+            Ok(ActionState {
+                completion: Completion::Incomplete,
+                input_required: InputRequired::No,
+            })
+        } else {
+            // Need user input for first step
+            Ok(ActionState {
+                completion: Completion::Incomplete,
+                input_required: InputRequired::Yes,
+            })
         }
     }
 

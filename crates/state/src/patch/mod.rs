@@ -1,4 +1,5 @@
-//! Patch operations that modify state.
+//! Patch operations that modify state. View operations are also included here, which lets us
+//! sequence them with other operations.
 mod insert;
 mod replace;
 mod replace_fuzzy;
@@ -32,8 +33,8 @@ pub enum Change {
     /// Insert text at a specific line in a file.
     Insert(insert::Insert),
 
-    /// Touch is a NoOp, it just enters the path as an affected file without modifying it.
-    Touch(PathBuf),
+    /// View just enters the path as an affected file without modifying it.
+    View(PathBuf),
 
     /// Undo reverts a single file to its previous state. Note that this adds a new snapshot entry,
     /// so undoing twice gets you back to the original state.       
@@ -48,7 +49,7 @@ impl Change {
             Change::ReplaceFuzzy(_) => "replace_fuzzy",
             Change::Replace(_) => "replace",
             Change::Insert(_) => "insert",
-            Change::Touch(_) => "view",
+            Change::View(_) => "view",
             Change::Undo(_) => "undo",
         }
     }
@@ -60,7 +61,7 @@ impl Change {
             Change::ReplaceFuzzy(replace) => &replace.path,
             Change::Replace(replace) => &replace.path,
             Change::Insert(insert) => &insert.path,
-            Change::Touch(path) => path,
+            Change::View(path) => path,
             Change::Undo(path) => path,
         }
     }
@@ -115,7 +116,7 @@ impl Change {
                 renderer.pop();
                 renderer.pop();
             }
-            Change::Touch(_) => {
+            Change::View(_) => {
                 renderer.para("view");
             }
             Change::Undo(path) => {
@@ -194,9 +195,8 @@ impl Patch {
     }
 
     /// Adds a Touch change to the patch
-    pub fn with_touch<P: AsRef<std::path::Path>>(mut self, path: P) -> Self {
-        self.changes
-            .push(Change::Touch(path.as_ref().to_path_buf()));
+    pub fn with_view<P: AsRef<std::path::Path>>(mut self, path: P) -> Self {
+        self.changes.push(Change::View(path.as_ref().to_path_buf()));
         self
     }
 
@@ -290,7 +290,7 @@ mod tests {
             .with_replace_fuzzy("file2.txt", "old", "new")
             .with_replace("file3.txt", "old", "new")
             .with_insert("file6.txt", 3, "inserted content")
-            .with_touch("file4.txt")
+            .with_view("file4.txt")
             .with_undo("file5.txt");
 
         assert_eq!(patch.changes.len(), 6);

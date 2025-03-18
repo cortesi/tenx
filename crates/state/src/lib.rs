@@ -336,7 +336,7 @@ impl State {
                         pinfo.succeeded += 1;
                     }
                 }
-                Change::Touch(_) => {
+                Change::View(_) => {
                     pinfo.should_continue = true;
                     pinfo.succeeded += 1;
                 }
@@ -561,7 +561,7 @@ impl State {
     {
         let paths = self.find(cwd, patterns)?;
         let file_count = paths.len();
-        let changes: Vec<Change> = paths.into_iter().map(patch::Change::Touch).collect();
+        let changes: Vec<Change> = paths.into_iter().map(patch::Change::View).collect();
         let patch = Patch { changes };
         let patch_info = self.patch(&patch)?;
         // Failures for touch changes should always be empty.
@@ -1048,7 +1048,7 @@ mod tests {
             .expect_state(assert_original("::b.txt", Some(""))),
             StateTestCase::new(
                 "file created in first snapshot",
-                vec![Patch::default().with_touch("::created.txt")],
+                vec![Patch::default().with_view("::created.txt")],
             )
             .expect_state(assert_original("::created.txt", Some(""))),
             StateTestCase::new(
@@ -1120,9 +1120,9 @@ mod tests {
             StateTestCase::new(
                 "view changes included",
                 vec![
-                    Patch::default().with_touch("::view1.txt"),
+                    Patch::default().with_view("::view1.txt"),
                     Patch::default()
-                        .with_touch("::view2.txt")
+                        .with_view("::view2.txt")
                         .with_write("::a.txt", "A0"),
                 ],
             )

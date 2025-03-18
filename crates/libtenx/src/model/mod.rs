@@ -4,6 +4,7 @@
 //! along with usage tracking and response handling.
 
 mod claude;
+mod claude_editor;
 mod conversation;
 mod dummy_model;
 mod google;

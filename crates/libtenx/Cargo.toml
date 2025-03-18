@@ -14,6 +14,8 @@ readme.workspace = true
 
 unirend = { path = "../unirend" }
 state = { path = "../state" }
+misanthropy = { path = "../../../misanthropy/crates/misanthropy" }
+#misanthropy = "0.0.7"
 
 # google-genai = { path = "../../../google-genai" }
 google-genai = "0.0.2"
@@ -43,7 +45,6 @@ textwrap = { version = "0.16", features = ["terminal_size"] }
 ron = "0.8.1"
 optional_struct = "0.5.2"
 libruskel = { workspace=true }
-misanthropy = "0.0.7"
 path-clean = "1.0.1"
 ignore = "0.4.23"
 strip-ansi-escapes = "0.2.0"

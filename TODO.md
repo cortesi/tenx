@@ -47,6 +47,7 @@ Bugs:
 
 Features:
     
+    - detailed dump for contexts
     - readonly: set a local file to be read-only
     - custom system prompt additions
     - graceful error handling for contexts, e.g. unfetchable urls
