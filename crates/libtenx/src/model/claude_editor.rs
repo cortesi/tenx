@@ -15,7 +15,6 @@ use crate::{
     session::Session,
     throttle::Throttle,
 };
-use state::{Insert, Replace, WriteFile};
 
 const MAX_TOKENS: u32 = 8192;
 
@@ -68,110 +67,78 @@ impl ClaudeEditor {
     }
 
     fn extract_changes(&self, req: &misanthropy::MessagesRequest) -> Result<ModelResponse> {
-        let mut mr = ModelResponse {
-            patch: Some(state::Patch::default()),
-            operations: vec![],
-            comment: None,
-            usage: None,
-            raw_response: None,
+        let last_message = match req.messages.last() {
+            Some(message) if message.role == Role::Assistant => message,
+            _ => {
+                return Ok(ModelResponse::default());
+            }
         };
 
-        if let Some(message) = &req.messages.last() {
-            if message.role == Role::Assistant {
-                if message.content.is_empty() {
-                    // We are seeing this happen fairly frequently with the Anthropic API.
-                    return Err(TenxError::Throttle(Throttle::Backoff));
-                }
+        if last_message.content.is_empty() {
+            // We are seeing this happen fairly frequently with the Anthropic API.
+            return Err(TenxError::Throttle(Throttle::Backoff));
+        }
 
-                // First, look for a comment in text content
-                for content in &message.content {
-                    if let Content::Text(text) = content {
-                        mr.comment = Some(text.text.clone());
-                        break;
-                    }
-                }
+        // Extract comment from text content
+        let mut comment = None;
+        for content in &last_message.content {
+            if let Content::Text(text) = content {
+                comment = Some(text.text.clone());
+                break;
+            }
+        }
 
-                // Then process tool uses
-                let mut has_changes = false;
-                for content in &message.content {
-                    if let Content::ToolUse(tool_use) = content {
-                        match serde_json::from_value::<tools::TextEditor>(tool_use.input.clone()) {
-                            Ok(edit) => {
-                                match edit {
-                                    tools::TextEditor::Create { path, file_text } => {
-                                        if let Some(patch) = &mut mr.patch {
-                                            patch.changes.push(state::Change::Write(WriteFile {
-                                                path: std::path::PathBuf::from(path),
-                                                content: file_text,
-                                            }));
-                                            has_changes = true;
-                                        }
-                                    }
-                                    tools::TextEditor::StrReplace {
-                                        path,
-                                        old_str,
-                                        new_str,
-                                    } => {
-                                        if let Some(patch) = &mut mr.patch {
-                                            patch.changes.push(state::Change::Replace(Replace {
-                                                path: std::path::PathBuf::from(path),
-                                                old: old_str,
-                                                new: new_str,
-                                            }));
-                                            has_changes = true;
-                                        }
-                                    }
-                                    tools::TextEditor::Insert {
-                                        path,
-                                        insert_line,
-                                        new_str,
-                                    } => {
-                                        if let Some(patch) = &mut mr.patch {
-                                            patch.changes.push(state::Change::Insert(Insert {
-                                                path: std::path::PathBuf::from(path),
-                                                line: insert_line,
-                                                new: new_str,
-                                            }));
-                                            has_changes = true;
-                                        }
-                                    }
-                                    tools::TextEditor::View { .. } => {
-                                        // View operation doesn't modify files, so no patch needed
-                                    }
-                                    tools::TextEditor::UndoEdit { .. } => {
-                                        // UndoEdit might need special handling depending on your implementation
-                                        // For now, we'll just log it
-                                        trace!(
-                                            "UndoEdit operation encountered but not implemented"
-                                        );
-                                    }
-                                }
+        // Process tool uses
+        let mut patch = state::Patch::default();
+
+        for content in &last_message.content {
+            if let Content::ToolUse(tool_use) = content {
+                match serde_json::from_value::<tools::TextEditor>(tool_use.input.clone()) {
+                    Ok(edit) => {
+                        match edit {
+                            tools::TextEditor::Create { path, file_text } => {
+                                patch = patch.with_write(path, file_text);
                             }
-                            Err(e) => {
-                                return Err(TenxError::Internal(format!(
-                                    "Failed to parse tool use: {}",
-                                    e
-                                )));
+                            tools::TextEditor::StrReplace {
+                                path,
+                                old_str,
+                                new_str,
+                            } => {
+                                patch = patch.with_replace(path, old_str, new_str);
+                            }
+                            tools::TextEditor::Insert {
+                                path,
+                                insert_line,
+                                new_str,
+                            } => {
+                                patch = patch.with_insert(path, insert_line, new_str);
+                            }
+                            tools::TextEditor::View { .. } => {
+                                // View operation doesn't modify files, so no patch needed
+                            }
+                            tools::TextEditor::UndoEdit { path } => {
+                                patch = patch.with_undo(path);
                             }
                         }
                     }
-                }
-
-                // If no actual changes were found, return None for the patch
-                if !has_changes {
-                    mr.patch = None;
+                    Err(e) => {
+                        return Err(TenxError::Internal(format!(
+                            "Failed to parse tool use: {}",
+                            e
+                        )));
+                    }
                 }
             }
         }
 
-        // Convert the entire message content to raw_response for debugging
-        if let Some(message) = &req.messages.last() {
-            if message.role == Role::Assistant {
-                mr.raw_response = Some(message.format_content());
-            }
-        }
-
-        Ok(mr)
+        // Create the ModelResponse at the end
+        Ok(ModelResponse {
+            patch: if !patch.is_empty() { Some(patch) } else { None },
+            operations: vec![],
+            comment,
+            usage: None,
+            raw_response: Some(last_message.format_content()),
+        })
     }
 
     fn request(

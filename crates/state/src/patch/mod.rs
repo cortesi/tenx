@@ -156,6 +156,10 @@ pub struct Patch {
 }
 
 impl Patch {
+    pub fn is_empty(&self) -> bool {
+        self.changes.is_empty()
+    }
+
     /// Adds a WriteFile change to the patch
     pub fn with_write<P, S>(mut self, path: P, content: S) -> Self
     where
