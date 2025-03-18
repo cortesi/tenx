@@ -360,6 +360,10 @@ impl State {
                         pinfo.succeeded += 1;
                     }
                 }
+                Change::ViewRange(_path, _, _) => {
+                    pinfo.should_continue = true;
+                    pinfo.succeeded += 1;
+                }
             }
         }
         pinfo.rollback_id = self.push_snapshot(snap);

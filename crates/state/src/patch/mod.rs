@@ -36,6 +36,10 @@ pub enum Change {
     /// View just enters the path as an affected file without modifying it.
     View(PathBuf),
 
+    /// View a range withina a file. Offsets are 0-based and exclusive. A None end offset means
+    /// the end of the file.
+    ViewRange(PathBuf, usize, Option<usize>),
+
     /// Undo reverts a single file to its previous state. Note that this adds a new snapshot entry,
     /// so undoing twice gets you back to the original state.       
     Undo(PathBuf),
@@ -50,6 +54,7 @@ impl Change {
             Change::Replace(_) => "replace",
             Change::Insert(_) => "insert",
             Change::View(_) => "view",
+            Change::ViewRange(_, _, _) => "view_range",
             Change::Undo(_) => "undo",
         }
     }
@@ -62,6 +67,7 @@ impl Change {
             Change::Replace(replace) => &replace.path,
             Change::Insert(insert) => &insert.path,
             Change::View(path) => path,
+            Change::ViewRange(path, _, _) => path,
             Change::Undo(path) => path,
         }
     }
@@ -123,6 +129,19 @@ impl Change {
                 let path_str = path.to_string_lossy();
                 renderer.push("undo");
                 renderer.para(&format!("undo changes to: {}", path_str));
+                renderer.pop();
+            }
+            Change::ViewRange(path, start, end) => {
+                let path_str = path.to_string_lossy();
+                renderer.push("view_range");
+                let end_str = match end {
+                    Some(e) => e.to_string(),
+                    None => "end".to_string(),
+                };
+                renderer.para(&format!(
+                    "view range from {} to {} in file: {}",
+                    start, end_str, path_str
+                ));
                 renderer.pop();
             }
         }
