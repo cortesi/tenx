@@ -380,14 +380,6 @@ pub struct Dialect {
     pub edit: bool,
 }
 
-#[optional_struct]
-#[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-/// Configuration for the tags dialect feature set.
-pub struct Tags {
-    /// Enable replace change type
-    pub replace: bool,
-}
-
 /// Project configuration.
 #[optional_struct]
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -506,11 +498,6 @@ pub struct Config {
     /// The number of steps we can take autonomously without user input. This doesn't limit the
     /// total number of steps in a session.
     pub step_limit: usize,
-
-    /// The tags dialect configuration.
-    #[optional_rename(OptionalTags)]
-    #[optional_wrap]
-    pub tags: Tags,
 
     /// Operations that can be executed by the model.
     #[optional_rename(OptionalDialect)]
@@ -719,11 +706,6 @@ impl Config {
         self
     }
 
-    pub fn with_dummy_dialect(mut self, dialect: dialect::DummyDialect) -> Self {
-        self.dummy_dialect = Some(dialect);
-        self
-    }
-
     pub fn with_root<P: AsRef<Path>>(mut self, path: P) -> Self {
         self.project.root = path.as_ref().into();
         self
@@ -815,10 +797,7 @@ impl Config {
         if let Some(dummy_dialect) = &self.dummy_dialect {
             return Ok(dialect::Dialect::Dummy(dummy_dialect.clone()));
         }
-        Ok(dialect::Dialect::Tags(dialect::Tags::new(
-            self.tags.replace,
-            self.dialect.edit,
-        )))
+        Ok(dialect::Dialect::Tags(dialect::Tags::new()))
     }
 
     /// Return all configured checks, even if disabled. Custom checks with the same name as builtin

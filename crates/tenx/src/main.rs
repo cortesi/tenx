@@ -477,7 +477,6 @@ async fn main() -> anyhow::Result<()> {
                     match command {
                         DialectCommands::Info => {
                             println!("Current dialect: {}", dialect.name());
-                            println!("\nSettings:\n{:#?}", config.tags);
                         }
                         DialectCommands::System => {
                             println!("Current dialect: {}", dialect.name());

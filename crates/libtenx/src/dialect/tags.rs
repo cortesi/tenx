@@ -19,14 +19,11 @@ const EDIT: &str = include_str!("./tags-edit.txt");
 
 /// Tenx's primary code generation dialect, which uses XML-ish tags as the basic communication format with models.
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
-pub struct Tags {
-    pub replace: bool,
-    pub edit: bool,
-}
+pub struct Tags {}
 
 impl Tags {
-    pub fn new(replace: bool, edit: bool) -> Self {
-        Self { replace, edit }
+    pub fn new() -> Self {
+        Self {}
     }
 }
 
@@ -37,12 +34,8 @@ impl DialectProvider for Tags {
 
     fn system(&self) -> String {
         let mut out = SYSTEM.to_string();
-        if self.replace {
-            out.push_str(REPLACE);
-        }
-        if self.edit {
-            out.push_str(EDIT);
-        }
+        out.push_str(REPLACE);
+        out.push_str(EDIT);
         out
     }
 
@@ -259,10 +252,7 @@ mod tests {
 
     #[test]
     fn test_parse_response_basic() {
-        let d = Tags {
-            replace: true,
-            edit: false,
-        };
+        let d = Tags {};
 
         let input = indoc! {r#"
             <comment>
@@ -403,23 +393,5 @@ mod tests {
                 Change::View(PathBuf::from("/path/to/second")),
             ]
         );
-    }
-
-    #[test]
-    fn test_render_system() {
-        let tags_with_smart = Tags {
-            replace: true,
-            edit: false,
-        };
-        let tags_without_smart = Tags {
-            replace: true,
-            edit: false,
-        };
-
-        // Test with smart enabled
-        let _system_with_smart = tags_with_smart.system();
-
-        // Test without smart
-        let _system_without_smart = tags_without_smart.system();
     }
 }
