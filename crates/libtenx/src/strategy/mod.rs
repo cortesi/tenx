@@ -1,8 +1,17 @@
 //! Strategies that drive Actions
+use async_trait::async_trait;
 use enum_dispatch::enum_dispatch;
 use serde::{Deserialize, Serialize};
 
-use crate::{config::Config, error::Result, events::EventSender, session::Session};
+use crate::{
+    config::Config,
+    dialect::DialectProvider,
+    error::{Result, TenxError},
+    events::EventSender,
+    model::ModelProvider,
+    session::ModelResponse,
+    session::Session,
+};
 use unirend::Detail;
 
 mod code;
@@ -59,6 +68,7 @@ impl ActionState {
 }
 
 /// A strategy for performing an Action.
+#[async_trait]
 #[enum_dispatch(Strategy)]
 pub trait ActionStrategy {
     /// Returns the name of the strategy.
@@ -108,8 +118,22 @@ pub trait ActionStrategy {
         _step_offset: usize,
         _renderer: &mut R,
         _detail: Detail,
-    ) -> Result<()> {
-        unimplemented!();
+    ) -> Result<()>;
+
+    async fn send(
+        &self,
+        config: &Config,
+        session: &mut Session,
+        action_offset: usize,
+        sender: Option<EventSender>,
+    ) -> Result<ModelResponse> {
+        let model = config.active_model()?;
+        let mut chat = model
+            .chat()
+            .ok_or(TenxError::Internal("Chat not supported".into()))?;
+        let dialect = config.dialect()?;
+        dialect.build_chat(config, session, action_offset, &mut chat)?;
+        chat.send(sender).await
     }
 }
 

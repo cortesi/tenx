@@ -49,7 +49,8 @@ impl DialectProvider for Tags {
         &self,
         config: &Config,
         session: &Session,
-        mut chat: Box<dyn Chat>,
+        action_offset: usize,
+        chat: &mut Box<dyn Chat>,
     ) -> Result<()> {
         chat.add_system_prompt(&self.system())?;
         chat.add_user_message(&format!(
@@ -60,10 +61,15 @@ impl DialectProvider for Tags {
         chat.add_agent_message(ACK)?;
 
         if !session.actions.is_empty() {
-            let last_action = session.actions.len() - 1;
-            for (i, step) in session.actions[last_action].steps.iter().enumerate() {
+            if session.actions.len() <= action_offset {
+                return Err(TenxError::Internal(
+                    "Action offset out of bounds".to_string(),
+                ));
+            }
+
+            for (i, step) in session.actions[action_offset].steps.iter().enumerate() {
                 // Add editables for this step
-                let editables = session.editables_for_step_state(last_action, i)?;
+                let editables = session.editables_for_step_state(action_offset, i)?;
                 if !editables.is_empty() {
                     chat.add_user_message(&format!(
                         "{}\n{}",
@@ -77,7 +83,7 @@ impl DialectProvider for Tags {
                 chat.add_user_message(&self.render_step_request(
                     config,
                     session,
-                    last_action,
+                    action_offset,
                     i,
                 )?)?;
 
@@ -86,18 +92,20 @@ impl DialectProvider for Tags {
                     chat.add_agent_message(&self.render_step_response(
                         config,
                         session,
-                        last_action,
+                        action_offset,
                         i,
                     )?)?;
-                } else if i != session.actions[last_action].steps.len() - 1 {
+                } else if i != session.actions[action_offset].steps.len() - 1 {
                     // We have no model response, but we're not the last step
                     chat.add_agent_message("omitted due to error")?;
                 }
             }
 
             // Add editables for the next step
-            let editables = session
-                .editables_for_step_state(last_action, session.actions[last_action].steps.len())?;
+            let editables = session.editables_for_step_state(
+                action_offset,
+                session.actions[action_offset].steps.len(),
+            )?;
             if !editables.is_empty() {
                 chat.add_user_message(&format!(
                     "{}\n{}",

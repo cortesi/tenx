@@ -34,7 +34,7 @@ use std::collections::HashMap;
 /// Calls to `add_user_message` and `add_agent_message` must be interleaved, with user messages
 /// first.
 #[async_trait]
-pub trait Chat {
+pub trait Chat: Send {
     /// Sets the system prompt for the chat. May be called multiple times, but all calls
     /// must be at the start of the chat.
     fn add_system_prompt(&mut self, prompt: &str) -> Result<()>;

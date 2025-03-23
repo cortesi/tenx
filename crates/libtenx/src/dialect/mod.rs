@@ -63,7 +63,13 @@ pub trait DialectProvider {
     /// Parse a model's response into concrete operations
     fn parse(&self, txt: &str) -> Result<ModelResponse>;
 
-    fn build_chat(&self, _config: &Config, _session: &Session, _chat: Box<dyn Chat>) -> Result<()> {
+    fn build_chat(
+        &self,
+        _config: &Config,
+        _session: &Session,
+        _action_offset: usize,
+        _chat: &mut Box<dyn Chat>,
+    ) -> Result<()> {
         Err(TenxError::Internal(
             "build_chat not implemented".to_string(),
         ))
