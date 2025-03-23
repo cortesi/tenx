@@ -456,4 +456,3 @@ impl ModelProvider for Claude {
         Ok(json)
     }
 }
-

@@ -128,4 +128,3 @@ pub enum Model {
     Google(google::Google),
     Dummy(DummyModel),
 }
-

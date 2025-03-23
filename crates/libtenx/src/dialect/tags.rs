@@ -8,6 +8,7 @@ use crate::{
     config::Config,
     context::ContextProvider,
     error::{Result, TenxError},
+    model::Chat,
     session::{ModelResponse, Session},
 };
 use fs_err as fs;
@@ -16,6 +17,11 @@ use state::{Change, Patch, ReplaceFuzzy, WriteFile};
 const SYSTEM: &str = include_str!("./tags-system.txt");
 const REPLACE: &str = include_str!("./tags-replace.txt");
 const EDIT: &str = include_str!("./tags-edit.txt");
+
+// Constants for conversation structure
+const CONTEXT_LEADIN: &str = "Here is some immutable context that you may not edit.";
+const EDITABLE_LEADIN: &str = "Here are the editable files.";
+const ACK: &str = "Got it.";
 
 /// Tenx's primary code generation dialect, which uses XML-ish tags as the basic communication format with models.
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
@@ -37,6 +43,72 @@ impl DialectProvider for Tags {
         out.push_str(REPLACE);
         out.push_str(EDIT);
         out
+    }
+
+    fn build_chat(
+        &self,
+        config: &Config,
+        session: &Session,
+        mut chat: Box<dyn Chat>,
+    ) -> Result<()> {
+        chat.add_system_prompt(&self.system())?;
+        chat.add_user_message(&format!(
+            "{}\n{}",
+            CONTEXT_LEADIN,
+            self.render_context(config, session)?
+        ))?;
+        chat.add_agent_message(ACK)?;
+
+        if !session.actions.is_empty() {
+            let last_action = session.actions.len() - 1;
+            for (i, step) in session.actions[last_action].steps.iter().enumerate() {
+                // Add editables for this step
+                let editables = session.editables_for_step_state(last_action, i)?;
+                if !editables.is_empty() {
+                    chat.add_user_message(&format!(
+                        "{}\n{}",
+                        EDITABLE_LEADIN,
+                        self.render_editables(config, session, editables)?
+                    ))?;
+                    chat.add_agent_message(ACK)?;
+                }
+
+                // Add the step request
+                chat.add_user_message(&self.render_step_request(
+                    config,
+                    session,
+                    last_action,
+                    i,
+                )?)?;
+
+                // Add the step response if available
+                if step.model_response.is_some() {
+                    chat.add_agent_message(&self.render_step_response(
+                        config,
+                        session,
+                        last_action,
+                        i,
+                    )?)?;
+                } else if i != session.actions[last_action].steps.len() - 1 {
+                    // We have no model response, but we're not the last step
+                    chat.add_agent_message("omitted due to error")?;
+                }
+            }
+
+            // Add editables for the next step
+            let editables = session
+                .editables_for_step_state(last_action, session.actions[last_action].steps.len())?;
+            if !editables.is_empty() {
+                chat.add_user_message(&format!(
+                    "{}\n{}",
+                    EDITABLE_LEADIN,
+                    self.render_editables(config, session, editables)?
+                ))?;
+                chat.add_agent_message(ACK)?;
+            }
+        }
+
+        Ok(())
     }
 
     fn render_context(&self, config: &Config, s: &Session) -> Result<String> {

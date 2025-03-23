@@ -246,10 +246,7 @@ impl Tenx {
     ) -> Result<strategy::ActionState> {
         self.save_session(session)?;
 
-        let action = session
-            .actions
-            .last()
-            .ok_or_else(|| TenxError::Internal("No actions in session".to_string()))?;
+        let action = session.last_action()?;
         let action_offset = session.actions.len() - 1;
         let state = action.strategy.state(&self.config, session, action_offset);
         if matches!(state.completion, Completion::Complete) {
