@@ -28,6 +28,37 @@ use crate::{
 
 use std::collections::HashMap;
 
+/// A trait used to prepare a chat interaction to be sent to the model for
+/// completion.
+///
+/// Calls to `add_user_message` and `add_agent_message` must be interleaved, with user messages
+/// first.
+#[async_trait]
+pub trait Chat {
+    /// Sets the system prompt for the chat. May be called multiple times, but all calls
+    /// must be at the start of the chat.
+    fn add_system_prompt(&self, prompt: &str) -> Result<()>;
+
+    /// Adds a user message to the chat.
+    fn add_user_message(&self, text: &str) -> Result<()>;
+
+    /// Adds an agent message to the chat.
+    fn add_agent_message(&self, text: &str) -> Result<()>;
+
+    /// Adds immutable context data to the chat, can be called multiple times, at any time.
+    fn add_context(&self, name: &str, data: &str) -> Result<()>;
+
+    /// Adds editable data to the chat. Can be called multiple times, at any time.
+    fn add_editable(&self, path: &str, data: &str) -> Result<()>;
+
+    /// Render and send a session to the model.
+    async fn send(&mut self, sender: Option<EventSender>) -> Result<ModelResponse>;
+
+    /// Render the chat for debugging. Often this is the JSON serialization of the message
+    /// as it would be sent to the model.
+    fn render(&self) -> Result<String>;
+}
+
 /// Represents usage statistics for different model types.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub enum Usage {
@@ -78,8 +109,14 @@ pub trait ModelProvider {
     ) -> Result<ModelResponse>;
 
     /// Render a session as it would be sent to the model. It's a requirement that this step be
-    /// able to render a sessio with no steps, that is, with the system prompt only.
+    /// able to render a session with no steps, that is, with the system prompt only.
     fn render(&self, config: &Config, session: &Session) -> Result<String>;
+
+    /// Return a conversation object for the model. If the model does not support
+    /// chat interactions, this should return `None`.
+    fn chat(&self) -> Option<Box<dyn Chat>> {
+        None
+    }
 }
 
 /// Available model implementations that can be used for AI interactions.
@@ -88,6 +125,6 @@ pub trait ModelProvider {
 pub enum Model {
     Claude(Claude),
     OpenAi(OpenAi),
-    Dummy(DummyModel),
     Google(google::Google),
+    Dummy(DummyModel),
 }

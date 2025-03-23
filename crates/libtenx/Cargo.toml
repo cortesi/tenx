@@ -42,7 +42,7 @@ async-openai = "0.28.0"
 reqwest = "0.12.9"
 futures-util = "0.3.31"
 textwrap = { version = "0.16", features = ["terminal_size"] }
-ron = "0.8.1"
+ron = "0.9.0"
 optional_struct = "0.5.2"
 libruskel = { workspace=true }
 path-clean = "1.0.1"

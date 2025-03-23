@@ -4,6 +4,9 @@ NOW:
 
 GOALS:
 
+    - System prompt generation
+        - Extract from dialects
+    - ModelProvider::render -> new render abstraction
     - Claude text editor tool
         - Support all operations in State
 

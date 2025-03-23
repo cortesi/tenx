@@ -18,7 +18,27 @@ use crate::{
     throttle::Throttle,
 };
 
+use super::Chat;
+
 const MAX_TOKENS: u32 = 8192;
+
+/// A model that interacts with the Anthropic API. The general design of the model is to:
+///
+/// - Have a large, cached system prompt with many examples.
+/// - Emit both the non-editable context and the editable context as pre-primed messages in the
+///   prompt.
+/// - Edit the conversation to keep the most up-to-date editable files frontmost.
+#[derive(Default, Debug, Clone)]
+pub struct ClaudeChat {
+    /// The user facing name of the model
+    pub name: String,
+    /// Upstream model name to use
+    pub api_model: String,
+    /// The Anthropic API key
+    pub anthropic_key: String,
+    /// Whether to stream responses
+    pub streaming: bool,
+}
 
 /// A model that interacts with the Anthropic API. The general design of the model is to:
 ///
@@ -193,6 +213,15 @@ impl Conversation<misanthropy::MessagesRequest> for Claude {
 impl ModelProvider for Claude {
     fn name(&self) -> String {
         self.name.clone()
+    }
+
+    fn chat(&self) -> Option<Box<dyn Chat>> {
+        Some(Box::new(ClaudeChat {
+            name: self.name.clone(),
+            api_model: self.api_model.clone(),
+            anthropic_key: self.anthropic_key.clone(),
+            streaming: self.streaming,
+        }))
     }
 
     fn api_model(&self) -> String {
