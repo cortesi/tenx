@@ -2,6 +2,9 @@
 use enum_dispatch::enum_dispatch;
 use std::path::PathBuf;
 
+#[cfg(test)]
+mod tags_test;
+
 mod dummy_dialect;
 mod tags;
 mod xmlish;
