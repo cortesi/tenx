@@ -8,7 +8,8 @@ mod xmlish;
 
 use crate::{
     config::Config,
-    error::Result,
+    error::{Result, TenxError},
+    model::Chat,
     session::{ModelResponse, Session},
 };
 
@@ -58,6 +59,12 @@ pub trait DialectProvider {
 
     /// Parse a model's response into concrete operations
     fn parse(&self, txt: &str) -> Result<ModelResponse>;
+
+    fn build_chat(&self, _config: &Config, _session: &Session, _chat: Box<dyn Chat>) -> Result<()> {
+        Err(TenxError::Internal(
+            "build_chat not implemented".to_string(),
+        ))
+    }
 }
 
 #[enum_dispatch]

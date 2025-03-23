@@ -37,19 +37,19 @@ use std::collections::HashMap;
 pub trait Chat {
     /// Sets the system prompt for the chat. May be called multiple times, but all calls
     /// must be at the start of the chat.
-    fn add_system_prompt(&self, prompt: &str) -> Result<()>;
+    fn add_system_prompt(&mut self, prompt: &str) -> Result<()>;
 
     /// Adds a user message to the chat.
-    fn add_user_message(&self, text: &str) -> Result<()>;
+    fn add_user_message(&mut self, text: &str) -> Result<()>;
 
     /// Adds an agent message to the chat.
-    fn add_agent_message(&self, text: &str) -> Result<()>;
+    fn add_agent_message(&mut self, text: &str) -> Result<()>;
 
     /// Adds immutable context data to the chat, can be called multiple times, at any time.
-    fn add_context(&self, name: &str, data: &str) -> Result<()>;
+    fn add_context(&mut self, name: &str, data: &str) -> Result<()>;
 
     /// Adds editable data to the chat. Can be called multiple times, at any time.
-    fn add_editable(&self, path: &str, data: &str) -> Result<()>;
+    fn add_editable(&mut self, path: &str, data: &str) -> Result<()>;
 
     /// Render and send a session to the model.
     async fn send(&mut self, sender: Option<EventSender>) -> Result<ModelResponse>;
@@ -128,3 +128,4 @@ pub enum Model {
     Google(google::Google),
     Dummy(DummyModel),
 }
+
