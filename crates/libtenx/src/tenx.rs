@@ -7,7 +7,6 @@ use crate::{
     context::{Context, ContextProvider},
     error::{Result, TenxError},
     events::{send_event, Event, EventBlock, EventSender},
-    model::ModelProvider,
     session::{Action, Session},
     session_store::{path_to_filename, SessionStore},
     strategy,
@@ -279,6 +278,9 @@ impl Tenx {
                     step.err = Some(e.clone());
                     self.save_session(session)?;
                 }
+                if e.should_retry().is_none() {
+                    return Err(e);
+                }
             }
         }
 
@@ -357,15 +359,23 @@ impl Tenx {
 
     /// Prompts the current model with the session's state and sets the resulting patch and usage.
     async fn prompt_model(&self, session: &mut Session, sender: Option<EventSender>) -> Result<()> {
-        // FIXME: Get the model from the last step
-        let mut model = self.config.active_model()?;
-        let _block = EventBlock::prompt(&sender, &model.name())?;
+        let action = session.last_action()?;
+        let strategy = action.strategy.clone();
+        let _block = EventBlock::prompt(&sender, strategy.name())?;
         // FIXME: Make this param configurable
         let mut throttler = crate::throttle::Throttler::new(25);
 
         loop {
             let start_time = std::time::Instant::now();
-            match model.send(&self.config, session, sender.clone()).await {
+            match strategy
+                .send(
+                    &self.config,
+                    session,
+                    session.actions.len() - 1,
+                    sender.clone(),
+                )
+                .await
+            {
                 Ok(resp) => {
                     let elapsed = start_time.elapsed().as_secs_f64();
                     if let Some(last_step) = session.last_step_mut() {

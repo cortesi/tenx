@@ -37,7 +37,7 @@ pub struct ClaudeChat {
     /// Whether to stream responses
     pub streaming: bool,
     /// The messages request being built
-    request: Option<misanthropy::MessagesRequest>,
+    request: misanthropy::MessagesRequest,
 }
 
 impl ClaudeChat {
@@ -95,39 +95,27 @@ impl ClaudeChat {
 #[async_trait::async_trait]
 impl Chat for ClaudeChat {
     fn add_system_prompt(&mut self, prompt: &str) -> Result<()> {
-        if let Some(req) = &mut self.request {
-            req.system = vec![misanthropy::Content::Text(misanthropy::Text {
-                text: prompt.into(),
-                cache_control: Some(misanthropy::CacheControl::Ephemeral),
-            })];
-            Ok(())
-        } else {
-            Err(TenxError::Internal("Request not initialized".into()))
-        }
+        self.request.system = vec![misanthropy::Content::Text(misanthropy::Text {
+            text: prompt.into(),
+            cache_control: Some(misanthropy::CacheControl::Ephemeral),
+        })];
+        Ok(())
     }
 
     fn add_user_message(&mut self, text: &str) -> Result<()> {
-        if let Some(req) = &mut self.request {
-            req.messages.push(misanthropy::Message {
-                role: misanthropy::Role::User,
-                content: vec![misanthropy::Content::text(text)],
-            });
-            Ok(())
-        } else {
-            Err(TenxError::Internal("Request not initialized".into()))
-        }
+        self.request.messages.push(misanthropy::Message {
+            role: misanthropy::Role::User,
+            content: vec![misanthropy::Content::text(text)],
+        });
+        Ok(())
     }
 
     fn add_agent_message(&mut self, text: &str) -> Result<()> {
-        if let Some(req) = &mut self.request {
-            req.messages.push(misanthropy::Message {
-                role: misanthropy::Role::Assistant,
-                content: vec![misanthropy::Content::text(text)],
-            });
-            Ok(())
-        } else {
-            Err(TenxError::Internal("Request not initialized".into()))
-        }
+        self.request.messages.push(misanthropy::Message {
+            role: misanthropy::Role::Assistant,
+            content: vec![misanthropy::Content::text(text)],
+        });
+        Ok(())
     }
 
     fn add_context(&mut self, name: &str, data: &str) -> Result<()> {
@@ -150,26 +138,21 @@ impl Chat for ClaudeChat {
             ));
         }
 
-        if self.request.is_none() {
-            return Err(TenxError::Internal("No request to process.".into()));
-        }
-
-        let mut request_clone = self.request.clone().unwrap();
-        request_clone.model = self.api_model.clone();
-        request_clone.max_tokens = MAX_TOKENS;
-        request_clone.stream = self.streaming;
+        self.request.model = self.api_model.clone();
+        self.request.max_tokens = MAX_TOKENS;
+        self.request.stream = self.streaming;
 
         trace!(
             "Sending request: {}",
-            serde_json::to_string_pretty(&request_clone)?
+            serde_json::to_string_pretty(&self.request)?
         );
 
         let resp = if self.streaming {
-            self.stream_response(self.anthropic_key.clone(), &request_clone, sender.clone())
+            self.stream_response(self.anthropic_key.clone(), &self.request, sender.clone())
                 .await?
         } else {
             let anthropic = Anthropic::new(&self.anthropic_key);
-            let resp = anthropic.messages(&request_clone).await?;
+            let resp = anthropic.messages(&self.request).await?;
             if let Some(text) = resp.format_content().into() {
                 send_event(&sender, Event::ModelResponse(text))?;
             }
@@ -178,15 +161,13 @@ impl Chat for ClaudeChat {
 
         trace!("Got response: {}", serde_json::to_string_pretty(&resp)?);
 
-        if let Some(req) = &mut self.request {
-            req.merge_response(&resp);
-        }
+        self.request.merge_response(&resp);
 
         // Get dialect from config
         let config = Config::default();
         let dialect = config.dialect()?;
 
-        let mut modresp = self.extract_changes(&dialect, &request_clone)?;
+        let mut modresp = self.extract_changes(&dialect, &self.request)?;
         modresp.usage = Some(super::Usage::Claude(ClaudeUsage {
             input_tokens: resp.usage.input_tokens,
             output_tokens: resp.usage.output_tokens,
@@ -197,12 +178,8 @@ impl Chat for ClaudeChat {
     }
 
     fn render(&self) -> Result<String> {
-        if let Some(req) = &self.request {
-            let json = serde_json::to_string_pretty(&req)?;
-            Ok(json)
-        } else {
-            Err(TenxError::Internal("Request not initialized".into()))
-        }
+        let json = serde_json::to_string_pretty(&self.request)?;
+        Ok(json)
     }
 }
 
@@ -386,7 +363,7 @@ impl ModelProvider for Claude {
             api_model: self.api_model.clone(),
             anthropic_key: self.anthropic_key.clone(),
             streaming: self.streaming,
-            request: Some(misanthropy::MessagesRequest {
+            request: misanthropy::MessagesRequest {
                 model: self.api_model.clone(),
                 max_tokens: MAX_TOKENS,
                 messages: Vec::new(),
@@ -396,7 +373,7 @@ impl ModelProvider for Claude {
                 tools: vec![],
                 tool_choice: misanthropy::ToolChoice::Auto,
                 stop_sequences: vec![],
-            }),
+            },
         }))
     }
 

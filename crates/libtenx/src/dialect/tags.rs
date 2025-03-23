@@ -100,20 +100,6 @@ impl DialectProvider for Tags {
                     chat.add_agent_message("omitted due to error")?;
                 }
             }
-
-            // Add editables for the next step
-            let editables = session.editables_for_step_state(
-                action_offset,
-                session.actions[action_offset].steps.len(),
-            )?;
-            if !editables.is_empty() {
-                chat.add_user_message(&format!(
-                    "{}\n{}",
-                    EDITABLE_LEADIN,
-                    self.render_editables(config, session, editables)?
-                ))?;
-                chat.add_agent_message(ACK)?;
-            }
         }
 
         Ok(())
