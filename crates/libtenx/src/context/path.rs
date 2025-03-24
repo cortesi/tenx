@@ -72,15 +72,10 @@ impl ContextProvider for Path {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::{
         context::{Context, ContextProvider},
-        model::{DummyModel, Model, ModelProvider},
-        session::{Action, Session, Step},
-        strategy,
         testutils::test_project,
     };
-    use tempfile::tempdir;
 
     #[test]
     fn test_glob_context_initialization() {
@@ -163,44 +158,6 @@ mod tests {
             assert_eq!(test_project.read(&context.source), context.body);
         } else {
             panic!("Expected ContextSpec::Path");
-        }
-    }
-
-    #[test]
-    fn test_file_context_outside_project_root() {
-        let test_project = test_project();
-        let outside_dir = tempdir().unwrap();
-        let outside_file_path = outside_dir.path().join("outside.txt");
-        std::fs::write(&outside_file_path, "Outside content").unwrap();
-
-        // Use config with CWD set to project root
-        let mut config = test_project.config.clone();
-        config = config.with_cwd(test_project.tempdir.path().to_path_buf());
-
-        // Create context and verify rendering when referencing file outside project root
-        let mut session = Session::new(&config).unwrap();
-        session.contexts.add(Context::Path(
-            Path::new(&config, outside_file_path.to_str().unwrap().to_string()).unwrap(),
-        ));
-        session
-            .add_action(
-                Action::new(&config, strategy::Strategy::Code(strategy::Code::new())).unwrap(),
-            )
-            .unwrap();
-        session
-            .last_action_mut()
-            .unwrap()
-            .add_step(Step::new(
-                "test_model".into(),
-                "test prompt".to_string(),
-                strategy::StrategyStep::Code(strategy::CodeStep::default()),
-            ))
-            .unwrap();
-
-        let model = Model::Dummy(DummyModel::default());
-        if let Model::Dummy(dummy) = model {
-            let rendered = dummy.render(&config, &session).unwrap();
-            assert!(rendered.contains("Outside content"));
         }
     }
 }

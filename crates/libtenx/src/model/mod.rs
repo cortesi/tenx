@@ -5,7 +5,6 @@
 
 mod claude;
 mod claude_editor;
-mod conversation;
 mod dummy_model;
 mod google;
 mod openai;
@@ -20,12 +19,7 @@ pub use dummy_model::{DummyModel, DummyUsage};
 pub use google::{Google, GoogleChat, GoogleUsage};
 pub use openai::{OpenAi, OpenAiChat, OpenAiUsage, ReasoningEffort};
 
-use crate::{
-    config::Config,
-    error::Result,
-    events::EventSender,
-    session::{ModelResponse, Session},
-};
+use crate::{error::Result, events::EventSender, session::ModelResponse};
 
 use std::collections::HashMap;
 
@@ -100,18 +94,6 @@ pub trait ModelProvider {
 
     /// Returns underlying name of the model.
     fn api_model(&self) -> String;
-
-    /// Render and send a session to the model.
-    async fn send(
-        &mut self,
-        config: &Config,
-        session: &Session,
-        sender: Option<EventSender>,
-    ) -> Result<ModelResponse>;
-
-    /// Render a session as it would be sent to the model. It's a requirement that this step be
-    /// able to render a session with no steps, that is, with the system prompt only.
-    fn render(&self, config: &Config, session: &Session) -> Result<String>;
 
     /// Return a conversation object for the model. If the model does not support
     /// chat interactions, this should return `None`.

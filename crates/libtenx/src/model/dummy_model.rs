@@ -2,10 +2,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 use super::{Chat, ModelProvider};
-use crate::{
-    config::Config, dialect::DialectProvider, error::Result, events::EventSender,
-    session::ModelResponse, session::Session,
-};
+use crate::{error::Result, events::EventSender, session::ModelResponse};
 
 use std::collections::HashMap;
 
@@ -102,40 +99,5 @@ impl ModelProvider for DummyModel {
         Some(Box::new(DummyChat {
             model_response: self.model_response.clone(),
         }))
-    }
-
-    async fn send(
-        &mut self,
-        _config: &Config,
-        _state: &Session,
-        _sender: Option<EventSender>,
-    ) -> Result<ModelResponse> {
-        let mut resp = self.model_response.clone()?;
-        resp.usage = Some(super::Usage::Dummy(DummyUsage { dummy_counter: 1 }));
-        Ok(resp)
-    }
-
-    fn render(&self, config: &Config, session: &Session) -> Result<String> {
-        let dialect = config.dialect()?;
-        let mut out = String::new();
-
-        // Add immutable context
-        out.push_str("=== Context ===\n");
-        out.push_str(&dialect.render_context(config, session)?);
-        out.push('\n');
-
-        let last_action = session.actions.len() - 1;
-
-        // Add request context
-        for (i, step) in session.actions[last_action].steps.iter().enumerate() {
-            out.push_str(&format!("=== Step {} ===\n", i));
-            out.push_str(&dialect.render_step_request(config, session, last_action, i)?);
-            if let Some(_response) = &step.model_response {
-                out.push_str(&dialect.render_step_response(config, session, last_action, i)?);
-            }
-            out.push('\n');
-        }
-
-        Ok(out)
     }
 }

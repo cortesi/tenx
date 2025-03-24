@@ -11,10 +11,8 @@ use crate::{
     dialect::{Dialect, DialectProvider},
     error::{Result, TenxError},
     events::*,
-    model::conversation::{build_conversation, Conversation},
     model::ModelProvider,
     session::ModelResponse,
-    session::Session,
     throttle::Throttle,
 };
 
@@ -249,109 +247,6 @@ impl From<serde_json::Error> for TenxError {
     }
 }
 
-impl Claude {
-    async fn stream_response(
-        &mut self,
-        api_key: String,
-        req: &misanthropy::MessagesRequest,
-        sender: Option<EventSender>,
-    ) -> Result<misanthropy::MessagesResponse> {
-        let anthropic = Anthropic::new(&api_key);
-        let mut streamed_response = anthropic.messages_stream(req)?;
-        while let Some(event) = streamed_response.next().await {
-            let event = event?;
-            match event {
-                StreamEvent::ContentBlockDelta {
-                    delta: ContentBlockDelta::TextDelta { text },
-                    ..
-                } => {
-                    send_event(&sender, Event::Snippet(text))?;
-                }
-                StreamEvent::Error { error } => {
-                    warn!("Error in stream: {:?}", error);
-                }
-                StreamEvent::MessageStop => {
-                    // The message has ended, but we don't need to do anything special here
-                }
-                _ => {} // Ignore other event types
-            }
-        }
-        Ok(streamed_response.response)
-    }
-
-    fn extract_changes(
-        &self,
-        dialect: &Dialect,
-        req: &misanthropy::MessagesRequest,
-    ) -> Result<ModelResponse> {
-        if let Some(message) = &req.messages.last() {
-            if message.role == Role::Assistant {
-                if message.content.is_empty() {
-                    // We are seeing this happen fairly frequently with the Anthropic API.
-                    return Err(TenxError::Throttle(Throttle::Backoff));
-                }
-                for content in &message.content {
-                    if let Content::Text(text) = content {
-                        return dialect.parse(&text.text);
-                    }
-                }
-            }
-        }
-        Err(TenxError::Internal("No patch to parse.".into()))
-    }
-
-    fn request(
-        &self,
-        config: &Config,
-        session: &Session,
-        dialect: &Dialect,
-    ) -> Result<misanthropy::MessagesRequest> {
-        let mut req = misanthropy::MessagesRequest {
-            model: self.api_model.clone(),
-            max_tokens: MAX_TOKENS,
-            messages: Vec::new(),
-            system: vec![],
-            temperature: None,
-            stream: true,
-            tools: vec![],
-            tool_choice: misanthropy::ToolChoice::Auto,
-            stop_sequences: vec![],
-        };
-        build_conversation(self, &mut req, config, session, dialect)?;
-        Ok(req)
-    }
-}
-
-impl Conversation<misanthropy::MessagesRequest> for Claude {
-    fn set_system_prompt(
-        &self,
-        req: &mut misanthropy::MessagesRequest,
-        prompt: &str,
-    ) -> Result<()> {
-        req.system = vec![misanthropy::Content::Text(misanthropy::Text {
-            text: prompt.into(),
-            cache_control: Some(misanthropy::CacheControl::Ephemeral),
-        })];
-        Ok(())
-    }
-
-    fn add_user_message(&self, req: &mut misanthropy::MessagesRequest, text: &str) -> Result<()> {
-        req.messages.push(misanthropy::Message {
-            role: misanthropy::Role::User,
-            content: vec![misanthropy::Content::text(text)],
-        });
-        Ok(())
-    }
-
-    fn add_agent_message(&self, req: &mut misanthropy::MessagesRequest, text: &str) -> Result<()> {
-        req.messages.push(misanthropy::Message {
-            role: misanthropy::Role::Assistant,
-            content: vec![misanthropy::Content::text(text)],
-        });
-        Ok(())
-    }
-}
-
 #[async_trait::async_trait]
 impl ModelProvider for Claude {
     fn name(&self) -> String {
@@ -379,57 +274,5 @@ impl ModelProvider for Claude {
 
     fn api_model(&self) -> String {
         self.api_model.clone()
-    }
-
-    async fn send(
-        &mut self,
-        config: &Config,
-        session: &Session,
-        sender: Option<EventSender>,
-    ) -> Result<ModelResponse> {
-        if self.anthropic_key.is_empty() {
-            return Err(TenxError::Model(
-                "No Anthropic key configured for Claude model.".into(),
-            ));
-        }
-
-        if !session.should_continue() {
-            return Err(TenxError::Internal("No prompt to process.".into()));
-        }
-        let dialect = config.dialect()?;
-        let mut req = self.request(config, session, &dialect)?;
-        req.stream = self.streaming;
-        trace!("Sending request: {}", serde_json::to_string_pretty(&req)?);
-
-        let resp = if self.streaming {
-            self.stream_response(self.anthropic_key.clone(), &req, sender)
-                .await?
-        } else {
-            let anthropic = Anthropic::new(&self.anthropic_key);
-            let resp = anthropic.messages(&req).await?;
-            if let Some(text) = resp.format_content().into() {
-                send_event(&sender, Event::ModelResponse(text))?;
-            }
-            resp
-        };
-
-        trace!("Got response: {}", serde_json::to_string_pretty(&resp)?);
-
-        req.merge_response(&resp);
-        let mut modresp = self.extract_changes(&dialect, &req)?;
-        modresp.usage = Some(super::Usage::Claude(ClaudeUsage {
-            input_tokens: resp.usage.input_tokens,
-            output_tokens: resp.usage.output_tokens,
-            cache_creation_input_tokens: resp.usage.cache_creation_input_tokens,
-            cache_read_input_tokens: resp.usage.cache_read_input_tokens,
-        }));
-        Ok(modresp)
-    }
-
-    fn render(&self, config: &Config, session: &Session) -> Result<String> {
-        let dialect = config.dialect()?;
-        let req = self.request(config, session, &dialect)?;
-        let json = serde_json::to_string_pretty(&req)?;
-        Ok(json)
     }
 }

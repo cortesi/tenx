@@ -12,7 +12,6 @@ use libtenx::{
     dialect::DialectProvider,
     error, event_consumers,
     events::Event,
-    model::ModelProvider,
     session::Session,
     Tenx,
 };
@@ -562,7 +561,6 @@ async fn main() -> anyhow::Result<()> {
                     detail,
                     short,
                 } => {
-                    let model = config.active_model()?;
                     let session = if let Some(path) = session_file {
                         libtenx::session_store::load_session(path)?
                     } else {
@@ -574,7 +572,8 @@ async fn main() -> anyhow::Result<()> {
                             println!("{:#?}", session);
                         }
                         "render" => {
-                            println!("{}", model.render(&config, &session)?);
+                            // FIXME: Use chat
+                            // println!("{}", model.render(&config, &session)?);
                         }
                         _ => {
                             // Determine detail level
