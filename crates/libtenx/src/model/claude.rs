@@ -88,6 +88,29 @@ impl ClaudeChat {
         }
         Err(TenxError::Internal("No patch to parse.".into()))
     }
+
+    fn append_last_message(&mut self, data: &str) -> Result<()> {
+        // If there is no current message, create one
+        if self.request.messages.is_empty()
+            || self.request.messages.last().unwrap().role != Role::User
+        {
+            self.request.messages.push(misanthropy::Message {
+                role: misanthropy::Role::User,
+                content: vec![misanthropy::Content::text(data)],
+            });
+        } else {
+            // Get the last message
+            let last_message = self.request.messages.last_mut().unwrap();
+            // Append to content - assumes the last content block is Text
+            if let Some(misanthropy::Content::Text(text)) = last_message.content.last_mut() {
+                text.text.push_str(data);
+            } else {
+                // If the last content block isn't text, add a new one
+                last_message.content.push(misanthropy::Content::text(data));
+            }
+        }
+        Ok(())
+    }
 }
 
 #[async_trait::async_trait]
@@ -116,17 +139,12 @@ impl Chat for ClaudeChat {
         Ok(())
     }
 
-    fn add_context(&mut self, name: &str, data: &str) -> Result<()> {
-        // Add context as a user message with a clear marker
-        self.add_user_message(&format!("<context name=\"{}\">{}\\</context>", name, data))
+    fn add_context(&mut self, _name: &str, data: &str) -> Result<()> {
+        self.append_last_message(data)
     }
 
-    fn add_editable(&mut self, path: &str, data: &str) -> Result<()> {
-        // Add editable content as a user message with a clear marker
-        self.add_user_message(&format!(
-            "<editable path=\"{}\">{}\\</editable>",
-            path, data
-        ))
+    fn add_editable(&mut self, _path: &str, data: &str) -> Result<()> {
+        self.append_last_message(data)
     }
 
     async fn send(&mut self, sender: Option<EventSender>) -> Result<ModelResponse> {

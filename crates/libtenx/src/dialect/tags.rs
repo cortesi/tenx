@@ -1,8 +1,6 @@
 //! Defines an interaction style where files are sent to the model in XML-like tags, and model
 //! responses are parsed from similar tags.
 
-use std::path::PathBuf;
-
 use super::{xmlish, DialectProvider};
 use crate::{
     config::Config,
@@ -31,6 +29,65 @@ impl Tags {
     pub fn new() -> Self {
         Self {}
     }
+
+    fn render_step_request(
+        &self,
+        _config: &Config,
+        session: &Session,
+        action_offset: usize,
+        step_offset: usize,
+    ) -> Result<String> {
+        let step = &session.actions[action_offset].steps[step_offset];
+        let mut rendered = String::new();
+        rendered.push_str(&format!("\n<prompt>\n{}\n</prompt>\n\n", &step.raw_prompt));
+        Ok(rendered)
+    }
+
+    fn render_step_response(
+        &self,
+        _config: &Config,
+        session: &Session,
+        action_offset: usize,
+        step_offset: usize,
+    ) -> Result<String> {
+        let step = &session.actions[action_offset].steps[step_offset];
+        if let Some(resp) = &step.model_response {
+            let mut rendered = String::new();
+            if let Some(comment) = &resp.comment {
+                rendered.push_str(&format!("<comment>\n{}\n</comment>\n\n", comment));
+            }
+            if let Some(patch) = &resp.patch {
+                for change in &patch.changes {
+                    match change {
+                        Change::Write(write_file) => {
+                            rendered.push_str(&format!(
+                                "<write_file path=\"{}\">\n{}\n</write_file>\n\n",
+                                write_file.path.display(),
+                                write_file.content
+                            ));
+                        }
+                        Change::ReplaceFuzzy(replace) => {
+                            rendered.push_str(&format!(
+                            "<replace path=\"{}\">\n<old>\n{}\n</old>\n<new>\n{}\n</new>\n</replace>\n\n",
+                            replace.path.display(),
+                            replace.old,
+                            replace.new
+                        ));
+                        }
+                        Change::View(v) => {
+                            rendered.push_str(&format!("<edit>\n{}\n</edit>\n", v.display()));
+                        }
+                        v => {
+                            panic!("unsupported change type: {:?}", v);
+                        }
+                    }
+                }
+            }
+            Ok(rendered)
+        } else {
+            Ok(String::new())
+        }
+    }
 }
 
 impl DialectProvider for Tags {
@@ -53,12 +110,20 @@ impl DialectProvider for Tags {
         chat: &mut Box<dyn Chat>,
     ) -> Result<()> {
         chat.add_system_prompt(&self.system())?;
-        chat.add_user_message(&format!(
-            "{}\n{}",
-            CONTEXT_LEADIN,
-            self.render_context(config, session)?
-        ))?;
-        chat.add_agent_message(ACK)?;
+
+        if !session.contexts.is_empty() {
+            chat.add_user_message(CONTEXT_LEADIN)?;
+            for cspec in &session.contexts {
+                for ctx in cspec.context_items(config, session)? {
+                    let txt = format!(
+                        "<item name=\"{}\" type=\"{:?}\">\n{}\n</item>\n",
+                        ctx.source, ctx.ty, ctx.body
+                    );
+                    chat.add_context(&ctx.source, &txt)?;
+                }
+            }
+            chat.add_agent_message(ACK)?;
+        }
 
         if !session.actions.is_empty() {
             if session.actions.len() <= action_offset {
@@ -71,11 +136,16 @@ impl DialectProvider for Tags {
                 // Add editables for this step
                 let editables = session.editables_for_step_state(action_offset, i)?;
                 if !editables.is_empty() {
-                    chat.add_user_message(&format!(
-                        "{}\n{}",
-                        EDITABLE_LEADIN,
-                        self.render_editables(config, session, editables)?
-                    ))?;
+                    chat.add_user_message(EDITABLE_LEADIN)?;
+                    for path in editables {
+                        let contents = fs::read_to_string(config.abspath(&path)?)?;
+                        let txt = &format!(
+                            "<editable path=\"{}\">\n{}</editable>\n\n",
+                            path.display(),
+                            contents
+                        );
+                        chat.add_editable(&path.display().to_string(), txt)?;
+                    }
                     chat.add_agent_message(ACK)?;
                 }
 
@@ -103,57 +173,6 @@ impl DialectProvider for Tags {
         }
 
         Ok(())
-    }
-
-    fn render_context(&self, config: &Config, s: &Session) -> Result<String> {
-        if self.system().is_empty() {
-            return Ok("There is no non-editable context.".into());
-        }
-
-        let mut rendered = String::new();
-        rendered.push_str("<context>\n");
-        for cspec in &s.contexts {
-            for ctx in cspec.context_items(config, s)? {
-                let txt = format!(
-                    "<item name=\"{}\" type=\"{:?}\">\n{}\n</item>\n",
-                    ctx.source, ctx.ty, ctx.body
-                );
-                rendered.push_str(&txt)
-            }
-        }
-        rendered.push_str("</context>");
-        Ok(rendered)
-    }
-
-    fn render_editables(
-        &self,
-        config: &Config,
-        _session: &Session,
-        paths: Vec<PathBuf>,
-    ) -> Result<String> {
-        let mut rendered = String::new();
-        for path in paths {
-            let contents = fs::read_to_string(config.abspath(&path)?)?;
-            rendered.push_str(&format!(
-                "<editable path=\"{}\">\n{}</editable>\n\n",
-                path.display(),
-                contents
-            ));
-        }
-        Ok(rendered)
-    }
-
-    fn render_step_request(
-        &self,
-        _config: &Config,
-        session: &Session,
-        action_offset: usize,
-        step_offset: usize,
-    ) -> Result<String> {
-        let step = &session.actions[action_offset].steps[step_offset];
-        let mut rendered = String::new();
-        rendered.push_str(&format!("\n<prompt>\n{}\n</prompt>\n\n", &step.raw_prompt));
-        Ok(rendered)
     }
 
     /// Parses a response string containing XML-like tags and returns a `Patch` struct.
@@ -256,57 +275,12 @@ impl DialectProvider for Tags {
             raw_response: Some(response.to_string()),
         })
     }
-
-    fn render_step_response(
-        &self,
-        _config: &Config,
-        session: &Session,
-        action_offset: usize,
-        step_offset: usize,
-    ) -> Result<String> {
-        let step = &session.actions[action_offset].steps[step_offset];
-        if let Some(resp) = &step.model_response {
-            let mut rendered = String::new();
-            if let Some(comment) = &resp.comment {
-                rendered.push_str(&format!("<comment>\n{}\n</comment>\n\n", comment));
-            }
-            if let Some(patch) = &resp.patch {
-                for change in &patch.changes {
-                    match change {
-                        Change::Write(write_file) => {
-                            rendered.push_str(&format!(
-                                "<write_file path=\"{}\">\n{}\n</write_file>\n\n",
-                                write_file.path.display(),
-                                write_file.content
-                            ));
-                        }
-                        Change::ReplaceFuzzy(replace) => {
-                            rendered.push_str(&format!(
-                            "<replace path=\"{}\">\n<old>\n{}\n</old>\n<new>\n{}\n</new>\n</replace>\n\n",
-                            replace.path.display(),
-                            replace.old,
-                            replace.new
-                        ));
-                        }
-                        Change::View(v) => {
-                            rendered.push_str(&format!("<edit>\n{}\n</edit>\n", v.display()));
-                        }
-                        v => {
-                            panic!("unsupported change type: {:?}", v);
-                        }
-                    }
-                }
-            }
-            Ok(rendered)
-        } else {
-            Ok(String::new())
-        }
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
 
     use crate::{
         session::{Action, Step},

@@ -44,17 +44,15 @@ fn main() {
 
 Files that are provided as context, but which you CAN NOT edit, are specified like this:
 
-<context path="src/tools.rs">
-    <item name="src/tools.rs" type="file">
-        fn main() {
-            println!("Hello, world!");
-        }
-    </item>
-    <item name="module_name" type="ruskel">
-        mod module_name {
-            pub fn hello() -> Result<()> { }
-        }
-    </item>
+<context name="src/tools.rs" type="file">
+fn main() {
+    println!("Hello, world!");
+}
+</context>
+<context name="module_name" type="ruskel">
+mod module_name {
+    pub fn hello() -> Result<()> { }
+}
 </context>
 
 - type="file" is a local file that's been included as context. 

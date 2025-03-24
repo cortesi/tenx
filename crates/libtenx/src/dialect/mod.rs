@@ -1,6 +1,5 @@
 //! Traits and implementations for different styles of interaction with models.
 use enum_dispatch::enum_dispatch;
-use std::path::PathBuf;
 
 #[cfg(test)]
 mod tags_test;
@@ -29,36 +28,6 @@ pub trait DialectProvider {
 
     /// Return the system prompt for this dialect.
     fn system(&self) -> String;
-
-    /// Render the immutable context to be sent to the model. This is included once in the
-    /// conversation.
-    fn render_context(&self, config: &Config, p: &Session) -> Result<String>;
-
-    /// Render the request portion of a step.
-    fn render_step_request(
-        &self,
-        config: &Config,
-        session: &Session,
-        action_offset: usize,
-        step_offset: usize,
-    ) -> Result<String>;
-
-    /// Render the response portion of a step.
-    fn render_step_response(
-        &self,
-        config: &Config,
-        session: &Session,
-        action_offset: usize,
-        step_offset: usize,
-    ) -> Result<String>;
-
-    /// Render the editable context section
-    fn render_editables(
-        &self,
-        config: &Config,
-        session: &Session,
-        paths: Vec<PathBuf>,
-    ) -> Result<String>;
 
     /// Parse a model's response into concrete operations
     fn parse(&self, txt: &str) -> Result<ModelResponse>;

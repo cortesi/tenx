@@ -1,8 +1,4 @@
-use crate::{
-    config::Config, dialect::DialectProvider, error::Result, session::ModelResponse,
-    session::Session,
-};
-use std::path::PathBuf;
+use crate::{dialect::DialectProvider, error::Result, session::ModelResponse};
 
 /// A dummy dialect for testing purposes.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -37,39 +33,6 @@ impl DialectProvider for DummyDialect {
 
     fn system(&self) -> String {
         String::new()
-    }
-
-    fn render_step_request(
-        &self,
-        _config: &Config,
-        _session: &Session,
-        _action_offset: usize,
-        _step_offset: usize,
-    ) -> Result<String> {
-        Ok(String::new())
-    }
-
-    fn render_editables(
-        &self,
-        _config: &Config,
-        _session: &Session,
-        _paths: Vec<PathBuf>,
-    ) -> Result<String> {
-        Ok(String::new())
-    }
-
-    fn render_context(&self, _config: &Config, _p: &Session) -> Result<String> {
-        Ok(String::new())
-    }
-
-    fn render_step_response(
-        &self,
-        _config: &Config,
-        _session: &Session,
-        _action_offset: usize,
-        _step_offset: usize,
-    ) -> Result<String> {
-        Ok(String::new())
     }
 
     fn parse(&self, _txt: &str) -> Result<ModelResponse> {

@@ -41,9 +41,11 @@ pub trait Chat: Send {
     fn add_agent_message(&mut self, text: &str) -> Result<()>;
 
     /// Adds immutable context data to the chat, can be called multiple times, at any time.
+    /// May start a new user message, and synthesize an agent response.
     fn add_context(&mut self, name: &str, data: &str) -> Result<()>;
 
     /// Adds editable data to the chat. Can be called multiple times, at any time.
+    /// May start a new user message, and synthesize an agent response.
     fn add_editable(&mut self, path: &str, data: &str) -> Result<()>;
 
     /// Render and send a session to the model.
