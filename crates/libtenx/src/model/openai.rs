@@ -21,10 +21,11 @@ use crate::{
     events::{send_event, Event, EventSender},
     model::{
         conversation::{build_conversation, Conversation},
-        ModelProvider,
+        Chat, ModelProvider,
     },
     session::ModelResponse,
     session::Session,
+    throttle::Throttle,
 };
 
 use std::collections::HashMap;
@@ -134,6 +135,214 @@ impl OpenAiUsage {
     }
 }
 
+/// A chat implementation for OpenAI models.
+#[derive(Debug, Clone)]
+pub struct OpenAiChat {
+    /// Upstream model name to use
+    pub api_model: String,
+    /// The OpenAI API key
+    pub openai_key: String,
+    /// Custom API base URL
+    pub api_base: String,
+    /// Whether to stream responses
+    pub streaming: bool,
+    /// Whether to skip using system prompt
+    pub no_system_prompt: bool,
+    /// Reasoning effort level for o1/o3 models
+    pub reasoning_effort: Option<ReasoningEffort>,
+    /// The request being built
+    request: CreateChatCompletionRequest,
+    /// Last response from the model
+    response: Option<ChatCompletionResponseMessage>,
+}
+
+impl OpenAiChat {
+    async fn stream_response(
+        &self,
+        sender: Option<EventSender>,
+    ) -> Result<CreateChatCompletionResponse> {
+        let openai_config = OpenAIConfig::new()
+            .with_api_key(self.openai_key.clone())
+            .with_api_base(&self.api_base);
+        let client = Client::with_config(openai_config);
+
+        let mut req = self.request.clone();
+        req.stream = Some(true);
+
+        let mut stream = client.chat().create_stream(req).await?;
+        let mut full_response = String::new();
+
+        while let Some(result) = stream.next().await {
+            match result {
+                Ok(response) => {
+                    for choice in response.choices {
+                        if let Some(content) = &choice.delta.content {
+                            full_response.push_str(content);
+                            send_event(&sender, Event::Snippet(content.to_string()))?;
+                        }
+                    }
+                }
+                Err(err) => {
+                    return Err(err.into());
+                }
+            }
+        }
+
+        #[allow(deprecated)]
+        Ok(CreateChatCompletionResponse {
+            id: "stream".to_string(),
+            object: "chat.completion".to_string(),
+            created: 0,
+            model: self.api_model.clone(),
+            system_fingerprint: None,
+            service_tier: None,
+            choices: vec![ChatChoice {
+                index: 0,
+                message: ChatCompletionResponseMessage {
+                    role: async_openai::types::Role::Assistant,
+                    content: Some(full_response),
+                    tool_calls: None,
+                    refusal: None,
+                    function_call: None,
+                    audio: None,
+                },
+                finish_reason: Some(FinishReason::Stop),
+                logprobs: None,
+            }],
+            usage: None,
+        })
+    }
+
+    fn extract_changes(&self, dialect: &Dialect) -> Result<ModelResponse> {
+        if let Some(response) = &self.response {
+            if let Some(content) = &response.content {
+                if content.is_empty() {
+                    return Err(TenxError::Throttle(Throttle::Backoff));
+                }
+                return dialect.parse(content);
+            }
+        }
+        Err(TenxError::Internal("No patch to parse.".into()))
+    }
+}
+
+#[async_trait]
+impl Chat for OpenAiChat {
+    fn add_system_prompt(&mut self, prompt: &str) -> Result<()> {
+        if self.no_system_prompt {
+            self.request.messages.push(
+                ChatCompletionRequestDeveloperMessageArgs::default()
+                    .content(prompt)
+                    .build()?
+                    .into(),
+            );
+        } else {
+            self.request.messages.push(
+                ChatCompletionRequestSystemMessageArgs::default()
+                    .content(prompt)
+                    .build()?
+                    .into(),
+            );
+        }
+        Ok(())
+    }
+
+    fn add_user_message(&mut self, text: &str) -> Result<()> {
+        self.request.messages.push(
+            ChatCompletionRequestUserMessageArgs::default()
+                .content(text)
+                .build()?
+                .into(),
+        );
+        Ok(())
+    }
+
+    fn add_agent_message(&mut self, text: &str) -> Result<()> {
+        self.request.messages.push(
+            ChatCompletionRequestAssistantMessageArgs::default()
+                .content(text)
+                .build()?
+                .into(),
+        );
+        Ok(())
+    }
+
+    fn add_context(&mut self, name: &str, data: &str) -> Result<()> {
+        // Add context as a user message with a clear marker
+        self.add_user_message(&format!("<context name=\"{}\">{}\\</context>", name, data))
+    }
+
+    fn add_editable(&mut self, path: &str, data: &str) -> Result<()> {
+        // Add editable content as a user message with a clear marker
+        self.add_user_message(&format!(
+            "<editable path=\"{}\">{}\\</editable>",
+            path, data
+        ))
+    }
+
+    async fn send(&mut self, sender: Option<EventSender>) -> Result<ModelResponse> {
+        if self.openai_key.is_empty() {
+            return Err(TenxError::Model("No OpenAI key configured.".into()));
+        }
+        if self.api_model.is_empty() {
+            return Err(TenxError::Model("Empty API model name".into()));
+        }
+
+        self.request.model = self.api_model.clone();
+        if let Some(ref re) = self.reasoning_effort {
+            self.request.reasoning_effort = Some(match re {
+                ReasoningEffort::Low => async_openai::types::ReasoningEffort::Low,
+                ReasoningEffort::Medium => async_openai::types::ReasoningEffort::Medium,
+                ReasoningEffort::High => async_openai::types::ReasoningEffort::High,
+            });
+        }
+
+        trace!("Sending request: {:?}", self.request);
+
+        let resp = if self.streaming {
+            self.stream_response(sender.clone()).await?
+        } else {
+            let openai_config = OpenAIConfig::new()
+                .with_api_key(self.openai_key.clone())
+                .with_api_base(&self.api_base);
+            let client = Client::with_config(openai_config);
+
+            let resp = client.chat().create(self.request.clone()).await?;
+            if let Some(content) = resp.choices[0].message.content.as_ref() {
+                send_event(&sender, Event::ModelResponse(content.to_string()))?;
+            }
+            resp
+        };
+
+        trace!("Got response: {:?}", resp);
+
+        // Store response for future reference
+        if let Some(choice) = resp.choices.first() {
+            self.response = Some(choice.message.clone());
+        }
+
+        // Get dialect from config
+        let config = Config::default();
+        let dialect = config.dialect()?;
+
+        let mut modresp = self.extract_changes(&dialect)?;
+
+        if let Some(usage) = resp.usage {
+            modresp.usage = Some(super::Usage::OpenAi(OpenAiUsage {
+                prompt_tokens: Some(usage.prompt_tokens),
+                completion_tokens: Some(usage.completion_tokens),
+                total_tokens: Some(usage.total_tokens),
+            }));
+        }
+
+        Ok(modresp)
+    }
+
+    fn render(&self) -> Result<String> {
+        Ok(format!("{:?}", self.request))
+    }
+}
+
 impl OpenAi {
     async fn stream_response(
         &self,
@@ -214,6 +423,32 @@ impl ModelProvider for OpenAi {
 
     fn api_model(&self) -> String {
         self.api_model.clone()
+    }
+
+    fn chat(&self) -> Option<Box<dyn Chat>> {
+        let mut ra = CreateChatCompletionRequestArgs::default();
+        ra.model(&self.api_model).messages(Vec::new());
+        if let Some(ref re) = self.reasoning_effort {
+            ra.reasoning_effort(match re {
+                ReasoningEffort::Low => async_openai::types::ReasoningEffort::Low,
+                ReasoningEffort::Medium => async_openai::types::ReasoningEffort::Medium,
+                ReasoningEffort::High => async_openai::types::ReasoningEffort::High,
+            });
+        }
+
+        match ra.build() {
+            Ok(request) => Some(Box::new(OpenAiChat {
+                api_model: self.api_model.clone(),
+                openai_key: self.openai_key.clone(),
+                api_base: self.api_base.clone(),
+                streaming: self.streaming,
+                no_system_prompt: self.no_system_prompt,
+                reasoning_effort: self.reasoning_effort.clone(),
+                request,
+                response: None,
+            })),
+            Err(_) => None,
+        }
     }
 
     async fn send(

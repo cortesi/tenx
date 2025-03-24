@@ -14,11 +14,11 @@ use async_trait::async_trait;
 use enum_dispatch::enum_dispatch;
 use serde::{Deserialize, Serialize};
 
-pub use claude::{Claude, ClaudeUsage};
+pub use claude::{Claude, ClaudeChat, ClaudeUsage};
 pub use claude_editor::ClaudeEditor;
 pub use dummy_model::{DummyModel, DummyUsage};
 pub use google::{Google, GoogleUsage};
-pub use openai::{OpenAi, OpenAiUsage, ReasoningEffort};
+pub use openai::{OpenAi, OpenAiChat, OpenAiUsage, ReasoningEffort};
 
 use crate::{
     config::Config,
