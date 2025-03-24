@@ -1,13 +1,51 @@
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
-use super::ModelProvider;
+use super::{Chat, ModelProvider};
 use crate::{
     config::Config, dialect::DialectProvider, error::Result, events::EventSender,
     session::ModelResponse, session::Session,
 };
 
 use std::collections::HashMap;
+
+/// A dummy chat implementation for testing purposes.
+pub struct DummyChat {
+    model_response: Result<ModelResponse>,
+}
+
+#[async_trait]
+impl Chat for DummyChat {
+    fn add_system_prompt(&mut self, _prompt: &str) -> Result<()> {
+        Ok(())
+    }
+
+    fn add_user_message(&mut self, _text: &str) -> Result<()> {
+        Ok(())
+    }
+
+    fn add_agent_message(&mut self, _text: &str) -> Result<()> {
+        Ok(())
+    }
+
+    fn add_context(&mut self, _name: &str, _data: &str) -> Result<()> {
+        Ok(())
+    }
+
+    fn add_editable(&mut self, _path: &str, _data: &str) -> Result<()> {
+        Ok(())
+    }
+
+    async fn send(&mut self, _sender: Option<EventSender>) -> Result<ModelResponse> {
+        let mut resp = self.model_response.clone()?;
+        resp.usage = Some(super::Usage::Dummy(DummyUsage { dummy_counter: 1 }));
+        Ok(resp)
+    }
+
+    fn render(&self) -> Result<String> {
+        Ok("DummyChat render".to_string())
+    }
+}
 
 /// A dummy usage struct for testing purposes.
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
@@ -58,6 +96,12 @@ impl ModelProvider for DummyModel {
 
     fn api_model(&self) -> String {
         "dummy".to_string()
+    }
+
+    fn chat(&self) -> Option<Box<dyn Chat>> {
+        Some(Box::new(DummyChat {
+            model_response: self.model_response.clone(),
+        }))
     }
 
     async fn send(

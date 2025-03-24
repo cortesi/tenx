@@ -15,6 +15,7 @@ use enum_dispatch::enum_dispatch;
 use serde::{Deserialize, Serialize};
 
 pub use claude::{Claude, ClaudeUsage};
+pub use claude_editor::ClaudeEditor;
 pub use dummy_model::{DummyModel, DummyUsage};
 pub use google::{Google, GoogleUsage};
 pub use openai::{OpenAi, OpenAiUsage, ReasoningEffort};
@@ -124,6 +125,7 @@ pub trait ModelProvider {
 #[derive(Debug, Clone)]
 pub enum Model {
     Claude(Claude),
+    ClaudeEditor(ClaudeEditor),
     OpenAi(OpenAi),
     Google(google::Google),
     Dummy(DummyModel),
