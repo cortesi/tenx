@@ -32,7 +32,6 @@ impl Tags {
 
     fn render_step_request(
         &self,
-        _config: &Config,
         session: &Session,
         action_offset: usize,
         step_offset: usize,
@@ -45,7 +44,6 @@ impl Tags {
 
     fn render_step_response(
         &self,
-        _config: &Config,
         session: &Session,
         action_offset: usize,
         step_offset: usize,
@@ -116,7 +114,7 @@ impl DialectProvider for Tags {
             for cspec in &session.contexts {
                 for ctx in cspec.context_items(config, session)? {
                     let txt = format!(
-                        "<item name=\"{}\" type=\"{:?}\">\n{}\n</item>\n",
+                        "<context name=\"{}\" type=\"{:?}\">\n{}\n</context>\n",
                         ctx.source, ctx.ty, ctx.body
                     );
                     chat.add_context(&ctx.source, &txt)?;
@@ -125,50 +123,31 @@ impl DialectProvider for Tags {
             chat.add_agent_message(ACK)?;
         }
 
-        if !session.actions.is_empty() {
-            if session.actions.len() <= action_offset {
-                return Err(TenxError::Internal(
-                    "Action offset out of bounds".to_string(),
-                ));
+        for (i, step) in session.actions[action_offset].steps.iter().enumerate() {
+            let editables = session.editables_for_step_state(action_offset, i)?;
+            if !editables.is_empty() {
+                chat.add_user_message(EDITABLE_LEADIN)?;
+                for path in editables {
+                    let contents = fs::read_to_string(config.abspath(&path)?)?;
+                    let txt = &format!(
+                        "<editable path=\"{}\">\n{}</editable>\n\n",
+                        path.display(),
+                        contents
+                    );
+                    chat.add_editable(&path.display().to_string(), txt)?;
+                }
+                chat.add_agent_message(ACK)?;
             }
 
-            for (i, step) in session.actions[action_offset].steps.iter().enumerate() {
-                // Add editables for this step
-                let editables = session.editables_for_step_state(action_offset, i)?;
-                if !editables.is_empty() {
-                    chat.add_user_message(EDITABLE_LEADIN)?;
-                    for path in editables {
-                        let contents = fs::read_to_string(config.abspath(&path)?)?;
-                        let txt = &format!(
-                            "<editable path=\"{}\">\n{}</editable>\n\n",
-                            path.display(),
-                            contents
-                        );
-                        chat.add_editable(&path.display().to_string(), txt)?;
-                    }
-                    chat.add_agent_message(ACK)?;
-                }
+            // Add the step request
+            chat.add_user_message(&self.render_step_request(session, action_offset, i)?)?;
 
-                // Add the step request
-                chat.add_user_message(&self.render_step_request(
-                    config,
-                    session,
-                    action_offset,
-                    i,
-                )?)?;
-
-                // Add the step response if available
-                if step.model_response.is_some() {
-                    chat.add_agent_message(&self.render_step_response(
-                        config,
-                        session,
-                        action_offset,
-                        i,
-                    )?)?;
-                } else if i != session.actions[action_offset].steps.len() - 1 {
-                    // We have no model response, but we're not the last step
-                    chat.add_agent_message("omitted due to error")?;
-                }
+            // Add the step response if available
+            if step.model_response.is_some() {
+                chat.add_agent_message(&self.render_step_response(session, action_offset, i)?)?;
+            } else if i != session.actions[action_offset].steps.len() - 1 {
+                // We have no model response, but we're not the last step
+                chat.add_agent_message("omitted due to error")?;
             }
         }
 
@@ -393,9 +372,7 @@ mod tests {
             step.model_response = Some(response);
         }
 
-        let result = d
-            .render_step_response(&Config::default(), &p.session, 0, 0)
-            .unwrap();
+        let result = d.render_step_response(&p.session, 0, 0).unwrap();
         assert_eq!(
             result,
             indoc! {r#"
