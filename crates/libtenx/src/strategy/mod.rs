@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     config::Config,
     dialect::DialectProvider,
+    dialect::Tags,
     error::{Result, TenxError},
     events::EventSender,
     model::ModelProvider,
@@ -131,7 +132,8 @@ pub trait ActionStrategy {
         let mut chat = model
             .chat()
             .ok_or(TenxError::Internal("Chat not supported".into()))?;
-        let dialect = config.dialect()?;
+
+        let dialect = Tags::new();
         dialect.build_chat(config, session, action_offset, &mut chat)?;
         chat.send(sender).await
     }

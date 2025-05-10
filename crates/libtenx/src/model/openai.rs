@@ -15,8 +15,7 @@ use serde::{Deserialize, Serialize};
 use tracing::trace;
 
 use crate::{
-    config::Config,
-    dialect::{Dialect, DialectProvider},
+    dialect::{Dialect, DialectProvider, Tags},
     error::{Result, TenxError},
     events::{send_event, Event, EventSender},
     model::{Chat, ModelProvider},
@@ -276,10 +275,7 @@ impl Chat for OpenAiChat {
             self.response = Some(choice.message.clone());
         }
 
-        // Get dialect from config
-        let config = Config::default();
-        let dialect = config.dialect()?;
-
+        let dialect = Dialect::Tags(Tags::new());
         let mut modresp = self.extract_changes(&dialect)?;
 
         if let Some(usage) = resp.usage {

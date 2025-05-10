@@ -15,7 +15,6 @@ use ron;
 use crate::{
     checks,
     config::default_config,
-    dialect,
     error::{self, TenxError},
     model,
 };
@@ -523,10 +522,6 @@ pub struct Config {
     #[serde(skip)]
     pub(crate) dummy_model: Option<model::DummyModel>,
 
-    /// Set a dummy dialect for end-to-end testing. Over-rides the configured dialect.
-    #[serde(skip)]
-    pub(crate) dummy_dialect: Option<dialect::DummyDialect>,
-
     /// The current working directory when testing. We need this, because we can't change the CWD
     /// reliably in tests for reasons of concurrency.
     #[serde(skip)]
@@ -790,14 +785,6 @@ impl Config {
                 streaming: can_stream && !self.models.no_stream,
             })),
         }
-    }
-
-    /// Returns the configured dialect.
-    pub fn dialect(&self) -> error::Result<dialect::Dialect> {
-        if let Some(dummy_dialect) = &self.dummy_dialect {
-            return Ok(dialect::Dialect::Dummy(dummy_dialect.clone()));
-        }
-        Ok(dialect::Dialect::Tags(dialect::Tags::new()))
     }
 
     /// Return all configured checks, even if disabled. Custom checks with the same name as builtin

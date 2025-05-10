@@ -7,8 +7,7 @@ use serde_json;
 use tracing::{trace, warn};
 
 use crate::{
-    config::Config,
-    dialect::{Dialect, DialectProvider},
+    dialect::{Dialect, DialectProvider, Tags},
     error::{Result, TenxError},
     events::*,
     model::ModelProvider,
@@ -178,10 +177,7 @@ impl Chat for ClaudeChat {
         trace!("Got response: {}", serde_json::to_string_pretty(&resp)?);
 
         self.request.merge_response(&resp);
-
-        // Get dialect from config
-        let config = Config::default();
-        let dialect = config.dialect()?;
+        let dialect = Dialect::Tags(Tags::new());
 
         let mut modresp = self.extract_changes(&dialect, &self.request)?;
         modresp.usage = Some(super::Usage::Claude(ClaudeUsage {
