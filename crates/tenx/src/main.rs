@@ -9,7 +9,6 @@ use tracing_subscriber::util::SubscriberInitExt;
 use libtenx::{
     config::{self},
     context::Context,
-    dialect::DialectProvider,
     error, event_consumers,
     events::Event,
     session::Session,
@@ -167,14 +166,6 @@ enum ContextCommands {
 }
 
 #[derive(Subcommand)]
-enum DialectCommands {
-    /// Print the current dialect and its settings
-    Info,
-    /// Print the complete system prompt
-    System,
-}
-
-#[derive(Subcommand)]
 enum Commands {
     /// Run check suite all project files, or a subet
     Check {
@@ -223,12 +214,6 @@ enum Commands {
     Context {
         #[clap(subcommand)]
         command: ContextCommands,
-    },
-    /// Dialect commands (alias: dia)
-    #[clap(alias = "dia")]
-    Dialect {
-        #[clap(subcommand)]
-        command: DialectCommands,
     },
     /// Add editable files to a session
     Edit {
@@ -468,19 +453,6 @@ async fn main() -> anyhow::Result<()> {
                         println!("{}{}", name.blue().bold(), status);
                         println!("    globs: {:?}", check.globs);
                         println!();
-                    }
-                    Ok(())
-                }
-                Commands::Dialect { command } => {
-                    let dialect = config.dialect()?;
-                    match command {
-                        DialectCommands::Info => {
-                            println!("Current dialect: {}", dialect.name());
-                        }
-                        DialectCommands::System => {
-                            println!("Current dialect: {}", dialect.name());
-                            println!("\nSystem prompt:\n{}", dialect.system());
-                        }
                     }
                     Ok(())
                 }

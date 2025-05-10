@@ -3,6 +3,10 @@ NOW:
 
 
 GOALS:
+    
+    - Shift dialect into model module
+        - Remove dialect operations from cli
+        - Remove dialect configuration options
 
     - System prompt generation
         - Extract from dialects
