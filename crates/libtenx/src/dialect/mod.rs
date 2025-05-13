@@ -4,7 +4,6 @@ use enum_dispatch::enum_dispatch;
 #[cfg(test)]
 mod tags_test;
 
-mod dummy_dialect;
 mod tags;
 mod xmlish;
 
@@ -15,7 +14,6 @@ use crate::{
     session::{ModelResponse, Session},
 };
 
-pub use dummy_dialect::*;
 pub use tags::*;
 
 /// A dialect encapsulates a particular style of interaction with a model. It defines the system
@@ -50,5 +48,4 @@ pub trait DialectProvider {
 /// Represents different dialects for interacting with models.
 pub enum Dialect {
     Tags(Tags),
-    Dummy(DummyDialect),
 }

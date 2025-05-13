@@ -390,7 +390,6 @@ pub fn default_config<P: AsRef<Path>>(current_dir: P) -> Config {
             project_map: true,
             ..Default::default()
         },
-        dialect: Dialect { edit: true },
         project: {
             let root = find_project_root(current_dir.as_ref());
             Project {

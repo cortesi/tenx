@@ -498,11 +498,6 @@ pub struct Config {
     /// total number of steps in a session.
     pub step_limit: usize,
 
-    /// Operations that can be executed by the model.
-    #[optional_rename(OptionalDialect)]
-    #[optional_wrap]
-    pub dialect: Dialect,
-
     /// The default context configuration.
     #[optional_rename(OptionalContext)]
     #[optional_wrap]

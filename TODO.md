@@ -5,7 +5,6 @@ NOW:
 GOALS:
     
     - Shift dialect into model module
-        - Remove dialect configuration options
 
     - System prompt generation
         - Extract from dialects
