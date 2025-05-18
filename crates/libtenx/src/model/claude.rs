@@ -7,9 +7,9 @@ use serde_json;
 use tracing::{trace, warn};
 
 use crate::{
-    dialect::{Dialect, DialectProvider, Tags},
     error::{Result, TenxError},
     events::*,
+    model::tags,
     model::ModelProvider,
     session::ModelResponse,
     throttle::Throttle,
@@ -67,11 +67,7 @@ impl ClaudeChat {
         Ok(streamed_response.response)
     }
 
-    fn extract_changes(
-        &self,
-        dialect: &Dialect,
-        req: &misanthropy::MessagesRequest,
-    ) -> Result<ModelResponse> {
+    fn extract_changes(&self, req: &misanthropy::MessagesRequest) -> Result<ModelResponse> {
         if let Some(message) = &req.messages.last() {
             if message.role == Role::Assistant {
                 if message.content.is_empty() {
@@ -80,7 +76,7 @@ impl ClaudeChat {
                 }
                 for content in &message.content {
                     if let Content::Text(text) = content {
-                        return dialect.parse(&text.text);
+                        return tags::parse(&text.text);
                     }
                 }
             }
@@ -177,9 +173,8 @@ impl Chat for ClaudeChat {
         trace!("Got response: {}", serde_json::to_string_pretty(&resp)?);
 
         self.request.merge_response(&resp);
-        let dialect = Dialect::Tags(Tags::new());
 
-        let mut modresp = self.extract_changes(&dialect, &self.request)?;
+        let mut modresp = self.extract_changes(&self.request)?;
         modresp.usage = Some(super::Usage::Claude(ClaudeUsage {
             input_tokens: resp.usage.input_tokens,
             output_tokens: resp.usage.output_tokens,

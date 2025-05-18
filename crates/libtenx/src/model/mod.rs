@@ -8,6 +8,7 @@ mod claude_editor;
 mod dummy_model;
 mod google;
 mod openai;
+mod tags;
 
 use async_trait::async_trait;
 use enum_dispatch::enum_dispatch;

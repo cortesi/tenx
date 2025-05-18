@@ -369,16 +369,6 @@ impl Model {
     }
 }
 
-/// Settings related to the dialect we are using to communicate to models. For the moment, we have
-/// only one dialect, so this section is pretty simple.
-#[optional_struct]
-#[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-/// Settings related to the dialect used for model communication.
-pub struct Dialect {
-    /// Allow the model to request to edit files in the project map
-    pub edit: bool,
-}
-
 /// Project configuration.
 #[optional_struct]
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
