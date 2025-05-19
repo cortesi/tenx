@@ -31,8 +31,9 @@ use std::collections::HashMap;
 /// first.
 #[async_trait]
 pub trait Chat: Send {
-    /// Sets the system prompt for the chat. May be called multiple times, but all calls
-    /// must be at the start of the chat.
+    /// Adds to the system prompt for the chat. May be called multiple times, but all calls must be
+    /// at the start of the chat. Typically, this appends to the model system prompt that defines
+    /// basic interactions.
     fn add_system_prompt(&mut self, prompt: &str) -> Result<()>;
 
     /// Adds a user message to the chat.

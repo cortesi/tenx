@@ -14,7 +14,6 @@ use state::{Change, Patch, ReplaceFuzzy, WriteFile};
 
 pub const SYSTEM: &str = include_str!("./tags-system.txt");
 
-// Constants for conversation structure
 const CONTEXT_LEADIN: &str = "Here is some immutable context that you may not edit.";
 const EDITABLE_LEADIN: &str = "Here are the editable files.";
 const ACK: &str = "Got it.";
@@ -173,19 +172,12 @@ fn render_step_response(
     }
 }
 
-fn system() -> String {
-    let mut out = SYSTEM.to_string();
-    out
-}
-
 fn build_chat(
     config: &Config,
     session: &Session,
     action_offset: usize,
     chat: &mut Box<dyn Chat>,
 ) -> Result<()> {
-    chat.add_system_prompt(&system())?;
-
     if !session.contexts.is_empty() {
         chat.add_user_message(CONTEXT_LEADIN)?;
         for cspec in &session.contexts {

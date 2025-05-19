@@ -38,6 +38,29 @@ pub struct ClaudeChat {
 }
 
 impl ClaudeChat {
+    /// Creates a new ClaudeChat configured for the given model, API key, and streaming setting.
+    pub fn new(api_model: String, anthropic_key: String, streaming: bool) -> Self {
+        let request = misanthropy::MessagesRequest {
+            model: api_model.clone(),
+            max_tokens: MAX_TOKENS,
+            messages: Vec::new(),
+            system: vec![misanthropy::Content::Text(misanthropy::Text {
+                text: tags::SYSTEM.into(),
+                cache_control: Some(misanthropy::CacheControl::Ephemeral),
+            })],
+            temperature: None,
+            stream: streaming,
+            tools: vec![],
+            tool_choice: misanthropy::ToolChoice::Auto,
+            stop_sequences: vec![],
+        };
+        Self {
+            api_model,
+            anthropic_key,
+            streaming,
+            request,
+        }
+    }
     async fn stream_response(
         &self,
         api_key: String,
@@ -111,10 +134,12 @@ impl ClaudeChat {
 #[async_trait::async_trait]
 impl Chat for ClaudeChat {
     fn add_system_prompt(&mut self, prompt: &str) -> Result<()> {
-        self.request.system = vec![misanthropy::Content::Text(misanthropy::Text {
-            text: prompt.into(),
-            cache_control: Some(misanthropy::CacheControl::Ephemeral),
-        })];
+        self.request
+            .system
+            .push(misanthropy::Content::Text(misanthropy::Text {
+                text: prompt.into(),
+                cache_control: Some(misanthropy::CacheControl::Ephemeral),
+            }));
         Ok(())
     }
 
@@ -263,22 +288,11 @@ impl ModelProvider for Claude {
     }
 
     fn chat(&self) -> Option<Box<dyn Chat>> {
-        Some(Box::new(ClaudeChat {
-            api_model: self.api_model.clone(),
-            anthropic_key: self.anthropic_key.clone(),
-            streaming: self.streaming,
-            request: misanthropy::MessagesRequest {
-                model: self.api_model.clone(),
-                max_tokens: MAX_TOKENS,
-                messages: Vec::new(),
-                system: vec![],
-                temperature: None,
-                stream: self.streaming,
-                tools: vec![],
-                tool_choice: misanthropy::ToolChoice::Auto,
-                stop_sequences: vec![],
-            },
-        }))
+        Some(Box::new(ClaudeChat::new(
+            self.api_model.clone(),
+            self.anthropic_key.clone(),
+            self.streaming,
+        )))
     }
 
     fn api_model(&self) -> String {
