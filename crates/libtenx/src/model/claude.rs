@@ -313,6 +313,25 @@ impl From<serde_json::Error> for TenxError {
     }
 }
 
+#[async_trait::async_trait]
+impl ModelProvider for Claude {
+    fn name(&self) -> String {
+        self.name.clone()
+    }
+
+    fn chat(&self) -> Option<Box<dyn Chat>> {
+        Some(Box::new(ClaudeChat::new(
+            self.api_model.clone(),
+            self.anthropic_key.clone(),
+            self.streaming,
+        )))
+    }
+
+    fn api_model(&self) -> String {
+        self.api_model.clone()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -329,7 +348,7 @@ mod tests {
         chat.add_user_message("Hello").unwrap();
         assert_eq!(chat.request.messages.len(), 1);
         assert_eq!(chat.request.messages[0].role, Role::User);
-        
+
         // Extract and check text content
         if let Content::Text(text_content) = &chat.request.messages[0].content[0] {
             assert_eq!(text_content.text, "Hello");
@@ -341,7 +360,7 @@ mod tests {
         // Test appending to existing user message
         chat.add_user_message(" World").unwrap();
         assert_eq!(chat.request.messages.len(), 1);
-        
+
         // Extract and check text content after append
         if let Content::Text(text_content) = &chat.request.messages[0].content[0] {
             assert_eq!(text_content.text, "Hello World");
@@ -354,7 +373,7 @@ mod tests {
         chat.add_user_message("Nice to meet you").unwrap();
         assert_eq!(chat.request.messages.len(), 3);
         assert_eq!(chat.request.messages[2].role, Role::User);
-        
+
         // Extract and check text content of new message
         if let Content::Text(text_content) = &chat.request.messages[2].content[0] {
             assert_eq!(text_content.text, "Nice to meet you");
@@ -375,7 +394,7 @@ mod tests {
         chat.add_agent_message("Hello").unwrap();
         assert_eq!(chat.request.messages.len(), 1);
         assert_eq!(chat.request.messages[0].role, Role::Assistant);
-        
+
         // Extract and check text content
         if let Content::Text(text_content) = &chat.request.messages[0].content[0] {
             assert_eq!(text_content.text, "Hello");
@@ -387,7 +406,7 @@ mod tests {
         // Test appending to existing agent message
         chat.add_agent_message(" World").unwrap();
         assert_eq!(chat.request.messages.len(), 1);
-        
+
         // Extract and check text content after append
         if let Content::Text(text_content) = &chat.request.messages[0].content[0] {
             assert_eq!(text_content.text, "Hello World");
@@ -400,31 +419,12 @@ mod tests {
         chat.add_agent_message("How can I help?").unwrap();
         assert_eq!(chat.request.messages.len(), 3);
         assert_eq!(chat.request.messages[2].role, Role::Assistant);
-        
+
         // Extract and check text content of new message
         if let Content::Text(text_content) = &chat.request.messages[2].content[0] {
             assert_eq!(text_content.text, "How can I help?");
         } else {
             panic!("Expected Text content");
         }
-    }
-}
-
-#[async_trait::async_trait]
-impl ModelProvider for Claude {
-    fn name(&self) -> String {
-        self.name.clone()
-    }
-
-    fn chat(&self) -> Option<Box<dyn Chat>> {
-        Some(Box::new(ClaudeChat::new(
-            self.api_model.clone(),
-            self.anthropic_key.clone(),
-            self.streaming,
-        )))
-    }
-
-    fn api_model(&self) -> String {
-        self.api_model.clone()
     }
 }
