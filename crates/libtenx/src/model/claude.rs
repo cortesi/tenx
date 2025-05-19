@@ -145,8 +145,8 @@ impl Chat for ClaudeChat {
 
     fn add_user_message(&mut self, text: &str) -> Result<()> {
         // If there are no messages or the last message is not from the user, create a new one
-        if self.request.messages.is_empty() 
-            || self.request.messages.last().unwrap().role != misanthropy::Role::User 
+        if self.request.messages.is_empty()
+            || self.request.messages.last().unwrap().role != misanthropy::Role::User
         {
             self.request.messages.push(misanthropy::Message {
                 role: misanthropy::Role::User,
@@ -156,7 +156,8 @@ impl Chat for ClaudeChat {
             // Get the last message
             let last_message = self.request.messages.last_mut().unwrap();
             // Append to content - assumes the last content block is Text
-            if let Some(misanthropy::Content::Text(text_content)) = last_message.content.last_mut() {
+            if let Some(misanthropy::Content::Text(text_content)) = last_message.content.last_mut()
+            {
                 text_content.text.push_str(text);
             } else {
                 // If the last content block isn't text, add a new one
@@ -168,8 +169,8 @@ impl Chat for ClaudeChat {
 
     fn add_agent_message(&mut self, text: &str) -> Result<()> {
         // If there are no messages or the last message is not from the assistant, create a new one
-        if self.request.messages.is_empty() 
-            || self.request.messages.last().unwrap().role != misanthropy::Role::Assistant 
+        if self.request.messages.is_empty()
+            || self.request.messages.last().unwrap().role != misanthropy::Role::Assistant
         {
             self.request.messages.push(misanthropy::Message {
                 role: misanthropy::Role::Assistant,
@@ -179,7 +180,8 @@ impl Chat for ClaudeChat {
             // Get the last message
             let last_message = self.request.messages.last_mut().unwrap();
             // Append to content - assumes the last content block is Text
-            if let Some(misanthropy::Content::Text(text_content)) = last_message.content.last_mut() {
+            if let Some(misanthropy::Content::Text(text_content)) = last_message.content.last_mut()
+            {
                 text_content.text.push_str(text);
             } else {
                 // If the last content block isn't text, add a new one
@@ -317,8 +319,12 @@ mod tests {
 
     #[test]
     fn test_add_user_message() {
-        let mut chat = ClaudeChat::new("claude-3-opus-20240229".to_string(), "fake-key".to_string(), false);
-        
+        let mut chat = ClaudeChat::new(
+            "claude-3-opus-20240229".to_string(),
+            "fake-key".to_string(),
+            false,
+        );
+
         // Test adding first message
         chat.add_user_message("Hello").unwrap();
         assert_eq!(chat.request.messages.len(), 1);
@@ -330,7 +336,7 @@ mod tests {
                 cache_control: None,
             })
         );
-        
+
         // Test appending to existing user message
         chat.add_user_message(" World").unwrap();
         assert_eq!(chat.request.messages.len(), 1);
@@ -341,7 +347,7 @@ mod tests {
                 cache_control: None,
             })
         );
-        
+
         // Test adding a new message after an agent message
         chat.add_agent_message("I'm Claude").unwrap();
         chat.add_user_message("Nice to meet you").unwrap();
@@ -355,11 +361,15 @@ mod tests {
             })
         );
     }
-    
+
     #[test]
     fn test_add_agent_message() {
-        let mut chat = ClaudeChat::new("claude-3-opus-20240229".to_string(), "fake-key".to_string(), false);
-        
+        let mut chat = ClaudeChat::new(
+            "claude-3-opus-20240229".to_string(),
+            "fake-key".to_string(),
+            false,
+        );
+
         // Test adding first message
         chat.add_agent_message("Hello").unwrap();
         assert_eq!(chat.request.messages.len(), 1);
@@ -371,7 +381,7 @@ mod tests {
                 cache_control: None,
             })
         );
-        
+
         // Test appending to existing agent message
         chat.add_agent_message(" World").unwrap();
         assert_eq!(chat.request.messages.len(), 1);
@@ -382,7 +392,7 @@ mod tests {
                 cache_control: None,
             })
         );
-        
+
         // Test adding a new message after a user message
         chat.add_user_message("Hi Claude").unwrap();
         chat.add_agent_message("How can I help?").unwrap();
