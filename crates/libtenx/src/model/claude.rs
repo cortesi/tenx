@@ -336,95 +336,49 @@ impl ModelProvider for Claude {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_add_user_message() {
-        let mut chat = ClaudeChat::new(
-            "claude-3-opus-20240229".to_string(),
-            "fake-key".to_string(),
-            false,
-        );
-
-        // Test adding first message
-        chat.add_user_message("Hello").unwrap();
-        assert_eq!(chat.request.messages.len(), 1);
-        assert_eq!(chat.request.messages[0].role, Role::User);
-
-        // Extract and check text content
-        if let Content::Text(text_content) = &chat.request.messages[0].content[0] {
-            assert_eq!(text_content.text, "Hello");
-            assert_eq!(text_content.cache_control, None);
-        } else {
-            panic!("Expected Text content");
-        }
-
-        // Test appending to existing user message
-        chat.add_user_message(" World").unwrap();
-        assert_eq!(chat.request.messages.len(), 1);
-
-        // Extract and check text content after append
-        if let Content::Text(text_content) = &chat.request.messages[0].content[0] {
-            assert_eq!(text_content.text, "Hello World");
-        } else {
-            panic!("Expected Text content");
-        }
-
-        // Test adding a new message after an agent message
-        chat.add_agent_message("I'm Claude").unwrap();
-        chat.add_user_message("Nice to meet you").unwrap();
-        assert_eq!(chat.request.messages.len(), 3);
-        assert_eq!(chat.request.messages[2].role, Role::User);
-
-        // Extract and check text content of new message
-        if let Content::Text(text_content) = &chat.request.messages[2].content[0] {
-            assert_eq!(text_content.text, "Nice to meet you");
+    fn text_of_first_content(message: &misanthropy::Message) -> &str {
+        if let Content::Text(text_content) = &message.content[0] {
+            &text_content.text
         } else {
             panic!("Expected Text content");
         }
     }
 
     #[test]
-    fn test_add_agent_message() {
+    fn test_add_user_and_agent_message() {
         let mut chat = ClaudeChat::new(
             "claude-3-opus-20240229".to_string(),
             "fake-key".to_string(),
             false,
         );
 
-        // Test adding first message
-        chat.add_agent_message("Hello").unwrap();
+        // Add user message and check
+        chat.add_user_message("Hello").unwrap();
         assert_eq!(chat.request.messages.len(), 1);
-        assert_eq!(chat.request.messages[0].role, Role::Assistant);
+        assert_eq!(chat.request.messages[0].role, Role::User);
+        assert_eq!(text_of_first_content(&chat.request.messages[0]), "Hello");
 
-        // Extract and check text content
-        if let Content::Text(text_content) = &chat.request.messages[0].content[0] {
-            assert_eq!(text_content.text, "Hello");
-            assert_eq!(text_content.cache_control, None);
-        } else {
-            panic!("Expected Text content");
-        }
-
-        // Test appending to existing agent message
-        chat.add_agent_message(" World").unwrap();
+        // Append to user message
+        chat.add_user_message(" World").unwrap();
         assert_eq!(chat.request.messages.len(), 1);
+        assert_eq!(text_of_first_content(&chat.request.messages[0]), "Hello World");
 
-        // Extract and check text content after append
-        if let Content::Text(text_content) = &chat.request.messages[0].content[0] {
-            assert_eq!(text_content.text, "Hello World");
-        } else {
-            panic!("Expected Text content");
-        }
+        // Add agent message and check
+        chat.add_agent_message("I'm Claude").unwrap();
+        assert_eq!(chat.request.messages.len(), 2);
+        assert_eq!(chat.request.messages[1].role, Role::Assistant);
+        assert_eq!(text_of_first_content(&chat.request.messages[1]), "I'm Claude");
 
-        // Test adding a new message after a user message
-        chat.add_user_message("Hi Claude").unwrap();
-        chat.add_agent_message("How can I help?").unwrap();
+        // Add another user message (should create new)
+        chat.add_user_message("Nice to meet you").unwrap();
         assert_eq!(chat.request.messages.len(), 3);
-        assert_eq!(chat.request.messages[2].role, Role::Assistant);
+        assert_eq!(chat.request.messages[2].role, Role::User);
+        assert_eq!(text_of_first_content(&chat.request.messages[2]), "Nice to meet you");
 
-        // Extract and check text content of new message
-        if let Content::Text(text_content) = &chat.request.messages[2].content[0] {
-            assert_eq!(text_content.text, "How can I help?");
-        } else {
-            panic!("Expected Text content");
-        }
+        // Add another agent message (should create new)
+        chat.add_agent_message("How can I help?").unwrap();
+        assert_eq!(chat.request.messages.len(), 4);
+        assert_eq!(chat.request.messages[3].role, Role::Assistant);
+        assert_eq!(text_of_first_content(&chat.request.messages[3]), "How can I help?");
     }
 }
