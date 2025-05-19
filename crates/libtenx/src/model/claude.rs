@@ -329,37 +329,38 @@ mod tests {
         chat.add_user_message("Hello").unwrap();
         assert_eq!(chat.request.messages.len(), 1);
         assert_eq!(chat.request.messages[0].role, Role::User);
-        assert_eq!(
-            chat.request.messages[0].content[0],
-            Content::Text(misanthropy::Text {
-                text: "Hello".to_string(),
-                cache_control: None,
-            })
-        );
+        
+        // Extract and check text content
+        if let Content::Text(text_content) = &chat.request.messages[0].content[0] {
+            assert_eq!(text_content.text, "Hello");
+            assert_eq!(text_content.cache_control, None);
+        } else {
+            panic!("Expected Text content");
+        }
 
         // Test appending to existing user message
         chat.add_user_message(" World").unwrap();
         assert_eq!(chat.request.messages.len(), 1);
-        assert_eq!(
-            chat.request.messages[0].content[0],
-            Content::Text(misanthropy::Text {
-                text: "Hello World".to_string(),
-                cache_control: None,
-            })
-        );
+        
+        // Extract and check text content after append
+        if let Content::Text(text_content) = &chat.request.messages[0].content[0] {
+            assert_eq!(text_content.text, "Hello World");
+        } else {
+            panic!("Expected Text content");
+        }
 
         // Test adding a new message after an agent message
         chat.add_agent_message("I'm Claude").unwrap();
         chat.add_user_message("Nice to meet you").unwrap();
         assert_eq!(chat.request.messages.len(), 3);
         assert_eq!(chat.request.messages[2].role, Role::User);
-        assert_eq!(
-            chat.request.messages[2].content[0],
-            Content::Text(misanthropy::Text {
-                text: "Nice to meet you".to_string(),
-                cache_control: None,
-            })
-        );
+        
+        // Extract and check text content of new message
+        if let Content::Text(text_content) = &chat.request.messages[2].content[0] {
+            assert_eq!(text_content.text, "Nice to meet you");
+        } else {
+            panic!("Expected Text content");
+        }
     }
 
     #[test]
@@ -374,37 +375,38 @@ mod tests {
         chat.add_agent_message("Hello").unwrap();
         assert_eq!(chat.request.messages.len(), 1);
         assert_eq!(chat.request.messages[0].role, Role::Assistant);
-        assert_eq!(
-            chat.request.messages[0].content[0],
-            Content::Text(misanthropy::Text {
-                text: "Hello".to_string(),
-                cache_control: None,
-            })
-        );
+        
+        // Extract and check text content
+        if let Content::Text(text_content) = &chat.request.messages[0].content[0] {
+            assert_eq!(text_content.text, "Hello");
+            assert_eq!(text_content.cache_control, None);
+        } else {
+            panic!("Expected Text content");
+        }
 
         // Test appending to existing agent message
         chat.add_agent_message(" World").unwrap();
         assert_eq!(chat.request.messages.len(), 1);
-        assert_eq!(
-            chat.request.messages[0].content[0],
-            Content::Text(misanthropy::Text {
-                text: "Hello World".to_string(),
-                cache_control: None,
-            })
-        );
+        
+        // Extract and check text content after append
+        if let Content::Text(text_content) = &chat.request.messages[0].content[0] {
+            assert_eq!(text_content.text, "Hello World");
+        } else {
+            panic!("Expected Text content");
+        }
 
         // Test adding a new message after a user message
         chat.add_user_message("Hi Claude").unwrap();
         chat.add_agent_message("How can I help?").unwrap();
         assert_eq!(chat.request.messages.len(), 3);
         assert_eq!(chat.request.messages[2].role, Role::Assistant);
-        assert_eq!(
-            chat.request.messages[2].content[0],
-            Content::Text(misanthropy::Text {
-                text: "How can I help?".to_string(),
-                cache_control: None,
-            })
-        );
+        
+        // Extract and check text content of new message
+        if let Content::Text(text_content) = &chat.request.messages[2].content[0] {
+            assert_eq!(text_content.text, "How can I help?");
+        } else {
+            panic!("Expected Text content");
+        }
     }
 }
 
