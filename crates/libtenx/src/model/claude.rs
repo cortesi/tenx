@@ -311,6 +311,93 @@ impl From<serde_json::Error> for TenxError {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_add_user_message() {
+        let mut chat = ClaudeChat::new("claude-3-opus-20240229".to_string(), "fake-key".to_string(), false);
+        
+        // Test adding first message
+        chat.add_user_message("Hello").unwrap();
+        assert_eq!(chat.request.messages.len(), 1);
+        assert_eq!(chat.request.messages[0].role, Role::User);
+        assert_eq!(
+            chat.request.messages[0].content[0],
+            Content::Text(misanthropy::Text {
+                text: "Hello".to_string(),
+                cache_control: None,
+            })
+        );
+        
+        // Test appending to existing user message
+        chat.add_user_message(" World").unwrap();
+        assert_eq!(chat.request.messages.len(), 1);
+        assert_eq!(
+            chat.request.messages[0].content[0],
+            Content::Text(misanthropy::Text {
+                text: "Hello World".to_string(),
+                cache_control: None,
+            })
+        );
+        
+        // Test adding a new message after an agent message
+        chat.add_agent_message("I'm Claude").unwrap();
+        chat.add_user_message("Nice to meet you").unwrap();
+        assert_eq!(chat.request.messages.len(), 3);
+        assert_eq!(chat.request.messages[2].role, Role::User);
+        assert_eq!(
+            chat.request.messages[2].content[0],
+            Content::Text(misanthropy::Text {
+                text: "Nice to meet you".to_string(),
+                cache_control: None,
+            })
+        );
+    }
+    
+    #[test]
+    fn test_add_agent_message() {
+        let mut chat = ClaudeChat::new("claude-3-opus-20240229".to_string(), "fake-key".to_string(), false);
+        
+        // Test adding first message
+        chat.add_agent_message("Hello").unwrap();
+        assert_eq!(chat.request.messages.len(), 1);
+        assert_eq!(chat.request.messages[0].role, Role::Assistant);
+        assert_eq!(
+            chat.request.messages[0].content[0],
+            Content::Text(misanthropy::Text {
+                text: "Hello".to_string(),
+                cache_control: None,
+            })
+        );
+        
+        // Test appending to existing agent message
+        chat.add_agent_message(" World").unwrap();
+        assert_eq!(chat.request.messages.len(), 1);
+        assert_eq!(
+            chat.request.messages[0].content[0],
+            Content::Text(misanthropy::Text {
+                text: "Hello World".to_string(),
+                cache_control: None,
+            })
+        );
+        
+        // Test adding a new message after a user message
+        chat.add_user_message("Hi Claude").unwrap();
+        chat.add_agent_message("How can I help?").unwrap();
+        assert_eq!(chat.request.messages.len(), 3);
+        assert_eq!(chat.request.messages[2].role, Role::Assistant);
+        assert_eq!(
+            chat.request.messages[2].content[0],
+            Content::Text(misanthropy::Text {
+                text: "How can I help?".to_string(),
+                cache_control: None,
+            })
+        );
+    }
+}
+
 #[async_trait::async_trait]
 impl ModelProvider for Claude {
     fn name(&self) -> String {
