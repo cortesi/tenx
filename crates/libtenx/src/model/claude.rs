@@ -131,6 +131,28 @@ impl ClaudeChat {
     }
 }
 
+impl ClaudeChat {
+    /// Helper to add or append a message with the given role.
+    fn add_message_with_role(&mut self, role: misanthropy::Role, text: &str) -> Result<()> {
+        if self.request.messages.is_empty()
+            || self.request.messages.last().unwrap().role != role
+        {
+            self.request.messages.push(misanthropy::Message {
+                role,
+                content: vec![misanthropy::Content::text(text)],
+            });
+        } else {
+            let last_message = self.request.messages.last_mut().unwrap();
+            if let Some(misanthropy::Content::Text(text_content)) = last_message.content.last_mut() {
+                text_content.text.push_str(text);
+            } else {
+                last_message.content.push(misanthropy::Content::text(text));
+            }
+        }
+        Ok(())
+    }
+}
+
 #[async_trait::async_trait]
 impl Chat for ClaudeChat {
     fn add_system_prompt(&mut self, prompt: &str) -> Result<()> {
@@ -144,51 +166,11 @@ impl Chat for ClaudeChat {
     }
 
     fn add_user_message(&mut self, text: &str) -> Result<()> {
-        // If there are no messages or the last message is not from the user, create a new one
-        if self.request.messages.is_empty()
-            || self.request.messages.last().unwrap().role != misanthropy::Role::User
-        {
-            self.request.messages.push(misanthropy::Message {
-                role: misanthropy::Role::User,
-                content: vec![misanthropy::Content::text(text)],
-            });
-        } else {
-            // Get the last message
-            let last_message = self.request.messages.last_mut().unwrap();
-            // Append to content - assumes the last content block is Text
-            if let Some(misanthropy::Content::Text(text_content)) = last_message.content.last_mut()
-            {
-                text_content.text.push_str(text);
-            } else {
-                // If the last content block isn't text, add a new one
-                last_message.content.push(misanthropy::Content::text(text));
-            }
-        }
-        Ok(())
+        self.add_message_with_role(misanthropy::Role::User, text)
     }
 
     fn add_agent_message(&mut self, text: &str) -> Result<()> {
-        // If there are no messages or the last message is not from the assistant, create a new one
-        if self.request.messages.is_empty()
-            || self.request.messages.last().unwrap().role != misanthropy::Role::Assistant
-        {
-            self.request.messages.push(misanthropy::Message {
-                role: misanthropy::Role::Assistant,
-                content: vec![misanthropy::Content::text(text)],
-            });
-        } else {
-            // Get the last message
-            let last_message = self.request.messages.last_mut().unwrap();
-            // Append to content - assumes the last content block is Text
-            if let Some(misanthropy::Content::Text(text_content)) = last_message.content.last_mut()
-            {
-                text_content.text.push_str(text);
-            } else {
-                // If the last content block isn't text, add a new one
-                last_message.content.push(misanthropy::Content::text(text));
-            }
-        }
-        Ok(())
+        self.add_message_with_role(misanthropy::Role::Assistant, text)
     }
 
     fn add_context(&mut self, _name: &str, data: &str) -> Result<()> {
