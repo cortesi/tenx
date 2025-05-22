@@ -4,11 +4,12 @@
 use super::xmlish;
 use crate::{
     config::Config,
-    context::ContextProvider,
+    context::{ContextItem, ContextProvider},
     error::{Result, TenxError},
     model::Chat,
     session::{ModelResponse, Session},
 };
+
 use fs_err as fs;
 use state::{Change, Patch, ReplaceFuzzy, WriteFile};
 
@@ -117,6 +118,15 @@ pub fn parse(response: &str) -> Result<ModelResponse> {
     })
 }
 
+pub fn render_context(ctx: &ContextItem) -> Result<String> {
+    let mut rendered = String::new();
+    rendered.push_str(&format!(
+        "<context name=\"{}\" type=\"{:?}\">\n{}\n</context>\n",
+        ctx.source, ctx.ty, ctx.body
+    ));
+    Ok(rendered)
+}
+
 fn render_step_request(
     session: &Session,
     action_offset: usize,
@@ -182,11 +192,7 @@ fn build_chat(
         chat.add_user_message(CONTEXT_LEADIN)?;
         for cspec in &session.contexts {
             for ctx in cspec.context_items(config, session)? {
-                let txt = format!(
-                    "<context name=\"{}\" type=\"{:?}\">\n{}\n</context>\n",
-                    ctx.source, ctx.ty, ctx.body
-                );
-                chat.add_context(&ctx.source, &txt)?;
+                chat.add_context(&ctx)?;
             }
         }
         chat.add_agent_message(ACK)?;

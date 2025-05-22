@@ -5,6 +5,7 @@ use tracing::{trace, warn};
 
 use super::claude::ClaudeUsage;
 use crate::{
+    context::ContextItem,
     error::{Result, TenxError},
     events::*,
     model::ModelProvider,
@@ -168,9 +169,12 @@ impl Chat for ClaudeEditorChat {
         Ok(())
     }
 
-    fn add_context(&mut self, name: &str, data: &str) -> Result<()> {
+    fn add_context(&mut self, ctx: &ContextItem) -> Result<()> {
         // Add context as a user message with a clear marker
-        self.add_user_message(&format!("<context name=\"{}\">{}\\</context>", name, data))
+        self.add_user_message(&format!(
+            "<context name=\"{}\">{}\\</context>",
+            ctx.source, ctx.body
+        ))
     }
 
     fn add_editable(&mut self, path: &str, data: &str) -> Result<()> {

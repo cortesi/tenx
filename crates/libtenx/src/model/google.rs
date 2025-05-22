@@ -8,6 +8,7 @@ use tracing::{trace, warn};
 use super::Chat;
 
 use crate::{
+    context::ContextItem,
     dialect::{Dialect, DialectProvider, Tags},
     error::{Result, TenxError},
     events::*,
@@ -221,9 +222,12 @@ impl Chat for GoogleChat {
         Ok(())
     }
 
-    fn add_context(&mut self, name: &str, data: &str) -> Result<()> {
+    fn add_context(&mut self, ctx: &ContextItem) -> Result<()> {
         // Add context as a user message with a clear marker
-        self.add_user_message(&format!("<context name=\"{}\">{}\\</context>", name, data))
+        self.add_user_message(&format!(
+            "<context name=\"{}\">{}\\</context>",
+            ctx.source, ctx.body
+        ))
     }
 
     fn add_editable(&mut self, path: &str, data: &str) -> Result<()> {

@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 use super::{Chat, ModelProvider};
-use crate::{error::Result, events::EventSender, session::ModelResponse};
+use crate::{context::ContextItem, error::Result, events::EventSender, session::ModelResponse};
 
 use std::collections::HashMap;
 
@@ -25,7 +25,7 @@ impl Chat for DummyChat {
         Ok(())
     }
 
-    fn add_context(&mut self, _name: &str, _data: &str) -> Result<()> {
+    fn add_context(&mut self, _ctx: &ContextItem) -> Result<()> {
         Ok(())
     }
 

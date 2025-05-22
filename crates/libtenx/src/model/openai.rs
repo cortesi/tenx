@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 use tracing::trace;
 
 use crate::{
+    context::ContextItem,
     dialect::{Dialect, DialectProvider, Tags},
     error::{Result, TenxError},
     events::{send_event, Event, EventSender},
@@ -221,9 +222,12 @@ impl Chat for OpenAiChat {
         Ok(())
     }
 
-    fn add_context(&mut self, name: &str, data: &str) -> Result<()> {
+    fn add_context(&mut self, ctx: &ContextItem) -> Result<()> {
         // Add context as a user message with a clear marker
-        self.add_user_message(&format!("<context name=\"{}\">{}\\</context>", name, data))
+        self.add_user_message(&format!(
+            "<context name=\"{}\">{}\\</context>",
+            ctx.source, ctx.body
+        ))
     }
 
     fn add_editable(&mut self, path: &str, data: &str) -> Result<()> {

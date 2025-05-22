@@ -117,7 +117,7 @@ impl DialectProvider for Tags {
                         "<context name=\"{}\" type=\"{:?}\">\n{}\n</context>\n",
                         ctx.source, ctx.ty, ctx.body
                     );
-                    chat.add_context(&ctx.source, &txt)?;
+                    chat.add_context(&ctx)?;
                 }
             }
             chat.add_agent_message(ACK)?;

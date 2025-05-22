@@ -7,6 +7,7 @@ use serde_json;
 use tracing::{trace, warn};
 
 use crate::{
+    context::ContextItem,
     error::{Result, TenxError},
     events::*,
     model::tags,
@@ -134,16 +135,15 @@ impl ClaudeChat {
 impl ClaudeChat {
     /// Helper to add or append a message with the given role.
     fn add_message_with_role(&mut self, role: misanthropy::Role, text: &str) -> Result<()> {
-        if self.request.messages.is_empty()
-            || self.request.messages.last().unwrap().role != role
-        {
+        if self.request.messages.is_empty() || self.request.messages.last().unwrap().role != role {
             self.request.messages.push(misanthropy::Message {
                 role,
                 content: vec![misanthropy::Content::text(text)],
             });
         } else {
             let last_message = self.request.messages.last_mut().unwrap();
-            if let Some(misanthropy::Content::Text(text_content)) = last_message.content.last_mut() {
+            if let Some(misanthropy::Content::Text(text_content)) = last_message.content.last_mut()
+            {
                 text_content.text.push_str(text);
             } else {
                 last_message.content.push(misanthropy::Content::text(text));
@@ -173,8 +173,8 @@ impl Chat for ClaudeChat {
         self.add_message_with_role(misanthropy::Role::Assistant, text)
     }
 
-    fn add_context(&mut self, _name: &str, data: &str) -> Result<()> {
-        self.append_last_message(data)
+    fn add_context(&mut self, ctx: &ContextItem) -> Result<()> {
+        self.add_user_message(&tags::render_context(ctx)?)
     }
 
     fn add_editable(&mut self, _path: &str, data: &str) -> Result<()> {
@@ -343,24 +343,36 @@ mod tests {
         // Append to user message
         chat.add_user_message(" World").unwrap();
         assert_eq!(chat.request.messages.len(), 1);
-        assert_eq!(text_of_first_content(&chat.request.messages[0]), "Hello World");
+        assert_eq!(
+            text_of_first_content(&chat.request.messages[0]),
+            "Hello World"
+        );
 
         // Add agent message and check
         chat.add_agent_message("I'm Claude").unwrap();
         assert_eq!(chat.request.messages.len(), 2);
         assert_eq!(chat.request.messages[1].role, Role::Assistant);
-        assert_eq!(text_of_first_content(&chat.request.messages[1]), "I'm Claude");
+        assert_eq!(
+            text_of_first_content(&chat.request.messages[1]),
+            "I'm Claude"
+        );
 
         // Add another user message (should create new)
         chat.add_user_message("Nice to meet you").unwrap();
         assert_eq!(chat.request.messages.len(), 3);
         assert_eq!(chat.request.messages[2].role, Role::User);
-        assert_eq!(text_of_first_content(&chat.request.messages[2]), "Nice to meet you");
+        assert_eq!(
+            text_of_first_content(&chat.request.messages[2]),
+            "Nice to meet you"
+        );
 
         // Add another agent message (should create new)
         chat.add_agent_message("How can I help?").unwrap();
         assert_eq!(chat.request.messages.len(), 4);
         assert_eq!(chat.request.messages[3].role, Role::Assistant);
-        assert_eq!(text_of_first_content(&chat.request.messages[3]), "How can I help?");
+        assert_eq!(
+            text_of_first_content(&chat.request.messages[3]),
+            "How can I help?"
+        );
     }
 }

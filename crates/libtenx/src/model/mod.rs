@@ -20,7 +20,7 @@ pub use dummy_model::{DummyModel, DummyUsage};
 pub use google::{Google, GoogleChat, GoogleUsage};
 pub use openai::{OpenAi, OpenAiChat, OpenAiUsage, ReasoningEffort};
 
-use crate::{error::Result, events::EventSender, session::ModelResponse};
+use crate::{context::ContextItem, error::Result, events::EventSender, session::ModelResponse};
 
 use std::collections::HashMap;
 
@@ -36,18 +36,20 @@ pub trait Chat: Send {
     /// basic interactions.
     fn add_system_prompt(&mut self, prompt: &str) -> Result<()>;
 
-    /// Adds a user message to the chat.
+    /// Adds a user message to the chat. If the last message is a user message, the text is
+    /// appended. If the last message is an agent message, a new user message is started.
     fn add_user_message(&mut self, text: &str) -> Result<()>;
 
-    /// Adds an agent message to the chat.
+    /// Adds an agent message to the chat. If the last message is an agent message, the text is
+    /// appended. If the last message is an user message, a new agent message is started.
     fn add_agent_message(&mut self, text: &str) -> Result<()>;
 
     /// Adds immutable context data to the chat, can be called multiple times, at any time.
-    /// May start a new user message, and synthesize an agent response.
-    fn add_context(&mut self, name: &str, data: &str) -> Result<()>;
+    /// May start a new user message and synthesize an agent response.
+    fn add_context(&mut self, ctx: &ContextItem) -> Result<()>;
 
     /// Adds editable data to the chat. Can be called multiple times, at any time.
-    /// May start a new user message, and synthesize an agent response.
+    /// May start a new user message and synthesize an agent response.
     fn add_editable(&mut self, path: &str, data: &str) -> Result<()>;
 
     /// Render and send a session to the model.
