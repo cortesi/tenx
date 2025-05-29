@@ -74,7 +74,7 @@ fn process_step(
     if let Some(err) = &step.err {
         if let Some(err_message) = err.should_retry() {
             messages.push(err_message.to_string());
-            user_message.push(format!("{}", err));
+            user_message.push(format!("{err}"));
         }
     }
 
@@ -84,13 +84,12 @@ fn process_step(
             let failure_messages = patch_info
                 .failures
                 .iter()
-                .map(|(change, err)| format!("Failed to apply change {:?}: {}", change, err))
+                .map(|(change, err)| format!("Failed to apply change {change:?}: {err}"))
                 .collect::<Vec<_>>()
                 .join("\n\n");
 
             messages.push(format!(
-                "Please fix the following issues with your changes:\n\n{}",
-                failure_messages
+                "Please fix the following issues with your changes:\n\n{failure_messages}",
             ));
             user_message.push("patch failures".into());
         }
@@ -242,7 +241,7 @@ fn render_step<R: Render>(
             let failure_messages: Vec<String> = patch_info
                 .failures
                 .iter()
-                .map(|(change, err)| format!("Failed to apply {:?}: {}", change, err))
+                .map(|(change, err)| format!("Failed to apply {change:?}: {err}"))
                 .collect();
 
             renderer.push("Patch failures:");
@@ -260,6 +259,7 @@ fn render_step<R: Render>(
     Ok(())
 }
 
+#[async_trait]
 impl ActionStrategy for Code {
     fn name(&self) -> &'static str {
         "code"
@@ -342,11 +342,29 @@ impl ActionStrategy for Code {
         detail: Detail,
     ) -> Result<()> {
         let step = &session.actions[action_offset].steps[step_offset].clone();
-        let header = format!("step {}:{}", action_offset, step_offset);
+        let header = format!("step {action_offset}:{step_offset}");
         render_step(step, renderer, &header, false, detail)
+    }
+
+    async fn send(
+        &self,
+        config: &Config,
+        session: &mut Session,
+        action_offset: usize,
+        sender: Option<EventSender>,
+    ) -> Result<ModelResponse> {
+        let model = config.active_model()?;
+        let mut chat = model
+            .chat()
+            .ok_or(TenxError::Internal("Chat not supported".into()))?;
+
+        let dialect = Tags::new();
+        dialect.build_chat(config, session, action_offset, &mut chat)?;
+        chat.send(sender).await
     }
 }
 
+#[async_trait]
 impl ActionStrategy for Fix {
     fn name(&self) -> &'static str {
         "fix"
@@ -389,7 +407,7 @@ impl ActionStrategy for Fix {
             // First step in the action
             let model = config.models.default.clone();
             let preamble = match prompt {
-                Some(ref s) => format!("{}\n", s),
+                Some(ref s) => format!("{s}\n"),
                 None => "".to_string(),
             };
             let raw_prompt =
@@ -435,9 +453,26 @@ impl ActionStrategy for Fix {
         let step = &session.actions[action_offset].steps[step_offset].clone();
 
         // Create the header
-        let header = format!("Step {}", step_offset);
+        let header = format!("Step {step_offset}");
 
         render_step(step, renderer, &header, true, detail)
+    }
+
+    async fn send(
+        &self,
+        config: &Config,
+        session: &mut Session,
+        action_offset: usize,
+        sender: Option<EventSender>,
+    ) -> Result<ModelResponse> {
+        let model = config.active_model()?;
+        let mut chat = model
+            .chat()
+            .ok_or(TenxError::Internal("Chat not supported".into()))?;
+
+        let dialect = Tags::new();
+        dialect.build_chat(config, session, action_offset, &mut chat)?;
+        chat.send(sender).await
     }
 }
 

@@ -127,16 +127,7 @@ pub trait ActionStrategy {
         session: &mut Session,
         action_offset: usize,
         sender: Option<EventSender>,
-    ) -> Result<ModelResponse> {
-        let model = config.active_model()?;
-        let mut chat = model
-            .chat()
-            .ok_or(TenxError::Internal("Chat not supported".into()))?;
-
-        let dialect = Tags::new();
-        dialect.build_chat(config, session, action_offset, &mut chat)?;
-        chat.send(sender).await
-    }
+    ) -> Result<ModelResponse>;
 }
 
 /// A strategy for performing an Action.

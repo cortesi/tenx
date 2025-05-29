@@ -15,8 +15,6 @@ use state::{Change, Patch, ReplaceFuzzy, WriteFile};
 
 pub const SYSTEM: &str = include_str!("./tags-system.txt");
 
-const CONTEXT_LEADIN: &str = "Here is some immutable context that you may not edit.";
-const EDITABLE_LEADIN: &str = "Here are the editable files.";
 const ACK: &str = "Got it.";
 
 /// Parses a response string containing XML-like tags and returns a `Patch` struct.
@@ -118,6 +116,14 @@ pub fn parse(response: &str) -> Result<ModelResponse> {
     })
 }
 
+pub fn render_editable(path: &str, data: &str) -> Result<String> {
+    let mut rendered = String::new();
+    rendered.push_str(&format!(
+        "<editable path=\"{path}\">\n{data}\n</editable>\n\n",
+    ));
+    Ok(rendered)
+}
+
 pub fn render_context(ctx: &ContextItem) -> Result<String> {
     let mut rendered = String::new();
     rendered.push_str(&format!(
@@ -189,7 +195,6 @@ fn build_chat(
     chat: &mut Box<dyn Chat>,
 ) -> Result<()> {
     if !session.contexts.is_empty() {
-        chat.add_user_message(CONTEXT_LEADIN)?;
         for cspec in &session.contexts {
             for ctx in cspec.context_items(config, session)? {
                 chat.add_context(&ctx)?;
@@ -197,19 +202,14 @@ fn build_chat(
         }
         chat.add_agent_message(ACK)?;
     }
-
     for (i, step) in session.actions[action_offset].steps.iter().enumerate() {
         let editables = session.editables_for_step_state(action_offset, i)?;
         if !editables.is_empty() {
-            chat.add_user_message(EDITABLE_LEADIN)?;
             for path in editables {
-                let contents = fs::read_to_string(config.abspath(&path)?)?;
-                let txt = &format!(
-                    "<editable path=\"{}\">\n{}</editable>\n\n",
-                    path.display(),
-                    contents
-                );
-                chat.add_editable(&path.display().to_string(), txt)?;
+                chat.add_editable(
+                    &path.display().to_string(),
+                    &fs::read_to_string(config.abspath(&path)?)?,
+                )?;
             }
             chat.add_agent_message(ACK)?;
         }
@@ -225,7 +225,6 @@ fn build_chat(
             chat.add_agent_message("omitted due to error")?;
         }
     }
-
     Ok(())
 }
 
