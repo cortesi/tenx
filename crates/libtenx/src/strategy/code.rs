@@ -99,21 +99,6 @@ fn process_step(
         }
     }
 
-    // Check for operations in model response that need further action
-    if let Some(model_response) = &step.model_response {
-        if !model_response.operations.is_empty() {
-            let model_message = "Operations applied".to_string();
-            messages.push(model_message.clone());
-            send_event(
-                &events,
-                Event::NextStep {
-                    user: "operations applied".into(),
-                    model: model_message.clone(),
-                },
-            )?;
-        }
-    }
-
     if !messages.is_empty() {
         let model_message = messages.join("\n\n");
         let user = user_message.join(", ");

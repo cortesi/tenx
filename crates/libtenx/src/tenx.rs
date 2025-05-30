@@ -417,7 +417,7 @@ mod tests {
         session::ModelResponse,
         strategy::{Completion, InputRequired},
     };
-    use state::{Change, Patch, WriteFile};
+    use state::{Operation, Patch, WriteFile};
 
     use fs_err as fs;
     use tempfile::tempdir;
@@ -457,12 +457,11 @@ mod tests {
                 ModelResponse {
                     comment: Some("Test comment".to_string()),
                     patch: Some(Patch {
-                        changes: vec![Change::Write(WriteFile {
+                        ops: vec![Operation::Write(WriteFile {
                             path: PathBuf::from("test.txt"),
                             content: "Updated content".to_string(),
                         })],
                     }),
-                    operations: vec![],
                     usage: None,
                     raw_response: Some("Test comment".to_string()),
                 },
@@ -521,12 +520,11 @@ mod tests {
                 ModelResponse {
                     comment: Some("Test comment".to_string()),
                     patch: Some(Patch {
-                        changes: vec![Change::Write(WriteFile {
+                        ops: vec![Operation::Write(WriteFile {
                             path: PathBuf::from("test.txt"),
                             content: "Updated content".to_string(),
                         })],
                     }),
-                    operations: vec![],
                     usage: None,
                     raw_response: Some("Test comment".to_string()),
                 },

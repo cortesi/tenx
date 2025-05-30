@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use indoc::indoc;
 use pretty_assertions::assert_eq;
 
-use state::{Change, Patch, ReplaceFuzzy, WriteFile};
+use state::{Operation, Patch, ReplaceFuzzy, WriteFile};
 
 use crate::{
     error::Result,
@@ -35,19 +35,18 @@ fn test_parse_response_basic() {
 
     let expected = ModelResponse {
         patch: Some(Patch {
-            changes: vec![
-                Change::Write(WriteFile {
+            ops: vec![
+                Operation::Write(WriteFile {
                     path: PathBuf::from("/path/to/file2.txt"),
                     content: "This is the content of the file.".to_string(),
                 }),
-                Change::ReplaceFuzzy(ReplaceFuzzy {
+                Operation::ReplaceFuzzy(ReplaceFuzzy {
                     path: PathBuf::from("/path/to/file.txt"),
                     old: "Old content".to_string(),
                     new: "New content".to_string(),
                 }),
             ],
         }),
-        operations: vec![],
         usage: None,
         comment: Some("This is a comment.".to_string()),
         raw_response: Some(input.to_string()),
@@ -73,10 +72,10 @@ fn test_parse_edit() {
 
     let result = parse(input).unwrap();
     assert_eq!(
-        result.patch.unwrap().changes,
+        result.patch.unwrap().ops,
         vec![
-            Change::View(PathBuf::from("src/main.rs")),
-            Change::View(PathBuf::from("with/leading/spaces.rs")),
+            Operation::View(PathBuf::from("src/main.rs")),
+            Operation::View(PathBuf::from("with/leading/spaces.rs")),
         ]
     );
 }
@@ -88,12 +87,11 @@ fn test_render_edit() -> Result<()> {
     let response = ModelResponse {
         comment: Some("A comment".into()),
         patch: Some(Patch {
-            changes: vec![
-                Change::View(PathBuf::from("src/main.rs")),
-                Change::View(PathBuf::from("src/lib.rs")),
+            ops: vec![
+                Operation::View(PathBuf::from("src/main.rs")),
+                Operation::View(PathBuf::from("src/lib.rs")),
             ],
         }),
-        operations: vec![],
         usage: None,
         raw_response: Some("Test response".into()),
     };
@@ -143,10 +141,10 @@ fn test_parse_edit_multiline() {
 
     let result = parse(input).unwrap();
     assert_eq!(
-        result.patch.unwrap().changes,
+        result.patch.unwrap().ops,
         vec![
-            Change::View(PathBuf::from("/path/to/first")),
-            Change::View(PathBuf::from("/path/to/second")),
+            Operation::View(PathBuf::from("/path/to/first")),
+            Operation::View(PathBuf::from("/path/to/second")),
         ]
     );
 }

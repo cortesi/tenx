@@ -165,8 +165,7 @@ mod tests {
                 .unwrap();
             if let Some(step) = p.session.last_step_mut() {
                 step.model_response = Some(ModelResponse {
-                    patch: Some(Patch { changes: vec![] }),
-                    operations: vec![],
+                    patch: Some(Patch { ops: vec![] }),
                     usage: None,
                     comment: Some(response.to_string()),
                     raw_response: Some(response.to_string()),

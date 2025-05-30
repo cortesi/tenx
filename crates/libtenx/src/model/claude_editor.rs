@@ -135,7 +135,6 @@ impl ClaudeEditorChat {
         // Create the ModelResponse at the end
         Ok(ModelResponse {
             patch: if !patch.is_empty() { Some(patch) } else { None },
-            operations: vec![],
             comment,
             usage: None,
             raw_response: Some(last_message.format_content()),

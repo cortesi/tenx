@@ -18,9 +18,9 @@ use unirend::{Detail, Render};
 
 use crate::error::Result;
 
-/// A change to be applied to the state.
+/// An operation on the state.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub enum Change {
+pub enum Operation {
     /// Write or create a complete file.
     Write(write::WriteFile),
 
@@ -45,48 +45,48 @@ pub enum Change {
     Undo(PathBuf),
 }
 
-impl Change {
-    /// Returns the name of the change type.
+impl Operation {
+    /// Returns the name of the operation type.
     pub fn name(&self) -> &str {
         match self {
-            Change::Write(_) => "write",
-            Change::ReplaceFuzzy(_) => "replace_fuzzy",
-            Change::Replace(_) => "replace",
-            Change::Insert(_) => "insert",
-            Change::View(_) => "view",
-            Change::ViewRange(_, _, _) => "view_range",
-            Change::Undo(_) => "undo",
+            Operation::Write(_) => "write",
+            Operation::ReplaceFuzzy(_) => "replace_fuzzy",
+            Operation::Replace(_) => "replace",
+            Operation::Insert(_) => "insert",
+            Operation::View(_) => "view",
+            Operation::ViewRange(_, _, _) => "view_range",
+            Operation::Undo(_) => "undo",
         }
     }
 
-    /// Returns the path of the file affected by this change.
+    /// Returns the path of the file affected by this operation.
     pub fn path(&self) -> &PathBuf {
         match self {
-            Change::Write(write_file) => &write_file.path,
-            Change::ReplaceFuzzy(replace) => &replace.path,
-            Change::Replace(replace) => &replace.path,
-            Change::Insert(insert) => &insert.path,
-            Change::View(path) => path,
-            Change::ViewRange(path, _, _) => path,
-            Change::Undo(path) => path,
+            Operation::Write(write_file) => &write_file.path,
+            Operation::ReplaceFuzzy(replace) => &replace.path,
+            Operation::Replace(replace) => &replace.path,
+            Operation::Insert(insert) => &insert.path,
+            Operation::View(path) => path,
+            Operation::ViewRange(path, _, _) => path,
+            Operation::Undo(path) => path,
         }
     }
 
-    /// Renders this change with the specified level of detail
+    /// Renders this operation with the specified level of detail
     pub fn render<R: Render>(&self, renderer: &mut R, _detail: Detail) -> Result<()> {
         match self {
-            Change::Write(write_file) => {
+            Operation::Write(write_file) => {
                 let path_str = write_file.path.to_string_lossy();
                 renderer.push("write");
-                renderer.push(&format!("write: {}", path_str));
+                renderer.push(&format!("write: {path_str}"));
                 renderer.para(&write_file.content);
                 renderer.pop();
                 renderer.pop();
             }
-            Change::ReplaceFuzzy(replace) => {
+            Operation::ReplaceFuzzy(replace) => {
                 let path_str = replace.path.to_string_lossy();
                 renderer.push("replace_fuzzy");
-                renderer.push(&format!("replace (fuzzy) in file: {}", path_str));
+                renderer.push(&format!("replace (fuzzy) in file: {path_str}"));
                 renderer.push("old:");
                 renderer.para(&replace.old);
                 renderer.pop();
@@ -96,10 +96,10 @@ impl Change {
                 renderer.pop();
                 renderer.pop();
             }
-            Change::Replace(replace) => {
+            Operation::Replace(replace) => {
                 let path_str = replace.path.to_string_lossy();
                 renderer.push("replace");
-                renderer.push(&format!("replace (exact) in file: {}", path_str));
+                renderer.push(&format!("replace (exact) in file: {path_str}"));
                 renderer.push("old:");
                 renderer.para(&replace.old);
                 renderer.pop();
@@ -109,7 +109,7 @@ impl Change {
                 renderer.pop();
                 renderer.pop();
             }
-            Change::Insert(insert) => {
+            Operation::Insert(insert) => {
                 let path_str = insert.path.to_string_lossy();
                 renderer.push("insert");
                 renderer.push(&format!(
@@ -122,16 +122,16 @@ impl Change {
                 renderer.pop();
                 renderer.pop();
             }
-            Change::View(_) => {
+            Operation::View(_) => {
                 renderer.para("view");
             }
-            Change::Undo(path) => {
+            Operation::Undo(path) => {
                 let path_str = path.to_string_lossy();
                 renderer.push("undo");
-                renderer.para(&format!("undo changes to: {}", path_str));
+                renderer.para(&format!("undo ops to: {path_str}"));
                 renderer.pop();
             }
-            Change::ViewRange(path, start, end) => {
+            Operation::ViewRange(path, start, end) => {
                 let path_str = path.to_string_lossy();
                 renderer.push("view_range");
                 let end_str = match end {
@@ -139,8 +139,7 @@ impl Change {
                     None => "end".to_string(),
                 };
                 renderer.para(&format!(
-                    "view range from {} to {} in file: {}",
-                    start, end_str, path_str
+                    "view range from {start} to {end_str} in file: {path_str}",
                 ));
                 renderer.pop();
             }
@@ -149,38 +148,39 @@ impl Change {
     }
 }
 
-/// A unified collection of Change operations, to be applied as a single patch.
+/// A unified collection of operations, to be applied as a single pass.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct Patch {
-    pub changes: Vec<Change>,
+    /// A list of operations
+    pub ops: Vec<Operation>,
 }
 
 impl Patch {
     pub fn is_empty(&self) -> bool {
-        self.changes.is_empty()
+        self.ops.is_empty()
     }
 
-    /// Adds a WriteFile change to the patch
+    /// Adds a WriteFile operation to the patch
     pub fn with_write<P, S>(mut self, path: P, content: S) -> Self
     where
         P: AsRef<std::path::Path>,
         S: AsRef<str>,
     {
-        self.changes.push(Change::Write(WriteFile {
+        self.ops.push(Operation::Write(WriteFile {
             path: path.as_ref().to_path_buf(),
             content: content.as_ref().to_string(),
         }));
         self
     }
 
-    /// Adds a ReplaceFuzzy change to the patch
+    /// Adds a ReplaceFuzzy operation to the patch
     pub fn with_replace_fuzzy<P, S1, S2>(mut self, path: P, old: S1, new: S2) -> Self
     where
         P: AsRef<std::path::Path>,
         S1: AsRef<str>,
         S2: AsRef<str>,
     {
-        self.changes.push(Change::ReplaceFuzzy(ReplaceFuzzy {
+        self.ops.push(Operation::ReplaceFuzzy(ReplaceFuzzy {
             path: path.as_ref().to_path_buf(),
             old: old.as_ref().to_string(),
             new: new.as_ref().to_string(),
@@ -188,14 +188,14 @@ impl Patch {
         self
     }
 
-    /// Adds a Replace change to the patch
+    /// Adds a Replace operation to the patch
     pub fn with_replace<P, S1, S2>(mut self, path: P, old: S1, new: S2) -> Self
     where
         P: AsRef<std::path::Path>,
         S1: AsRef<str>,
         S2: AsRef<str>,
     {
-        self.changes.push(Change::Replace(Replace {
+        self.ops.push(Operation::Replace(Replace {
             path: path.as_ref().to_path_buf(),
             old: old.as_ref().to_string(),
             new: new.as_ref().to_string(),
@@ -203,13 +203,13 @@ impl Patch {
         self
     }
 
-    /// Adds an Insert change to the patch
+    /// Adds an Insert operation to the patch
     pub fn with_insert<P, S>(mut self, path: P, line: usize, content: S) -> Self
     where
         P: AsRef<std::path::Path>,
         S: AsRef<str>,
     {
-        self.changes.push(Change::Insert(Insert {
+        self.ops.push(Operation::Insert(Insert {
             path: path.as_ref().to_path_buf(),
             line,
             new: content.as_ref().to_string(),
@@ -217,25 +217,28 @@ impl Patch {
         self
     }
 
-    /// Adds a Touch change to the patch
+    /// Adds a Touch operation to the patch
     pub fn with_view<P: AsRef<std::path::Path>>(mut self, path: P) -> Self {
-        self.changes.push(Change::View(path.as_ref().to_path_buf()));
+        self.ops.push(Operation::View(path.as_ref().to_path_buf()));
         self
     }
 
-    /// Adds a ViewRange change to the patch
+    /// Adds a ViewRange operation to the patch
     pub fn with_view_range<P: AsRef<std::path::Path>>(
         mut self,
         path: P,
         start: usize,
         end: Option<usize>,
     ) -> Self {
-        self.changes
-            .push(Change::ViewRange(path.as_ref().to_path_buf(), start, end));
+        self.ops.push(Operation::ViewRange(
+            path.as_ref().to_path_buf(),
+            start,
+            end,
+        ));
         self
     }
 
-    /// Adds a ViewRange change to the patch with one-based indexing
+    /// Adds a ViewRange operation to the patch with one-based indexing
     ///
     /// Takes start and end line numbers in one-based form.
     /// If end is -1, it's considered to be the end of the file.
@@ -257,31 +260,28 @@ impl Patch {
         self.with_view_range(path, start_zero_based as usize, end_opt)
     }
 
-    /// Adds an Undo change to the patch
+    /// Adds an Undo operation to the patch
     pub fn with_undo<P: AsRef<std::path::Path>>(mut self, path: P) -> Self {
-        self.changes.push(Change::Undo(path.as_ref().to_path_buf()));
+        self.ops.push(Operation::Undo(path.as_ref().to_path_buf()));
         self
     }
 
-    /// Returns a vector of unique PathBufs for all files changed in the patch.
+    /// Returns a vector of unique PathBufs for all files affected by the patch.
     pub fn affected_files(&self) -> Vec<PathBuf> {
         let mut paths = HashMap::new();
-        for change in &self.changes {
-            paths.insert(change.path().clone(), ());
+        for op in &self.ops {
+            paths.insert(op.path().clone(), ());
         }
         paths.into_keys().collect()
     }
 
-    /// Groups changes by file path
-    fn changes_by_file(&self) -> HashMap<&PathBuf, Vec<&Change>> {
-        let mut file_changes = HashMap::new();
-        for change in &self.changes {
-            file_changes
-                .entry(change.path())
-                .or_insert_with(Vec::new)
-                .push(change);
+    /// Groups ops by file path
+    fn ops_by_file(&self) -> HashMap<&PathBuf, Vec<&Operation>> {
+        let mut file_ops = HashMap::new();
+        for op in &self.ops {
+            file_ops.entry(op.path()).or_insert_with(Vec::new).push(op);
         }
-        file_changes
+        file_ops
     }
 
     /// Renders the patch with the specified level of detail
@@ -291,27 +291,27 @@ impl Patch {
         // Simplest summary for minimal detail
         if detail < Detail::Default {
             renderer.para(&format!(
-                "{} changes made to {} files",
-                self.changes.len(),
+                "{} opserations on {} files",
+                self.ops.len(),
                 affected_files.len()
             ));
         } else {
-            let file_changes = self.changes_by_file();
-            for (file, changes) in file_changes {
+            let file_ops = self.ops_by_file();
+            for (file, ops) in file_ops {
                 renderer.push(&file.to_string_lossy());
                 if detail >= Detail::Detailed {
-                    for change in changes {
-                        change.render(renderer, detail)?;
+                    for op in ops {
+                        op.render(renderer, detail)?;
                     }
                 } else {
                     let mut counts: HashMap<String, usize> = HashMap::new();
-                    for c in changes {
+                    for c in ops {
                         let count = counts.entry(c.name().to_string()).or_insert(0);
                         *count += 1;
                     }
                     let counts: Vec<String> = counts
                         .iter()
-                        .map(|(name, count)| format!("{} ({})", name, count))
+                        .map(|(name, count)| format!("{name} ({count})"))
                         .collect();
                     renderer.para(&counts.join(", "));
                 }
@@ -329,15 +329,15 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     #[test]
-    fn test_changed_files() {
+    fn test_affected_files() {
         let patch = Patch::default()
             .with_write("file1.txt", "content")
             .with_replace_fuzzy("file2.txt", "old", "new");
 
-        let changed_files = patch.affected_files();
-        assert_eq!(changed_files.len(), 2);
-        assert!(changed_files.contains(&PathBuf::from("file1.txt")));
-        assert!(changed_files.contains(&PathBuf::from("file2.txt")));
+        let affected_files = patch.affected_files();
+        assert_eq!(affected_files.len(), 2);
+        assert!(affected_files.contains(&PathBuf::from("file1.txt")));
+        assert!(affected_files.contains(&PathBuf::from("file2.txt")));
     }
 
     #[test]
@@ -350,15 +350,15 @@ mod tests {
             .with_view("file4.txt")
             .with_undo("file5.txt");
 
-        assert_eq!(patch.changes.len(), 6);
+        assert_eq!(patch.ops.len(), 6);
 
-        let changed_files = patch.affected_files();
-        assert_eq!(changed_files.len(), 6);
-        assert!(changed_files.contains(&PathBuf::from("file1.txt")));
-        assert!(changed_files.contains(&PathBuf::from("file2.txt")));
-        assert!(changed_files.contains(&PathBuf::from("file3.txt")));
-        assert!(changed_files.contains(&PathBuf::from("file4.txt")));
-        assert!(changed_files.contains(&PathBuf::from("file5.txt")));
-        assert!(changed_files.contains(&PathBuf::from("file6.txt")));
+        let affected_files = patch.affected_files();
+        assert_eq!(affected_files.len(), 6);
+        assert!(affected_files.contains(&PathBuf::from("file1.txt")));
+        assert!(affected_files.contains(&PathBuf::from("file2.txt")));
+        assert!(affected_files.contains(&PathBuf::from("file3.txt")));
+        assert!(affected_files.contains(&PathBuf::from("file4.txt")));
+        assert!(affected_files.contains(&PathBuf::from("file5.txt")));
+        assert!(affected_files.contains(&PathBuf::from("file6.txt")));
     }
 }

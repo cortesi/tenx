@@ -21,19 +21,12 @@ pub struct ModelResponse {
     /// The unified patch in the response
     pub patch: Option<Patch>,
 
-    /// Operations requested by the model, other than patching.
-    pub operations: Vec<Operation>,
-
     /// Model-specific usage statistics
     pub usage: Option<Usage>,
 
     /// The raw text response from the model
     pub raw_response: Option<String>,
 }
-
-/// Operations requested by the model, other than patching.
-#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
-pub enum Operation {}
 
 /// A single step in the session - single prompt and model response. Steps also store
 /// processed information from the active strategy in `strategy_step`.
@@ -484,7 +477,6 @@ mod tests {
         step1.model_response = Some(ModelResponse {
             comment: Some("first response".into()),
             patch: None,
-            operations: vec![],
             usage: None,
             raw_response: Some("first raw".into()),
         });
@@ -499,7 +491,6 @@ mod tests {
         step2.model_response = Some(ModelResponse {
             comment: Some("second response".into()),
             patch: None,
-            operations: vec![],
             usage: None,
             raw_response: Some("second raw".into()),
         });

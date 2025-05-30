@@ -43,11 +43,11 @@ pub struct PatchInfo {
     /// Some operations, like View, mean the dialogue with the model should continue
     pub should_continue: bool,
     /// All errors here are of type TenxError::Patch
-    pub failures: Vec<(Change, Error)>,
+    pub failures: Vec<(Operation, Error)>,
 }
 
 impl PatchInfo {
-    pub fn add_failure(&mut self, change: Change, error: Error) -> Result<()> {
+    pub fn add_failure(&mut self, change: Operation, error: Error) -> Result<()> {
         match error {
             Error::Patch { user, model } => {
                 self.failures.push((change, Error::Patch { user, model }));
@@ -143,7 +143,7 @@ impl State {
 
             total_replaced_lines += hunk_replaced_lines;
 
-            changes.push(Change::ReplaceFuzzy(patch::ReplaceFuzzy {
+            changes.push(Operation::ReplaceFuzzy(patch::ReplaceFuzzy {
                 path: path_buf.clone(),
                 old: old_content,
                 new: new_content,
@@ -157,13 +157,13 @@ impl State {
             || current_content.is_empty()
             || (total_lines > 0 && (total_replaced_lines as f64) / (total_lines as f64) > 0.5)
         {
-            changes = vec![Change::Write(WriteFile {
+            changes = vec![Operation::Write(WriteFile {
                 path: path_buf,
                 content: current_content,
             })];
         }
 
-        Ok(Patch { changes })
+        Ok(Patch { ops: changes })
     }
 
     /// Set the directory path and glob patterns for file operations.
@@ -291,16 +291,16 @@ impl State {
             should_continue: false,
             failures: Vec::new(),
         };
-        for change in &patch.changes {
+        for change in &patch.ops {
             match change {
-                Change::Write(write_file) => {
+                Operation::Write(write_file) => {
                     if let Err(e) = self.write(write_file.path.as_path(), &write_file.content) {
                         pinfo.add_failure(change.clone(), e)?;
                     } else {
                         pinfo.succeeded += 1;
                     }
                 }
-                Change::ReplaceFuzzy(replace) => {
+                Operation::ReplaceFuzzy(replace) => {
                     let res = (|| {
                         let original = self.read(replace.path.as_path())?;
                         let new_content = replace.apply(&original)?;
@@ -312,7 +312,7 @@ impl State {
                         pinfo.succeeded += 1;
                     }
                 }
-                Change::Replace(replace) => {
+                Operation::Replace(replace) => {
                     let res = (|| {
                         let original = self.read(replace.path.as_path())?;
                         let new_content = replace.apply(&original)?;
@@ -324,7 +324,7 @@ impl State {
                         pinfo.succeeded += 1;
                     }
                 }
-                Change::Insert(insert) => {
+                Operation::Insert(insert) => {
                     let res = (|| {
                         let original = self.read(insert.path.as_path())?;
                         let new_content = insert.apply(&original)?;
@@ -336,11 +336,11 @@ impl State {
                         pinfo.succeeded += 1;
                     }
                 }
-                Change::View(_) => {
+                Operation::View(_) => {
                     pinfo.should_continue = true;
                     pinfo.succeeded += 1;
                 }
-                Change::Undo(path) => {
+                Operation::Undo(path) => {
                     let res = (|| {
                         if let Some(previous_content) = self.last_original(path) {
                             self.write(path, &previous_content)?;
@@ -360,7 +360,7 @@ impl State {
                         pinfo.succeeded += 1;
                     }
                 }
-                Change::ViewRange(_path, _, _) => {
+                Operation::ViewRange(_path, _, _) => {
                     pinfo.should_continue = true;
                     pinfo.succeeded += 1;
                 }
@@ -565,8 +565,8 @@ impl State {
     {
         let paths = self.find(cwd, patterns)?;
         let file_count = paths.len();
-        let changes: Vec<Change> = paths.into_iter().map(patch::Change::View).collect();
-        let patch = Patch { changes };
+        let changes: Vec<Operation> = paths.into_iter().map(patch::Operation::View).collect();
+        let patch = Patch { ops: changes };
         let patch_info = self.patch(&patch)?;
         // Failures for touch changes should always be empty.
         debug_assert!(patch_info.failures.is_empty());
@@ -575,7 +575,7 @@ impl State {
 
     /// Add an empty patch to the snapshot sequence and return a snapshot ID. Useful as a markder.
     pub fn mark(&mut self) -> Result<u64> {
-        let patch = Patch { changes: vec![] };
+        let patch = Patch { ops: vec![] };
         let patch_info = self.patch(&patch)?;
         // Failures for mark changes should always be empty.
         debug_assert!(patch_info.failures.is_empty());
@@ -588,7 +588,7 @@ mod tests {
     use super::abspath::AbsPath;
     use super::*;
     // test imports are used below
-    use crate::patch::Change;
+    use crate::patch::Operation;
     use std::{collections::HashMap, path::PathBuf};
     use tempfile::TempDir;
 
@@ -1380,9 +1380,9 @@ mod tests {
 
         // Test case 1: Small change should generate a Replace operation
         let patch1 = state.diff_path(&path1).unwrap();
-        assert!(!patch1.changes.is_empty());
-        match &patch1.changes[0] {
-            Change::Write(w) => {
+        assert!(!patch1.ops.is_empty());
+        match &patch1.ops[0] {
+            Operation::Write(w) => {
                 assert_eq!(w.path, path1);
                 assert_eq!(w.content, "Hello there");
             }
@@ -1391,9 +1391,9 @@ mod tests {
 
         // Test case 2: Multiple small changes should generate Replace operations
         let patch2 = state.diff_path(&path2).unwrap();
-        assert!(!patch2.changes.is_empty());
-        match &patch2.changes[0] {
-            Change::Write(w) => {
+        assert!(!patch2.ops.is_empty());
+        match &patch2.ops[0] {
+            Operation::Write(w) => {
                 assert_eq!(w.path, path2);
                 assert_eq!(
                     w.content,
@@ -1405,9 +1405,9 @@ mod tests {
 
         // Test case 3: Major changes should generate a Write operation
         let patch3 = state.diff_path(&path3).unwrap();
-        assert!(!patch3.changes.is_empty());
-        match &patch3.changes[0] {
-            Change::Write(w) => {
+        assert!(!patch3.ops.is_empty());
+        match &patch3.ops[0] {
+            Operation::Write(w) => {
                 assert_eq!(w.path, path3);
                 assert_eq!(
                     w.content,
@@ -1419,9 +1419,9 @@ mod tests {
 
         // Test case 4: Completely different content should generate a Write operation
         let patch4 = state.diff_path(&path4).unwrap();
-        assert!(!patch4.changes.is_empty());
-        match &patch4.changes[0] {
-            Change::Write(w) => {
+        assert!(!patch4.ops.is_empty());
+        match &patch4.ops[0] {
+            Operation::Write(w) => {
                 assert_eq!(w.path, path4);
                 assert_eq!(w.content, "Totally different content");
             }
@@ -1430,9 +1430,9 @@ mod tests {
 
         // Test case 5: Empty to non-empty should generate a Write operation
         let patch5 = state.diff_path(&path5).unwrap();
-        assert!(!patch5.changes.is_empty());
-        match &patch5.changes[0] {
-            Change::Write(w) => {
+        assert!(!patch5.ops.is_empty());
+        match &patch5.ops[0] {
+            Operation::Write(w) => {
                 assert_eq!(w.path, path5);
                 assert_eq!(w.content, "New content added");
             }
@@ -1441,9 +1441,9 @@ mod tests {
 
         // Test case 6: Non-empty to empty should generate a Write operation
         let patch6 = state.diff_path(&path6).unwrap();
-        assert!(!patch6.changes.is_empty());
-        match &patch6.changes[0] {
-            Change::Write(w) => {
+        assert!(!patch6.ops.is_empty());
+        match &patch6.ops[0] {
+            Operation::Write(w) => {
                 assert_eq!(w.path, path6);
                 assert_eq!(w.content, "");
             }

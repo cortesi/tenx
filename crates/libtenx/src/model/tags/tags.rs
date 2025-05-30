@@ -11,7 +11,7 @@ use crate::{
 };
 
 use fs_err as fs;
-use state::{Change, Patch, ReplaceFuzzy, WriteFile};
+use state::{Operation, Patch, ReplaceFuzzy, WriteFile};
 
 pub const SYSTEM: &str = include_str!("./tags-system.txt");
 
@@ -60,7 +60,7 @@ pub fn parse(response: &str) -> Result<ModelResponse> {
                         })?
                         .clone();
                     let (_, content) = xmlish::parse_block("write_file", &mut lines)?;
-                    patch.changes.push(Change::Write(WriteFile {
+                    patch.ops.push(Operation::Write(WriteFile {
                         path: path.into(),
                         content: content.join("\n"),
                     }));
@@ -80,7 +80,7 @@ pub fn parse(response: &str) -> Result<ModelResponse> {
                     let mut replace_lines = replace_content.into_iter().peekable();
                     let (_, old) = xmlish::parse_block("old", &mut replace_lines)?;
                     let (_, new) = xmlish::parse_block("new", &mut replace_lines)?;
-                    patch.changes.push(Change::ReplaceFuzzy(ReplaceFuzzy {
+                    patch.ops.push(Operation::ReplaceFuzzy(ReplaceFuzzy {
                         path: path.into(),
                         old: old.join("\n"),
                         new: new.join("\n"),
@@ -95,7 +95,7 @@ pub fn parse(response: &str) -> Result<ModelResponse> {
                     for line in content {
                         let path = line.trim().to_string();
                         if !path.is_empty() {
-                            patch.changes.push(Change::View(path.clone().into()));
+                            patch.ops.push(Operation::View(path.clone().into()));
                         }
                     }
                 }
@@ -109,7 +109,6 @@ pub fn parse(response: &str) -> Result<ModelResponse> {
     }
     Ok(ModelResponse {
         patch: Some(patch),
-        operations: vec![],
         usage: None,
         comment,
         raw_response: Some(response.to_string()),
@@ -156,16 +155,16 @@ fn render_step_response(
             rendered.push_str(&format!("<comment>\n{comment}\n</comment>\n\n"));
         }
         if let Some(patch) = &resp.patch {
-            for change in &patch.changes {
+            for change in &patch.ops {
                 match change {
-                    Change::Write(write_file) => {
+                    Operation::Write(write_file) => {
                         rendered.push_str(&format!(
                             "<write_file path=\"{}\">\n{}\n</write_file>\n\n",
                             write_file.path.display(),
                             write_file.content
                         ));
                     }
-                    Change::ReplaceFuzzy(replace) => {
+                    Operation::ReplaceFuzzy(replace) => {
                         rendered.push_str(&format!(
                             "<replace path=\"{}\">\n<old>\n{}\n</old>\n<new>\n{}\n</new>\n</replace>\n\n",
                             replace.path.display(),
@@ -173,7 +172,7 @@ fn render_step_response(
                             replace.new
                         ));
                     }
-                    Change::View(v) => {
+                    Operation::View(v) => {
                         rendered.push_str(&format!("<edit>\n{}\n</edit>\n", v.display()));
                     }
                     v => {
@@ -262,19 +261,18 @@ mod tests {
 
         let expected = ModelResponse {
             patch: Some(Patch {
-                changes: vec![
-                    Change::Write(WriteFile {
+                ops: vec![
+                    Operation::Write(WriteFile {
                         path: PathBuf::from("/path/to/file2.txt"),
                         content: "This is the content of the file.".to_string(),
                     }),
-                    Change::ReplaceFuzzy(ReplaceFuzzy {
+                    Operation::ReplaceFuzzy(ReplaceFuzzy {
                         path: PathBuf::from("/path/to/file.txt"),
                         old: "Old content".to_string(),
                         new: "New content".to_string(),
                     }),
                 ],
             }),
-            operations: vec![],
             usage: None,
             comment: Some("This is a comment.".to_string()),
             raw_response: Some(input.to_string()),
@@ -300,10 +298,10 @@ mod tests {
 
         let result = parse(input).unwrap();
         assert_eq!(
-            result.patch.unwrap().changes,
+            result.patch.unwrap().ops,
             vec![
-                Change::View(PathBuf::from("src/main.rs")),
-                Change::View(PathBuf::from("with/leading/spaces.rs")),
+                Operation::View(PathBuf::from("src/main.rs")),
+                Operation::View(PathBuf::from("with/leading/spaces.rs")),
             ]
         );
     }
@@ -315,12 +313,11 @@ mod tests {
         let response = ModelResponse {
             comment: Some("A comment".into()),
             patch: Some(Patch {
-                changes: vec![
-                    Change::View(PathBuf::from("src/main.rs")),
-                    Change::View(PathBuf::from("src/lib.rs")),
+                ops: vec![
+                    Operation::View(PathBuf::from("src/main.rs")),
+                    Operation::View(PathBuf::from("src/lib.rs")),
                 ],
             }),
-            operations: vec![],
             usage: None,
             raw_response: Some("Test response".into()),
         };
@@ -368,10 +365,10 @@ mod tests {
 
         let result = parse(input).unwrap();
         assert_eq!(
-            result.patch.unwrap().changes,
+            result.patch.unwrap().ops,
             vec![
-                Change::View(PathBuf::from("/path/to/first")),
-                Change::View(PathBuf::from("/path/to/second")),
+                Operation::View(PathBuf::from("/path/to/first")),
+                Operation::View(PathBuf::from("/path/to/second")),
             ]
         );
     }
