@@ -10,19 +10,24 @@ mod google;
 mod openai;
 mod tags;
 
+use std::collections::HashMap;
+
 use async_trait::async_trait;
 use enum_dispatch::enum_dispatch;
 use serde::{Deserialize, Serialize};
+
+use state::Patch;
+
+use crate::{
+    config::Config, context::ContextItem, error::Result, events::EventSender,
+    session::ModelResponse, session::Session,
+};
 
 pub use claude::{Claude, ClaudeChat, ClaudeUsage};
 pub use claude_editor::ClaudeEditor;
 pub use dummy_model::{DummyModel, DummyUsage};
 pub use google::{Google, GoogleChat, GoogleUsage};
 pub use openai::{OpenAi, OpenAiChat, OpenAiUsage, ReasoningEffort};
-
-use crate::{context::ContextItem, error::Result, events::EventSender, session::ModelResponse};
-
-use std::collections::HashMap;
 
 /// A trait used to prepare a chat interaction to be sent to the model for
 /// completion.
@@ -36,11 +41,11 @@ pub trait Chat: Send {
     /// basic interactions.
     fn add_system_prompt(&mut self, prompt: &str) -> Result<()>;
 
-    /// Adds a user message to the chat. If the last message is a user message, the text is
+    /// Adds a raw  user message to the chat. If the last message is a user message, the text is
     /// appended. If the last message is an agent message, a new user message is started.
     fn add_user_message(&mut self, text: &str) -> Result<()>;
 
-    /// Adds an agent message to the chat. If the last message is an agent message, the text is
+    /// Adds a raw agent message to the chat. If the last message is an agent message, the text is
     /// appended. If the last message is an user message, a new agent message is started.
     fn add_agent_message(&mut self, text: &str) -> Result<()>;
 
@@ -51,6 +56,21 @@ pub trait Chat: Send {
     /// Adds editable data to the chat. Can be called multiple times, at any time.
     /// May start a new user message and synthesize an agent response.
     fn add_editable(&mut self, path: &str, data: &str) -> Result<()>;
+
+    /// Adds a representation of a patch to the chat.
+    fn add_agent_patch(&mut self, _patch: &Patch) -> Result<()> {
+        Ok(())
+    }
+
+    /// Adds a representation of a patch to the chat.
+    fn add_agent_comment(&mut self, _patch: &str) -> Result<()> {
+        Ok(())
+    }
+
+    /// Adds a representation of a patch to the chat.
+    fn add_user_prompt(&mut self, _patch: &str) -> Result<()> {
+        Ok(())
+    }
 
     /// Render and send a session to the model.
     async fn send(&mut self, sender: Option<EventSender>) -> Result<ModelResponse>;

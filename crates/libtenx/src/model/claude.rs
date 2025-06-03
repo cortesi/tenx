@@ -1,6 +1,7 @@
 //! This module implements the Claude model provider for the tenx system.
 use std::{collections::HashMap, convert::From};
 
+use fs_err as fs;
 use misanthropy::{Anthropic, Content, ContentBlockDelta, Role, StreamEvent};
 use serde::{Deserialize, Serialize};
 use serde_json;
@@ -156,6 +157,18 @@ impl Chat for ClaudeChat {
 
     fn add_editable(&mut self, path: &str, data: &str) -> Result<()> {
         self.add_user_message(&tags::render_editable(path, data)?)
+    }
+
+    fn add_agent_patch(&mut self, patch: &crate::model::Patch) -> Result<()> {
+        self.add_agent_message(&tags::render_patch(patch)?)
+    }
+
+    fn add_agent_comment(&mut self, comment: &str) -> Result<()> {
+        self.add_agent_message(&tags::render_comment(comment)?)
+    }
+
+    fn add_user_prompt(&mut self, prompt: &str) -> Result<()> {
+        self.add_user_message(&tags::render_prompt(prompt)?)
     }
 
     async fn send(&mut self, sender: Option<EventSender>) -> Result<ModelResponse> {

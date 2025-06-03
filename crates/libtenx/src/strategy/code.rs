@@ -4,14 +4,51 @@ use tracing::debug;
 use crate::{
     checks::check_paths,
     config::Config,
+    context::ContextProvider,
     error::Result,
     error::TenxError,
     events::{send_event, Event, EventSender},
+    model::Chat,
     session::{Action, Step},
 };
 use unirend::{Detail, Render, Style};
 
 use super::*;
+
+pub const ACK: &str = "Got it.";
+
+fn build_chat(
+    config: &Config,
+    session: &Session,
+    action_offset: usize,
+    chat: &mut Box<dyn Chat>,
+) -> Result<()> {
+    if !session.contexts.is_empty() {
+        for cspec in &session.contexts {
+            for ctx in cspec.context_items(config, session)? {
+                chat.add_context(&ctx)?;
+            }
+        }
+        chat.add_agent_message(ACK)?;
+    }
+    for (step_offset, step) in session.actions[action_offset].steps.iter().enumerate() {
+        if !step.raw_prompt.is_empty() {
+            chat.add_user_prompt(&step.raw_prompt)?;
+        }
+        if let Some(model_response) = &step.model_response {
+            if let Some(comment) = &model_response.comment {
+                chat.add_agent_message(comment)?;
+            }
+            if let Some(patch) = &model_response.patch {
+                chat.add_agent_patch(patch)?;
+            } else if step_offset != session.actions[action_offset].steps.len() - 1 {
+                chat.add_agent_message("omitted due to error")?;
+            }
+        }
+    }
+
+    Ok(())
+}
 
 /// Shared step data for Code and Fix strategies.
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
@@ -342,9 +379,7 @@ impl ActionStrategy for Code {
         let mut chat = model
             .chat()
             .ok_or(TenxError::Internal("Chat not supported".into()))?;
-
-        let dialect = Tags::new();
-        dialect.build_chat(config, session, action_offset, &mut chat)?;
+        build_chat(config, session, action_offset, &mut chat)?;
         chat.send(sender).await
     }
 }
