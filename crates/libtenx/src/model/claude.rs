@@ -1,7 +1,6 @@
 //! This module implements the Claude model provider for the tenx system.
 use std::{collections::HashMap, convert::From};
 
-use fs_err as fs;
 use misanthropy::{Anthropic, Content, ContentBlockDelta, Role, StreamEvent};
 use serde::{Deserialize, Serialize};
 use serde_json;

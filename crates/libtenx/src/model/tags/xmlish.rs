@@ -3,6 +3,51 @@
 use crate::error::{Result, TenxError};
 use std::collections::HashMap;
 
+/// Escapes special XML characters in a string
+pub fn escape_xml(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&apos;")
+}
+
+/// Constructs an XML tag with the given name, attributes, and body content.
+///
+/// Attributes can be passed as:
+/// - `[]` - no attributes (empty slice)
+/// - `[("key", "value")]` - array of tuples
+/// - `[("key1", "value1"), ("key2", "value2")]` - multiple attributes
+/// - `vec![("key", "value")]` - vector of tuples
+pub fn tag<'a, A>(name: &str, attrs: A, body: &str) -> String
+where
+    A: AsRef<[(&'a str, &'a str)]>,
+{
+    let mut result = format!("<{name}");
+
+    // Add attributes
+    for (key, value) in attrs.as_ref() {
+        result.push_str(&format!(r#" {}="{}""#, key, escape_xml(value)));
+    }
+
+    result.push('>');
+
+    if !body.is_empty() {
+        result.push('\n');
+        result.push_str(body);
+        if !body.ends_with('\n') {
+            result.push('\n');
+        }
+    } else {
+        result.push('\n');
+    }
+
+    result.push_str(&format!("</{name}>"));
+    result.push_str("\n\n");
+
+    result
+}
+
 /// Represents an XML-like tag with a name and attributes.
 #[derive(Debug)]
 pub struct Tag {
@@ -46,7 +91,7 @@ pub fn parse_open(line: &str) -> Option<Tag> {
 
 /// Checks if the given line contains a well-formed close tag for the specified tag name.
 pub fn is_close(line: &str, tag_name: &str) -> bool {
-    line.contains(&format!("</{}>", tag_name))
+    line.contains(&format!("</{tag_name}>"))
 }
 
 /// Parses a block of XML-like content, starting with an opening tag and ending with a matching closing tag.
@@ -60,10 +105,7 @@ where
     })?;
     let tag = parse_open(&opening_line).ok_or_else(|| TenxError::ResponseParse {
         user: "Failed to parse model response".into(),
-        model: format!(
-            "Invalid opening tag in XML-like structure. Line: '{}'",
-            opening_line
-        ),
+        model: format!("Invalid opening tag in XML-like structure. Line: '{opening_line}'",),
     })?;
 
     if tag.name != tag_name {
@@ -100,8 +142,7 @@ where
     Err(TenxError::ResponseParse {
         user: "Failed to parse model response".into(),
         model: format!(
-            "Closing tag not found for {} in XML-like structure. Last line processed: '{}'",
-            tag_name, last_line
+            "Closing tag not found for {tag_name} in XML-like structure. Last line processed: '{last_line}'",
         ),
     })
 }
@@ -136,23 +177,21 @@ mod tests {
             match expected {
                 Some((name, attrs)) => {
                     let tag = result.unwrap();
-                    assert_eq!(tag.name, name, "Failed for input: {}", input);
+                    assert_eq!(tag.name, name, "Failed for input: {input}");
                     assert_eq!(
                         tag.attributes.len(),
                         attrs.len(),
-                        "Failed for input: {}",
-                        input
+                        "Failed for input: {input}",
                     );
                     for (k, v) in attrs {
                         assert_eq!(
                             tag.attributes.get(k),
                             Some(&v.to_string()),
-                            "Failed for input: {}",
-                            input
+                            "Failed for input: {input}",
                         );
                     }
                 }
-                None => assert!(result.is_none(), "Failed for input: {}", input),
+                None => assert!(result.is_none(), "Failed for input: {input}"),
             }
         }
     }
@@ -197,7 +236,7 @@ mod tests {
         ];
         let mut iter = input.into_iter().map(String::from);
         let result = parse_block("test", &mut iter);
-        assert!(result.is_ok(), "parse_block failed: {:?}", result);
+        assert!(result.is_ok(), "parse_block failed: {result:?}");
         let (tag, contents) = result.unwrap();
         assert_eq!(tag.name, "test");
         assert_eq!(tag.attributes.get("attr"), Some(&"value".to_string()));
@@ -237,5 +276,48 @@ mod tests {
                 "  Outer content",
             ]
         );
+    }
+
+    #[test]
+    fn test_escape_xml() {
+        assert_eq!(escape_xml(""), "");
+        assert_eq!(escape_xml("normal text"), "normal text");
+        assert_eq!(escape_xml("a & b"), "a &amp; b");
+        assert_eq!(escape_xml("<tag>"), "&lt;tag&gt;");
+        assert_eq!(escape_xml("\"quotes\""), "&quot;quotes&quot;");
+        assert_eq!(escape_xml("'apostrophe'"), "&apos;apostrophe&apos;");
+        assert_eq!(
+            escape_xml("all & <special> \"chars\" 'here'"),
+            "all &amp; &lt;special&gt; &quot;chars&quot; &apos;here&apos;"
+        );
+    }
+
+    #[test]
+    fn test_tag_construction() {
+        // Test with no attributes
+        assert_eq!(tag("test", [], "content"), "<test>\ncontent\n</test>\n\n");
+
+        // Test with one attribute
+        assert_eq!(
+            tag("test", [("key", "value")], "content"),
+            "<test key=\"value\">\ncontent\n</test>\n\n"
+        );
+
+        // Test with multiple attributes
+        let result = tag("test", [("key1", "value1"), ("key2", "value2")], "content");
+        assert!(result.contains("key1=\"value1\""));
+        assert!(result.contains("key2=\"value2\""));
+
+        // Test with attributes that need escaping
+        assert_eq!(
+            tag("test", [("path", "/path/with/<special>&chars")], ""),
+            "<test path=\"/path/with/&lt;special&gt;&amp;chars\">\n</test>\n\n"
+        );
+
+        // Test with Vec of tuples
+        let attrs = vec![("a", "1"), ("b", "2")];
+        let result = tag("test", attrs.as_slice(), "body");
+        assert!(result.contains("a=\"1\""));
+        assert!(result.contains("b=\"2\""));
     }
 }

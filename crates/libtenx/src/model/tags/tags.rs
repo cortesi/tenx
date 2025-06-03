@@ -1,7 +1,7 @@
 //! Defines an interaction style where files are sent to the model in XML-like tags, and model
 //! responses are parsed from similar tags.
 
-use super::xmlish;
+use super::xmlish::{self, tag};
 use crate::{
     context::ContextItem,
     error::{Result, TenxError},
@@ -113,32 +113,24 @@ pub fn parse(response: &str) -> Result<ModelResponse> {
 }
 
 pub fn render_prompt(prompt: &str) -> Result<String> {
-    let mut rendered = String::new();
-    rendered.push_str(&format!("<prompt>\n{prompt}\n</prompt>\n\n"));
-    Ok(rendered)
+    Ok(tag("prompt", [], prompt))
 }
 
 pub fn render_editable(path: &str, data: &str) -> Result<String> {
-    let mut rendered = String::new();
-    rendered.push_str(&format!(
-        "<editable path=\"{path}\">\n{data}\n</editable>\n\n",
-    ));
-    Ok(rendered)
+    Ok(tag("editable", [("path", path)], data))
 }
 
 pub fn render_comment(comment: &str) -> Result<String> {
-    let mut rendered = String::new();
-    rendered.push_str(&format!("<comment>\n{comment}\n</comment>\n\n"));
-    Ok(rendered)
+    Ok(tag("comment", [], comment))
 }
 
 pub fn render_context(ctx: &ContextItem) -> Result<String> {
-    let mut rendered = String::new();
-    rendered.push_str(&format!(
-        "<context name=\"{}\" type=\"{:?}\">\n{}\n</context>\n",
-        ctx.source, ctx.ty, ctx.body
-    ));
-    Ok(rendered)
+    let type_str = format!("{:?}", ctx.ty);
+    Ok(tag(
+        "context",
+        [("name", ctx.source.as_str()), ("type", type_str.as_str())],
+        &ctx.body,
+    ))
 }
 
 pub fn render_patch(patch: &Patch) -> Result<String> {
@@ -146,22 +138,25 @@ pub fn render_patch(patch: &Patch) -> Result<String> {
     for change in &patch.ops {
         match change {
             Operation::Write(write_file) => {
-                rendered.push_str(&format!(
-                    "<write_file path=\"{}\">\n{}\n</write_file>\n\n",
-                    write_file.path.display(),
-                    write_file.content
+                let path_str = write_file.path.display().to_string();
+                rendered.push_str(&tag(
+                    "write_file",
+                    [("path", path_str.as_str())],
+                    &write_file.content,
                 ));
             }
             Operation::ReplaceFuzzy(replace) => {
-                rendered.push_str(&format!(
-                    "<replace path=\"{}\">\n<old>\n{}\n</old>\n<new>\n{}\n</new>\n</replace>\n\n",
-                    replace.path.display(),
-                    replace.old,
-                    replace.new
-                ));
+                let path_str = replace.path.display().to_string();
+
+                let old_tag = tag("old", [], &replace.old);
+                let new_tag = tag("new", [], &replace.new);
+                let body = format!("{}{}", old_tag.trim_end(), new_tag);
+
+                rendered.push_str(&tag("replace", [("path", path_str.as_str())], &body));
             }
             Operation::View(v) => {
-                rendered.push_str(&format!("<edit>\n{}\n</edit>\n", v.display()));
+                let path_str = v.display().to_string();
+                rendered.push_str(&tag("edit", [], &path_str));
             }
             _ => {
                 panic!("unsupported change type: {change:?}");
@@ -174,7 +169,7 @@ pub fn render_patch(patch: &Patch) -> Result<String> {
 pub fn render_model_response(mr: &ModelResponse) -> Result<String> {
     let mut rendered = String::new();
     if let Some(comment) = &mr.comment {
-        rendered.push_str(&format!("<comment>\n{comment}\n</comment>\n\n"));
+        rendered.push_str(&tag("comment", [], comment));
     }
     if let Some(patch) = &mr.patch {
         rendered.push_str(render_patch(patch)?.as_str());
@@ -326,5 +321,25 @@ mod tests {
                 Operation::View(PathBuf::from("/path/to/second")),
             ]
         );
+    }
+
+    #[test]
+    fn test_xml_escaping() {
+        // Test escaping in attributes
+        let path = "/path/with/\"quotes\"/and/<brackets>&ampersands";
+        let content = "Content with <tags> & \"quotes\" and 'apostrophes'";
+
+        let result = render_editable(path, content).unwrap();
+
+        // Check that special characters are properly escaped
+        assert!(result.contains(
+            "path=\"/path/with/&quot;quotes&quot;/and/&lt;brackets&gt;&amp;ampersands\""
+        ));
+        assert!(result.contains("Content with <tags> & \"quotes\" and 'apostrophes'"));
+
+        // Test escaping in comment
+        let comment = "This has <xml> tags & special \"chars\"";
+        let result = render_comment(comment).unwrap();
+        assert!(result.contains("This has <xml> tags & special \"chars\""));
     }
 }
