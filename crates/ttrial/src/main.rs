@@ -65,7 +65,7 @@ async fn run_trial(
         } else {
             "pass".green()
         };
-        println!("    {}", status);
+        println!("    {status}");
     }
 
     Ok((report, session))
@@ -85,7 +85,7 @@ fn sort_reports(reports: &mut [TrialReport]) {
 fn print_report_text(reports: &mut [TrialReport]) {
     sort_reports(reports);
     for report in reports {
-        println!("{:#?}", report);
+        println!("{report:#?}");
     }
 }
 
@@ -327,7 +327,7 @@ async fn main() -> anyhow::Result<()> {
             };
 
             table.add_row(vec![
-                Cell::new(format!("{:.1}%", success_rate)),
+                Cell::new(format!("{success_rate:.1}%")),
                 Cell::new(&score.model_name),
                 Cell::new(&score.api_model),
                 Cell::new(score.total_trials.to_string()),
@@ -449,8 +449,7 @@ async fn main() -> anyhow::Result<()> {
                 let total_time: f64 = reports.iter().map(|r| r.total_response_time).sum();
 
                 println!(
-                    "Ran {} trials in {:.1}s ({} failed)",
-                    total, total_time, failed
+                    "Ran {total} trials in {total_time:.1}s ({failed} failed)"
                 );
             }
 
@@ -469,7 +468,7 @@ async fn main() -> anyhow::Result<()> {
                 if !trial.desc.is_empty() {
                     let desc = format_description(&trial.desc);
                     for line in desc.lines() {
-                        println!("    {}", line);
+                        println!("    {line}");
                     }
                 }
             }

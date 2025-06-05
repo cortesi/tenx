@@ -124,8 +124,7 @@ impl ClaudeEditorChat {
                     },
                     Err(e) => {
                         return Err(TenxError::Internal(format!(
-                            "Failed to parse tool use: {}",
-                            e
+                            "Failed to parse tool use: {e}"
                         )));
                     }
                 }
@@ -179,8 +178,7 @@ impl Chat for ClaudeEditorChat {
     fn add_editable(&mut self, path: &str, data: &str) -> Result<()> {
         // Add editable content as a user message with a clear marker
         self.add_user_message(&format!(
-            "<editable path=\"{}\">{}\\</editable>",
-            path, data
+            "<editable path=\"{path}\">{data}\\</editable>"
         ))
     }
 

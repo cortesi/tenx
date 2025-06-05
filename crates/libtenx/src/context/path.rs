@@ -60,8 +60,8 @@ impl ContextProvider for Path {
 
     fn id(&self) -> String {
         match &self.path_type {
-            PathType::SinglePath(path) => format!("single:{}", path),
-            PathType::Pattern(pattern) => format!("pattern:{}", pattern),
+            PathType::SinglePath(path) => format!("single:{path}"),
+            PathType::Pattern(pattern) => format!("pattern:{pattern}"),
         }
     }
 

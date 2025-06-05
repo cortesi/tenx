@@ -233,8 +233,7 @@ impl Chat for OpenAiChat {
     fn add_editable(&mut self, path: &str, data: &str) -> Result<()> {
         // Add editable content as a user message with a clear marker
         self.add_user_message(&format!(
-            "<editable path=\"{}\">{}\\</editable>",
-            path, data
+            "<editable path=\"{path}\">{data}\\</editable>"
         ))
     }
 

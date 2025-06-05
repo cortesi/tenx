@@ -39,8 +39,7 @@ pub fn create_tracing_subscriber(verbosity: u8, sender: EventSender) -> impl Sub
         EnvFilter::new("trace")
     } else {
         EnvFilter::new(format!(
-            "libtenx={},tenx={},ttrial={}",
-            log_level, log_level, log_level
+            "libtenx={log_level},tenx={log_level},ttrial={log_level}"
         ))
     };
 
@@ -89,7 +88,7 @@ pub async fn output_logs(mut receiver: EventReceiver, mut kill_signal: mpsc::Rec
                             LogLevel::Debug => "debug".cyan(),
                             LogLevel::Trace => "trace".magenta(),
                         };
-                        println!("{}: {}", severity, message);
+                        println!("{severity}: {message}");
                     }
                     Event::IterationLimit => {
                         println!("{}: step limit reached", "warn".yellow());
@@ -161,7 +160,7 @@ pub async fn output_progress(
                 match event {
                     Event::Throttled(ms) => {
                         finish_spinner(&mut current_spinner);
-                        println!("{:>width$}{}", "", format!("throttled: waiting {}ms", ms).yellow(), width=spinner_indent);
+                        println!("{:>width$}{}", "", format!("throttled: waiting {ms}ms").yellow(), width=spinner_indent);
                     }
                     Event::Interact => {
                         finish_spinner(&mut current_spinner);
@@ -169,7 +168,7 @@ pub async fn output_progress(
                     }
                     Event::NextStep{ref user, ref model} => {
                         finish_spinner(&mut current_spinner);
-                        println!("{:>width$}{}", "", format!("next step: {}", user).yellow(), width=spinner_indent);
+                        println!("{:>width$}{}", "", format!("next step: {user}").yellow(), width=spinner_indent);
                         if verbosity > 0 {
                             let wrapped = textwrap::indent(
                                 &textwrap::fill(model, 80 - spinner_indent),
@@ -185,15 +184,15 @@ pub async fn output_progress(
                     }
                     Event::Fatal(ref message) => {
                         finish_spinner(&mut current_spinner);
-                        println!("{:>width$}{}", "", format!("fatal: {}", message).red(), width=spinner_indent);
+                        println!("{:>width$}{}", "", format!("fatal: {message}").red(), width=spinner_indent);
                     }
                     Event::Snippet(ref chunk) => {
                         finish_spinner(&mut current_spinner);
-                        print!("{}", chunk);
+                        print!("{chunk}");
                     }
                     Event::ModelResponse(ref text) => {
                         finish_spinner(&mut current_spinner);
-                        print!("{}", text);
+                        print!("{text}");
                     }
                     Event::Finish => {
                         finish_spinner(&mut current_spinner);

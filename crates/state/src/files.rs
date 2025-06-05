@@ -71,15 +71,15 @@ where
     for pattern in &globs {
         builder
             .add(pattern)
-            .map_err(|e| Error::Path(format!("Invalid glob pattern: {}", e)))?;
+            .map_err(|e| Error::Path(format!("Invalid glob pattern: {e}")))?;
     }
     builder
         .add("!/.git")
-        .map_err(|e| Error::Path(format!("Invalid glob pattern: {}", e)))?; // Don't include the .git directory
+        .map_err(|e| Error::Path(format!("Invalid glob pattern: {e}")))?; // Don't include the .git directory
 
     let overrides = builder
         .build()
-        .map_err(|e| Error::Path(format!("Failed to build override rules: {}", e)))?;
+        .map_err(|e| Error::Path(format!("Failed to build override rules: {e}")))?;
 
     // Build and configure the walker
     let mut walker = WalkBuilder::new(&root);
@@ -94,7 +94,7 @@ where
     // Collect all files, converting to relative paths
     let mut files = Vec::new();
     for result in walker.build() {
-        let entry = result.map_err(|e| Error::Path(format!("Walk error: {}", e)))?;
+        let entry = result.map_err(|e| Error::Path(format!("Walk error: {e}")))?;
         if entry.file_type().is_some_and(|ft| ft.is_file()) {
             if let Ok(path) = entry.path().strip_prefix(&root) {
                 files.push(path.to_path_buf());

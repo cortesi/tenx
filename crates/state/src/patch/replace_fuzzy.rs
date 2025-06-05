@@ -137,7 +137,7 @@ mod tests {
 
             let result = replace
                 .apply(input)
-                .unwrap_or_else(|_| panic!("Failed to apply replace: {}", name));
+                .unwrap_or_else(|_| panic!("Failed to apply replace: {name}"));
             assert_eq!(result, expected_output.trim_end(), "Test case: {}", name);
         }
     }

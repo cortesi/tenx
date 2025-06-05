@@ -383,7 +383,7 @@ impl State {
             }
         }
         if to_revert.is_empty() {
-            return Err(Error::Internal(format!("Snapshot id {} not found", id)));
+            return Err(Error::Internal(format!("Snapshot id {id} not found")));
         }
         for (_id, snap) in to_revert.into_iter().rev() {
             self.revert_snapshot(snap)?;
@@ -1010,13 +1010,13 @@ mod tests {
 
                 match (result, expected) {
                     (Some(got), Some(expected)) => {
-                        assert_eq!(got, expected, "Original content mismatch for {}", path);
+                        assert_eq!(got, expected, "Original content mismatch for {path}");
                     }
                     (None, None) => {
                         // Both are None, that's correct
                     }
                     (got, expected) => {
-                        panic!("For {}: got {:?}, expected {:?}", path, got, expected);
+                        panic!("For {path}: got {got:?}, expected {expected:?}");
                     }
                 }
             })
@@ -1152,13 +1152,13 @@ mod tests {
 
                 match (result, expected) {
                     (Some(got), Some(expected)) => {
-                        assert_eq!(got, expected, "Last original content mismatch for {}", path);
+                        assert_eq!(got, expected, "Last original content mismatch for {path}");
                     }
                     (None, None) => {
                         // Both are None, that's correct
                     }
                     (got, expected) => {
-                        panic!("For {}: got {:?}, expected {:?}", path, got, expected);
+                        panic!("For {path}: got {got:?}, expected {expected:?}");
                     }
                 }
             })

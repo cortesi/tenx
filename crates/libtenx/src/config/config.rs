@@ -72,7 +72,7 @@ pub fn load_config(current_dir: &Path) -> error::Result<Config> {
     let home_config_path = home_config_dir().join(HOME_CONFIG_FILE);
     let home_config = if home_config_path.exists() {
         fs::read_to_string(&home_config_path)
-            .map_err(|e| TenxError::Config(format!("Failed to read home config file: {}", e)))?
+            .map_err(|e| TenxError::Config(format!("Failed to read home config file: {e}")))?
     } else {
         String::new()
     };
@@ -82,7 +82,7 @@ pub fn load_config(current_dir: &Path) -> error::Result<Config> {
     let project_config_path = project_root.join(PROJECT_CONFIG_FILE);
     let project_config = if project_config_path.exists() {
         fs::read_to_string(&project_config_path)
-            .map_err(|e| TenxError::Config(format!("Failed to read local config file: {}", e)))?
+            .map_err(|e| TenxError::Config(format!("Failed to read local config file: {e}")))?
     } else {
         String::new()
     };
@@ -254,9 +254,9 @@ impl Model {
                     Self::abbreviate_key(key)
                 };
                 [
-                    format!("api_model = {}", api_model),
-                    format!("key = {}", key),
-                    format!("key_env = {}", key_env),
+                    format!("api_model = {api_model}"),
+                    format!("key = {key}"),
+                    format!("key_env = {key_env}"),
                 ]
                 .join("\n")
             }
@@ -275,12 +275,12 @@ impl Model {
                     Self::abbreviate_key(key)
                 };
                 [
-                    format!("api_base = {}", api_base),
-                    format!("api_model = {}", api_model),
-                    format!("key = {}", key),
-                    format!("key_env = {}", key_env),
-                    format!("no_system_prompt = {}", no_system_prompt),
-                    format!("stream = {}", can_stream),
+                    format!("api_base = {api_base}"),
+                    format!("api_model = {api_model}"),
+                    format!("key = {key}"),
+                    format!("key_env = {key_env}"),
+                    format!("no_system_prompt = {no_system_prompt}"),
+                    format!("stream = {can_stream}"),
                 ]
                 .join("\n")
             }
@@ -297,10 +297,10 @@ impl Model {
                     Self::abbreviate_key(key)
                 };
                 [
-                    format!("api_model = {}", api_model),
-                    format!("key = {}", key),
-                    format!("key_env = {}", key_env),
-                    format!("stream = {}", can_stream),
+                    format!("api_model = {api_model}"),
+                    format!("key = {key}"),
+                    format!("key_env = {key_env}"),
+                    format!("stream = {can_stream}"),
                 ]
                 .join("\n")
             }
@@ -540,7 +540,7 @@ impl Config {
             Ok(PathBuf::from(test_cwd))
         } else {
             env::current_dir()
-                .map_err(|e| TenxError::Internal(format!("Failed to get current directory: {}", e)))
+                .map_err(|e| TenxError::Internal(format!("Failed to get current directory: {e}")))
         }
     }
 
@@ -601,7 +601,7 @@ impl Config {
         let current_dir = current_dir.as_ref();
 
         let project_root = absolute(self.project_root())
-            .map_err(|e| TenxError::Internal(format!("Could not absolute project root: {}", e)))?;
+            .map_err(|e| TenxError::Internal(format!("Could not absolute project root: {e}")))?;
 
         Ok(clean(if path.is_absolute() {
             diff_paths(path, &project_root).unwrap_or(path.to_path_buf())
@@ -609,7 +609,7 @@ impl Config {
             path.to_path_buf()
         } else {
             let abs_path = absolute(current_dir.join(path))
-                .map_err(|e| TenxError::Internal(format!("Could not absolute path: {}", e)))?;
+                .map_err(|e| TenxError::Internal(format!("Could not absolute path: {e}")))?;
             diff_paths(&abs_path, &project_root).unwrap_or(path.to_path_buf())
         }))
     }
@@ -618,7 +618,7 @@ impl Config {
     pub fn match_files_with_glob(&self, pattern: &str) -> error::Result<Vec<PathBuf>> {
         let project_root = &self.project_root();
         let glob = Glob::new(pattern)
-            .map_err(|e| TenxError::Internal(format!("Invalid glob pattern: {}", e)))?;
+            .map_err(|e| TenxError::Internal(format!("Invalid glob pattern: {e}")))?;
         let included_files = self.project_files()?;
 
         let current_dir = self.cwd()?;
@@ -651,8 +651,7 @@ impl Config {
                     matched_files.push(relative_path.to_path_buf());
                 } else {
                     return Err(TenxError::Internal(format!(
-                        "File does not exist: {:?}",
-                        absolute_path
+                        "File does not exist: {absolute_path:?}"
                     )));
                 }
             }
@@ -678,7 +677,7 @@ impl Config {
     pub fn to_ron(&self) -> error::Result<String> {
         let pretty_config = ron::ser::PrettyConfig::default();
         ron::ser::to_string_pretty(self, pretty_config)
-            .map_err(|e| TenxError::Internal(format!("Failed to serialize to RON: {}", e)))
+            .map_err(|e| TenxError::Internal(format!("Failed to serialize to RON: {e}")))
     }
 
     pub fn with_dummy_model(mut self, model: model::DummyModel) -> Self {
@@ -727,7 +726,7 @@ impl Config {
             .model_confs()
             .into_iter()
             .find(|m| m.name() == name)
-            .ok_or_else(|| TenxError::Internal(format!("Model {} not found", name)))?;
+            .ok_or_else(|| TenxError::Internal(format!("Model {name} not found")))?;
 
         match model_config {
             Model::Claude {

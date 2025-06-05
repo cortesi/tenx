@@ -19,8 +19,8 @@ use serde::{Deserialize, Serialize};
 use state::Patch;
 
 use crate::{
-    config::Config, context::ContextItem, error::Result, events::EventSender,
-    session::ModelResponse, session::Session,
+    context::ContextItem, error::Result, events::EventSender,
+    session::ModelResponse,
 };
 
 pub use claude::{Claude, ClaudeChat, ClaudeUsage};

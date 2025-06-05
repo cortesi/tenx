@@ -43,7 +43,7 @@ impl Render for Markdown {
             Style::Plain => "",
         };
 
-        self.parts.push(format!("{}{}", prefix, text));
+        self.parts.push(format!("{prefix}{text}"));
         self.level += 1;
     }
 
@@ -63,7 +63,7 @@ impl Render for Markdown {
 
     fn bullets(&mut self, items: Vec<String>) {
         for item in items {
-            self.parts.push(format!("- {}", item));
+            self.parts.push(format!("- {item}"));
         }
         // Add an empty line after the bullet list
         self.parts.push(String::new());

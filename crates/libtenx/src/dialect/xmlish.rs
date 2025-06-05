@@ -46,7 +46,7 @@ pub fn parse_open(line: &str) -> Option<Tag> {
 
 /// Checks if the given line contains a well-formed close tag for the specified tag name.
 pub fn is_close(line: &str, tag_name: &str) -> bool {
-    line.contains(&format!("</{}>", tag_name))
+    line.contains(&format!("</{tag_name}>"))
 }
 
 /// Parses a block of XML-like content, starting with an opening tag and ending with a matching closing tag.
@@ -61,8 +61,7 @@ where
     let tag = parse_open(&opening_line).ok_or_else(|| TenxError::ResponseParse {
         user: "Failed to parse model response".into(),
         model: format!(
-            "Invalid opening tag in XML-like structure. Line: '{}'",
-            opening_line
+            "Invalid opening tag in XML-like structure. Line: '{opening_line}'"
         ),
     })?;
 
@@ -100,8 +99,7 @@ where
     Err(TenxError::ResponseParse {
         user: "Failed to parse model response".into(),
         model: format!(
-            "Closing tag not found for {} in XML-like structure. Last line processed: '{}'",
-            tag_name, last_line
+            "Closing tag not found for {tag_name} in XML-like structure. Last line processed: '{last_line}'"
         ),
     })
 }
@@ -136,23 +134,21 @@ mod tests {
             match expected {
                 Some((name, attrs)) => {
                     let tag = result.unwrap();
-                    assert_eq!(tag.name, name, "Failed for input: {}", input);
+                    assert_eq!(tag.name, name, "Failed for input: {input}");
                     assert_eq!(
                         tag.attributes.len(),
                         attrs.len(),
-                        "Failed for input: {}",
-                        input
+                        "Failed for input: {input}"
                     );
                     for (k, v) in attrs {
                         assert_eq!(
                             tag.attributes.get(k),
                             Some(&v.to_string()),
-                            "Failed for input: {}",
-                            input
+                            "Failed for input: {input}"
                         );
                     }
                 }
-                None => assert!(result.is_none(), "Failed for input: {}", input),
+                None => assert!(result.is_none(), "Failed for input: {input}"),
             }
         }
     }
@@ -197,7 +193,7 @@ mod tests {
         ];
         let mut iter = input.into_iter().map(String::from);
         let result = parse_block("test", &mut iter);
-        assert!(result.is_ok(), "parse_block failed: {:?}", result);
+        assert!(result.is_ok(), "parse_block failed: {result:?}");
         let (tag, contents) = result.unwrap();
         assert_eq!(tag.name, "test");
         assert_eq!(tag.attributes.get("attr"), Some(&"value".to_string()));

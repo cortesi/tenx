@@ -25,9 +25,9 @@ pub fn load_session<P: AsRef<Path>>(path: P) -> Result<Session> {
         )));
     }
     let serialized = fs::read_to_string(path)
-        .map_err(|e| TenxError::SessionStore(format!("Failed to read session: {}", e)))?;
+        .map_err(|e| TenxError::SessionStore(format!("Failed to read session: {e}")))?;
     serde_json::from_str(&serialized)
-        .map_err(|e| TenxError::SessionStore(format!("Failed to parse session: {}", e)))
+        .map_err(|e| TenxError::SessionStore(format!("Failed to parse session: {e}")))
 }
 
 /// Manages persistent storage and retrieval of Session objects.
@@ -49,7 +49,7 @@ impl SessionStore {
     pub fn save(&self, name: &str, state: &Session) -> Result<()> {
         let file_path = self.base_dir.join(name);
         let serialized = serde_json::to_string(state)
-            .map_err(|e| TenxError::SessionStore(format!("serialization failed: {}", e)))?;
+            .map_err(|e| TenxError::SessionStore(format!("serialization failed: {e}")))?;
         fs::write(&file_path, serialized)?;
         Ok(())
     }
@@ -70,13 +70,13 @@ impl SessionStore {
     pub fn list(&self) -> Result<Vec<String>> {
         let mut sessions = Vec::new();
         for entry in fs::read_dir(&self.base_dir)
-            .map_err(|e| TenxError::SessionStore(format!("Failed to read directory: {}", e)))?
+            .map_err(|e| TenxError::SessionStore(format!("Failed to read directory: {e}")))?
         {
             let entry = entry
-                .map_err(|e| TenxError::SessionStore(format!("Failed to read entry: {}", e)))?;
+                .map_err(|e| TenxError::SessionStore(format!("Failed to read entry: {e}")))?;
             if entry
                 .file_type()
-                .map_err(|e| TenxError::SessionStore(format!("Failed to get file type: {}", e)))?
+                .map_err(|e| TenxError::SessionStore(format!("Failed to get file type: {e}")))?
                 .is_file()
             {
                 if let Some(name) = entry.file_name().to_str() {

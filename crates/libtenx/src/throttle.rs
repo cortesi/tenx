@@ -20,7 +20,7 @@ pub enum Throttle {
 impl std::fmt::Display for Throttle {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Throttle::RetryAfter(secs) => write!(f, "retry after {} seconds", secs),
+            Throttle::RetryAfter(secs) => write!(f, "retry after {secs} seconds"),
             Throttle::Backoff => write!(f, "rate limited"),
         }
     }
@@ -127,7 +127,7 @@ mod tests {
         // Fourth retry should fail
         match throttler.throttle_time(&Throttle::Backoff) {
             Err(TenxError::MaxRetries(3)) => (),
-            other => panic!("Expected MaxRetries error, got {:?}", other),
+            other => panic!("Expected MaxRetries error, got {other:?}"),
         }
     }
 }

@@ -122,7 +122,7 @@ impl Event {
             Event::ContextStart => Some("preparing context".to_string()),
             Event::PreCheckStart => Some("pre checks".to_string()),
             Event::PostCheckStart => Some("post checks".to_string()),
-            Event::PromptStart(n) => Some(format!("prompting {}", n)),
+            Event::PromptStart(n) => Some(format!("prompting {n}")),
             _ => None,
         }
     }
@@ -141,8 +141,8 @@ impl Event {
         match self {
             Event::PreCheckStart => Some("Pre checks...".to_string()),
             Event::PostCheckStart => Some("Post checks...".to_string()),
-            Event::CheckStart(name) => Some(format!("Check {}...", name)),
-            Event::PromptStart(model) => Some(format!("Prompting {}...", model)),
+            Event::CheckStart(name) => Some(format!("Check {name}...")),
+            Event::PromptStart(model) => Some(format!("Prompting {model}...")),
             Event::ApplyPatch => Some("Applying patch...".to_string()),
             Event::IterationLimit => Some("Step limit reached".to_string()),
             _ => None,

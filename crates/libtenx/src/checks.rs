@@ -44,7 +44,7 @@ impl Check {
             Err(TenxError::Check {
                 name: self.name.clone(),
                 user: msg,
-                model: format!("stdout:\n{}\n\nstderr:\n{}", stdout, stderr),
+                model: format!("stdout:\n{stdout}\n\nstderr:\n{stderr}"),
             })
         } else {
             Ok(())

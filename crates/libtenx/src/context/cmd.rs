@@ -96,7 +96,7 @@ mod tests {
         assert_eq!(items[0].source, cmd);
         assert_eq!(items[0].body, "hello world\nerror");
 
-        assert_eq!(context.human(), format!("cmd: {}", cmd));
+        assert_eq!(context.human(), format!("cmd: {cmd}"));
         assert!(!rt.block_on(async { context.needs_refresh(&config).await }));
     }
 }

@@ -103,7 +103,7 @@ impl Term {
     /// Adds a line with the appropriate indentation to parts
     fn add_indented(&mut self, text: &str) {
         let indent = " ".repeat(self.level * INDENT_SPACES);
-        self.parts.push(format!("{}{}", indent, text));
+        self.parts.push(format!("{indent}{text}"));
     }
 }
 
@@ -218,7 +218,7 @@ impl Render for Term {
                 // Subsequent lines with indent aligned with text after bullet
                 let continuation_indent = " ".repeat(bullet_prefix_width);
                 for line in wrapped_lines.iter().skip(1) {
-                    let indented_line = format!("{}{}", continuation_indent, line);
+                    let indented_line = format!("{continuation_indent}{line}");
                     self.add_indented(&indented_line);
                 }
             }

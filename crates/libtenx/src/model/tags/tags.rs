@@ -12,8 +12,6 @@ use state::{Operation, Patch, ReplaceFuzzy, WriteFile};
 
 pub const SYSTEM: &str = include_str!("./tags-system.txt");
 
-pub const ACK: &str = "Got it.";
-
 /// Parses a response string containing XML-like tags and returns a `Patch` struct.
 ///
 /// The input string should contain one or more of the following tags:
@@ -162,17 +160,6 @@ pub fn render_patch(patch: &Patch) -> Result<String> {
                 panic!("unsupported change type: {change:?}");
             }
         }
-    }
-    Ok(rendered)
-}
-
-pub fn render_model_response(mr: &ModelResponse) -> Result<String> {
-    let mut rendered = String::new();
-    if let Some(comment) = &mr.comment {
-        rendered.push_str(&tag("comment", [], comment));
-    }
-    if let Some(patch) = &mr.patch {
-        rendered.push_str(render_patch(patch)?.as_str());
     }
     Ok(rendered)
 }
