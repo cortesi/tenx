@@ -123,7 +123,7 @@ impl Tenx {
     pub fn code(&self, session: &mut Session) -> Result<()> {
         let action = Action::new(
             &self.config,
-            strategy::Strategy::Code(strategy::Code::new()),
+            strategy::Strategy::Code(strategy::Code::default()),
         )?;
         session.add_action(action)?;
         self.save_session(session)?;
@@ -132,23 +132,14 @@ impl Tenx {
 
     /// Adds a fix action to the session.
     /// Files must be already added to the session with session.state.view() before calling this.
-    pub fn fix(&self, session: &mut Session, sender: &Option<EventSender>) -> Result<()> {
-        let pre_result = check_all(&self.config, sender);
-        if let Err(e) = pre_result {
-            if let TenxError::Check { model, .. } = e {
-                let action = Action::new(
-                    &self.config,
-                    strategy::Strategy::Fix(strategy::Fix::new(&model)),
-                )?;
-                session.add_action(action)?;
-                self.save_session(session)?;
-            } else {
-                return Err(e);
-            }
-            Ok(())
-        } else {
-            Err(TenxError::Internal("No errors found".to_string()))
-        }
+    pub fn fix(&self, session: &mut Session) -> Result<()> {
+        let action = Action::new(
+            &self.config,
+            strategy::Strategy::Fix(strategy::Fix::default()),
+        )?;
+        session.add_action(action)?;
+        self.save_session(session)?;
+        Ok(())
     }
 
     /// Saves a session to the store.
@@ -545,7 +536,7 @@ mod tests {
         session
             .add_action(Action::new(
                 &config,
-                strategy::Strategy::Code(strategy::Code::new()),
+                strategy::Strategy::Code(strategy::Code::default()),
             )?)
             .unwrap();
 

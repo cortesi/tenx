@@ -37,7 +37,7 @@ fn parse_config_file(ron_str: &str) -> error::Result<ConfigFile> {
         ron::Options::default().with_default_extension(ron::extensions::Extensions::IMPLICIT_SOME);
     options
         .from_str(ron_str)
-        .map_err(|e| TenxError::Internal(format!("Failed to parse RON: {}", e)))
+        .map_err(|e| TenxError::Internal(format!("Failed to parse RON: {e}")))
 }
 
 /// Loads the configuration by merging defaults, home, and local configuration files.
@@ -53,14 +53,14 @@ fn parse_config(
     // Load from home config file
     if !home_config.is_empty() {
         let home_config = parse_config_file(home_config)
-            .map_err(|e| TenxError::Config(format!("Failed to parse home config file: {}", e)))?;
+            .map_err(|e| TenxError::Config(format!("Failed to parse home config file: {e}")))?;
         cnf = cnf.apply(home_config);
     }
 
     // Load from local config file
     if !project_config.is_empty() {
         let project_config = parse_config_file(project_config)
-            .map_err(|e| TenxError::Config(format!("Failed to parse local config file: {}", e)))?;
+            .map_err(|e| TenxError::Config(format!("Failed to parse local config file: {e}")))?;
         cnf = cnf.apply(project_config);
     }
     Ok(cnf.build(default_conf))

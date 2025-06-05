@@ -277,8 +277,7 @@ impl Session {
     pub fn reset(&mut self, action_idx: usize, step_idx: Option<usize>) -> Result<()> {
         if action_idx >= self.actions.len() {
             return Err(TenxError::Internal(format!(
-                "Invalid action index: {}",
-                action_idx
+                "Invalid action index: {action_idx}",
             )));
         }
 
@@ -375,8 +374,7 @@ impl Session {
     ) -> Result<Vec<PathBuf>> {
         if action_idx >= self.actions.len() {
             return Err(TenxError::Internal(format!(
-                "Invalid action index: {}",
-                action_idx
+                "Invalid action index: {action_idx}",
             )));
         }
 
@@ -465,7 +463,7 @@ mod tests {
     fn test_retry_resets_step() -> Result<()> {
         let tp = testutils::test_project();
         // Use a Code strategy from the code module.
-        let strategy = Strategy::Code(strategy::Code::new());
+        let strategy = Strategy::Code(strategy::Code::default());
         let mut action = Action::new(&tp.config, strategy)?;
 
         // Add the first step.

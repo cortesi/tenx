@@ -103,7 +103,7 @@ fn test_render_edit() -> Result<()> {
 
     p.session.add_action(Action::new(
         &p.config,
-        strategy::Strategy::Code(strategy::Code::new()),
+        strategy::Strategy::Code(strategy::Code::default()),
     )?)?;
     p.session.last_action_mut()?.add_step(Step::new(
         "test_model".into(),

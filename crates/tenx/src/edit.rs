@@ -145,7 +145,7 @@ mod tests {
         p.session
             .add_action(Action::new(
                 &p.config,
-                strategy::Strategy::Code(strategy::Code::new()),
+                strategy::Strategy::Code(strategy::Code::default()),
             )?)
             .unwrap();
 

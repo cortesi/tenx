@@ -52,7 +52,7 @@ impl Tags {
         if let Some(resp) = &step.model_response {
             let mut rendered = String::new();
             if let Some(comment) = &resp.comment {
-                rendered.push_str(&format!("<comment>\n{}\n</comment>\n\n", comment));
+                rendered.push_str(&format!("<comment>\n{comment}\n</comment>\n\n"));
             }
             if let Some(patch) = &resp.patch {
                 for change in &patch.ops {
@@ -76,7 +76,7 @@ impl Tags {
                             rendered.push_str(&format!("<edit>\n{}\n</edit>\n", v.display()));
                         }
                         v => {
-                            panic!("unsupported change type: {:?}", v);
+                            panic!("unsupported change type: {v:?}");
                         }
                     }
                 }
@@ -188,8 +188,7 @@ impl DialectProvider for Tags {
                             .ok_or_else(|| TenxError::ResponseParse {
                                 user: "Failed to parse model response".into(),
                                 model: format!(
-                                    "Missing path attribute in write_file tag. Line: '{}'",
-                                    line
+                                    "Missing path attribute in write_file tag. Line: '{line}'",
                                 ),
                             })?
                             .clone();
@@ -206,8 +205,7 @@ impl DialectProvider for Tags {
                             .ok_or_else(|| TenxError::ResponseParse {
                                 user: "Failed to parse model response".into(),
                                 model: format!(
-                                    "Missing path attribute in replace tag. Line: '{}'",
-                                    line
+                                    "Missing path attribute in replace tag. Line: '{line}'",
                                 ),
                             })?
                             .clone();
@@ -354,7 +352,7 @@ mod tests {
 
         p.session.add_action(Action::new(
             &p.config,
-            strategy::Strategy::Code(strategy::Code::new()),
+            strategy::Strategy::Code(strategy::Code::default()),
         )?)?;
         p.session.last_action_mut()?.add_step(Step::new(
             "test_model".into(),

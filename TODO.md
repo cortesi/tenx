@@ -4,7 +4,8 @@ NOW:
 
 GOALS:
     
-    - Shift dialect into model module
+    - Shift checks into strategy
+    - Make ActionStrategy::check a generic post hook
 
     - System prompt generation
         - Extract from dialects

@@ -402,7 +402,7 @@ async fn main() -> anyhow::Result<()> {
                         println!("{}", model.name().blue().bold());
                         println!("    kind: {}", model.kind());
                         for line in model.text_config(*full).lines() {
-                            println!("    {}", line);
+                            println!("    {line}");
                         }
                         println!();
                     }
@@ -541,7 +541,7 @@ async fn main() -> anyhow::Result<()> {
 
                     match fmt.as_str() {
                         "raw" => {
-                            println!("{:#?}", session);
+                            println!("{session:#?}");
                         }
                         "render" => {
                             // FIXME: Use chat
@@ -570,7 +570,7 @@ async fn main() -> anyhow::Result<()> {
                 Commands::Edit { files } => {
                     let mut session = tx.load_session()?;
                     let total = tx.edit(&mut session, files)?;
-                    println!("{} files added for editing", total);
+                    println!("{total} files added for editing");
                     Ok(())
                 }
                 Commands::Context { command } => {
@@ -648,7 +648,7 @@ async fn main() -> anyhow::Result<()> {
 
                         tx.reset(&mut session, action_idx, step_idx)?;
 
-                        println!("Session reset to step {}", offset_str);
+                        println!("Session reset to step {offset_str}");
                     }
                     Ok(())
                 }
@@ -715,7 +715,7 @@ async fn main() -> anyhow::Result<()> {
                     } else {
                         None
                     };
-                    tx.fix(&mut session, &Some(sender.clone()))?;
+                    tx.fix(&mut session)?;
                     // Add files to the session if provided
                     if let Some(file_list) = &files {
                         if !file_list.is_empty() {

@@ -58,13 +58,13 @@ impl TrialConf {
             .with_default_extension(ron::extensions::Extensions::IMPLICIT_SOME);
         options
             .from_str(s)
-            .map_err(|e| TenxError::Internal(format!("Failed to parse trial RON: {}", e)))
+            .map_err(|e| TenxError::Internal(format!("Failed to parse trial RON: {e}")))
     }
 
     /// Read a trial configuration from a RON file
     pub fn read<P: AsRef<Path>>(path: P) -> Result<Self> {
         let contents = fs::read_to_string(path)
-            .map_err(|e| TenxError::Internal(format!("Failed to read trial file: {}", e)))?;
+            .map_err(|e| TenxError::Internal(format!("Failed to read trial file: {e}")))?;
         Self::from_str(&contents)
     }
 
@@ -98,7 +98,7 @@ impl Trial {
     /// "$tempdir/project" regardless of source directory name.
     fn setup_temp_project(&self) -> Result<TempDir> {
         let temp_dir = TempDir::new()
-            .map_err(|e| TenxError::Internal(format!("Failed to create temp directory: {}", e)))?;
+            .map_err(|e| TenxError::Internal(format!("Failed to create temp directory: {e}")))?;
 
         let mut src_path = self.base_dir.clone();
         src_path.push("projects");
@@ -107,7 +107,7 @@ impl Trial {
         let dst_path = temp_dir.path().to_path_buf();
 
         fs_extra::dir::copy(&src_path, &dst_path, &fs_extra::dir::CopyOptions::new())
-            .map_err(|e| TenxError::Internal(format!("Failed to copy project directory: {}", e)))?;
+            .map_err(|e| TenxError::Internal(format!("Failed to copy project directory: {e}")))?;
 
         // For a project path like "foo/bar", we want to rename "bar" to "project"
         let path_buf = PathBuf::from(&self.trial_conf.project);
@@ -118,13 +118,11 @@ impl Trial {
             .ok_or_else(|| TenxError::Internal("Invalid project name".to_string()))?;
 
         let copied_dir = dst_path.join(project_name);
-        fs::rename(&copied_dir, dst_path.join("project")).map_err(|e| {
-            TenxError::Internal(format!("Failed to rename project directory: {}", e))
-        })?;
+        fs::rename(&copied_dir, dst_path.join("project"))
+            .map_err(|e| TenxError::Internal(format!("Failed to rename project directory: {e}")))?;
 
-        fs::create_dir_all(dst_path.join("session")).map_err(|e| {
-            TenxError::Internal(format!("Failed to create session directory: {}", e))
-        })?;
+        fs::create_dir_all(dst_path.join("session"))
+            .map_err(|e| TenxError::Internal(format!("Failed to create session directory: {e}")))?;
 
         Ok(temp_dir)
     }
@@ -159,7 +157,7 @@ impl Trial {
                 Some(prompt.to_string())
             }
             TrialOp::Fix { prompt, .. } => {
-                tenx.fix(&mut session, &sender)?;
+                tenx.fix(&mut session)?;
                 prompt.clone()
             }
         };
@@ -207,7 +205,7 @@ impl Trial {
     pub fn load<P: AsRef<Path>>(base_dir: P, name: &str) -> Result<Self> {
         info!("loading trial: {}", name);
         let mut path = PathBuf::from(base_dir.as_ref());
-        path.push(format!("{}.ron", name));
+        path.push(format!("{name}.ron"));
         let trial_conf = TrialConf::read(&path)?;
         trial_conf.validate(&base_dir)?;
         let tenx_conf = trial_conf.config.clone().build(Self::default_config()?);
@@ -227,11 +225,11 @@ pub fn list_trials<P: AsRef<Path>>(base_dir: P, patterns: Option<&[&str]>) -> Re
     let fs_pattern = base_dir.as_ref().join("*.ron");
     let fs_pattern = fs_pattern.to_string_lossy();
 
-    for entry in glob(&fs_pattern)
-        .map_err(|e| TenxError::Internal(format!("Invalid glob pattern: {}", e)))?
+    for entry in
+        glob(&fs_pattern).map_err(|e| TenxError::Internal(format!("Invalid glob pattern: {e}")))?
     {
         let path =
-            entry.map_err(|e| TenxError::Internal(format!("Failed to read glob entry: {}", e)))?;
+            entry.map_err(|e| TenxError::Internal(format!("Failed to read glob entry: {e}")))?;
         let name = path
             .file_stem()
             .and_then(|s| s.to_str())
@@ -244,7 +242,7 @@ pub fn list_trials<P: AsRef<Path>>(base_dir: P, patterns: Option<&[&str]>) -> Re
             .iter()
             .map(|p| {
                 glob::Pattern::new(p)
-                    .map_err(|e| TenxError::Internal(format!("Invalid glob pattern: {}", e)))
+                    .map_err(|e| TenxError::Internal(format!("Invalid glob pattern: {e}")))
             })
             .collect::<Result<Vec<_>>>()?;
 
