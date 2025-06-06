@@ -45,6 +45,9 @@ pub struct Step {
     /// error.
     pub prompt_error: Option<TenxError>,
 
+    /// Check results from validation checks that failed during this step
+    pub check_results: Vec<CheckResult>,
+
     /// Time in seconds to receive the complete model response
     pub response_time: Option<f64>,
 
@@ -62,9 +65,6 @@ pub struct Step {
     /// changes. That means this rollback precedes any cahnges made in this step.
     pub rollback_id: u64,
     pub strategy_step: StrategyStep,
-
-    /// Check results from validation checks that failed during this step
-    pub check_results: Vec<CheckResult>,
 }
 
 impl Step {
