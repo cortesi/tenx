@@ -507,6 +507,10 @@ pub struct Config {
     #[serde(skip)]
     pub(crate) dummy_model: Option<model::DummyModel>,
 
+    /// When set, this error will be returned from all checks. For testing purposes only.
+    #[serde(skip)]
+    pub(crate) check_error: Option<error::TenxError>,
+
     /// The current working directory when testing. We need this, because we can't change the CWD
     /// reliably in tests for reasons of concurrency.
     #[serde(skip)]
@@ -682,6 +686,11 @@ impl Config {
 
     pub fn with_dummy_model(mut self, model: model::DummyModel) -> Self {
         self.dummy_model = Some(model);
+        self
+    }
+
+    pub fn with_check_error(mut self, e: Option<error::TenxError>) -> Self {
+        self.check_error = e;
         self
     }
 

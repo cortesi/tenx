@@ -36,7 +36,7 @@ fn render_edit_text(session: &Session, retry: bool) -> Result<String> {
     match session.last_step() {
         Some(step) => {
             if retry {
-                text.push_str(&step.raw_prompt);
+                text.push_str(&step.prompt);
             }
         }
         None => {

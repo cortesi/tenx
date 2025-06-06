@@ -38,7 +38,7 @@ impl Tags {
     ) -> Result<String> {
         let step = &session.actions[action_offset].steps[step_offset];
         let mut rendered = String::new();
-        rendered.push_str(&format!("\n<prompt>\n{}\n</prompt>\n\n", &step.raw_prompt));
+        rendered.push_str(&format!("\n<prompt>\n{}\n</prompt>\n\n", &step.prompt));
         Ok(rendered)
     }
 

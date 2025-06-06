@@ -90,6 +90,10 @@ pub fn check_paths(
     paths: &Vec<PathBuf>,
     sender: &Option<EventSender>,
 ) -> Result<()> {
+    if let Some(cerror) = &conf.check_error {
+        return Err(cerror.clone());
+    }
+
     for c in conf.enabled_checks() {
         if c.is_relevant(paths)? {
             let _check_block = EventBlock::check(sender, &c.name)?;

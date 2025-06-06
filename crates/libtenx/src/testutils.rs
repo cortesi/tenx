@@ -1,4 +1,4 @@
-use crate::{config, session::Session};
+use crate::{config, error, session::Session};
 use fs_err as fs;
 use std::path::Path;
 use tempfile::{tempdir, TempDir};
@@ -49,6 +49,11 @@ pub fn test_project() -> TestProject {
 }
 
 impl TestProject {
+    pub fn with_check_error(mut self, e: Option<error::TenxError>) -> Self {
+        self.config = self.config.with_check_error(e);
+        self
+    }
+
     /// Creates a file tree structure in the mock project's temporary directory.
     ///
     /// # Arguments

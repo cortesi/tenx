@@ -40,8 +40,6 @@ trait SubStore: Debug {
 pub struct PatchInfo {
     pub rollback_id: u64,
     pub succeeded: usize,
-    /// Some operations, like View, mean the dialogue with the model should continue
-    pub should_continue: bool,
     /// All errors here are of type TenxError::Patch
     pub failures: Vec<(Operation, Error)>,
 }
@@ -288,7 +286,6 @@ impl State {
         let mut pinfo = PatchInfo {
             rollback_id: 0,
             succeeded: 0,
-            should_continue: false,
             failures: Vec::new(),
         };
         for change in &patch.ops {
@@ -337,7 +334,6 @@ impl State {
                     }
                 }
                 Operation::View(_) => {
-                    pinfo.should_continue = true;
                     pinfo.succeeded += 1;
                 }
                 Operation::Undo(path) => {
@@ -361,7 +357,6 @@ impl State {
                     }
                 }
                 Operation::ViewRange(_path, _, _) => {
-                    pinfo.should_continue = true;
                     pinfo.succeeded += 1;
                 }
             }

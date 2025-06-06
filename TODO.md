@@ -4,7 +4,7 @@ NOW:
 
 GOALS:
     
-    - Shift checks into strategy
+    - user_error method for Chat
     - Make ActionStrategy::check a generic post hook
 
     - System prompt generation
