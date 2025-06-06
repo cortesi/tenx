@@ -179,6 +179,17 @@ impl Chat for ClaudeChat {
         Ok(())
     }
 
+    fn add_user_patch_failure(
+        &mut self,
+        patch_failures: &[crate::model::PatchFailure],
+    ) -> Result<()> {
+        if !patch_failures.is_empty() {
+            let rendered = tags::render_patch_failures(patch_failures)?;
+            self.add_user_message(&rendered)?;
+        }
+        Ok(())
+    }
+
     async fn send(&mut self, sender: Option<EventSender>) -> Result<ModelResponse> {
         if self.anthropic_key.is_empty() {
             return Err(TenxError::Model(

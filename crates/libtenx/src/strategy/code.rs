@@ -44,11 +44,10 @@ fn build_chat(
 
         if step_offset > 0 {
             if let Some(prev_step) = session.actions[action_offset].steps.get(step_offset - 1) {
-                // Now we add any errors from the previous step
-                if !step.check_results.is_empty() {
-                    chat.add_user_check_results(&prev_step.check_results)?;
+                chat.add_user_check_results(&prev_step.check_results)?;
+                if let Some(patch_info) = &prev_step.patch_info {
+                    chat.add_user_patch_failure(&patch_info.failures)?;
                 }
-                if let Some(_patch_info) = &prev_step.patch_info {}
             }
         }
 
@@ -58,8 +57,6 @@ fn build_chat(
             }
             if let Some(patch) = &model_response.patch {
                 chat.add_agent_patch(patch)?;
-            } else if step_offset != session.actions[action_offset].steps.len() - 1 {
-                chat.add_agent_message("omitted due to error")?;
             }
         }
     }

@@ -16,7 +16,7 @@ use async_trait::async_trait;
 use enum_dispatch::enum_dispatch;
 use serde::{Deserialize, Serialize};
 
-use state::Patch;
+use state::{Patch, PatchFailure};
 
 use crate::{
     checks::CheckResult, context::ContextItem, error::Result, events::EventSender,
@@ -69,6 +69,10 @@ pub trait Chat: Send {
 
     /// Adds a representation of a patch to the chat.
     fn add_user_prompt(&mut self, _patch: &str) -> Result<()> {
+        Ok(())
+    }
+
+    fn add_user_patch_failure(&mut self, _patch: &[PatchFailure]) -> Result<()> {
         Ok(())
     }
 

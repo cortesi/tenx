@@ -41,15 +41,12 @@ pub struct Step {
     /// prompt plus error information, context, state and so forth.
     pub prompt: String,
 
-    /// An error that should be included in the prompt to the model. Usually this is a check
-    /// error.
-    pub prompt_error: Option<TenxError>,
-
     /// Time in seconds to receive the complete model response
     pub response_time: Option<f64>,
 
-    /// An associated error, for instance an error processing a model response. This may be
-    /// retryable, in which case a new step will be synthesized to go back to the model.
+    /// An associated error, for instance an error returned in the model response, or a timeout.
+    /// This may be retryable, in which case a new step will be synthesized to go back to the
+    /// model.
     pub err: Option<TenxError>,
 
     /// The response from the model
@@ -77,7 +74,6 @@ impl Step {
             model_response: None,
             response_time: None,
             patch_info: None,
-            prompt_error: None,
             err: None,
             strategy_state: strategy_step,
             check_results: Vec::new(),
@@ -487,7 +483,8 @@ mod tests {
         let mut step1 = Step::new(
             "model1".into(),
             strategy::StrategyState::Code(strategy::CodeState::default()),
-        ).with_prompt("prompt1");
+        )
+        .with_prompt("prompt1");
         step1.model_response = Some(ModelResponse {
             comment: Some("first response".into()),
             patch: None,
@@ -500,7 +497,8 @@ mod tests {
         let mut step2 = Step::new(
             "model1".into(),
             strategy::StrategyState::Code(strategy::CodeState::default()),
-        ).with_prompt("prompt2");
+        )
+        .with_prompt("prompt2");
         step2.model_response = Some(ModelResponse {
             comment: Some("second response".into()),
             patch: None,

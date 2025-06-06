@@ -4,7 +4,9 @@ NOW:
 
 GOALS:
     
-    - user_error method for Chat
+    - Handle Step::err
+        - We probably just want to skip rendering the step, and cater for retry
+          in next_step
     - Make ActionStrategy::check a generic post hook
 
     - System prompt generation

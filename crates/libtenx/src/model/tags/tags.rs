@@ -9,7 +9,7 @@ use crate::{
     session::ModelResponse,
 };
 
-use state::{Operation, Patch, ReplaceFuzzy, WriteFile};
+use state::{Operation, Patch, PatchFailure, ReplaceFuzzy, WriteFile};
 
 pub const SYSTEM: &str = include_str!("./tags-system.txt");
 
@@ -173,6 +173,20 @@ pub fn render_check_results(check_results: &[CheckResult]) -> Result<String> {
     let mut rendered = String::from("Please fix the following validation errors\n");
     for result in check_results {
         rendered.push_str(&tag("check_error", [], &result.model));
+    }
+
+    Ok(rendered)
+}
+
+pub fn render_patch_failures(pf: &[PatchFailure]) -> Result<String> {
+    if pf.is_empty() {
+        return Ok(String::new());
+    }
+
+    let mut rendered =
+        String::from("Some parts of the patch failed to apply. Please fix and retry.\n");
+    for result in pf {
+        rendered.push_str(&tag("patch_failure", [], &result.model));
     }
 
     Ok(rendered)
