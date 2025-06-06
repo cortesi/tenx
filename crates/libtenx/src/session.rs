@@ -68,11 +68,11 @@ pub struct Step {
 }
 
 impl Step {
-    /// Creates a new Step with the given prompt and rollback ID.
-    pub fn new(model: String, raw_prompt: String, strategy_step: StrategyState) -> Self {
+    /// Creates a new Step with the given model and strategy state.
+    pub fn new(model: String, strategy_step: StrategyState) -> Self {
         Step {
             model,
-            prompt: raw_prompt,
+            prompt: String::new(),
             rollback_id: 0,
             model_response: None,
             response_time: None,
@@ -84,8 +84,8 @@ impl Step {
         }
     }
 
-    pub fn with_prompt(mut self, prompt: String) -> Self {
-        self.prompt = prompt;
+    pub fn with_prompt(mut self, prompt: impl Into<String>) -> Self {
+        self.prompt = prompt.into();
         self
     }
 
@@ -486,9 +486,8 @@ mod tests {
         // Add the first step.
         let mut step1 = Step::new(
             "model1".into(),
-            "prompt1".into(),
             strategy::StrategyState::Code(strategy::CodeState::default()),
-        );
+        ).with_prompt("prompt1");
         step1.model_response = Some(ModelResponse {
             comment: Some("first response".into()),
             patch: None,
@@ -500,9 +499,8 @@ mod tests {
         // Add the second step.
         let mut step2 = Step::new(
             "model1".into(),
-            "prompt2".into(),
             strategy::StrategyState::Code(strategy::CodeState::default()),
-        );
+        ).with_prompt("prompt2");
         step2.model_response = Some(ModelResponse {
             comment: Some("second response".into()),
             patch: None,

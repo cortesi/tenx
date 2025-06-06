@@ -114,7 +114,6 @@ fn next_step(
             if !check_results.is_empty() {
                 let mut new_step = Step::new(
                     last_step.model.clone(),
-                    "".to_string(),
                     StrategyState::Code(CodeState::default()),
                 );
                 new_step.check_results = check_results;
@@ -131,7 +130,6 @@ fn next_step(
 
     let mut new_step = Step::new(
         last_step.model.clone(),
-        "".to_string(),
         StrategyState::Code(CodeState::default()),
     );
     new_step.prompt_error = last_step.err.clone();
@@ -291,8 +289,8 @@ impl ActionStrategy for Code {
             next_step(config, session, action_offset, events)
         } else if let Some(p) = prompt {
             let model = config.models.default.clone();
-            let raw_prompt = p.clone();
-            let new_step = Step::new(model, raw_prompt, StrategyState::Code(CodeState::default()));
+            let new_step =
+                Step::new(model, StrategyState::Code(CodeState::default())).with_prompt(p);
             session.last_action_mut()?.add_step(new_step)?;
 
             Ok(ActionState {
@@ -401,11 +399,8 @@ impl ActionStrategy for Fix {
                     None => "".to_string(),
                 };
                 let raw_prompt = format! {"{preamble}\nPlease fix the following errors.\n"};
-                let new_step = Step::new(
-                    model,
-                    raw_prompt,
-                    StrategyState::Fix(FixState { check_results }),
-                );
+                let new_step = Step::new(model, StrategyState::Fix(FixState { check_results }))
+                    .with_prompt(raw_prompt);
                 action.add_step(new_step)?;
                 ActionState {
                     completion: Completion::Incomplete,
@@ -503,11 +498,13 @@ mod test {
         assert_eq!(session_clone.last_step().unwrap().prompt, "Test");
 
         // Test retry with patch error
-        session.last_action_mut()?.add_step(Step::new(
-            test_project.config.models.default.clone(),
-            "Test".into(),
-            StrategyState::Code(CodeState::default()),
-        ))?;
+        session.last_action_mut()?.add_step(
+            Step::new(
+                test_project.config.models.default.clone(),
+                StrategyState::Code(CodeState::default()),
+            )
+            .with_prompt("Test"),
+        )?;
         let patch_err = TenxError::Patch {
             user: "Error".into(),
             model: "Retry".into(),

@@ -159,9 +159,8 @@ mod tests {
                 .unwrap()
                 .add_step(Step::new(
                     "test_model".into(),
-                    prompt.to_string(),
                     libtenx::strategy::StrategyState::Code(libtenx::strategy::CodeState::default()),
-                ))
+                ).with_prompt(prompt))
                 .unwrap();
             if let Some(step) = p.session.last_step_mut() {
                 step.model_response = Some(ModelResponse {
