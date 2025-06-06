@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use crate::Operation;
+
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Error, Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
@@ -26,4 +28,15 @@ impl From<std::io::Error> for Error {
     fn from(error: std::io::Error) -> Self {
         Error::Io(error.to_string())
     }
+}
+
+/// Represents a patch operation failure with context about which operation failed
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PatchFailure {
+    /// The user-facing error message
+    pub user: String,
+    /// The model-facing error message (for AI context)
+    pub model: String,
+    /// The operation that failed
+    pub operation: Operation,
 }

@@ -221,7 +221,7 @@ fn render_step<R: Render>(
             let failure_messages: Vec<String> = patch_info
                 .failures
                 .iter()
-                .map(|(change, err)| format!("Failed to apply {change:?}: {err}"))
+                .map(|failure| format!("Failed to apply {:?}: {}", failure.operation, failure.user))
                 .collect();
 
             renderer.push("Patch failures:");

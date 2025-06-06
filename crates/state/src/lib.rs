@@ -38,17 +38,23 @@ trait SubStore: Debug {
 /// Information about a patch operation, including success/failure counts and any errors.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PatchInfo {
+    /// Rollback ID which can be used to revert this patch
     pub rollback_id: u64,
+    /// Number of patch operations that succeeded
     pub succeeded: usize,
-    /// All errors here are of type TenxError::Patch
-    pub failures: Vec<(Operation, Error)>,
+    /// All patch failures with their associated operations
+    pub failures: Vec<PatchFailure>,
 }
 
 impl PatchInfo {
     pub fn add_failure(&mut self, change: Operation, error: Error) -> Result<()> {
         match error {
             Error::Patch { user, model } => {
-                self.failures.push((change, Error::Patch { user, model }));
+                self.failures.push(PatchFailure {
+                    user,
+                    model,
+                    operation: change,
+                });
                 Ok(())
             }
             _ => Err(error),
@@ -790,11 +796,11 @@ mod tests {
                     info.failures.len()
                 );
                 assert! {
-                    info.failures[0].1.to_string().to_lowercase().contains(&msg.to_lowercase()),
+                    info.failures[0].user.to_lowercase().contains(&msg.to_lowercase()),
                     "[{}] Expected patch failure message to contain '{}', got: {}",
                     test_case.name,
                     msg,
-                    info.failures[0].1
+                    info.failures[0].user
                 }
             }
 
