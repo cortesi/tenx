@@ -105,19 +105,12 @@ fn next_step(
         if !paths.is_empty() {
             let check_results = check_paths(config, &paths, &events)?;
             if !check_results.is_empty() {
-                // Create check error from first failed check
-                let first_check = &check_results[0];
-                let check_error = TenxError::Internal(format!(
-                    "{}: {}",
-                    first_check.name, first_check.user
-                ));
                 let mut new_step = Step::new(
                     last_step.model.clone(),
                     "".to_string(),
                     StrategyStep::Code(CodeStep::default()),
                 );
-                new_step.prompt_error = Some(check_error);
-                new_step.check_results = check_results;
+                new_step.prompt_check_results = check_results;
                 session.last_action_mut()?.add_step(new_step)?;
 
                 debug!("Action incomplete: next step created with check error");
@@ -266,7 +259,7 @@ impl ActionStrategy for Code {
         }
         let check_results = check_paths(config, &paths, &events)?;
         if let Some(last_step) = session.last_step_mut() {
-            last_step.check_results = check_results;
+            last_step.prompt_check_results = check_results;
         }
         Ok(())
     }
@@ -365,7 +358,7 @@ impl ActionStrategy for Fix {
         let paths = &session.actions[action_offset].state.changed()?;
         let check_results = check_paths(config, paths, &events)?;
         if let Some(last_step) = session.last_step_mut() {
-            last_step.check_results = check_results;
+            last_step.prompt_check_results = check_results;
         }
         Ok(())
     }
@@ -537,9 +530,8 @@ mod test {
 
     #[test]
     fn test_fix_next_step() -> Result<()> {
-        let test_project = test_project().with_check_error(Some(TenxError::Internal(
-            "parser: Syntax error".into(),
-        )));
+        let test_project = test_project()
+            .with_check_error(Some(TenxError::Internal("parser: Syntax error".into())));
 
         let mut session = Session::new(&test_project.config)?;
         let fix = Fix::default();

@@ -45,8 +45,8 @@ pub struct Step {
     /// error.
     pub prompt_error: Option<TenxError>,
 
-    /// Check results from validation checks that failed during this step
-    pub check_results: Vec<CheckResult>,
+    /// Check results from validation checks that failed after the previous step.
+    pub prompt_check_results: Vec<CheckResult>,
 
     /// Time in seconds to receive the complete model response
     pub response_time: Option<f64>,
@@ -80,7 +80,7 @@ impl Step {
             prompt_error: None,
             err: None,
             strategy_step,
-            check_results: Vec::new(),
+            prompt_check_results: Vec::new(),
         }
     }
 
