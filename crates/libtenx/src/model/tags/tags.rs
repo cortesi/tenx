@@ -171,7 +171,6 @@ pub fn render_check_results(check_results: &Vec<CheckResult>) -> Result<String> 
     }
 
     let mut rendered = String::from("Please fix the following validation errors\n");
-
     for result in check_results {
         rendered.push_str(&tag("check_error", [], &result.model));
     }

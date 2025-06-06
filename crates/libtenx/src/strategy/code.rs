@@ -280,7 +280,6 @@ impl ActionStrategy for Code {
         prompt: Option<String>,
     ) -> Result<ActionState> {
         let action = &session.actions[action_offset];
-
         if let Some(step) = action.last_step() {
             // If the last step is incomplete, don't synthesize a new step
             if step.is_incomplete() {

@@ -84,6 +84,11 @@ impl Step {
         }
     }
 
+    pub fn with_prompt(mut self, prompt: String) -> Self {
+        self.prompt = prompt;
+        self
+    }
+
     /// Reset the step, clearing all response data and setting the rollback ID. The rollback ID is
     /// required because presumably the state has been rolled back before this call.
     pub fn reset(&mut self, rollback_id: u64) {

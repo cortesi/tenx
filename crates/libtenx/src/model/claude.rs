@@ -7,6 +7,7 @@ use serde_json;
 use tracing::{trace, warn};
 
 use crate::{
+    checks::CheckResult,
     context::ContextItem,
     error::{Result, TenxError},
     events::*,
@@ -168,6 +169,14 @@ impl Chat for ClaudeChat {
 
     fn add_user_prompt(&mut self, prompt: &str) -> Result<()> {
         self.add_user_message(&tags::render_prompt(prompt)?)
+    }
+
+    fn add_user_check_results(&mut self, results: Vec<CheckResult>) -> Result<()> {
+        if !results.is_empty() {
+            let rendered = tags::render_check_results(&results)?;
+            self.add_user_message(&rendered)?;
+        }
+        Ok(())
     }
 
     async fn send(&mut self, sender: Option<EventSender>) -> Result<ModelResponse> {
@@ -363,5 +372,46 @@ mod tests {
             text_of_first_content(&chat.request.messages[3]),
             "How can I help?"
         );
+    }
+
+    #[test]
+    fn test_add_user_check_results() {
+        let mut chat = ClaudeChat::new(
+            "claude-3-opus-20240229".to_string(),
+            "fake-key".to_string(),
+            false,
+        );
+
+        // Test with empty results - should not add any message
+        let empty_results: Vec<CheckResult> = vec![];
+        chat.add_user_check_results(empty_results).unwrap();
+        assert_eq!(chat.request.messages.len(), 0);
+
+        // Test with check results
+        let check_results = vec![
+            CheckResult {
+                name: "test1".to_string(),
+                user: "Test failed".to_string(),
+                model: "Error: test1 failed\nDetails: something went wrong".to_string(),
+            },
+            CheckResult {
+                name: "test2".to_string(),
+                user: "Another test failed".to_string(),
+                model: "Error: test2 failed\nDetails: different error".to_string(),
+            },
+        ];
+
+        chat.add_user_check_results(check_results).unwrap();
+        assert_eq!(chat.request.messages.len(), 1);
+        assert_eq!(chat.request.messages[0].role, Role::User);
+
+        let content = text_of_first_content(&chat.request.messages[0]);
+        assert!(content.starts_with("Please fix the following validation errors\n"));
+        assert!(content.contains(
+            "<check_error>\nError: test1 failed\nDetails: something went wrong\n</check_error>"
+        ));
+        assert!(content.contains(
+            "<check_error>\nError: test2 failed\nDetails: different error\n</check_error>"
+        ));
     }
 }
