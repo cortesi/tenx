@@ -18,10 +18,7 @@ use serde::{Deserialize, Serialize};
 
 use state::Patch;
 
-use crate::{
-    context::ContextItem, error::Result, events::EventSender,
-    session::ModelResponse,
-};
+use crate::{context::ContextItem, error::Result, events::EventSender, session::ModelResponse};
 
 pub use claude::{Claude, ClaudeChat, ClaudeUsage};
 pub use claude_editor::ClaudeEditor;

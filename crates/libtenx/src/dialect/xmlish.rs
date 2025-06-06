@@ -60,9 +60,7 @@ where
     })?;
     let tag = parse_open(&opening_line).ok_or_else(|| TenxError::ResponseParse {
         user: "Failed to parse model response".into(),
-        model: format!(
-            "Invalid opening tag in XML-like structure. Line: '{opening_line}'"
-        ),
+        model: format!("Invalid opening tag in XML-like structure. Line: '{opening_line}'"),
     })?;
 
     if tag.name != tag_name {

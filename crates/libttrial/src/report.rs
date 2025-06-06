@@ -130,9 +130,7 @@ impl TrialReport {
 
         let api_model = config
             .get_model_conf(&model_name)
-            .ok_or_else(|| {
-                TenxError::Internal(format!("Model config not found for {model_name}"))
-            })?
+            .ok_or_else(|| TenxError::Internal(format!("Model config not found for {model_name}")))?
             .api_model()
             .to_string();
 

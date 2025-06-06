@@ -448,9 +448,7 @@ async fn main() -> anyhow::Result<()> {
                 let failed = reports.iter().filter(|r| r.failed).count();
                 let total_time: f64 = reports.iter().map(|r| r.total_response_time).sum();
 
-                println!(
-                    "Ran {total} trials in {total_time:.1}s ({failed} failed)"
-                );
+                println!("Ran {total} trials in {total_time:.1}s ({failed} failed)");
             }
 
             Ok(())

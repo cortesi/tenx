@@ -94,6 +94,8 @@ pub struct State {
     memory: memory::Memory,
     snapshots: Vec<(u64, Snapshot)>,
     next_snapshot_id: u64,
+    /// Track which snapshot IDs represent actual modifications (not just views)
+    modification_ids: HashSet<u64>,
 }
 
 impl State {
@@ -288,6 +290,10 @@ impl State {
             succeeded: 0,
             failures: Vec::new(),
         };
+
+        // Track if this patch contains any successfully applied modifying operations
+        let mut has_modifications = false;
+
         for change in &patch.ops {
             match change {
                 Operation::Write(write_file) => {
@@ -295,6 +301,9 @@ impl State {
                         pinfo.add_failure(change.clone(), e)?;
                     } else {
                         pinfo.succeeded += 1;
+                        if change.is_modification() {
+                            has_modifications = true;
+                        }
                     }
                 }
                 Operation::ReplaceFuzzy(replace) => {
@@ -307,6 +316,9 @@ impl State {
                         pinfo.add_failure(change.clone(), e)?;
                     } else {
                         pinfo.succeeded += 1;
+                        if change.is_modification() {
+                            has_modifications = true;
+                        }
                     }
                 }
                 Operation::Replace(replace) => {
@@ -319,6 +331,9 @@ impl State {
                         pinfo.add_failure(change.clone(), e)?;
                     } else {
                         pinfo.succeeded += 1;
+                        if change.is_modification() {
+                            has_modifications = true;
+                        }
                     }
                 }
                 Operation::Insert(insert) => {
@@ -331,6 +346,9 @@ impl State {
                         pinfo.add_failure(change.clone(), e)?;
                     } else {
                         pinfo.succeeded += 1;
+                        if change.is_modification() {
+                            has_modifications = true;
+                        }
                     }
                 }
                 Operation::View(_) => {
@@ -354,6 +372,9 @@ impl State {
                         pinfo.add_failure(change.clone(), e)?;
                     } else {
                         pinfo.succeeded += 1;
+                        if change.is_modification() {
+                            has_modifications = true;
+                        }
                     }
                 }
                 Operation::ViewRange(_path, _, _) => {
@@ -362,6 +383,11 @@ impl State {
             }
         }
         pinfo.rollback_id = self.push_snapshot(snap);
+
+        // Track this snapshot as a modification if it contained any modifying operations
+        if has_modifications {
+            self.modification_ids.insert(pinfo.rollback_id);
+        }
 
         Ok(pinfo)
     }
@@ -380,6 +406,12 @@ impl State {
         if to_revert.is_empty() {
             return Err(Error::Internal(format!("Snapshot id {id} not found")));
         }
+
+        // Clean up modification IDs for reverted snapshots
+        for (snap_id, _snap) in to_revert.iter() {
+            self.modification_ids.remove(snap_id);
+        }
+
         for (_id, snap) in to_revert.into_iter().rev() {
             self.revert_snapshot(snap)?;
         }
@@ -551,10 +583,10 @@ impl State {
     }
 
     /// Creates and dispatches a touch patch for files matching the provided patterns. Expands the
-    /// patterns using the current working directory, creates a `Change::Touch` for each matched
+    /// patterns using the current working directory, creates a `Operatiion::View` for each matched
     /// path, and applies the patch. Returns a tuple of (snapshot ID, file count) from applying the
     /// patch.
-    pub fn touch<P>(&mut self, cwd: P, patterns: Vec<String>) -> Result<(u64, usize)>
+    pub fn view<P>(&mut self, cwd: P, patterns: Vec<String>) -> Result<(u64, usize)>
     where
         P: abspath::IntoAbsPath,
     {
@@ -575,6 +607,14 @@ impl State {
         // Failures for mark changes should always be empty.
         debug_assert!(patch_info.failures.is_empty());
         Ok(patch_info.rollback_id)
+    }
+
+    /// Checks if the state has been modified since the given rollback ID.
+    /// Returns true if any modifications have been made since that ID, false otherwise.
+    /// View operations are not considered modifications.
+    pub fn was_modified_since(&self, rollback_id: u64) -> bool {
+        // Check if any modification IDs exist after the given rollback_id
+        self.modification_ids.iter().any(|&id| id > rollback_id)
     }
 }
 
@@ -1303,6 +1343,132 @@ mod tests {
         ];
 
         StateTest::run_tests(test_cases);
+    }
+
+    #[test]
+    fn test_was_modified_since() {
+        let mut state = State::default();
+
+        // Initialize with some test files
+        let mut initial_files = HashMap::new();
+        initial_files.insert(PathBuf::from("::test1.txt"), "Initial content".to_string());
+        initial_files.insert(
+            PathBuf::from("::test2.txt"),
+            "Initial content 2".to_string(),
+        );
+        state = state.with_memory(initial_files).unwrap();
+
+        // Take initial snapshot
+        let initial_id = state.mark().unwrap();
+        assert_eq!(initial_id, 0);
+
+        // No modifications yet
+        assert!(!state.was_modified_since(initial_id));
+
+        // Apply a View operation - should NOT count as modification
+        let view_patch = Patch::default().with_view("::test1.txt");
+        let view_info = state.patch(&view_patch).unwrap();
+        assert!(!state.was_modified_since(initial_id));
+        assert!(!state.was_modified_since(view_info.rollback_id));
+
+        // Apply a ViewRange operation - should NOT count as modification
+        let view_range_patch = Patch::default().with_view_range("::test1.txt", 0, Some(10));
+        let view_range_info = state.patch(&view_range_patch).unwrap();
+        assert!(!state.was_modified_since(initial_id));
+        assert!(!state.was_modified_since(view_range_info.rollback_id));
+
+        // Apply a Write operation - SHOULD count as modification
+        let write_patch = Patch::default().with_write("::test1.txt", "Modified content");
+        let write_info = state.patch(&write_patch).unwrap();
+        assert!(state.was_modified_since(initial_id));
+        assert!(state.was_modified_since(view_info.rollback_id));
+        assert!(state.was_modified_since(view_range_info.rollback_id));
+        assert!(!state.was_modified_since(write_info.rollback_id));
+
+        // Mark a checkpoint
+        let checkpoint_id = state.mark().unwrap();
+        assert!(!state.was_modified_since(checkpoint_id));
+
+        // Apply a Replace operation - SHOULD count as modification
+        let replace_patch = Patch::default().with_replace("::test2.txt", "Initial", "Modified");
+        let replace_info = state.patch(&replace_patch).unwrap();
+        assert!(state.was_modified_since(checkpoint_id));
+        assert!(!state.was_modified_since(replace_info.rollback_id));
+
+        // Apply an Insert operation - SHOULD count as modification
+        let insert_patch = Patch::default().with_insert("::test1.txt", 0, "Inserted line\n");
+        let insert_info = state.patch(&insert_patch).unwrap();
+        assert!(state.was_modified_since(checkpoint_id));
+        assert!(state.was_modified_since(replace_info.rollback_id));
+        assert!(!state.was_modified_since(insert_info.rollback_id));
+
+        // Apply an Undo operation - SHOULD count as modification
+        let undo_patch = Patch::default().with_undo("::test1.txt");
+        let undo_info = state.patch(&undo_patch).unwrap();
+        assert!(state.was_modified_since(insert_info.rollback_id));
+        assert!(!state.was_modified_since(undo_info.rollback_id));
+
+        // Test with file creation
+        let create_patch = Patch::default().with_write("::new_file.txt", "New content");
+        let create_info = state.patch(&create_patch).unwrap();
+        assert!(state.was_modified_since(undo_info.rollback_id));
+        assert!(!state.was_modified_since(create_info.rollback_id));
+
+        // Test mixed patch with both View and Write operations
+        let mixed_patch = Patch::default()
+            .with_view("::test1.txt")
+            .with_write("::test2.txt", "Another modification");
+        let mixed_info = state.patch(&mixed_patch).unwrap();
+        assert!(state.was_modified_since(create_info.rollback_id));
+        assert!(!state.was_modified_since(mixed_info.rollback_id));
+    }
+
+    #[test]
+    fn test_was_modified_since_edge_cases() {
+        let mut state = State::default();
+
+        // Edge case: Empty state
+        assert!(!state.was_modified_since(0));
+        assert!(!state.was_modified_since(100));
+
+        // Initialize with a test file
+        let mut initial_files = HashMap::new();
+        initial_files.insert(PathBuf::from("::test.txt"), "Initial".to_string());
+        state = state.with_memory(initial_files).unwrap();
+
+        // Edge case: Rollback ID doesn't exist yet
+        assert!(!state.was_modified_since(999));
+
+        // Apply a modification
+        let write_patch = Patch::default().with_write("::test.txt", "Modified");
+        let write_info = state.patch(&write_patch).unwrap();
+
+        // Check that it's not modified since a future ID
+        assert!(!state.was_modified_since(999)); // Future ID that doesn't exist
+
+        // Revert the modification
+        state.revert(write_info.rollback_id).unwrap();
+
+        // After revert, no modifications should be tracked
+        assert!(!state.was_modified_since(0));
+
+        // Apply multiple operations in one patch
+        let multi_patch = Patch::default()
+            .with_view("::test.txt")
+            .with_view_range("::test.txt", 0, Some(10))
+            .with_write("::test2.txt", "New file");
+        let multi_info = state.patch(&multi_patch).unwrap();
+
+        // Should be considered modified because of the write operation
+        assert!(state.was_modified_since(0));
+
+        // Edge case: Check modification since the same ID
+        assert!(!state.was_modified_since(multi_info.rollback_id));
+
+        // Edge case: Empty patch (mark operation)
+        let mark_id = state.mark().unwrap();
+        assert!(!state.was_modified_since(multi_info.rollback_id));
+        assert!(!state.was_modified_since(mark_id));
     }
 
     #[test]

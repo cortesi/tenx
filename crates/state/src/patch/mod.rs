@@ -72,6 +72,20 @@ impl Operation {
         }
     }
 
+    /// Returns true if this operation modifies the state, false if it's read-only.
+    /// View and ViewRange operations are not considered modifications.
+    pub fn is_modification(&self) -> bool {
+        match self {
+            Operation::Write(_) => true,
+            Operation::ReplaceFuzzy(_) => true,
+            Operation::Replace(_) => true,
+            Operation::Insert(_) => true,
+            Operation::View(_) => false,
+            Operation::ViewRange(_, _, _) => false,
+            Operation::Undo(_) => true,
+        }
+    }
+
     /// Renders this operation with the specified level of detail
     pub fn render<R: Render>(&self, renderer: &mut R, _detail: Detail) -> Result<()> {
         match self {
@@ -360,5 +374,42 @@ mod tests {
         assert!(affected_files.contains(&PathBuf::from("file4.txt")));
         assert!(affected_files.contains(&PathBuf::from("file5.txt")));
         assert!(affected_files.contains(&PathBuf::from("file6.txt")));
+    }
+
+    #[test]
+    fn test_is_modification() {
+        // Test modifying operations
+        assert!(Operation::Write(write::WriteFile {
+            path: PathBuf::from("test.txt"),
+            content: "content".to_string(),
+        })
+        .is_modification());
+
+        assert!(Operation::ReplaceFuzzy(replace_fuzzy::ReplaceFuzzy {
+            path: PathBuf::from("test.txt"),
+            old: "old".to_string(),
+            new: "new".to_string(),
+        })
+        .is_modification());
+
+        assert!(Operation::Replace(replace::Replace {
+            path: PathBuf::from("test.txt"),
+            old: "old".to_string(),
+            new: "new".to_string(),
+        })
+        .is_modification());
+
+        assert!(Operation::Insert(insert::Insert {
+            path: PathBuf::from("test.txt"),
+            line: 0,
+            new: "content".to_string(),
+        })
+        .is_modification());
+
+        assert!(Operation::Undo(PathBuf::from("test.txt")).is_modification());
+
+        // Test non-modifying operations
+        assert!(!Operation::View(PathBuf::from("test.txt")).is_modification());
+        assert!(!Operation::ViewRange(PathBuf::from("test.txt"), 0, Some(10)).is_modification());
     }
 }

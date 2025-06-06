@@ -72,10 +72,10 @@ pub struct Fix {}
 /// 2. Creates a new step with appropriate messages if needed
 /// 3. Returns the current state of the action
 fn next_step(
-    _config: &Config,
+    config: &Config,
     session: &mut Session,
     action_offset: usize,
-    _events: Option<EventSender>,
+    events: Option<EventSender>,
 ) -> Result<ActionState> {
     let last_step = session.actions[action_offset]
         .last_step()
@@ -97,10 +97,15 @@ fn next_step(
         });
     }
 
-    // let paths = session.actions[action_offset].state.changed()?;
-    // if !paths.is_empty() {
-    //     let perr = check_paths(config, &paths, &events);
-    // }
+    if session.actions[action_offset]
+        .state
+        .was_modified_since(last_step.rollback_id)
+    {
+        let paths = session.actions[action_offset].state.changed()?;
+        if !paths.is_empty() {
+            let _perr = check_paths(config, &paths, &events);
+        }
+    }
 
     let mut new_step = Step::new(
         last_step.model.clone(),

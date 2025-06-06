@@ -72,8 +72,8 @@ impl SessionStore {
         for entry in fs::read_dir(&self.base_dir)
             .map_err(|e| TenxError::SessionStore(format!("Failed to read directory: {e}")))?
         {
-            let entry = entry
-                .map_err(|e| TenxError::SessionStore(format!("Failed to read entry: {e}")))?;
+            let entry =
+                entry.map_err(|e| TenxError::SessionStore(format!("Failed to read entry: {e}")))?;
             if entry
                 .file_type()
                 .map_err(|e| TenxError::SessionStore(format!("Failed to get file type: {e}")))?

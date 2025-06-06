@@ -169,7 +169,7 @@ impl Trial {
                     session
                         .last_action_mut()?
                         .state
-                        .touch(tenx.config.cwd()?, vec![path.to_string_lossy().to_string()])?;
+                        .view(tenx.config.cwd()?, vec![path.to_string_lossy().to_string()])?;
                 }
             }
         }

@@ -177,9 +177,7 @@ impl Chat for ClaudeEditorChat {
 
     fn add_editable(&mut self, path: &str, data: &str) -> Result<()> {
         // Add editable content as a user message with a clear marker
-        self.add_user_message(&format!(
-            "<editable path=\"{path}\">{data}\\</editable>"
-        ))
+        self.add_user_message(&format!("<editable path=\"{path}\">{data}\\</editable>"))
     }
 
     async fn send(&mut self, sender: Option<EventSender>) -> Result<ModelResponse> {
