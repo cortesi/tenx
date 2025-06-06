@@ -219,10 +219,21 @@ impl Tenx {
     /// Run checks on specified paths.
     pub fn check(&self, paths: Vec<PathBuf>, sender: &Option<EventSender>) -> Result<()> {
         let _block = EventBlock::start(sender)?;
-        if paths.is_empty() {
-            check_all(&self.config, sender)
+        let check_results = if paths.is_empty() {
+            check_all(&self.config, sender)?
         } else {
-            check_paths(&self.config, &paths, sender)
+            check_paths(&self.config, &paths, sender)?
+        };
+
+        if !check_results.is_empty() {
+            // Return error for first failed check to maintain compatibility
+            let first_check = &check_results[0];
+            Err(TenxError::Internal(format!(
+                "{}: {}",
+                first_check.name, first_check.user
+            )))
+        } else {
+            Ok(())
         }
     }
 

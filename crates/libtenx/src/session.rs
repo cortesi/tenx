@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    checks::CheckResult,
     config, context,
     error::{Result, TenxError},
     model::Usage,
@@ -61,6 +62,9 @@ pub struct Step {
     /// changes. That means this rollback precedes any cahnges made in this step.
     pub rollback_id: u64,
     pub strategy_step: StrategyStep,
+
+    /// Check results from validation checks that failed during this step
+    pub check_results: Vec<CheckResult>,
 }
 
 impl Step {
@@ -76,6 +80,7 @@ impl Step {
             prompt_error: None,
             err: None,
             strategy_step,
+            check_results: Vec::new(),
         }
     }
 

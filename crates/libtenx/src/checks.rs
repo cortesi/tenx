@@ -7,6 +7,17 @@ use crate::{
     events::{EventBlock, EventSender},
     exec::exec,
 };
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
+pub struct CheckResult {
+    /// The name of the validator that failed
+    pub name: String,
+    /// An error to display to the user
+    pub user: String,
+    /// An error to the model, often the full tool output
+    pub model: String,
+}
 
 pub enum Runnable {
     Ok,
@@ -36,18 +47,18 @@ pub struct Check {
 }
 
 impl Check {
-    pub fn check(&self, config: &Config) -> Result<()> {
+    pub fn check(&self, config: &Config) -> Result<Option<CheckResult>> {
         let (status, stdout, stderr) = exec(config.project_root(), &self.command)?;
 
         if !status.success() || (self.fail_on_stderr && !stderr.is_empty()) {
             let msg = format!("Check command failed: {}", self.command);
-            Err(TenxError::Check {
+            Ok(Some(CheckResult {
                 name: self.name.clone(),
                 user: msg,
                 model: format!("stdout:\n{stdout}\n\nstderr:\n{stderr}"),
-            })
+            }))
         } else {
-            Ok(())
+            Ok(None)
         }
     }
 
@@ -89,22 +100,25 @@ pub fn check_paths(
     conf: &Config,
     paths: &Vec<PathBuf>,
     sender: &Option<EventSender>,
-) -> Result<()> {
+) -> Result<Vec<CheckResult>> {
     if let Some(cerror) = &conf.check_error {
         return Err(cerror.clone());
     }
 
+    let mut failed_checks = Vec::new();
     for c in conf.enabled_checks() {
         if c.is_relevant(paths)? {
             let _check_block = EventBlock::check(sender, &c.name)?;
-            c.check(conf)?;
+            if let Some(result) = c.check(conf)? {
+                failed_checks.push(result);
+            }
         }
     }
-    Ok(())
+    Ok(failed_checks)
 }
 
 /// Run checks on all configured state files.
-pub fn check_all(conf: &Config, sender: &Option<EventSender>) -> Result<()> {
+pub fn check_all(conf: &Config, sender: &Option<EventSender>) -> Result<Vec<CheckResult>> {
     let state = conf.state()?;
     check_paths(conf, &state.list()?, sender)
 }
@@ -148,6 +162,7 @@ mod tests {
         let config = test_config();
         let result = shell.check(&config);
         assert!(result.is_ok());
+        assert!(result.unwrap().is_none());
     }
 
     #[test]
@@ -162,16 +177,12 @@ mod tests {
 
         let config = test_config();
         let result = shell.check(&config);
-        assert!(result.is_err());
+        assert!(result.is_ok());
 
-        match result {
-            Err(TenxError::Check { name, user, model }) => {
-                assert_eq!(name, "test");
-                assert!(user.contains("Check command failed"));
-                assert!(model.contains("stdout:\noutput message"));
-                assert!(model.contains("stderr:\nerror message"));
-            }
-            _ => panic!("Expected Check error"),
-        }
+        let check_result = result.unwrap().unwrap();
+        assert_eq!(check_result.name, "test");
+        assert!(check_result.user.contains("Check command failed"));
+        assert!(check_result.model.contains("stdout:\noutput message"));
+        assert!(check_result.model.contains("stderr:\nerror message"));
     }
 }

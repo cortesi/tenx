@@ -9,7 +9,7 @@ use tracing_subscriber::util::SubscriberInitExt;
 use libtenx::{
     config::{self},
     context::Context,
-    error, event_consumers,
+    event_consumers,
     events::Event,
     session::Session,
     Tenx,
@@ -751,12 +751,6 @@ async fn main() -> anyhow::Result<()> {
                     match tx.check(paths, &Some(sender.clone())) {
                         Ok(_) => Ok(()),
                         Err(e) => match e {
-                            error::TenxError::Check { name, user, model } => Err(anyhow!(
-                                "Check '{}' failed: {}\nfull output:\n{}",
-                                name,
-                                user,
-                                model
-                            )),
                             other => Err(other.into()),
                         },
                     }

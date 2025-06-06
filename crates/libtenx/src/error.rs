@@ -44,17 +44,6 @@ pub enum TenxError {
     #[error("Error applying patch: {user}")]
     Patch { user: String, model: String },
 
-    /// A patch error, which could cause a retry.
-    #[error("{name}: {user}")]
-    Check {
-        /// The name of the validator that failed
-        name: String,
-        /// An error to display to the user
-        user: String,
-        /// An error to the model, often the full tool output
-        model: String,
-    },
-
     /// An error that occurs when sending an event.
     #[error("Error sending event: {0}")]
     EventSend(String),
@@ -76,7 +65,6 @@ impl TenxError {
     /// Returns the model response if the error is retryable, otherwise None.
     pub fn should_retry(&self) -> Option<String> {
         match self {
-            TenxError::Check { model, .. } => Some(model.to_string()),
             TenxError::Patch { model, .. } => Some(model.to_string()),
             TenxError::ResponseParse { model, .. } => Some(model.to_string()),
             _ => None,

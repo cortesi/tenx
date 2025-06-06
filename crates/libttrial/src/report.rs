@@ -135,7 +135,7 @@ impl TrialReport {
             .to_string();
 
         let mut error_patch = 0;
-        let mut error_check = 0;
+        let error_check = 0;
         let mut error_response_parse = 0;
         let mut error_other = 0;
 
@@ -149,7 +149,6 @@ impl TrialReport {
                 if let Some(err) = &step.err {
                     match err {
                         TenxError::Patch { .. } => error_patch += 1,
-                        TenxError::Check { .. } => error_check += 1,
                         TenxError::ResponseParse { .. } => error_response_parse += 1,
                         _ => error_other += 1,
                     }
