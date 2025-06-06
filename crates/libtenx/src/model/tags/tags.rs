@@ -3,6 +3,7 @@
 
 use super::xmlish::{self, tag};
 use crate::{
+    checks::CheckResult,
     context::ContextItem,
     error::{Result, TenxError},
     session::ModelResponse,
@@ -164,6 +165,20 @@ pub fn render_patch(patch: &Patch) -> Result<String> {
     Ok(rendered)
 }
 
+pub fn render_check_results(check_results: &Vec<CheckResult>) -> Result<String> {
+    if check_results.is_empty() {
+        return Ok(String::new());
+    }
+
+    let mut rendered = String::from("Please fix the following validation errors\n");
+
+    for result in check_results {
+        rendered.push_str(&tag("check_error", [], &result.model));
+    }
+
+    Ok(rendered)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -266,7 +281,7 @@ mod tests {
         p.session.last_action_mut()?.add_step(Step::new(
             "test_model".into(),
             "test".into(),
-            strategy::StrategyStep::Code(strategy::CodeStep::default()),
+            strategy::StrategyState::Code(strategy::CodeState::default()),
         ))?;
         if let Some(step) = p.session.last_step_mut() {
             step.model_response = Some(response);
@@ -328,5 +343,38 @@ mod tests {
         let comment = "This has <xml> tags & special \"chars\"";
         let result = render_comment(comment).unwrap();
         assert!(result.contains("This has <xml> tags & special \"chars\""));
+    }
+
+    #[test]
+    fn test_render_check_results() {
+        use crate::checks::CheckResult;
+
+        // Test empty vec
+        let empty_results: Vec<CheckResult> = vec![];
+        let result = render_check_results(&empty_results).unwrap();
+        assert_eq!(result, "");
+
+        // Test with check results
+        let check_results = vec![
+            CheckResult {
+                name: "test1".to_string(),
+                user: "Test failed".to_string(),
+                model: "Error: test1 failed\nDetails: something went wrong".to_string(),
+            },
+            CheckResult {
+                name: "test2".to_string(),
+                user: "Another test failed".to_string(),
+                model: "Error: test2 failed\nDetails: different error".to_string(),
+            },
+        ];
+
+        let result = render_check_results(&check_results).unwrap();
+        assert!(result.starts_with("Please fix the following validation errors\n"));
+        assert!(result.contains(
+            "<check_error>\nError: test1 failed\nDetails: something went wrong\n</check_error>"
+        ));
+        assert!(result.contains(
+            "<check_error>\nError: test2 failed\nDetails: different error\n</check_error>"
+        ));
     }
 }

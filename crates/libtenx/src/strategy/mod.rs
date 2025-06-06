@@ -134,6 +134,7 @@ pub enum Strategy {
 
 /// Strategy-specific state for a step.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum StrategyStep {
-    Code(CodeStep),
+pub enum StrategyState {
+    Code(CodeState),
+    Fix(FixState),
 }

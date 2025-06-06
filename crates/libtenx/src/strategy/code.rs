@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use tracing::debug;
 
 use crate::{
+    checks::CheckResult,
     checks::{check_all, check_paths},
     config::Config,
     context::ContextProvider,
@@ -55,7 +56,13 @@ fn build_chat(
 
 /// Shared step data for Code and Fix strategies.
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
-pub struct CodeStep {}
+pub struct CodeState {}
+
+/// Shared step data for Code and Fix strategies.
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+pub struct FixState {
+    pub check_results: Vec<CheckResult>,
+}
 
 /// The Code strategy allows the model to write and modify code based on a prompt.
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
@@ -108,9 +115,9 @@ fn next_step(
                 let mut new_step = Step::new(
                     last_step.model.clone(),
                     "".to_string(),
-                    StrategyStep::Code(CodeStep::default()),
+                    StrategyState::Code(CodeState::default()),
                 );
-                new_step.prompt_check_results = check_results;
+                new_step.check_results = check_results;
                 session.last_action_mut()?.add_step(new_step)?;
 
                 debug!("Action incomplete: next step created with check error");
@@ -125,7 +132,7 @@ fn next_step(
     let mut new_step = Step::new(
         last_step.model.clone(),
         "".to_string(),
-        StrategyStep::Code(CodeStep::default()),
+        StrategyState::Code(CodeState::default()),
     );
     new_step.prompt_error = last_step.err.clone();
     session.last_action_mut()?.add_step(new_step)?;
@@ -259,7 +266,7 @@ impl ActionStrategy for Code {
         }
         let check_results = check_paths(config, &paths, &events)?;
         if let Some(last_step) = session.last_step_mut() {
-            last_step.prompt_check_results = check_results;
+            last_step.check_results = check_results;
         }
         Ok(())
     }
@@ -286,7 +293,7 @@ impl ActionStrategy for Code {
         } else if let Some(p) = prompt {
             let model = config.models.default.clone();
             let raw_prompt = p.clone();
-            let new_step = Step::new(model, raw_prompt, StrategyStep::Code(CodeStep::default()));
+            let new_step = Step::new(model, raw_prompt, StrategyState::Code(CodeState::default()));
             session.last_action_mut()?.add_step(new_step)?;
 
             Ok(ActionState {
@@ -358,7 +365,7 @@ impl ActionStrategy for Fix {
         let paths = &session.actions[action_offset].state.changed()?;
         let check_results = check_paths(config, paths, &events)?;
         if let Some(last_step) = session.last_step_mut() {
-            last_step.prompt_check_results = check_results;
+            last_step.check_results = check_results;
         }
         Ok(())
     }
@@ -382,26 +389,27 @@ impl ActionStrategy for Fix {
             next_step(config, session, action_offset, events)
         } else {
             // First step in the action, let's run the tests
-            let pre_result = check_all(config, &events);
-            Ok(if let Err(e) = pre_result {
+            let check_results = check_all(config, &events)?;
+            Ok(if check_results.is_empty() {
+                ActionState {
+                    completion: Completion::Complete,
+                    input_required: InputRequired::No,
+                }
+            } else {
                 let model = config.models.default.clone();
                 let preamble = match prompt {
                     Some(ref s) => format!("{s}\n"),
                     None => "".to_string(),
                 };
                 let raw_prompt = format! {"{preamble}\nPlease fix the following errors.\n"};
-                let mut new_step =
-                    Step::new(model, raw_prompt, StrategyStep::Code(CodeStep::default()));
-
-                new_step.prompt_error = Some(e);
+                let new_step = Step::new(
+                    model,
+                    raw_prompt,
+                    StrategyState::Fix(FixState { check_results }),
+                );
                 action.add_step(new_step)?;
                 ActionState {
                     completion: Completion::Incomplete,
-                    input_required: InputRequired::No,
-                }
-            } else {
-                ActionState {
-                    completion: Completion::Complete,
                     input_required: InputRequired::No,
                 }
             })
@@ -499,7 +507,7 @@ mod test {
         session.last_action_mut()?.add_step(Step::new(
             test_project.config.models.default.clone(),
             "Test".into(),
-            StrategyStep::Code(CodeStep::default()),
+            StrategyState::Code(CodeState::default()),
         ))?;
         let patch_err = TenxError::Patch {
             user: "Error".into(),

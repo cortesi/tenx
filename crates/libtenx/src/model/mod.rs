@@ -18,7 +18,10 @@ use serde::{Deserialize, Serialize};
 
 use state::Patch;
 
-use crate::{context::ContextItem, error::Result, events::EventSender, session::ModelResponse};
+use crate::{
+    checks::CheckResult, context::ContextItem, error::Result, events::EventSender,
+    session::ModelResponse,
+};
 
 pub use claude::{Claude, ClaudeChat, ClaudeUsage};
 pub use claude_editor::ClaudeEditor;
@@ -66,6 +69,11 @@ pub trait Chat: Send {
 
     /// Adds a representation of a patch to the chat.
     fn add_user_prompt(&mut self, _patch: &str) -> Result<()> {
+        Ok(())
+    }
+
+    /// Adds check results to the current user message, or creates a new user message.
+    fn add_user_check_results(&mut self, _results: Vec<CheckResult>) -> Result<()> {
         Ok(())
     }
 

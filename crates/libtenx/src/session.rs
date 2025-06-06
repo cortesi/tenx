@@ -8,7 +8,7 @@ use crate::{
     config, context,
     error::{Result, TenxError},
     model::Usage,
-    strategy::{self, ActionStrategy, StrategyStep},
+    strategy::{self, ActionStrategy, StrategyState},
 };
 use state::{self, Patch};
 use unirend::Detail;
@@ -45,9 +45,6 @@ pub struct Step {
     /// error.
     pub prompt_error: Option<TenxError>,
 
-    /// Check results from validation checks that failed after the previous step.
-    pub prompt_check_results: Vec<CheckResult>,
-
     /// Time in seconds to receive the complete model response
     pub response_time: Option<f64>,
 
@@ -61,15 +58,18 @@ pub struct Step {
     /// Information about the patch applied in this step, including any failures.
     pub patch_info: Option<state::PatchInfo>,
 
+    /// Check results from validation checks that failed after the patch is applied.
+    pub check_results: Vec<CheckResult>,
+
     /// The rollback identifier for this step. Rolling back to this identifier will revert all
     /// changes. That means this rollback precedes any cahnges made in this step.
     pub rollback_id: u64,
-    pub strategy_step: StrategyStep,
+    pub strategy_state: StrategyState,
 }
 
 impl Step {
     /// Creates a new Step with the given prompt and rollback ID.
-    pub fn new(model: String, raw_prompt: String, strategy_step: StrategyStep) -> Self {
+    pub fn new(model: String, raw_prompt: String, strategy_step: StrategyState) -> Self {
         Step {
             model,
             prompt: raw_prompt,
@@ -79,8 +79,8 @@ impl Step {
             patch_info: None,
             prompt_error: None,
             err: None,
-            strategy_step,
-            prompt_check_results: Vec::new(),
+            strategy_state: strategy_step,
+            check_results: Vec::new(),
         }
     }
 
@@ -482,7 +482,7 @@ mod tests {
         let mut step1 = Step::new(
             "model1".into(),
             "prompt1".into(),
-            strategy::StrategyStep::Code(strategy::CodeStep::default()),
+            strategy::StrategyState::Code(strategy::CodeState::default()),
         );
         step1.model_response = Some(ModelResponse {
             comment: Some("first response".into()),
@@ -496,7 +496,7 @@ mod tests {
         let mut step2 = Step::new(
             "model1".into(),
             "prompt2".into(),
-            strategy::StrategyStep::Code(strategy::CodeStep::default()),
+            strategy::StrategyState::Code(strategy::CodeState::default()),
         );
         step2.model_response = Some(ModelResponse {
             comment: Some("second response".into()),
