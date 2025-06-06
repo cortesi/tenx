@@ -32,12 +32,25 @@ fn build_chat(
         }
         chat.add_agent_message(ACK)?;
     }
+
     for (step_offset, step) in session.actions[action_offset].steps.iter().enumerate() {
+        if let StrategyState::Fix(f) = &step.strategy_state {
+            chat.add_user_check_results(&f.check_results)?;
+        };
+
         if !step.prompt.is_empty() {
             chat.add_user_prompt(&step.prompt)?;
         }
 
-        // FIXME: Add prompt_error, add errors from previous patch
+        if step_offset > 0 {
+            if let Some(prev_step) = session.actions[action_offset].steps.get(step_offset - 1) {
+                // Now we add any errors from the previous step
+                if !step.check_results.is_empty() {
+                    chat.add_user_check_results(&prev_step.check_results)?;
+                }
+                if let Some(_patch_info) = &prev_step.patch_info {}
+            }
+        }
 
         if let Some(model_response) = &step.model_response {
             if let Some(comment) = &model_response.comment {
@@ -128,11 +141,10 @@ fn next_step(
         }
     }
 
-    let mut new_step = Step::new(
+    let new_step = Step::new(
         last_step.model.clone(),
         StrategyState::Code(CodeState::default()),
     );
-    new_step.prompt_error = last_step.err.clone();
     session.last_action_mut()?.add_step(new_step)?;
 
     debug!("Action incomplete: next step created");
@@ -534,8 +546,11 @@ mod test {
 
     #[test]
     fn test_fix_next_step() -> Result<()> {
-        let test_project = test_project()
-            .with_check_error(Some(TenxError::Internal("parser: Syntax error".into())));
+        let test_project = test_project().with_check_result(Some(Ok(vec![CheckResult {
+            name: "test".into(),
+            user: "Test error".into(),
+            model: "Model response".into(),
+        }])));
 
         let mut session = Session::new(&test_project.config)?;
         let fix = Fix::default();

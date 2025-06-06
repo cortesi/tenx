@@ -1,4 +1,4 @@
-use crate::{config, error, session::Session};
+use crate::{checks::CheckResult, config, error, session::Session};
 use fs_err as fs;
 use std::path::Path;
 use tempfile::{tempdir, TempDir};
@@ -49,8 +49,8 @@ pub fn test_project() -> TestProject {
 }
 
 impl TestProject {
-    pub fn with_check_error(mut self, e: Option<error::TenxError>) -> Self {
-        self.config = self.config.with_check_error(e);
+    pub fn with_check_result(mut self, e: Option<error::Result<Vec<CheckResult>>>) -> Self {
+        self.config = self.config.with_check_result(e);
         self
     }
 

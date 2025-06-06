@@ -101,8 +101,8 @@ pub fn check_paths(
     paths: &Vec<PathBuf>,
     sender: &Option<EventSender>,
 ) -> Result<Vec<CheckResult>> {
-    if let Some(cerror) = &conf.check_error {
-        return Err(cerror.clone());
+    if let Some(cresult) = &conf.check_result {
+        return cresult.clone();
     }
 
     let mut failed_checks = Vec::new();

@@ -171,9 +171,9 @@ impl Chat for ClaudeChat {
         self.add_user_message(&tags::render_prompt(prompt)?)
     }
 
-    fn add_user_check_results(&mut self, results: Vec<CheckResult>) -> Result<()> {
+    fn add_user_check_results(&mut self, results: &[CheckResult]) -> Result<()> {
         if !results.is_empty() {
-            let rendered = tags::render_check_results(&results)?;
+            let rendered = tags::render_check_results(results)?;
             self.add_user_message(&rendered)?;
         }
         Ok(())
@@ -384,7 +384,7 @@ mod tests {
 
         // Test with empty results - should not add any message
         let empty_results: Vec<CheckResult> = vec![];
-        chat.add_user_check_results(empty_results).unwrap();
+        chat.add_user_check_results(&empty_results).unwrap();
         assert_eq!(chat.request.messages.len(), 0);
 
         // Test with check results
@@ -401,7 +401,7 @@ mod tests {
             },
         ];
 
-        chat.add_user_check_results(check_results).unwrap();
+        chat.add_user_check_results(&check_results).unwrap();
         assert_eq!(chat.request.messages.len(), 1);
         assert_eq!(chat.request.messages[0].role, Role::User);
 

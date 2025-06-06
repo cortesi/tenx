@@ -165,7 +165,7 @@ pub fn render_patch(patch: &Patch) -> Result<String> {
     Ok(rendered)
 }
 
-pub fn render_check_results(check_results: &Vec<CheckResult>) -> Result<String> {
+pub fn render_check_results(check_results: &[CheckResult]) -> Result<String> {
     if check_results.is_empty() {
         return Ok(String::new());
     }
@@ -277,10 +277,13 @@ mod tests {
             &p.config,
             strategy::Strategy::Code(strategy::Code::default()),
         )?)?;
-        p.session.last_action_mut()?.add_step(Step::new(
-            "test_model".into(),
-            strategy::StrategyState::Code(strategy::CodeState::default()),
-        ).with_prompt("test"))?;
+        p.session.last_action_mut()?.add_step(
+            Step::new(
+                "test_model".into(),
+                strategy::StrategyState::Code(strategy::CodeState::default()),
+            )
+            .with_prompt("test"),
+        )?;
         if let Some(step) = p.session.last_step_mut() {
             step.model_response = Some(response);
         }

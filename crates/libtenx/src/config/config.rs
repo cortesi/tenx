@@ -509,7 +509,7 @@ pub struct Config {
 
     /// When set, this error will be returned from all checks. For testing purposes only.
     #[serde(skip)]
-    pub(crate) check_error: Option<error::TenxError>,
+    pub(crate) check_result: Option<error::Result<Vec<checks::CheckResult>>>,
 
     /// The current working directory when testing. We need this, because we can't change the CWD
     /// reliably in tests for reasons of concurrency.
@@ -689,8 +689,8 @@ impl Config {
         self
     }
 
-    pub fn with_check_error(mut self, e: Option<error::TenxError>) -> Self {
-        self.check_error = e;
+    pub fn with_check_result(mut self, e: Option<error::Result<Vec<checks::CheckResult>>>) -> Self {
+        self.check_result = e;
         self
     }
 

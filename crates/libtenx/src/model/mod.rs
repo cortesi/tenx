@@ -73,7 +73,7 @@ pub trait Chat: Send {
     }
 
     /// Adds check results to the current user message, or creates a new user message.
-    fn add_user_check_results(&mut self, _results: Vec<CheckResult>) -> Result<()> {
+    fn add_user_check_results(&mut self, _results: &[CheckResult]) -> Result<()> {
         Ok(())
     }
 
