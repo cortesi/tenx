@@ -148,9 +148,13 @@ impl TrialReport {
             for step in &act.steps {
                 if let Some(err) = &step.err {
                     match err {
-                        TenxError::Patch { .. } => error_patch += 1,
                         TenxError::ResponseParse { .. } => error_response_parse += 1,
                         _ => error_other += 1,
+                    }
+                }
+                if let Some(patch_info) = &step.patch_info {
+                    if !patch_info.failures.is_empty() {
+                        error_patch += 1;
                     }
                 }
                 total_response_time += step.response_time.unwrap_or(0.0);

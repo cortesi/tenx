@@ -497,7 +497,7 @@ impl ActionStrategy for Fix {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{error::TenxError, strategy::Strategy, testutils::test_project};
+    use crate::{strategy::Strategy, testutils::test_project};
 
     #[test]
     fn test_code_next_step() -> Result<()> {
@@ -535,11 +535,11 @@ mod test {
             )
             .with_prompt("Test"),
         )?;
-        let patch_err = TenxError::Patch {
-            user: "Error".into(),
-            model: "Retry".into(),
-        };
-        session.last_step_mut().unwrap().err = Some(patch_err);
+        // let patch_err = TenxError::Patch {
+        //     user: "Error".into(),
+        //     model: "Retry".into(),
+        // };
+        // session.last_step_mut().unwrap().err = Some(patch_err);
 
         // let state = code.next_step(&test_project.config, &mut session, action_idx, None, None)?;
         // assert_eq!(state.completion, Completion::Incomplete);
