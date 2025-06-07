@@ -34,10 +34,16 @@ fn build_chat(
         chat.add_agent_message(ACK)?;
     }
 
-    for (step_offset, step) in session.actions[action_offset].steps.iter().enumerate() {
+    let action = session
+        .actions
+        .get(action_offset)
+        .ok_or(TenxError::Internal(format!(
+            "Action {action_offset} not found in session",
+        )))?;
+    for (step_offset, step) in action.steps.iter().enumerate() {
         if step_offset > 0 {
-            if let Some(prev_step) = session.actions[action_offset].steps.get(step_offset - 1) {
-                if let Some(model_response) = &step.model_response {
+            if let Some(prev_step) = action.steps.get(step_offset - 1) {
+                if let Some(model_response) = &prev_step.model_response {
                     if let Some(comment) = &model_response.comment {
                         chat.add_agent_message(comment)?;
                     }
@@ -51,15 +57,13 @@ fn build_chat(
                                 Operation::View(path) => {
                                     chat.add_editable(
                                         path.as_os_str().to_str().unwrap_or_default(),
-                                        &session.actions[action_offset].state.read(path)?,
+                                        &action.state.read(path)?,
                                     )?;
                                 }
                                 Operation::ViewRange(path, start, end) => {
                                     chat.add_editable(
                                         path.as_os_str().to_str().unwrap_or_default(),
-                                        &session.actions[action_offset]
-                                            .state
-                                            .read_range(path, *start, *end)?,
+                                        &action.state.read_range(path, *start, *end)?,
                                     )?;
                                 }
                                 _ => {}
@@ -75,7 +79,7 @@ fn build_chat(
             }
         } else if let StrategyState::Fix(f) = &step.strategy_state {
             chat.add_user_check_results(&f.check_results)?;
-        };
+        }
         if !step.prompt.is_empty() {
             chat.add_user_prompt(&step.prompt)?;
         }
@@ -131,7 +135,7 @@ fn next_step(
     );
     session.last_action_mut()?.add_step(new_step)?;
 
-    debug!("Action: next step created");
+    debug!("Action: next step created: {:#?}", session.last_step());
     Ok(ActionState {
         completion: Completion::Incomplete,
         input_required: InputRequired::No,
