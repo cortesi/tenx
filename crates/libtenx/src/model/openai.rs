@@ -15,10 +15,11 @@ use serde::{Deserialize, Serialize};
 use tracing::trace;
 
 use crate::{
+    checks::CheckResult,
     context::ContextItem,
-    dialect::{Dialect, DialectProvider, Tags},
     error::{Result, TenxError},
     events::{send_event, Event, EventSender},
+    model::tags,
     model::{Chat, ModelProvider},
     session::ModelResponse,
     throttle::Throttle,
@@ -112,6 +113,84 @@ pub struct OpenAiChat {
 }
 
 impl OpenAiChat {
+    /// Creates a new OpenAiChat configured for the given model, API key, and settings.
+    pub fn new(
+        api_model: String,
+        openai_key: String,
+        api_base: String,
+        streaming: bool,
+        no_system_prompt: bool,
+        reasoning_effort: Option<ReasoningEffort>,
+    ) -> Result<Self> {
+        let mut ra = CreateChatCompletionRequestArgs::default();
+        ra.model(&api_model);
+
+        // Add system prompt based on configuration
+        let mut messages = Vec::new();
+        if no_system_prompt {
+            messages.push(
+                ChatCompletionRequestDeveloperMessageArgs::default()
+                    .content(tags::SYSTEM)
+                    .build()?
+                    .into(),
+            );
+        } else {
+            messages.push(
+                ChatCompletionRequestSystemMessageArgs::default()
+                    .content(tags::SYSTEM)
+                    .build()?
+                    .into(),
+            );
+        }
+
+        ra.messages(messages);
+
+        if let Some(ref re) = reasoning_effort {
+            ra.reasoning_effort(match re {
+                ReasoningEffort::Low => async_openai::types::ReasoningEffort::Low,
+                ReasoningEffort::Medium => async_openai::types::ReasoningEffort::Medium,
+                ReasoningEffort::High => async_openai::types::ReasoningEffort::High,
+            });
+        }
+
+        Ok(Self {
+            api_model,
+            openai_key,
+            api_base,
+            streaming,
+            no_system_prompt,
+            reasoning_effort,
+            request: ra.build()?,
+            response: None,
+        })
+    }
+
+    /// Helper to add or append a message with the given role.
+    fn add_message_with_role(&mut self, role: async_openai::types::Role, text: &str) -> Result<()> {
+        // For OpenAI, we'll just add new messages without consolidation
+        // since the API structure makes it complex to modify existing messages
+        let message = match role {
+            async_openai::types::Role::User => ChatCompletionRequestUserMessageArgs::default()
+                .content(text.trim())
+                .build()?
+                .into(),
+            async_openai::types::Role::Assistant => {
+                ChatCompletionRequestAssistantMessageArgs::default()
+                    .content(text.trim())
+                    .build()?
+                    .into()
+            }
+            async_openai::types::Role::System => ChatCompletionRequestSystemMessageArgs::default()
+                .content(text.trim())
+                .build()?
+                .into(),
+            _ => return Err(TenxError::Internal("Unsupported role".into())),
+        };
+
+        self.request.messages.push(message);
+        Ok(())
+    }
+
     async fn stream_response(
         &self,
         sender: Option<EventSender>,
@@ -168,13 +247,13 @@ impl OpenAiChat {
         })
     }
 
-    fn extract_changes(&self, dialect: &Dialect) -> Result<ModelResponse> {
+    fn extract_changes(&self) -> Result<ModelResponse> {
         if let Some(response) = &self.response {
             if let Some(content) = &response.content {
                 if content.is_empty() {
                     return Err(TenxError::Throttle(Throttle::Backoff));
                 }
-                return dialect.parse(content);
+                return tags::parse(content);
             }
         }
         Err(TenxError::Internal("No patch to parse.".into()))
@@ -184,6 +263,8 @@ impl OpenAiChat {
 #[async_trait]
 impl Chat for OpenAiChat {
     fn add_system_prompt(&mut self, prompt: &str) -> Result<()> {
+        // For simplicity, we'll just add new system messages
+        // The initial system prompt is already added in the constructor
         if self.no_system_prompt {
             self.request.messages.push(
                 ChatCompletionRequestDeveloperMessageArgs::default()
@@ -203,36 +284,50 @@ impl Chat for OpenAiChat {
     }
 
     fn add_user_message(&mut self, text: &str) -> Result<()> {
-        self.request.messages.push(
-            ChatCompletionRequestUserMessageArgs::default()
-                .content(text)
-                .build()?
-                .into(),
-        );
-        Ok(())
+        self.add_message_with_role(async_openai::types::Role::User, text)
     }
 
     fn add_agent_message(&mut self, text: &str) -> Result<()> {
-        self.request.messages.push(
-            ChatCompletionRequestAssistantMessageArgs::default()
-                .content(text)
-                .build()?
-                .into(),
-        );
-        Ok(())
+        self.add_message_with_role(async_openai::types::Role::Assistant, text)
     }
 
     fn add_context(&mut self, ctx: &ContextItem) -> Result<()> {
-        // Add context as a user message with a clear marker
-        self.add_user_message(&format!(
-            "<context name=\"{}\">{}\\</context>",
-            ctx.source, ctx.body
-        ))
+        self.add_user_message(&tags::render_context(ctx)?)
     }
 
     fn add_editable(&mut self, path: &str, data: &str) -> Result<()> {
-        // Add editable content as a user message with a clear marker
-        self.add_user_message(&format!("<editable path=\"{path}\">{data}\\</editable>"))
+        self.add_user_message(&tags::render_editable(path, data)?)
+    }
+
+    fn add_agent_patch(&mut self, patch: &crate::model::Patch) -> Result<()> {
+        self.add_agent_message(&tags::render_patch(patch)?)
+    }
+
+    fn add_agent_comment(&mut self, comment: &str) -> Result<()> {
+        self.add_agent_message(&tags::render_comment(comment)?)
+    }
+
+    fn add_user_prompt(&mut self, prompt: &str) -> Result<()> {
+        self.add_user_message(&tags::render_prompt(prompt)?)
+    }
+
+    fn add_user_check_results(&mut self, results: &[CheckResult]) -> Result<()> {
+        if !results.is_empty() {
+            let rendered = tags::render_check_results(results)?;
+            self.add_user_message(&rendered)?;
+        }
+        Ok(())
+    }
+
+    fn add_user_patch_failure(
+        &mut self,
+        patch_failures: &[crate::model::PatchFailure],
+    ) -> Result<()> {
+        if !patch_failures.is_empty() {
+            let rendered = tags::render_patch_failures(patch_failures)?;
+            self.add_user_message(&rendered)?;
+        }
+        Ok(())
     }
 
     async fn send(&mut self, sender: Option<EventSender>) -> Result<ModelResponse> {
@@ -276,8 +371,7 @@ impl Chat for OpenAiChat {
             self.response = Some(choice.message.clone());
         }
 
-        let dialect = Dialect::Tags(Tags::new());
-        let mut modresp = self.extract_changes(&dialect)?;
+        let mut modresp = self.extract_changes()?;
 
         if let Some(usage) = resp.usage {
             modresp.usage = Some(super::Usage::OpenAi(OpenAiUsage {
@@ -306,27 +400,15 @@ impl ModelProvider for OpenAi {
     }
 
     fn chat(&self) -> Option<Box<dyn Chat>> {
-        let mut ra = CreateChatCompletionRequestArgs::default();
-        ra.model(&self.api_model).messages(Vec::new());
-        if let Some(ref re) = self.reasoning_effort {
-            ra.reasoning_effort(match re {
-                ReasoningEffort::Low => async_openai::types::ReasoningEffort::Low,
-                ReasoningEffort::Medium => async_openai::types::ReasoningEffort::Medium,
-                ReasoningEffort::High => async_openai::types::ReasoningEffort::High,
-            });
-        }
-
-        match ra.build() {
-            Ok(request) => Some(Box::new(OpenAiChat {
-                api_model: self.api_model.clone(),
-                openai_key: self.openai_key.clone(),
-                api_base: self.api_base.clone(),
-                streaming: self.streaming,
-                no_system_prompt: self.no_system_prompt,
-                reasoning_effort: self.reasoning_effort.clone(),
-                request,
-                response: None,
-            })),
+        match OpenAiChat::new(
+            self.api_model.clone(),
+            self.openai_key.clone(),
+            self.api_base.clone(),
+            self.streaming,
+            self.no_system_prompt,
+            self.reasoning_effort.clone(),
+        ) {
+            Ok(chat) => Some(Box::new(chat)),
             Err(_) => None,
         }
     }
