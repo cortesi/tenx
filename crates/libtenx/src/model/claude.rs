@@ -357,7 +357,7 @@ mod tests {
         assert_eq!(chat.request.messages.len(), 1);
         assert_eq!(
             text_of_first_content(&chat.request.messages[0]),
-            "Hello World"
+            "Hello\nWorld"
         );
 
         // Add agent message and check
