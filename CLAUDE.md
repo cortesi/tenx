@@ -23,6 +23,8 @@ cargo clippy
 cargo fmt
 ```
 
+Always run `cargo fmt` before ending to ensure code style consistency.
+
 ## Architecture Overview
 
 Tenx is an AI-assisted coding tool built around a **session-based workflow** with multiple independent crates:

@@ -40,10 +40,16 @@ trait SubStore: Debug {
 pub struct PatchInfo {
     /// Rollback ID which can be used to revert this patch
     pub rollback_id: u64,
+
     /// Number of patch operations that succeeded
     pub succeeded: usize,
+
     /// All patch failures with their associated operations
     pub failures: Vec<PatchFailure>,
+
+    /// If the patch includes view operations, we should continue to a next step to send them to
+    /// the model.
+    pub should_continue: bool,
 }
 
 impl PatchInfo {
@@ -230,6 +236,33 @@ impl State {
         self.dispatch_ro(path, |store| store.read(path))
     }
 
+    /// Reads a range of lines from a file.
+    ///
+    /// # Arguments
+    /// * `path` - The path to the file
+    /// * `start` - The 0-based starting line index (inclusive)
+    /// * `end` - The 0-based ending line index (exclusive). If None, reads to the end of the file.
+    ///
+    /// # Returns
+    /// A string containing the requested lines, joined with newlines.
+    pub fn read_range(&self, path: &Path, start: usize, end: Option<usize>) -> Result<String> {
+        let content = self.read(path)?;
+
+        let lines: Vec<&str> = content.lines().collect();
+
+        if start >= lines.len() {
+            return Ok(String::new());
+        }
+
+        let actual_end = end.unwrap_or(lines.len()).min(lines.len());
+
+        if start >= actual_end {
+            return Ok(String::new());
+        }
+
+        Ok(lines[start..actual_end].join("\n"))
+    }
+
     /// Writes content to a path.
     fn write(&mut self, path: &Path, content: &str) -> Result<()> {
         self.dispatch_mut(path, |store| store.write(path, content))
@@ -290,6 +323,7 @@ impl State {
             rollback_id: 0,
             succeeded: 0,
             failures: Vec::new(),
+            should_continue: patch.ops.iter().any(|op| op.is_view()),
         };
 
         // Track if this patch contains any successfully applied modifying operations
@@ -1477,6 +1511,90 @@ mod tests {
         let mark_id = state.mark().unwrap();
         assert!(!state.was_modified_since(multi_info.rollback_id));
         assert!(!state.was_modified_since(mark_id));
+    }
+
+    #[test]
+    fn test_read_range() {
+        let mut state = State::default();
+
+        // Test file with multiple lines
+        let path = PathBuf::from("::test.txt");
+        let content = "Line 1\nLine 2\nLine 3\nLine 4\nLine 5";
+
+        let mut initial_files = HashMap::new();
+        initial_files.insert(path.clone(), content.to_string());
+        state = state.with_memory(initial_files).unwrap();
+
+        // Test reading full range
+        let result = state.read_range(&path, 0, None).unwrap();
+        assert_eq!(result, content);
+
+        // Test reading from start
+        let result = state.read_range(&path, 0, Some(2)).unwrap();
+        assert_eq!(result, "Line 1\nLine 2");
+
+        // Test reading middle range
+        let result = state.read_range(&path, 1, Some(3)).unwrap();
+        assert_eq!(result, "Line 2\nLine 3");
+
+        // Test reading to end
+        let result = state.read_range(&path, 3, None).unwrap();
+        assert_eq!(result, "Line 4\nLine 5");
+
+        // Test reading single line
+        let result = state.read_range(&path, 2, Some(3)).unwrap();
+        assert_eq!(result, "Line 3");
+
+        // Test out of bounds start
+        let result = state.read_range(&path, 10, None).unwrap();
+        assert_eq!(result, "");
+
+        // Test out of bounds end
+        let result = state.read_range(&path, 0, Some(10)).unwrap();
+        assert_eq!(result, content);
+
+        // Test empty range
+        let result = state.read_range(&path, 2, Some(2)).unwrap();
+        assert_eq!(result, "");
+
+        // Test inverted range
+        let result = state.read_range(&path, 3, Some(1)).unwrap();
+        assert_eq!(result, "");
+
+        // Test file ending with newline - note that trailing newline is not preserved
+        let path2 = PathBuf::from("::test2.txt");
+        let content2 = "Line 1\nLine 2\nLine 3\n";
+
+        let mut initial_files2 = HashMap::new();
+        initial_files2.insert(path2.clone(), content2.to_string());
+        state = state.with_memory(initial_files2).unwrap();
+
+        let result = state.read_range(&path2, 0, None).unwrap();
+        assert_eq!(result, "Line 1\nLine 2\nLine 3"); // No trailing newline
+
+        let result = state.read_range(&path2, 2, None).unwrap();
+        assert_eq!(result, "Line 3"); // No trailing newline
+
+        // Test empty file
+        let path3 = PathBuf::from("::empty.txt");
+        let mut initial_files3 = HashMap::new();
+        initial_files3.insert(path3.clone(), "".to_string());
+        state = state.with_memory(initial_files3).unwrap();
+
+        let result = state.read_range(&path3, 0, None).unwrap();
+        assert_eq!(result, "");
+
+        // Test with CRLF line endings
+        let path4 = PathBuf::from("::crlf.txt");
+        let content4 = "Line 1\r\nLine 2\r\nLine 3";
+
+        let mut initial_files4 = HashMap::new();
+        initial_files4.insert(path4.clone(), content4.to_string());
+        state = state.with_memory(initial_files4).unwrap();
+
+        // Should split correctly and join with \n
+        let result = state.read_range(&path4, 0, Some(2)).unwrap();
+        assert_eq!(result, "Line 1\nLine 2");
     }
 
     #[test]

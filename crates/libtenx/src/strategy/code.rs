@@ -12,6 +12,7 @@ use crate::{
     model::Chat,
     session::{Action, Step},
 };
+use state::Operation;
 use unirend::{Detail, Render, Style};
 
 use super::*;
@@ -34,30 +35,49 @@ fn build_chat(
     }
 
     for (step_offset, step) in session.actions[action_offset].steps.iter().enumerate() {
-        if let StrategyState::Fix(f) = &step.strategy_state {
-            chat.add_user_check_results(&f.check_results)?;
-        };
-
-        if !step.prompt.is_empty() {
-            chat.add_user_prompt(&step.prompt)?;
-        }
-
         if step_offset > 0 {
             if let Some(prev_step) = session.actions[action_offset].steps.get(step_offset - 1) {
+                if let Some(model_response) = &step.model_response {
+                    if let Some(comment) = &model_response.comment {
+                        chat.add_agent_message(comment)?;
+                    }
+                    if let Some(patch) = &model_response.patch {
+                        chat.add_agent_patch(patch)?;
+                    }
+
+                    if let Some(patch) = &model_response.patch {
+                        for op in &patch.ops {
+                            match op {
+                                Operation::View(path) => {
+                                    chat.add_editable(
+                                        path.as_os_str().to_str().unwrap_or_default(),
+                                        &session.actions[action_offset].state.read(path)?,
+                                    )?;
+                                }
+                                Operation::ViewRange(path, start, end) => {
+                                    chat.add_editable(
+                                        path.as_os_str().to_str().unwrap_or_default(),
+                                        &session.actions[action_offset]
+                                            .state
+                                            .read_range(path, *start, *end)?,
+                                    )?;
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+
                 chat.add_user_check_results(&prev_step.check_results)?;
                 if let Some(patch_info) = &prev_step.patch_info {
                     chat.add_user_patch_failure(&patch_info.failures)?;
                 }
             }
-        }
-
-        if let Some(model_response) = &step.model_response {
-            if let Some(comment) = &model_response.comment {
-                chat.add_agent_message(comment)?;
-            }
-            if let Some(patch) = &model_response.patch {
-                chat.add_agent_patch(patch)?;
-            }
+        } else if let StrategyState::Fix(f) = &step.strategy_state {
+            chat.add_user_check_results(&f.check_results)?;
+        };
+        if !step.prompt.is_empty() {
+            chat.add_user_prompt(&step.prompt)?;
         }
     }
 
@@ -89,53 +109,20 @@ pub struct Fix {}
 /// 2. Creates a new step with appropriate messages if needed
 /// 3. Returns the current state of the action
 fn next_step(
-    config: &Config,
+    _config: &Config,
     session: &mut Session,
     action_offset: usize,
-    events: Option<EventSender>,
+    _events: Option<EventSender>,
 ) -> Result<ActionState> {
     let last_step = session.actions[action_offset]
         .last_step()
         .ok_or(TenxError::Internal("No steps in action".into()))?;
-
-    if let Some(err) = &last_step.err {
-        if err.should_retry().is_none() {
-            debug!("Action complete - non-retryable error: {err}");
-            return Ok(ActionState {
-                completion: Completion::Complete,
-                input_required: InputRequired::No,
-            });
-        }
-    } else if last_step.patch_info.is_none() {
-        debug!("Action complete - no error or patch");
+    if !should_next_step(last_step) {
+        debug!("Action complete - no next step needed");
         return Ok(ActionState {
             completion: Completion::Complete,
             input_required: InputRequired::No,
         });
-    }
-
-    if session.actions[action_offset]
-        .state
-        .was_modified_since(last_step.rollback_id)
-    {
-        let paths = session.actions[action_offset].state.changed()?;
-        if !paths.is_empty() {
-            let check_results = check_paths(config, &paths, &events)?;
-            if !check_results.is_empty() {
-                let mut new_step = Step::new(
-                    last_step.model.clone(),
-                    StrategyState::Code(CodeState::default()),
-                );
-                new_step.check_results = check_results;
-                session.last_action_mut()?.add_step(new_step)?;
-
-                debug!("Action incomplete: next step created with check error");
-                return Ok(ActionState {
-                    completion: Completion::Incomplete,
-                    input_required: InputRequired::No,
-                });
-            }
-        }
     }
 
     let new_step = Step::new(
@@ -144,25 +131,65 @@ fn next_step(
     );
     session.last_action_mut()?.add_step(new_step)?;
 
-    debug!("Action incomplete: next step created");
+    debug!("Action: next step created");
     Ok(ActionState {
         completion: Completion::Incomplete,
         input_required: InputRequired::No,
     })
 }
 
-/// Returns true if a step should generate a next step, based on:
-/// a) there is a patch error, or
-/// b) there is a step error, and the error's should_retry() is not None.
-pub fn should_next_step(step: &Step) -> bool {
-    if step
-        .patch_info
-        .as_ref()
-        .is_some_and(|p| !p.failures.is_empty())
+/// Common check function
+fn check(
+    config: &Config,
+    session: &mut Session,
+    action_offset: usize,
+    events: Option<EventSender>,
+) -> Result<()> {
+    let last_step = session.actions[action_offset]
+        .last_step()
+        .ok_or(TenxError::Internal("No steps in action".into()))?;
+    if session.actions[action_offset]
+        .state
+        .was_modified_since(last_step.rollback_id)
     {
+        let paths = session.actions[action_offset].state.changed()?;
+        if paths.is_empty() {
+            // No changes, nothing to check
+            return Ok(());
+        }
+        let check_results = check_paths(config, &paths, &events)?;
+        if let Some(last_step) = session.last_step_mut() {
+            last_step.check_results = check_results;
+        }
+    }
+    Ok(())
+}
+
+/// Should a next step be generated? True if:
+///
+/// - There is a check failure
+/// - The patch included view requests
+/// - The patch has failures
+/// - There is a retryable error in the last step
+///
+pub fn should_next_step(step: &Step) -> bool {
+    // Check failure
+    if !step.check_results.is_empty() {
         return true;
     }
 
+    if let Some(patch_info) = &step.patch_info {
+        // Patch included view requests
+        if patch_info.should_continue {
+            return true;
+        }
+        // Patch has failures
+        if !patch_info.failures.is_empty() {
+            return true;
+        }
+    };
+
+    // Retryable error
     if let Some(err) = &step.err {
         if err.should_retry().is_some() {
             return true;
@@ -180,25 +207,22 @@ fn get_action_state(action: &Action) -> ActionState {
             input_required: InputRequired::Yes,
         };
     }
-
-    if let Some(step) = action.last_step() {
-        if step.is_incomplete() || should_next_step(step) {
-            return ActionState {
-                completion: Completion::Incomplete,
-                input_required: InputRequired::No,
-            };
-        } else {
-            return ActionState {
-                completion: Completion::Complete,
-                input_required: InputRequired::No,
-            };
+    let last_step = action.last_step().unwrap();
+    if last_step.model_response.is_none() {
+        ActionState {
+            completion: Completion::Incomplete,
+            input_required: InputRequired::No,
         }
-    }
-
-    // Fallback (shouldn't happen)
-    ActionState {
-        completion: Completion::Incomplete,
-        input_required: InputRequired::No,
+    } else if !should_next_step(last_step) {
+        ActionState {
+            completion: Completion::Complete,
+            input_required: InputRequired::No,
+        }
+    } else {
+        ActionState {
+            completion: Completion::Incomplete,
+            input_required: InputRequired::No,
+        }
     }
 }
 
@@ -287,16 +311,7 @@ impl ActionStrategy for Code {
         action_offset: usize,
         events: Option<EventSender>,
     ) -> Result<()> {
-        let paths = session.actions[action_offset].state.changed()?;
-        if paths.is_empty() {
-            // No changes, nothing to check
-            return Ok(());
-        }
-        let check_results = check_paths(config, &paths, &events)?;
-        if let Some(last_step) = session.last_step_mut() {
-            last_step.check_results = check_results;
-        }
-        Ok(())
+        check(config, session, action_offset, events)
     }
 
     fn next_step(
@@ -318,17 +333,17 @@ impl ActionStrategy for Code {
             }
             next_step(config, session, action_offset, events)
         } else if let Some(p) = prompt {
+            // First step, with a provided prompt
             let model = config.models.default.clone();
             let new_step =
                 Step::new(model, StrategyState::Code(CodeState::default())).with_prompt(p);
             session.last_action_mut()?.add_step(new_step)?;
-
             Ok(ActionState {
                 completion: Completion::Incomplete,
                 input_required: InputRequired::No,
             })
         } else {
-            // Need user input for first step
+            // No prompt, need user input
             Ok(ActionState {
                 completion: Completion::Incomplete,
                 input_required: InputRequired::Yes,
@@ -389,12 +404,7 @@ impl ActionStrategy for Fix {
         action_offset: usize,
         events: Option<EventSender>,
     ) -> Result<()> {
-        let paths = &session.actions[action_offset].state.changed()?;
-        let check_results = check_paths(config, paths, &events)?;
-        if let Some(last_step) = session.last_step_mut() {
-            last_step.check_results = check_results;
-        }
-        Ok(())
+        check(config, session, action_offset, events)
     }
 
     fn next_step(

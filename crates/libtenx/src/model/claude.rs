@@ -116,15 +116,18 @@ impl ClaudeChat {
         if self.request.messages.is_empty() || self.request.messages.last().unwrap().role != role {
             self.request.messages.push(misanthropy::Message {
                 role,
-                content: vec![misanthropy::Content::text(text)],
+                content: vec![misanthropy::Content::text(text.trim())],
             });
         } else {
             let last_message = self.request.messages.last_mut().unwrap();
             if let Some(misanthropy::Content::Text(text_content)) = last_message.content.last_mut()
             {
-                text_content.text.push_str(text);
+                text_content.text.push('\n');
+                text_content.text.push_str(text.trim());
             } else {
-                last_message.content.push(misanthropy::Content::text(text));
+                last_message
+                    .content
+                    .push(misanthropy::Content::text(text.trim()));
             }
         }
         Ok(())

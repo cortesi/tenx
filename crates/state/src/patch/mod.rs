@@ -95,6 +95,11 @@ impl Operation {
         }
     }
 
+    /// Is this operation a view operation?
+    pub fn is_view(&self) -> bool {
+        matches!(self, Operation::View(_) | Operation::ViewRange(_, _, _))
+    }
+
     /// Renders this operation with the specified level of detail
     pub fn render<R: Render>(&self, renderer: &mut R, _detail: Detail) -> Result<()> {
         match self {
