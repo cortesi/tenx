@@ -672,8 +672,8 @@ impl Config {
     }
 
     pub fn project_files(&self) -> error::Result<Vec<PathBuf>> {
-        let root = state::abspath::AbsPath::new(self.project.root.clone())?;
-        let ret = state::files::list_files(root, self.project.include.clone())?;
+        let ret =
+            state::files::list_files(self.project.root.clone(), self.project.include.clone())?;
         Ok(ret)
     }
 

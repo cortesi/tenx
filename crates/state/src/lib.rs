@@ -9,7 +9,7 @@ mod directory;
 mod error;
 mod memory;
 
-pub mod abspath;
+mod abspath;
 pub mod files;
 mod patch;
 
