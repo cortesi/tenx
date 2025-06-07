@@ -6,7 +6,9 @@ use super::config::*;
 const DEFAULT_STEP_LIMIT: usize = 16;
 
 const ANTHROPIC_API_KEY: &str = "ANTHROPIC_API_KEY";
-const ANTHROPIC_CLAUDE_SONNET: &str = "claude-3-7-sonnet-latest";
+const ANTHROPIC_CLAUDE_SONNET4: &str = "claude-sonnet-4-20250514";
+const ANTHROPIC_CLAUDE_OPUS4: &str = "claude-opus-4-20250514";
+const ANTHROPIC_CLAUDE_SONNET37: &str = "claude-3-7-sonnet-latest";
 const ANTHROPIC_CLAUDE_SONNET35: &str = "claude-3-5-sonnet-latest";
 const ANTHROPIC_CLAUDE_HAIKU: &str = "claude-3-5-haiku-latest";
 
@@ -68,8 +70,20 @@ fn default_models() -> Vec<Model> {
     if env::var(ANTHROPIC_API_KEY).is_ok() {
         models.extend_from_slice(&[
             Model::Claude {
+                name: "opus".to_string(),
+                api_model: ANTHROPIC_CLAUDE_OPUS4.to_string(),
+                key: "".to_string(),
+                key_env: ANTHROPIC_API_KEY.to_string(),
+            },
+            Model::Claude {
                 name: "sonnet".to_string(),
-                api_model: ANTHROPIC_CLAUDE_SONNET.to_string(),
+                api_model: ANTHROPIC_CLAUDE_SONNET4.to_string(),
+                key: "".to_string(),
+                key_env: ANTHROPIC_API_KEY.to_string(),
+            },
+            Model::Claude {
+                name: "sonnet37".to_string(),
+                api_model: ANTHROPIC_CLAUDE_SONNET37.to_string(),
                 key: "".to_string(),
                 key_env: ANTHROPIC_API_KEY.to_string(),
             },
