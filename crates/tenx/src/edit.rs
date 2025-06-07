@@ -157,10 +157,15 @@ mod tests {
             p.session
                 .last_action_mut()
                 .unwrap()
-                .add_step(Step::new(
-                    "test_model".into(),
-                    libtenx::strategy::StrategyState::Code(libtenx::strategy::CodeState::default()),
-                ).with_prompt(prompt))
+                .add_step(
+                    Step::new(
+                        "test_model".into(),
+                        libtenx::strategy::StrategyState::Code(
+                            libtenx::strategy::CodeState::default(),
+                        ),
+                    )
+                    .with_prompt(prompt),
+                )
                 .unwrap();
             if let Some(step) = p.session.last_step_mut() {
                 step.model_response = Some(ModelResponse {

@@ -95,7 +95,6 @@ impl From<state::Error> for TenxError {
             state::Error::Io(e) => TenxError::Io(e),
             state::Error::NotFound { msg, path } => TenxError::NotFound { msg, path },
             state::Error::Internal(e) => TenxError::Internal(e),
-            state::Error::Patch { user, model } => TenxError::Patch { user, model },
         }
     }
 }

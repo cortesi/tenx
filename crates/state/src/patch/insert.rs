@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-use crate::error::{Error, Result};
+use super::PatchError;
 
 /// An insert operation that adds text at a specific line in a file.
 /// Offset 0 is the start of the file.
@@ -18,11 +18,11 @@ impl Insert {
     ///
     /// Inserts the new content at the specified line.
     /// Returns an error if the line number is out of bounds.
-    pub fn apply(&self, input: &str) -> Result<String> {
+    pub(crate) fn apply(&self, input: &str) -> Result<String, PatchError> {
         let lines: Vec<&str> = input.lines().collect();
 
         if self.line > lines.len() {
-            return Err(Error::Patch {
+            return Err(PatchError {
                 user: format!("Line {} is out of bounds", self.line),
                 model: format!(
                     "Cannot insert at line {} because the file only has {} lines",

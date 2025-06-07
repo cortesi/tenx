@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-use crate::error::{Error, Result};
+use super::PatchError;
 
 /// An exact replace operation that replaces one occurrence of a string with another.
 /// The match must be exact and appear exactly once in the file.
@@ -18,9 +18,9 @@ impl Replace {
     ///
     /// Replaces exactly one occurrence of the old content with the new content.
     /// Returns an error if the old content is not found exactly once.
-    pub fn apply(&self, input: &str) -> Result<String> {
+    pub(crate) fn apply(&self, input: &str) -> Result<String, PatchError> {
         match input.matches(&self.old).count() {
-            0 => Err(Error::Patch {
+            0 => Err(PatchError {
                 user: "Text to replace not found".to_string(),
                 model: format!(
                     "Could not find the specified text in the source file:\n{}",
@@ -28,7 +28,7 @@ impl Replace {
                 ),
             }),
             1 => Ok(input.replace(&self.old, &self.new)),
-            _ => Err(Error::Patch {
+            _ => Err(PatchError {
                 user: "Multiple occurrences of text to replace found".to_string(),
                 model: format!(
                     "Found multiple occurrences of the specified text in the source file:\n{}",

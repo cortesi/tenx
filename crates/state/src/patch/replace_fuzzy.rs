@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-use crate::error::{Error, Result};
+use super::PatchError;
 
 /// An replace operation that replaces once occurrence of a string with another. This operation is
 /// fuzzy - meaning it tries really hard to make the replacement by ignoring leading and trailing
@@ -19,7 +19,7 @@ impl ReplaceFuzzy {
     ///
     /// Replaces only the first occurrence of the old content with the new content.
     /// Returns the modified string if the replacement was successful, or an error if no changes were made.
-    pub fn apply(&self, input: &str) -> Result<String> {
+    pub(crate) fn apply(&self, input: &str) -> Result<String, PatchError> {
         let old_lines: Vec<&str> = self.old.lines().map(str::trim).collect();
         let new_lines: Vec<&str> = self.new.lines().collect();
         let input_lines: Vec<&str> = input.lines().collect();
@@ -43,7 +43,7 @@ impl ReplaceFuzzy {
             }
         }
 
-        Err(Error::Patch {
+        Err(PatchError {
             user: "Could not find the text to replace".to_string(),
             model: format!(
                 "Invalid replace specification - could not find the following text in the source file:\n{}",

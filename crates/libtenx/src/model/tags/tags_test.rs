@@ -100,10 +100,13 @@ fn test_render_edit() -> Result<()> {
         &p.config,
         strategy::Strategy::Code(strategy::Code::default()),
     )?)?;
-    p.session.last_action_mut()?.add_step(Step::new(
-        "test_model".into(),
-        strategy::StrategyState::Code(strategy::CodeState::default()),
-    ).with_prompt("test"))?;
+    p.session.last_action_mut()?.add_step(
+        Step::new(
+            "test_model".into(),
+            strategy::StrategyState::Code(strategy::CodeState::default()),
+        )
+        .with_prompt("test"),
+    )?;
     if let Some(step) = p.session.last_step_mut() {
         step.model_response = Some(response);
     }

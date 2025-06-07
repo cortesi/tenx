@@ -18,10 +18,6 @@ pub enum Error {
 
     #[error("Internal error: {0}")]
     Internal(String),
-
-    /// A patch error, which could cause a retry.
-    #[error("Error applying patch: {user}")]
-    Patch { user: String, model: String },
 }
 
 impl From<std::io::Error> for Error {

@@ -10,6 +10,15 @@ pub use replace::*;
 pub use replace_fuzzy::*;
 pub use write::*;
 
+/// Internal error type for patch operations
+#[derive(Debug)]
+pub(crate) struct PatchError {
+    /// The user-facing error message
+    pub user: String,
+    /// The model-facing error message (for AI context)
+    pub model: String,
+}
+
 use std::collections::HashMap;
 use std::path::PathBuf;
 

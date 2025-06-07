@@ -47,18 +47,13 @@ pub struct PatchInfo {
 }
 
 impl PatchInfo {
-    pub fn add_failure(&mut self, change: Operation, error: Error) -> Result<()> {
-        match error {
-            Error::Patch { user, model } => {
-                self.failures.push(PatchFailure {
-                    user,
-                    model,
-                    operation: change,
-                });
-                Ok(())
-            }
-            _ => Err(error),
-        }
+    /// Add a patch failure from a PatchError
+    fn add_patch_failure(&mut self, operation: Operation, patch_err: PatchError) {
+        self.failures.push(PatchFailure {
+            user: patch_err.user,
+            model: patch_err.model,
+            operation,
+        });
     }
 }
 
@@ -304,7 +299,7 @@ impl State {
             match change {
                 Operation::Write(write_file) => {
                     if let Err(e) = self.write(write_file.path.as_path(), &write_file.content) {
-                        pinfo.add_failure(change.clone(), e)?;
+                        return Err(e);
                     } else {
                         pinfo.succeeded += 1;
                         if change.is_modification() {
@@ -313,74 +308,81 @@ impl State {
                     }
                 }
                 Operation::ReplaceFuzzy(replace) => {
-                    let res = (|| {
+                    let res = (|| -> Result<()> {
                         let original = self.read(replace.path.as_path())?;
-                        let new_content = replace.apply(&original)?;
-                        self.write(replace.path.as_path(), &new_content)
-                    })();
-                    if let Err(e) = res {
-                        pinfo.add_failure(change.clone(), e)?;
-                    } else {
-                        pinfo.succeeded += 1;
-                        if change.is_modification() {
-                            has_modifications = true;
+                        match replace.apply(&original) {
+                            Ok(new_content) => {
+                                self.write(replace.path.as_path(), &new_content)?;
+                                pinfo.succeeded += 1;
+                                if change.is_modification() {
+                                    has_modifications = true;
+                                }
+                            }
+                            Err(patch_err) => {
+                                pinfo.add_patch_failure(change.clone(), patch_err);
+                            }
                         }
-                    }
+                        Ok(())
+                    })();
+                    res?;
                 }
                 Operation::Replace(replace) => {
-                    let res = (|| {
+                    let res = (|| -> Result<()> {
                         let original = self.read(replace.path.as_path())?;
-                        let new_content = replace.apply(&original)?;
-                        self.write(replace.path.as_path(), &new_content)
-                    })();
-                    if let Err(e) = res {
-                        pinfo.add_failure(change.clone(), e)?;
-                    } else {
-                        pinfo.succeeded += 1;
-                        if change.is_modification() {
-                            has_modifications = true;
+                        match replace.apply(&original) {
+                            Ok(new_content) => {
+                                self.write(replace.path.as_path(), &new_content)?;
+                                pinfo.succeeded += 1;
+                                if change.is_modification() {
+                                    has_modifications = true;
+                                }
+                            }
+                            Err(patch_err) => {
+                                pinfo.add_patch_failure(change.clone(), patch_err);
+                            }
                         }
-                    }
+                        Ok(())
+                    })();
+                    res?;
                 }
                 Operation::Insert(insert) => {
-                    let res = (|| {
+                    let res = (|| -> Result<()> {
                         let original = self.read(insert.path.as_path())?;
-                        let new_content = insert.apply(&original)?;
-                        self.write(insert.path.as_path(), &new_content)
-                    })();
-                    if let Err(e) = res {
-                        pinfo.add_failure(change.clone(), e)?;
-                    } else {
-                        pinfo.succeeded += 1;
-                        if change.is_modification() {
-                            has_modifications = true;
+                        match insert.apply(&original) {
+                            Ok(new_content) => {
+                                self.write(insert.path.as_path(), &new_content)?;
+                                pinfo.succeeded += 1;
+                                if change.is_modification() {
+                                    has_modifications = true;
+                                }
+                            }
+                            Err(patch_err) => {
+                                pinfo.add_patch_failure(change.clone(), patch_err);
+                            }
                         }
-                    }
+                        Ok(())
+                    })();
+                    res?;
                 }
                 Operation::View(_) => {
                     pinfo.succeeded += 1;
                 }
                 Operation::Undo(path) => {
-                    let res = (|| {
-                        if let Some(previous_content) = self.last_original(path) {
-                            self.write(path, &previous_content)?;
-                            Ok(())
-                        } else {
-                            let msg =
-                                format!("No previous version found for undo: {}", path.display());
-                            Err(Error::Patch {
-                                user: msg.clone(),
-                                model: msg,
-                            })
-                        }
-                    })();
-                    if let Err(e) = res {
-                        pinfo.add_failure(change.clone(), e)?;
-                    } else {
+                    if let Some(previous_content) = self.last_original(path) {
+                        self.write(path, &previous_content)?;
                         pinfo.succeeded += 1;
                         if change.is_modification() {
                             has_modifications = true;
                         }
+                    } else {
+                        let msg = format!("No previous version found for undo: {}", path.display());
+                        pinfo.add_patch_failure(
+                            change.clone(),
+                            PatchError {
+                                user: msg.clone(),
+                                model: msg,
+                            },
+                        );
                     }
                 }
                 Operation::ViewRange(_path, _, _) => {
