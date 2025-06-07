@@ -8,10 +8,11 @@ use tracing::{trace, warn};
 use super::Chat;
 
 use crate::{
+    checks::CheckResult,
     context::ContextItem,
-    dialect::{Dialect, DialectProvider, Tags},
     error::{Result, TenxError},
     events::*,
+    model::tags,
     model::ModelProvider,
     session::ModelResponse,
     throttle::Throttle,
@@ -100,6 +101,52 @@ pub struct GoogleChat {
 }
 
 impl GoogleChat {
+    /// Creates a new GoogleChat configured for the given model, API key, and streaming setting.
+    pub fn new(api_model: String, api_key: String, streaming: bool) -> Self {
+        let request = GenerateContentReq::default()
+            .model(&api_model)
+            .system_instruction(Content::default().parts(vec![Part::default().text(tags::SYSTEM)]));
+        Self {
+            api_model,
+            api_key,
+            streaming,
+            request,
+        }
+    }
+
+    /// Helper to add or append a message with the given role.
+    fn add_message_with_role(&mut self, role: &str, text: &str) -> Result<()> {
+        let mut contents = self.request.contents.clone();
+
+        // Check if we need to consolidate with the last message
+        if !contents.is_empty() && contents.last().unwrap().role.as_deref() == Some(role) {
+            // Append to the last message
+            let last_content = contents.last_mut().unwrap();
+            if let Some(parts) = &mut last_content.parts {
+                if let Some(last_part) = parts.last_mut() {
+                    if let Some(existing_text) = &last_part.text {
+                        last_part.text = Some(format!("{}\n{}", existing_text, text.trim()));
+                    } else {
+                        last_part.text = Some(text.trim().to_string());
+                    }
+                } else {
+                    parts.push(Part::default().text(text.trim()));
+                }
+            } else {
+                last_content.parts = Some(vec![Part::default().text(text.trim())]);
+            }
+        } else {
+            // Create a new message
+            let content = Content::default()
+                .parts(vec![Part::default().text(text.trim())])
+                .role(role);
+            contents.push(content);
+        }
+
+        self.request = self.request.clone().contents(contents);
+        Ok(())
+    }
+
     fn emit_event(
         &self,
         sender: &Option<EventSender>,
@@ -145,11 +192,7 @@ impl GoogleChat {
         Ok(responses)
     }
 
-    fn extract_changes(
-        &self,
-        dialect: &Dialect,
-        responses: &[GenerateContentResponse],
-    ) -> Result<ModelResponse> {
+    fn extract_changes(&self, responses: &[GenerateContentResponse]) -> Result<ModelResponse> {
         let mut full_text = String::new();
         let mut total_prompt_tokens = 0;
         let mut total_candidate_tokens = 0;
@@ -180,7 +223,7 @@ impl GoogleChat {
             return Err(TenxError::Throttle(Throttle::Backoff));
         }
 
-        let mut modresp = dialect.parse(&full_text)?;
+        let mut modresp = tags::parse(&full_text)?;
         modresp.usage = Some(super::Usage::Google(GoogleUsage {
             input_tokens: Some(total_prompt_tokens as u32),
             output_tokens: Some(total_candidate_tokens as u32),
@@ -194,45 +237,75 @@ impl GoogleChat {
 #[async_trait::async_trait]
 impl Chat for GoogleChat {
     fn add_system_prompt(&mut self, prompt: &str) -> Result<()> {
+        // Append to the existing system instruction
+        let current_system = self
+            .request
+            .system_instruction
+            .as_ref()
+            .and_then(|c| c.parts.as_ref())
+            .and_then(|p| p.first())
+            .and_then(|p| p.text.as_ref())
+            .unwrap_or(&String::new())
+            .to_string();
+
+        let new_system = if current_system.is_empty() {
+            prompt.to_string()
+        } else {
+            format!("{}\n{}", current_system, prompt)
+        };
+
         self.request = self
             .request
             .clone()
-            .system_instruction(Content::default().parts(vec![Part::default().text(prompt)]));
+            .system_instruction(Content::default().parts(vec![Part::default().text(new_system)]));
         Ok(())
     }
 
     fn add_user_message(&mut self, text: &str) -> Result<()> {
-        let content = Content::default()
-            .parts(vec![Part::default().text(text)])
-            .role("user");
-        let mut contents = self.request.contents.clone();
-        contents.push(content);
-        self.request = self.request.clone().contents(contents);
-        Ok(())
+        self.add_message_with_role("user", text)
     }
 
     fn add_agent_message(&mut self, text: &str) -> Result<()> {
-        let content = Content::default()
-            .parts(vec![Part::default().text(text)])
-            .role("model");
-
-        let mut contents = self.request.contents.clone();
-        contents.push(content);
-        self.request = self.request.clone().contents(contents);
-        Ok(())
+        self.add_message_with_role("model", text)
     }
 
     fn add_context(&mut self, ctx: &ContextItem) -> Result<()> {
-        // Add context as a user message with a clear marker
-        self.add_user_message(&format!(
-            "<context name=\"{}\">{}\\</context>",
-            ctx.source, ctx.body
-        ))
+        self.add_user_message(&tags::render_context(ctx)?)
     }
 
     fn add_editable(&mut self, path: &str, data: &str) -> Result<()> {
-        // Add editable content as a user message with a clear marker
-        self.add_user_message(&format!("<editable path=\"{path}\">{data}\\</editable>"))
+        self.add_user_message(&tags::render_editable(path, data)?)
+    }
+
+    fn add_agent_patch(&mut self, patch: &crate::model::Patch) -> Result<()> {
+        self.add_agent_message(&tags::render_patch(patch)?)
+    }
+
+    fn add_agent_comment(&mut self, comment: &str) -> Result<()> {
+        self.add_agent_message(&tags::render_comment(comment)?)
+    }
+
+    fn add_user_prompt(&mut self, prompt: &str) -> Result<()> {
+        self.add_user_message(&tags::render_prompt(prompt)?)
+    }
+
+    fn add_user_check_results(&mut self, results: &[CheckResult]) -> Result<()> {
+        if !results.is_empty() {
+            let rendered = tags::render_check_results(results)?;
+            self.add_user_message(&rendered)?;
+        }
+        Ok(())
+    }
+
+    fn add_user_patch_failure(
+        &mut self,
+        patch_failures: &[crate::model::PatchFailure],
+    ) -> Result<()> {
+        if !patch_failures.is_empty() {
+            let rendered = tags::render_patch_failures(patch_failures)?;
+            self.add_user_message(&rendered)?;
+        }
+        Ok(())
     }
 
     async fn send(&mut self, sender: Option<EventSender>) -> Result<ModelResponse> {
@@ -260,8 +333,7 @@ impl Chat for GoogleChat {
 
         trace!("Got responses: {:#?}", responses);
 
-        let dialect = Dialect::Tags(Tags::new());
-        let modresp = self.extract_changes(&dialect, &responses)?;
+        let modresp = self.extract_changes(&responses)?;
         Ok(modresp)
     }
 
@@ -281,11 +353,10 @@ impl ModelProvider for Google {
     }
 
     fn chat(&self) -> Option<Box<dyn Chat>> {
-        Some(Box::new(GoogleChat {
-            api_model: self.api_model.clone(),
-            api_key: self.api_key.clone(),
-            streaming: self.streaming,
-            request: GenerateContentReq::default(),
-        }))
+        Some(Box::new(GoogleChat::new(
+            self.api_model.clone(),
+            self.api_key.clone(),
+            self.streaming,
+        )))
     }
 }
