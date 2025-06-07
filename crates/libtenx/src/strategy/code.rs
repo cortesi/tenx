@@ -512,6 +512,8 @@ impl ActionStrategy for Fix {
 mod test {
     use super::*;
     use crate::{strategy::Strategy, testutils::test_project};
+    use state;
+    use std::path::PathBuf;
 
     #[test]
     fn test_code_next_step() -> Result<()> {
@@ -541,7 +543,7 @@ mod test {
         assert_eq!(state.input_required, InputRequired::No);
         assert_eq!(session_clone.last_step().unwrap().prompt, "Test");
 
-        // Test retry with patch error
+        // Test retry with patch failure
         session.last_action_mut()?.add_step(
             Step::new(
                 test_project.config.models.default.clone(),
@@ -549,29 +551,57 @@ mod test {
             )
             .with_prompt("Test"),
         )?;
-        // let patch_err = TenxError::Patch {
-        //     user: "Error".into(),
-        //     model: "Retry".into(),
-        // };
-        // session.last_step_mut().unwrap().err = Some(patch_err);
 
-        // let state = code.next_step(&test_project.config, &mut session, action_idx, None, None)?;
-        // assert_eq!(state.completion, Completion::Incomplete);
-        // assert_eq!(session.last_step().unwrap().raw_prompt, "Retry");
-        //
-        // // Non-retryable error should complete the action
-        // let mut session_clone = session.clone();
-        // session_clone.last_step_mut().unwrap().err = Some(TenxError::Config("Error".into()));
-        //
-        // let state = code.next_step(
-        //     &test_project.config,
-        //     &mut session_clone,
-        //     action_idx,
-        //     None,
-        //     None,
-        // )?;
-        //
-        // assert_eq!(state.completion, Completion::Complete);
+        // Simulate a patch failure
+        session.last_step_mut().unwrap().patch_info = Some(state::PatchInfo {
+            rollback_id: 0,
+            succeeded: 0,
+            failures: vec![state::PatchFailure {
+                user: "Text not found".into(),
+                model: "The text 'old_text' was not found in the file".into(),
+                operation: state::Operation::Replace(state::Replace {
+                    path: PathBuf::from("test.rs"),
+                    old: "old_text".into(),
+                    new: "new_text".into(),
+                }),
+            }],
+            should_continue: false,
+        });
+
+        let state = code.next_step(&test_project.config, &mut session, action_idx, None, None)?;
+        assert_eq!(state.completion, Completion::Incomplete);
+        assert_eq!(state.input_required, InputRequired::No);
+
+        // Test retryable error
+        let mut session_clone = session.clone();
+        session_clone.last_step_mut().unwrap().err = Some(TenxError::ResponseParse {
+            user: "Failed to parse response".into(),
+            model: "Please format your response correctly".into(),
+        });
+        session_clone.last_step_mut().unwrap().patch_info = None;
+
+        let state = code.next_step(
+            &test_project.config,
+            &mut session_clone,
+            action_idx,
+            None,
+            None,
+        )?;
+        assert_eq!(state.completion, Completion::Incomplete);
+
+        // Non-retryable error should complete the action
+        let mut session_clone2 = session.clone();
+        session_clone2.last_step_mut().unwrap().err = Some(TenxError::Config("Error".into()));
+        session_clone2.last_step_mut().unwrap().patch_info = None;
+
+        let state = code.next_step(
+            &test_project.config,
+            &mut session_clone2,
+            action_idx,
+            None,
+            None,
+        )?;
+        assert_eq!(state.completion, Completion::Complete);
 
         Ok(())
     }
@@ -604,40 +634,48 @@ mod test {
 
         assert_eq!(state.completion, Completion::Incomplete);
 
-        println!("Last step: {:#?}", session.actions[action_idx].steps);
         assert!(session.actions[action_idx]
             .last_step()
             .unwrap()
             .prompt
             .contains("Fix prompt"));
 
-        //
-        // // Test retryable error
-        // session.last_step_mut().unwrap().err = Some(TenxError::Patch {
-        //     user: "Error".into(),
-        //     model: "Retry".into(),
-        // });
-        //
-        // let state = fix.next_step(&test_project.config, &mut session, action_idx, None, None)?;
-        // assert_eq!(state.completion, Completion::Incomplete);
-        // assert_eq!(session.last_step().unwrap().raw_prompt, "Retry");
-        //
-        // // Test default prompt in a new action
-        // let fix2 = Fix::default();
-        // let mut session2 = Session::new(&test_project.config)?;
-        // session2.add_action(Action::new(
-        //     &test_project.config,
-        //     Strategy::Fix(fix2.clone()),
-        // )?)?;
-        // let action_idx2 = session2.actions.len() - 1;
-        //
-        // let state = fix2.next_step(&test_project.config, &mut session2, action_idx2, None, None)?;
-        // assert_eq!(state.completion, Completion::Incomplete);
-        // assert!(session2
-        //     .last_step()
-        //     .unwrap()
-        //     .raw_prompt
-        //     .starts_with("Please fix the following errors"),);
+        // Test patch failure triggers retry
+        session.last_step_mut().unwrap().patch_info = Some(state::PatchInfo {
+            rollback_id: 0,
+            succeeded: 1,
+            failures: vec![state::PatchFailure {
+                user: "Unable to find text".into(),
+                model: "The search pattern was not found".into(),
+                operation: state::Operation::Replace(state::Replace {
+                    path: PathBuf::from("main.rs"),
+                    old: "pattern".into(),
+                    new: "replacement".into(),
+                }),
+            }],
+            should_continue: false,
+        });
+
+        let state = fix.next_step(&test_project.config, &mut session, action_idx, None, None)?;
+        assert_eq!(state.completion, Completion::Incomplete);
+        assert_eq!(state.input_required, InputRequired::No);
+
+        // Test default prompt in a new action
+        let fix2 = Fix::default();
+        let mut session2 = Session::new(&test_project.config)?;
+        session2.add_action(Action::new(
+            &test_project.config,
+            Strategy::Fix(fix2.clone()),
+        )?)?;
+        let action_idx2 = session2.actions.len() - 1;
+
+        let state = fix2.next_step(&test_project.config, &mut session2, action_idx2, None, None)?;
+        assert_eq!(state.completion, Completion::Incomplete);
+        assert!(session2
+            .last_step()
+            .unwrap()
+            .prompt
+            .starts_with("\nPlease fix the following errors"));
 
         Ok(())
     }
