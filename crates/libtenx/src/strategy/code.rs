@@ -151,6 +151,27 @@ fn next_step(
     })
 }
 
+/// Returns true if a step should generate a next step, based on:
+/// a) there is a patch error, or
+/// b) there is a step error, and the error's should_retry() is not None.
+pub fn should_next_step(step: &Step) -> bool {
+    if step
+        .patch_info
+        .as_ref()
+        .is_some_and(|p| !p.failures.is_empty())
+    {
+        return true;
+    }
+
+    if let Some(err) = &step.err {
+        if err.should_retry().is_some() {
+            return true;
+        }
+    }
+
+    false
+}
+
 /// Determines the current state of an action
 fn get_action_state(action: &Action) -> ActionState {
     if action.steps.is_empty() {
@@ -161,7 +182,7 @@ fn get_action_state(action: &Action) -> ActionState {
     }
 
     if let Some(step) = action.last_step() {
-        if step.is_incomplete() || step.should_continue() {
+        if step.is_incomplete() || should_next_step(step) {
             return ActionState {
                 completion: Completion::Incomplete,
                 input_required: InputRequired::No,

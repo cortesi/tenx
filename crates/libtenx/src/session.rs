@@ -95,30 +95,9 @@ impl Step {
         self.rollback_id = rollback_id;
     }
 
-    /// Is this step incomplete?
+    /// Is this step incomplete? That is, does it still have to be sent to the model?
     pub fn is_incomplete(&self) -> bool {
         self.model_response.is_none() && self.err.is_none()
-    }
-
-    /// Returns true if a step should continue, based on:
-    /// a) there is a patch error, or
-    /// b) there is a step error, and the error's should_retry() is not None.
-    pub fn should_continue(&self) -> bool {
-        if self
-            .patch_info
-            .as_ref()
-            .is_some_and(|p| !p.failures.is_empty())
-        {
-            return true;
-        }
-
-        if let Some(err) = &self.err {
-            if err.should_retry().is_some() {
-                return true;
-            }
-        }
-
-        false
     }
 }
 
