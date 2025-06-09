@@ -1,4 +1,7 @@
 ** Tenx is undergoing heavy refactoring - please use a release for the moment. **
+
+---
+
 ![Discord](https://img.shields.io/discord/1381424110831145070?style=flat-square&logo=rust&link=https%3A%2F%2Fdiscord.gg%2FfHmRmuBDxF)
 [![Crates.io](https://img.shields.io/crates/v/tenx.svg)](https://crates.io/crates/tenx)
 [![Docs](https://img.shields.io/docsrs/libtenx)](https://docs.rs/libtenx)
