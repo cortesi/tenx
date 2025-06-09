@@ -1,5 +1,5 @@
 ** Tenx is undergoing heavy refactoring - please use a release for the moment. **
-
+![Discord](https://img.shields.io/discord/1381424110831145070?style=flat-square&logo=rust&link=https%3A%2F%2Fdiscord.gg%2FfHmRmuBDxF)
 [![Crates.io](https://img.shields.io/crates/v/tenx.svg)](https://crates.io/crates/tenx)
 [![Docs](https://img.shields.io/docsrs/libtenx)](https://docs.rs/libtenx)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
@@ -18,6 +18,13 @@ cargo install tenx
 <p align="center">
   <img src="https://raw.githubusercontent.com/cortesi/tenx/master/.assets/quickstart_quick.gif">
 </p>
+
+
+## Community
+
+Want to contribute? Have ideas or feature requests? Come tell us about it on
+[Discord](https://discord.gg/fHmRmuBDxF). 
+
 
 ## Features
 
