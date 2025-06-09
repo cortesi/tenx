@@ -55,6 +55,10 @@ impl ClaudeChat {
             tools: vec![],
             tool_choice: misanthropy::ToolChoice::Auto,
             stop_sequences: vec![],
+            thinking: None,
+            top_p: None,
+            top_k: None,
+            metadata: None,
         };
         Self {
             api_model,

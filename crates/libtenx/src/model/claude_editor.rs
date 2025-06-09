@@ -267,6 +267,10 @@ impl ModelProvider for ClaudeEditor {
             tools: vec![],
             tool_choice: misanthropy::ToolChoice::Auto,
             stop_sequences: vec![],
+            thinking: None,
+            top_p: None,
+            top_k: None,
+            metadata: None,
         };
 
         // Add text editor tool
