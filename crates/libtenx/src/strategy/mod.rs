@@ -4,8 +4,8 @@ use enum_dispatch::enum_dispatch;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    config::Config, dialect::DialectProvider, dialect::Tags, error::Result, events::EventSender,
-    model::ModelProvider, session::ModelResponse, session::Session,
+    config::Config, error::Result, events::EventSender, model::ModelProvider,
+    session::ModelResponse, session::Session,
 };
 use unirend::Detail;
 
