@@ -501,9 +501,7 @@ impl ActionStrategy for Fix {
         let mut chat = model
             .chat()
             .ok_or(TenxError::Internal("Chat not supported".into()))?;
-
-        let dialect = Tags::new();
-        dialect.build_chat(config, session, action_offset, &mut chat)?;
+        build_chat(config, session, action_offset, &mut chat)?;
         chat.send(sender).await
     }
 }
