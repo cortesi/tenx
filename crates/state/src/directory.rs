@@ -27,7 +27,15 @@ impl Directory {
 
     /// Converts a path relative to the root directory to an absolute path
     fn abspath(&self, path: &Path) -> Result<PathBuf> {
-        let p = PathBuf::from(&*self.root).join(path);
+        // First normalize the path to ensure it doesn't escape the root
+        let normalized = files::normalize_path(
+            self.root.clone(),
+            self.root.clone(),
+            path.to_str()
+                .ok_or_else(|| Error::Path("Invalid path encoding".to_string()))?,
+        )?;
+
+        let p = PathBuf::from(&*self.root).join(normalized);
         absolute(p.clone())
             .map_err(|e| Error::Internal(format!("could not absolute {}: {}", p.display(), e)))
     }
@@ -107,5 +115,105 @@ impl SubStore for Directory {
 
     fn remove(&mut self, path: &Path) -> Result<()> {
         self.remove(path)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    #[test]
+    fn test_directory_path_security() -> Result<()> {
+        let temp_dir = TempDir::new().expect("failed to create temp dir");
+        let root = AbsPath::new(temp_dir.path().to_path_buf())?;
+        let mut dir = Directory::new(root.clone(), vec![])?;
+
+        // Setup: create a test file
+        dir.write(Path::new("test.txt"), "test content")?;
+        assert_eq!(dir.read(Path::new("test.txt"))?, "test content");
+
+        // Test path traversal attempts
+        for attempt in &[
+            "../secret.txt",
+            "../../etc/passwd",
+            "subdir/../../secret.txt",
+        ] {
+            assert!(
+                dir.read(Path::new(attempt)).is_err(),
+                "Read {} should fail",
+                attempt
+            );
+            assert!(
+                dir.write(Path::new(attempt), "bad").is_err(),
+                "Write {} should fail",
+                attempt
+            );
+            assert!(
+                dir.remove(Path::new(attempt)).is_err(),
+                "Remove {} should fail",
+                attempt
+            );
+        }
+
+        // Test absolute paths - should be confined to root
+        for path in &["/etc/passwd", "/tmp/test.txt"] {
+            if dir.write(Path::new(path), "test").is_ok() {
+                let abs_path = dir.abspath(Path::new(path))?;
+                assert!(abs_path.starts_with(&*root), "{} escaped root", path);
+                dir.remove(Path::new(path)).ok();
+            }
+        }
+
+        // Verify valid paths work
+        dir.write(Path::new("subdir/nested.txt"), "nested")?;
+        assert_eq!(dir.read(Path::new("subdir/nested.txt"))?, "nested");
+
+        // Verify list only returns files under root
+        for file in dir.list()? {
+            assert!(
+                root.join(&file).starts_with(&*root),
+                "{:?} outside root",
+                file
+            );
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_directory_symlink_security() -> Result<()> {
+        let temp_dir = TempDir::new().expect("failed to create temp dir");
+        let root = AbsPath::new(temp_dir.path().to_path_buf())?;
+        let mut dir = Directory::new(root.clone(), vec![])?;
+
+        // Create outside target
+        let outside_dir = TempDir::new().expect("failed to create outside dir");
+        let outside_file = outside_dir.path().join("secret.txt");
+        std::fs::write(&outside_file, "secret")?;
+
+        // Create symlinks pointing outside root
+        #[cfg(unix)]
+        use std::os::unix::fs::symlink;
+        #[cfg(windows)]
+        use std::os::windows::fs::symlink_file;
+
+        let link_path = temp_dir.path().join("link");
+        #[cfg(unix)]
+        symlink(&outside_file, &link_path).unwrap();
+        #[cfg(windows)]
+        symlink_file(&outside_file, &link_path).unwrap();
+
+        // Test symlink access (documents known limitation)
+        if dir.read(Path::new("link")).is_ok() {
+            println!("Warning: Symlinks can escape root directory");
+        }
+        if dir.write(Path::new("link"), "modified").is_ok() {
+            if std::fs::read_to_string(&outside_file).unwrap() == "modified" {
+                println!("Warning: Can write through symlinks");
+            }
+        }
+
+        Ok(())
     }
 }

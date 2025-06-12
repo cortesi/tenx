@@ -1598,6 +1598,142 @@ mod tests {
     }
 
     #[test]
+    fn test_state_path_security() {
+        let temp_dir = TempDir::new().expect("failed to create temp dir");
+        let root = temp_dir.path().to_path_buf();
+        let mut state = State::default()
+            .with_directory(AbsPath::new(root.clone()).unwrap(), vec!["*".to_string()])
+            .unwrap();
+
+        // Test path traversal attempts
+        for attempt in &[
+            "../secret.txt",
+            "../../etc/passwd",
+            "subdir/../../secret.txt",
+        ] {
+            assert!(
+                state.read(Path::new(attempt)).is_err(),
+                "Read {} should fail",
+                attempt
+            );
+            assert!(
+                state
+                    .patch(&Patch::default().with_write(attempt, "bad"))
+                    .is_err(),
+                "Write {} should fail",
+                attempt
+            );
+        }
+
+        // Test various patch operations with traversal
+        let patches = vec![
+            Patch::default().with_replace("../test.txt", "old", "new"),
+            Patch::default().with_insert("../../test.txt", 0, "inserted"),
+            Patch::default().with_view("../../../secret.txt"),
+        ];
+        for patch in patches {
+            assert!(
+                state.patch(&patch).is_err(),
+                "Patch with traversal should fail"
+            );
+        }
+
+        // Absolute paths should be confined to root
+        if state
+            .patch(&Patch::default().with_write("/etc/passwd", "test"))
+            .is_ok()
+        {
+            assert!(
+                root.join("etc/passwd").exists(),
+                "Absolute path confined to root"
+            );
+            std::fs::remove_file(root.join("etc/passwd")).ok();
+        }
+
+        // Valid operations should work
+        let valid = Patch::default()
+            .with_write("test.txt", "valid")
+            .with_write("subdir/nested.txt", "nested");
+        assert_eq!(state.patch(&valid).unwrap().failures.len(), 0);
+        assert!(root.join("test.txt").exists() && root.join("subdir/nested.txt").exists());
+    }
+
+    #[test]
+    fn test_state_find_and_list_security() {
+        let temp_dir = TempDir::new().expect("failed to create temp dir");
+        let root = temp_dir.path().to_path_buf();
+        let mut state = State::default()
+            .with_directory(AbsPath::new(root.clone()).unwrap(), vec!["*".to_string()])
+            .unwrap();
+
+        // Setup files
+        state.write(Path::new("test1.txt"), "content1").unwrap();
+        state
+            .write(Path::new("subdir/test2.txt"), "content2")
+            .unwrap();
+
+        // Test find with traversal patterns
+        let cwd = AbsPath::new(root.clone()).unwrap();
+        for pattern in &["../*.txt", "../../*", "/etc/*"] {
+            if let Ok(files) = state.find(cwd.clone(), vec![pattern.to_string()]) {
+                for file in files {
+                    assert!(
+                        root.join(&file).starts_with(&root),
+                        "{:?} escaped root with pattern {}",
+                        file,
+                        pattern
+                    );
+                }
+            }
+        }
+
+        // Test list - all files should be within root
+        for file in state.list().unwrap() {
+            if !file.to_string_lossy().starts_with(MEM_PREFIX) {
+                assert!(
+                    root.join(&file).starts_with(&root),
+                    "{:?} escaped root",
+                    file
+                );
+            }
+        }
+
+        // Valid patterns should work
+        let found = state.find(cwd, vec!["*.txt".to_string()]).unwrap();
+        assert!(!found.is_empty() && found.iter().all(|f| root.join(f).exists()));
+    }
+
+    #[test]
+    fn test_state_memory_prefix_isolation() {
+        let mut state = State::default()
+            .with_memory(HashMap::from([
+                (PathBuf::from("::mem1.txt"), "content1".to_string()),
+                (PathBuf::from("::mem2.txt"), "content2".to_string()),
+            ]))
+            .unwrap();
+
+        // Memory files can use any path patterns (they're isolated from filesystem)
+        state.write(Path::new("::../secret.txt"), "memory").unwrap();
+        assert_eq!(state.read(Path::new("::../secret.txt")).unwrap(), "memory");
+
+        // Memory operations with system paths stay in memory
+        let mem_patch = Patch::default()
+            .with_write("::/etc/passwd", "memory only")
+            .with_write("::../../secret.txt", "also memory");
+        assert_eq!(state.patch(&mem_patch).unwrap().failures.len(), 0);
+
+        // Verify they're in memory, not filesystem
+        assert_eq!(
+            state.read(Path::new("::/etc/passwd")).unwrap(),
+            "memory only"
+        );
+        assert!(
+            !Path::new("/etc/passwd").exists()
+                || std::fs::read_to_string("/etc/passwd").unwrap() != "memory only"
+        );
+    }
+
+    #[test]
     fn test_diff_path() {
         // Test diff_path directly without relying on the StateTest framework
         let mut state = State::default();

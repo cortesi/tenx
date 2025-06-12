@@ -1,9 +1,8 @@
 //! File and path manipulation for filesystem state.
-use std::path::PathBuf;
+use std::path::{Component, PathBuf};
 
 use ignore::{overrides::OverrideBuilder, WalkBuilder};
 use path_clean;
-use pathdiff::diff_paths;
 
 use super::abspath::IntoAbsPath;
 
@@ -29,7 +28,9 @@ where
     if path.starts_with(GLOB_START) {
         return Ok(PathBuf::from(path));
     }
-    let path = path_clean::clean(path);
+    // Convert Windows-style separators to Unix-style for consistent handling
+    let normalized_input = path.replace('\\', "/");
+    let path = path_clean::clean(&normalized_input);
 
     let abs_path = if path.is_relative() {
         cwd.join(&path)
@@ -37,18 +38,48 @@ where
         path.clone()
     };
 
-    let rel_path = diff_paths(&abs_path, &root).ok_or_else(|| {
-        Error::Path(format!(
-            "Path not under current directory: {}",
-            path.display()
-        ))
-    })?;
-    if rel_path.starts_with("..") {
+    // Manually resolve the path by processing components
+    let mut resolved = PathBuf::new();
+
+    for component in abs_path.components() {
+        match component {
+            Component::Prefix(p) => resolved.push(p.as_os_str()),
+            Component::RootDir => resolved.push("/"),
+            Component::CurDir => {} // Skip "."
+            Component::ParentDir => {
+                // Pop the last component if we go up with ".."
+                if !resolved.pop() {
+                    // If we can't pop, the path goes outside the root
+                    return Err(Error::Path(format!(
+                        "Path not under current directory: {}",
+                        path.display()
+                    )));
+                }
+            }
+            Component::Normal(p) => resolved.push(p),
+        }
+    }
+
+    // Check if the resolved path is under the root
+    if !resolved.starts_with(&*root) {
         return Err(Error::Path(format!(
             "Path not under current directory: {}",
             path.display()
         )));
     }
+
+    // Get the relative path from root
+    let rel_path = resolved
+        .strip_prefix(&*root)
+        .map_err(|_| {
+            Error::Path(format!(
+                "Path not under current directory: {}",
+                path.display()
+            ))
+        })?
+        .to_path_buf();
+
+    // The path is valid - it's within the root after resolution
     Ok(rel_path)
 }
 
@@ -114,109 +145,93 @@ mod tests {
 
     #[test]
     fn test_normalize_path() -> Result<()> {
-        struct TestCase {
-            name: &'static str,
-            root: &'static str,
-            cwd: &'static str,
-            input: &'static str,
-            expected: Option<&'static str>,
-        }
-
-        let cases = vec![
-            // Glob patterns must remain unchanged.
-            TestCase {
-                name: "simple glob pattern",
-                root: "/project",
-                cwd: "/project/src",
-                input: "*.rs",
-                expected: Some("*.rs"),
-            },
-            TestCase {
-                name: "recursive glob pattern",
-                root: "/project",
-                cwd: "/project/src",
-                input: "**/test.rs",
-                expected: Some("**/test.rs"),
-            },
-            // Relative path: joining with cwd yields a path relative to project root.
-            TestCase {
-                name: "relative path",
-                root: "/project",
-                cwd: "/project/src",
-                input: "test.rs",
-                expected: Some("src/test.rs"),
-            },
-            // Absolute path under root should normalize correctly.
-            TestCase {
-                name: "absolute path under root",
-                root: "/project",
-                cwd: "/project/src",
-                input: "/project/src/test.rs",
-                expected: Some("src/test.rs"),
-            },
-            // Paths outside the root should yield an error.
-            TestCase {
-                name: "path outside root",
-                root: "/project",
-                cwd: "/project/src",
-                input: "/outside.rs",
-                expected: None,
-            },
-            // Test with cwd outside root - should fail
-            TestCase {
-                name: "cwd outside root",
-                root: "/project",
-                cwd: "/other/dir",
-                input: "test.rs",
-                expected: None,
-            },
-            // Test with cwd at different absolute path but same relative path
-            TestCase {
-                name: "cwd in different absolute path",
-                root: "/other/project",
-                cwd: "/other/project/src",
-                input: "test.rs",
-                expected: Some("src/test.rs"),
-            },
-            // Test with root deep in filesystem
-            TestCase {
-                name: "deep root path",
-                root: "/very/deep/project/path",
-                cwd: "/very/deep/project/path/src",
-                input: "test.rs",
-                expected: Some("src/test.rs"),
-            },
-        ];
-
-        for case in cases {
-            let root = AbsPath::new(PathBuf::from(case.root))?;
-            let cwd = AbsPath::new(PathBuf::from(case.cwd))?;
-            let result = normalize_path(root, cwd, case.input);
-            match (result, case.expected) {
-                (Ok(path), Some(exp)) => {
-                    assert_eq!(
-                        path,
-                        PathBuf::from(exp),
-                        "Failed case: {}. Input: {}",
-                        case.name,
-                        case.input
-                    );
-                }
-                (Err(_), None) => { /* expected error */ }
-                (Ok(path), None) => {
-                    panic!(
-                        "Expected error for case '{}', but got path: {:?}",
-                        case.name, path
-                    );
-                }
+        // Helper to run a test case
+        let test = |root: &str, cwd: &str, input: &str, expected: Option<&str>| -> Result<()> {
+            let root = AbsPath::new(PathBuf::from(root))?;
+            let cwd = AbsPath::new(PathBuf::from(cwd))?;
+            let result = normalize_path(root, cwd, input);
+            match (result, expected) {
+                (Ok(path), Some(exp)) => assert_eq!(path, PathBuf::from(exp)),
+                (Err(_), None) => {} // expected error
+                (Ok(path), None) => panic!("Expected error for '{}', got: {:?}", input, path),
                 (Err(e), Some(exp)) => {
-                    panic!(
-                        "Expected path '{}' for case '{}', but got error: {:?}",
-                        exp, case.name, e
-                    );
+                    panic!("Expected '{}' for '{}', got error: {:?}", exp, input, e)
                 }
             }
-        }
+            Ok(())
+        };
+
+        // Glob patterns remain unchanged
+        test("/project", "/project/src", "*.rs", Some("*.rs"))?;
+        test("/project", "/project/src", "**/test.rs", Some("**/test.rs"))?;
+
+        // Basic path resolution
+        test("/project", "/project/src", "test.rs", Some("src/test.rs"))?;
+        test(
+            "/project",
+            "/project/src",
+            "/project/src/test.rs",
+            Some("src/test.rs"),
+        )?;
+        test(
+            "/project",
+            "/anywhere",
+            "/project/src/test.rs",
+            Some("src/test.rs"),
+        )?;
+
+        // Path traversal attempts (should fail)
+        test("/project", "/project/src", "../../../etc/passwd", None)?;
+        test("/project", "/project/src", "/etc/passwd", None)?;
+        test(
+            "/project",
+            "/project/src",
+            "subdir/../../../outside.txt",
+            None,
+        )?;
+        test("/project", "/other/dir", "test.rs", None)?;
+
+        // Valid .. usage within root
+        test(
+            "/project",
+            "/project/src/subdir",
+            "../test.rs",
+            Some("src/test.rs"),
+        )?;
+        test(
+            "/project",
+            "/project/src/subdir",
+            "./.././test.rs",
+            Some("src/test.rs"),
+        )?;
+        test("/project", "/project/src", "./test.rs", Some("src/test.rs"))?;
+
+        // Complex path patterns
+        test(
+            "/project",
+            "/project",
+            "src/../src/../src/test.rs",
+            Some("src/test.rs"),
+        )?;
+
+        // Windows-style paths
+        test("/project", "/project/src", "..\\..\\..\\etc\\passwd", None)?;
+        test("/project", "/project/src", "../..\\../etc/passwd", None)?;
+
+        // Edge cases (these don't escape root)
+        test(
+            "/project",
+            "/project/src",
+            "%2e%2e/%2e%2e/etc/passwd",
+            Some("src/%2e%2e/%2e%2e/etc/passwd"),
+        )?;
+        test(
+            "/project",
+            "/project/src",
+            "test.rs\x00.txt",
+            Some("src/test.rs\x00.txt"),
+        )?;
+
         Ok(())
     }
 
