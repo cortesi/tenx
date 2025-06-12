@@ -18,7 +18,6 @@ MCP integration will enable Tenx to:
 - Support STDIO and Streamable HTTP transport protocols
 - Include tool definitions with comprehensive annotations in model prompts
 - Parse and execute tool calls from model responses
-- Provide context from external systems
 - Support OAuth 2.1 authorization for secure access to remote MCP servers
 
 ## Implementation Plan
@@ -26,7 +25,7 @@ MCP integration will enable Tenx to:
 ### Module 1: Server Configuration
 
 1.1. **MCP Configuration File (`mcp.json`)**
-   - Located in project root directory
+   - Located in users project directory
    - Defines available MCP servers and their connection details
    ```json
    {
@@ -68,25 +67,25 @@ MCP integration will enable Tenx to:
        - [goose](https://github.com/block/goose/tree/main/crates/mcp-client)
        - [zed](https://github.com/zed-industries/zed/tree/f428d54b74611dbd5f58b4239b4ddd96eeef7e33/crates/context_server)
      - Option B - roll our own
-       - Create `MCPClient` trait with updated implementations:
-         - `StdioMCPClient` for process-based servers (primary)
-         - `StreamableHTTPMCPClient` for new streamable HTTP transport
        - Implement MCP JSON-RPC 2.0 entities
+       - Implement transport layers
        - Support comprehensive authorization framework with OAuth 2.1
-   - Connection management
+   - Process/Connection management
     - Handle server lifecycle (start, stop, health checks with progress notifications)
     - Reconnection logic with exponential backoff
     - Session management for HTTP transport with proper session handling
 
-2.2. **Tool Discovery and Management**
-   - Query connected servers for available tools with annotations
+2.2. **Tool Listing**
+   - Query connected servers for available tools
+     - Name
+     - Description
+     - Input Schema
    - Cache tool definitions with refresh mechanisms
    - Handle tools from multiple servers with conflict resolution
    - Support comprehensive tool annotations:
      - Behavioral annotations (read-only, destructive, etc.)
      - Safety annotations for user consent flows
      - Performance annotations for optimization
-   - Tool validation against enhanced schemas
 
 2.3. **Authorization Framework**
    - Implement OAuth 2.1 client with PKCE (mandatory)
@@ -99,34 +98,29 @@ MCP integration will enable Tenx to:
 ### Module 3: Model Integration
 
 3.1. **Prompt Enhancement**
-   - Extend `Chat` trait to include tool definitions with full annotations
-   - Format tool schemas for OpenAI function calling with annotation metadata
+   - Extend prompt include tool definitions with annotations/instructions
    - Enhanced tool filtering based on annotations and context
-   - Support for audio content type in addition to text and image
+   - Make sure we are using prompt caching whenever available
+   - Optionally: use function calls for OpenAI
 
-3.2. **Tool Call Processing**
-   - Extend `ModelResponse` to include tool calls with batch support
+3.2. **Tool Call Parsing**
    - Parse tool call requests from model responses
-   - Validate tool call parameters against enhanced schemas
-   - Handle JSON-RPC batch operations for efficiency
-   - Enhanced error handling with descriptive messages
+   - Validate tool call parameters against schemas
 
-3.3. **Tool Execution**
+3.3. **Tool Call Execution**
    - Execute tool calls against appropriate MCP servers
    - Enhanced error handling and timeout management
-   - Support batch execution where beneficial
    - Handle authorization requirements per tool
-   - Return formatted results with support for multiple content types
+   - Return formatted results initially for text, but eventually support other content types
    - Progress tracking with descriptive status updates
 
 ### Module 4: Conversation Integration
 
 4.1. **Multi-turn Tool Support**
-   - Extend conversation flow to handle tool call/response cycles
+   - Extend conversation flow to handle multiple tool call/response cycles
    - Add tool results back to conversation context
    - Handle large tool results with intelligent truncation
    - Comprehensive tool call history tracking
-   - Support for audio content in tool results
 
 4.2. **State Management**
     - Track tool execution state across sessions
@@ -136,6 +130,15 @@ MCP integration will enable Tenx to:
     - Authorization state management
 
 ## Technical Implementation
+
+### Configuration
+
+- Extend `Config` struct to include MCP server definitions
+- Handle globally configured MCP servers
+- Add validation for MCP server configurations including transport types
+- Basic environment variable substitution
+- Support for OAuth 2.1 authorization configuration
+- Protocol version negotiation
 
 ### MCP Protocol
 - Use existing Rust MCP libraries, or implement JSON-RPC 2.0 client
@@ -303,3 +306,6 @@ crates/libtenx/src/
 5. Provide enhanced error messages and progress tracking
 6. Integrate batch processing, and concurrent requests for improved performance
 7. Ensure user consent flows work properly for destructive operations
+
+## Extra notes and questions
+- Should we need to support SSE transport? it is being used by servers, but [deprecated as of 2025-11-05](https://modelcontextprotocol.io/docs/concepts/transports#server-sent-events-sse-deprecated)
