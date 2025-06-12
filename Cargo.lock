@@ -3162,6 +3162,8 @@ dependencies = [
 [[package]]
 name = "misanthropy"
 version = "0.0.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f1cd20f77b722140d1a689e7eb49bd54ec25bc1fe6fb408730ab2f9824a09bab"
 dependencies = [
  "base64",
  "futures-util",
