@@ -50,9 +50,9 @@ MCP integration will enable Tenx to:
    }
    ```
 
-### Module 2: MCP Client Implementation
+### Module 2: MCP Host Implementation
 
-2.1. **Core MCP Client**
+2.1. **Core MCP Host**
 - Protocol implementation
   - Option: A - Use an existing implementation of the MCP protocol
     - [rust-mcp-sdk](https://github.com/rust-mcp-stack/rust-mcp-sdk)
