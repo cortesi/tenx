@@ -8,12 +8,13 @@ This document is up to date with the latest MCP protocol version: 2025-03-26.
 
 This implementation should be compatible with MCP servers running different protocol versions:
 
- - 2025-03-26
- - 2024-11-05
+- 2025-03-26
+- 2024-11-05
 
 ## Overview
 
 MCP integration will enable Tenx to:
+
 - Connect to external MCP servers providing tools and resources
 - Support STDIO and Streamable HTTP transport protocols
 - Include tool definitions with comprehensive annotations in model prompts
@@ -25,8 +26,8 @@ MCP integration will enable Tenx to:
 ### Module 1: Server Configuration
 
 1.1. **MCP Configuration File (`mcp.json`)**
-   - Located in users project directory
-   - Defines available MCP servers and their connection details
+- Located in users project directory
+- Defines available MCP servers and their connection details
    ```json
    {
      "mcpServers": {
@@ -49,85 +50,77 @@ MCP integration will enable Tenx to:
    }
    ```
 
-1.2. **Configuration Loading**
-   - Extend `Config` struct to include MCP server definitions
-   - Add validation for MCP server configurations including transport types
-   - Handle optional MCP configuration (graceful degradation when file missing)
-   - Basic environment variable substitution
-   - Support for OAuth 2.1 authorization configuration
-   - Protocol version negotiation
-
 ### Module 2: MCP Client Implementation
 
 2.1. **Core MCP Client**
-   - Protocol implementation
-     - Option: A - Use an existing implementation of the MCP protocol
-       - [rust-mcp-sdk](https://github.com/rust-mcp-stack/rust-mcp-sdk)
-       - [rmcp](https://github.com/modelcontextprotocol/rust-sdk/tree/main/crates/rmcp)
-       - [goose](https://github.com/block/goose/tree/main/crates/mcp-client)
-       - [zed](https://github.com/zed-industries/zed/tree/f428d54b74611dbd5f58b4239b4ddd96eeef7e33/crates/context_server)
-     - Option B - roll our own
-       - Implement MCP JSON-RPC 2.0 entities
-       - Implement transport layers
-       - Support comprehensive authorization framework with OAuth 2.1
-   - Process/Connection management
+- Protocol implementation
+  - Option: A - Use an existing implementation of the MCP protocol
+    - [rust-mcp-sdk](https://github.com/rust-mcp-stack/rust-mcp-sdk)
+    - [rmcp](https://github.com/modelcontextprotocol/rust-sdk/tree/main/crates/rmcp)
+    - [goose](https://github.com/block/goose/tree/main/crates/mcp-client)
+    - [zed](https://github.com/zed-industries/zed/tree/f428d54b74611dbd5f58b4239b4ddd96eeef7e33/crates/context_server)
+  - Option B - roll our own
+    - Implement MCP JSON-RPC 2.0 entities
+    - Implement transport layers
+    - Support comprehensive authorization framework with OAuth 2.1
+  - Process/Connection management
     - Handle server lifecycle (start, stop, health checks with progress notifications)
     - Reconnection logic with exponential backoff
     - Session management for HTTP transport with proper session handling
 
 2.2. **Tool Listing**
-   - Query connected servers for available tools
-     - Name
-     - Description
-     - Input Schema
-   - Cache tool definitions with refresh mechanisms
-   - Handle tools from multiple servers with conflict resolution
-   - Support comprehensive tool annotations:
-     - Behavioral annotations (read-only, destructive, etc.)
-     - Safety annotations for user consent flows
-     - Performance annotations for optimization
+- Query connected servers for available tools
+  - Name
+  - Description
+  - Input Schema
+- Cache tool definitions with refresh mechanisms
+- Handle tools from multiple servers with conflict resolution
+- Support comprehensive tool annotations:
+  - Behavioral annotations (read-only, destructive, etc.)
+  - Safety annotations for user consent flows
+  - Performance annotations for optimization
 
 2.3. **Authorization Framework**
-   - Implement OAuth 2.1 client with PKCE (mandatory)
-   - Support Dynamic Client Registration where available
-   - Handle authorization code flow for HTTP-based MCP servers
-   - Secure token storage and refresh mechanisms
-   - Integration with MCP server authorization endpoints
-   - Support for `.well-known/oauth-authorization-server` discovery
+- Implement OAuth 2.1 client with PKCE (mandatory)
+- Support Dynamic Client Registration where available
+- Handle authorization code flow for HTTP-based MCP servers
+- Secure token storage and refresh mechanisms
+- Integration with MCP server authorization endpoints
+- Support for `.well-known/oauth-authorization-server` discovery
 
 ### Module 3: Model Integration
 
 3.1. **Prompt Enhancement**
-   - Extend prompt include tool definitions with annotations/instructions
-   - Enhanced tool filtering based on annotations and context
-   - Make sure we are using prompt caching whenever available
-   - Optionally: use function calls for OpenAI
+- Extend prompt include tool definitions with annotations/instructions
+- Enhanced tool filtering based on annotations and context
+- Make sure we are using prompt caching whenever available
+- Optionally: use function calls for OpenAI
 
 3.2. **Tool Call Parsing**
-   - Parse tool call requests from model responses
-   - Validate tool call parameters against schemas
+- Parse tool call requests from model responses
+- Validate tool call parameters against schemas
 
 3.3. **Tool Call Execution**
-   - Execute tool calls against appropriate MCP servers
-   - Enhanced error handling and timeout management
-   - Handle authorization requirements per tool
-   - Return formatted results initially for text, but eventually support other content types
-   - Progress tracking with descriptive status updates
+- Execute tool calls against appropriate MCP servers
+- Enhanced error handling and timeout management
+- Handle authorization requirements per tool
+- Return formatted results initially for text, but eventually support other content types
+- Progress tracking with descriptive status updates
 
 ### Module 4: Conversation Integration
 
 4.1. **Multi-turn Tool Support**
-   - Extend conversation flow to handle multiple tool call/response cycles
-   - Add tool results back to conversation context
-   - Handle large tool results with intelligent truncation
-   - Comprehensive tool call history tracking
+- Extend conversation flow to handle multiple tool call/response cycles
+- Add tool results back to conversation context
+- Handle large tool results with intelligent truncation
+- Comprehensive tool call history tracking
 
 4.2. **State Management**
-    - Track tool execution state across sessions
-    - Enhanced session-based tool history
-    - Proper cleanup on session reset
-    - Session persistence for HTTP transport with resumability
-    - Authorization state management
+- Track tool execution state across sessions
+- Enhanced session-based tool history
+- Proper cleanup on session reset
+- Session persistence for HTTP transport with resumability
+- Authorization state management
 
 ## Technical Implementation
 
@@ -149,15 +142,15 @@ MCP integration will enable Tenx to:
 
 ### Transport Support
 - **STDIO**: Primary transport for local tool servers
-  - Process management with tokio-process
-  - JSON-RPC over stdin/stdout with batch support
-  - Process lifecycle management
+- Process management with tokio-process
+- JSON-RPC over stdin/stdout with batch support
+- Process lifecycle management
 - **Streamable HTTP**: Updated transport replacing HTTP+SSE
-  - Improved flexibility and reliability
-  - HTTP POST for client-to-server communication
-  - Enhanced streaming capabilities
-  - Session management with proper resumability
-  - Connection health monitoring
+- Improved flexibility and reliability
+- HTTP POST for client-to-server communication
+- Enhanced streaming capabilities
+- Session management with proper resumability
+- Connection health monitoring
 
 ### Authorization (OAuth 2.1)
 - **Mandatory PKCE**: All OAuth implementations must use PKCE
@@ -173,10 +166,10 @@ MCP integration will enable Tenx to:
 - OAuth 2.1 security best practices
 - Tool safety based on behavioral annotations
 - For HTTP transport:
-  - Validate `Origin` headers to prevent DNS rebinding attacks
-  - Use HTTPS for production deployments
-  - Proper session validation and CSRF protection
-  - Secure authorization token handling
+- Validate `Origin` headers to prevent DNS rebinding attacks
+- Use HTTPS for production deployments
+- Proper session validation and CSRF protection
+- Secure authorization token handling
 
 ### Performance
 - Async/await for non-blocking operations
